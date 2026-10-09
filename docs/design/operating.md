@@ -31,9 +31,10 @@ it; backups and faults are M6's and say so. What is open is in section
   alarms (disk, memory, pressure), failed units, drift, costs. Liveness
   costs nothing: a machine that stops redialling is down.
 - **Telemetry stays on the machine** (section 5), in bounded windows:
-  the journal, on a persistent subvolume a task declares; hearth's own
-  samples of the machine's signals; each check's history. It is served
-  when asked (wire.md, section 7). There is no central store to start.
+  the journal, on a persistent subvolume a task declares, a container's
+  in its host's; hearth's own samples of the machine's signals; each
+  check's history. It is served when asked (wire.md, section 7). There
+  is no central store to start.
 - **Two operational effects, keyed or conditional** (section 6): roll
   back, and restart a unit. Policy is the engine's. Any other waits until
   it is needed.
@@ -441,11 +442,24 @@ person reads them through the engine.
   - The journal's directory is `/var/log/journal/<machine-id>`. The
     machine-id is identity, written into every slot at prepare (slots.md,
     5.4), so every slot of the target writes one journal.
-  - **A container's journal** is the same `core` entry of its own
-    target: a persistent subvolume on its host's top level, bound into
-    the container alone, under its own machine-id. The host's builder,
-    which serves journal reads, cannot reach it beneath the activator's
-    mount, so how a container's journal is read is open (section 10).
+  - **A container's journal lives in its host's** [M5]. The host's
+    activator writes `LinkJournal=try-host` into the container's nspawn
+    settings (slots.md, 12.1), so nspawn makes
+    `/var/log/journal/<the container's machine-id>` in the host's
+    persistent journal subvolume and binds it into the container at the
+    same path. The container's `core` task declares no `journal` entry
+    (format.md, 5.7).
+  - The container's machine-id is its identity, made once and kept by
+    its host's activator (slots.md, 5.4 and 12.1), so every slot of the
+    container writes one journal. nspawn refuses to link a journal whose
+    id is its host's, which a container's never is.
+  - The host's builder reads it as it reads its own, being in
+    `systemd-journal`, with `journalctl
+    --directory=/var/log/journal/<machine-id>`, whether the container
+    runs or not. That journald inside a container with its own id range
+    can write the directory nspawn makes, and that the host's
+    `systemd-journal` can read what it writes there, is to verify on the
+    VM tier (testing.md, 7.3).
 - **hearth samples the machine's signals:** CPU (`/proc/stat`), memory
   (`/proc/meminfo`), pressure (`/proc/pressure/*`), load
   (`/proc/loadavg`), and disk use per mount (`df`), every 10 s.
@@ -484,9 +498,9 @@ defines their orders):
 - **hearth checks only mechanics:** the key, the condition, that the
   unit belongs to the slot. It never refuses on judgement.
 - **For a container's target,** a roll back is a trial of its other
-  blessed slot through its host (slots.md, 12.3); which unit a restart
-  names, one inside the container or the container's own, is open
-  (wire.md, section 11).
+  blessed slot through its host (slots.md, 12.3), and a restart names a
+  unit inside the container, restarted through `systemctl --machine=`
+  (activator.md, 5.9).
 - **In standalone mode,** `hearth rollback` is the client's (wire.md,
   3.1). A person on the machine restarts a unit with `systemctl` as
   root; hearth does not wrap it.
@@ -659,8 +673,8 @@ off-machine backup of service data at all, and snapper missed
 
 - **The network faults need a pool's containers on networks of their
   own** (veth pairs and a bridge), where the fleet's containers share
-  their host's (`VirtualEthernet=no`); a container's network is one of
-  the parameters format.md (section 13) leaves open.
+  their host's (`VirtualEthernet=no`); a container's network is a
+  placement field, `network: veth` with its `bridge` (format.md, 3.4).
 - **Every fault has an end,** a duration in its order, after which the
   host's hearth removes it itself: a fault, like a trial, always ends,
   even if the engine is gone.
@@ -740,8 +754,8 @@ off-machine backup of service data at all, and snapper missed
   depends on the lab's pool hosts (machine.md).
 - **History across the fleet:** when a central store for metrics and
   logs is worth deploying, and which.
-- **A container's journal:** on its own persistent subvolume, read
-  by the host's activator for its builder, or kept on the host's with
-  nspawn's `LinkJournal=`, which the host's builder reads as its own; it
-  depends on how `hearth logs` and the wire's journal reads name a
-  container (wire.md, sections 3 and 7).
+- **A container's journal under its own ids [M5]:** whether journald
+  in a container with a private id range can write the directory
+  `LinkJournal=try-host` makes on the host, and whether the host's
+  `systemd-journal` reads its files (section 5); to verify on the VM
+  tier (testing.md, 7.3).

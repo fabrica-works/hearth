@@ -72,8 +72,10 @@ in section 12.
 The MVP's machine is `x1-prod`, a laptop with an NVMe disk. It runs os
 today, with direct EFI-stub entries labelled `a` and `b`, and already
 shows the three facts apart: running slot `b`, `BootOrder` default `a`.
-A person is at hand, so a hang no watchdog covers is recoverable; the
-machine is held to the same invariants as the others all the same.
+hearth installs it afresh on a wiped disk, as every machine (section 8):
+nothing of os's is kept. A person is at hand, so a hang no watchdog
+covers is recoverable; the machine is held to the same invariants as
+the others all the same.
 
 ### 2.2 Incus VMs with their own disk
 
@@ -184,8 +186,10 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 
 - **A host's containers [M5]** add the same names under their own
   targets: on `rhi-prod`, `@chat-prod.a`, `@chat-prod.a.var`,
-  `@chat-prod.b`, `@chat-prod.b.var` and `@chat-prod.journal`, beside
-  the host's own (slots.md, 12.1). The table above holds for them, the
+  `@chat-prod.b`, `@chat-prod.b.var` and `@chat-prod.<name>` for each
+  of its `data` entries, beside the host's own (slots.md, 12.1). Its
+  journal has no subvolume of its own: it lives in the host's
+  (operating.md, section 5). The table above holds for them, the
   host's activator acting for the container; os's `@<target>.machines`
   under `/var/lib/machines` has no successor.
 - **Slots exist once prepared:** os made empty placeholders at format
@@ -773,7 +777,7 @@ it refuses to start, naming every reason at once, unless:
   (activator.md, 7.2);
 - the disk is a whole block device, none of it mounted, not the live
   system's own, and blank unless `--wipe` is given (Vultr's volumes come
-  with an image installed); with `--adopt-os`, an os disk instead (8.6);
+  with an image installed, and `x1-prod`'s holds os);
 - the tools of 8.2 are present, `ssh-keygen` (`openssh-client`) among
   them, and what the builder needs: `newuidmap` and `newgidmap`
   (Debian's `uidmap`), `mmdebstrap` and `git` (store.md, section 9).
@@ -810,10 +814,10 @@ failure finds what the first run made, up to the disk's wipe.
    machine's configuration (8.1) into the builder's state, owned by
    `hearth`, with the repository's read credential under the store's
    `credentials/` (render.md, 2.2), never in the secret store.
-5. **Import the secrets** from `--secrets` (activator.md, 5.8),
-   identity included when the machine keeps one it had, such as os's
-   SSH host keys. A secret the spec names and the store lacks fails the
-   place in step 7, naming every missing one.
+5. **Import the secrets** from `--secrets` (activator.md, 5.8). A
+   secret the spec names and the store lacks fails the place in step 7,
+   naming every missing one. Identity is never imported: step 7 makes
+   it.
 6. **Build:** bootstrap enters a transient scope with `Delegate=yes`
    (`systemd-run --scope --property=Delegate=yes`) and lays out its
    cgroups as the daemon does (activator.md, 3.1); its activator's
@@ -894,60 +898,6 @@ the activator (activator.md, 5.10), on a disk named by its stable id
 (`/dev/disk/by-id/…`), conditional on the disk being blank, and keyed
 by the identifiers the order gives. The pool host's activator makes the
 disk and bootstraps the machine onto it.
-
-### 8.6 Adopting an os machine, and importing data
-
-M3 retires os on `x1-prod`, whose disk already has an ESP and os's
-layout (`@x1-prod.a`, `@x1-prod.b`, their `.var`, `@x1-prod.srv.*`,
-`@x1-prod.machines`) and which runs os's slot `b`. `hearth bootstrap
---adopt-os b` takes it over without a wipe, from a live system as any
-bootstrap, so a first slot that fails falls back to os:
-
-1. **Keep the disk:** no wipe, partition or format. The disk must hold
-   os's layout for the target and the ESP; `--adopt-os` names os's slot
-   to keep, `b`, and hearth takes the other.
-2. **Make `@hearth.store` and `@hearth.state`,** and write the machine
-   record and configuration (8.2, step 4).
-3. **Import secrets and identity** (activator.md, 5.8): os's SSH host
-   keys and its machine-id, so the host keys stay and the journal's
-   directory, named by the machine-id, goes on.
-4. **Take over os's persistent data** as the target's `data` entries,
-   under a mapping the command declares, such as
-   `--map srv.data=data --map srv.core/journal=journal --map srv.core/iwd=iwd`:
-   a whole subvolume is renamed (`@x1-prod.srv.data` to
-   `@x1-prod.data`); a directory inside one (`srv.core`'s `journal/` and
-   `iwd/`, homes where os kept them) is cloned into a new subvolume with
-   `FICLONE`, as slots.md, 5.3 copies `/var`. Files keep their owners;
-   a uid that differs between os's output and hearth's is reported, for
-   the operator. os's other subvolumes (`@x1-prod`, `@x1-prod.install`,
-   `@rescue`, what no mapping names) stay, reported by drift until a
-   person deletes them.
-5. **Build, and prepare hearth's first slot into os's other slot, `a`,**
-   which prepare deletes first; its ESP files, which share os's names,
-   are written over, and its two entries made (4.2). os's entry for `a`
-   is deleted.
-6. **Try it, with os's `b` as the default:** `BootOrder` starts with
-   os's entry for `b`; slot `b` is recorded `blessed` with no output, an
-   os slot hearth treats as blessed until its first prepare into `b`
-   replaces it; slot `a` is armed for a one-shot trial (slots.md, 6.3).
-   The operator reboots.
-7. **The first boot is the trial.** Slot `a` blesses itself and moves
-   the default (slots.md, 7.3); os's `b` then waits as the previous
-   slot until hearth prepares into it. A trial that fails lands in os,
-   where no hearth runs: the operator sees os, and running bootstrap
-   again resumes from what the first run made, by its keys.
-
-**A host that runs containers [M5]** (carbon, rhi, vul) keeps them
-under `/var/lib/machines`, os's `@<target>.machines`: each container's
-link to its active root slot, and its `.var` and `.srv`. M3 adopts
-`x1-prod`, which has none; adopting such a host is open (section 12).
-
-**Importing data without os.** `--data <name>=<directory>`, on any
-bootstrap, copies a directory tree (an old disk mounted on the live
-system, a backup restored by hand) into the new persistent subvolume
-`@<target>.<name>`, through descriptors, owners kept, before the first
-prepare seeds what the directory did not hold. wire.md, 3.8 carries
-both flags.
 
 ## 9. Firmware quirks and Secure Boot
 
@@ -1041,9 +991,8 @@ slots.md, section 4's, judged by booting the firmware and GRUB models:
   written only when its command line changed;
 - **a one-shot whose save fails is never taken,** and a default that
   panics at every boot reaches `previous` on BIOS (slots.md, 8.4);
-- **bootstrap ends with one blessed default slot,** or, adopting os,
-  with a trial whose fall back is os's slot; else with a typed failure
-  and a disk that a second run can finish.
+- **bootstrap ends with one blessed default slot,** or with a typed
+  failure and a disk that a second run can finish.
 
 ## 11. What changes from os
 
@@ -1107,12 +1056,3 @@ slots.md, section 4's, judged by booting the firmware and GRUB models:
   `security.csm=true` for BIOS (to verify).
 - **Disks as an effect [M6]:** how the lab names the disks it orders;
   depends on the pool's design.
-- **Adopting os's data:** owners whose ids differ between os's output
-  and hearth's, and where os kept `x1-prod`'s homes; depends on a dry
-  run of `--adopt-os` on a copy of the disk (8.6).
-- **Adopting a host that runs containers [M5]:** which of a container's
-  `.var` and `.srv` under os's `@<target>.machines` become its target's
-  `data` entries, whose ids they are owned by (each container's
-  `PrivateUsers=` base), and whether a container's first hearth slot
-  can fall back to its os root rather than to nothing (8.6; slots.md,
-  12.3); depends on a dry run on carbon or rhi.

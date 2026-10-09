@@ -228,7 +228,8 @@ Inputs, from the place request (activator.md, 5.1): the slot, the
 output's key and tree digest, its kernel version and digests, the
 `data`, `secrets` and `boot` parts, the package users, the trial's
 window, the units allowed to fail, and the target's kind and firmware
-from `meta`, or a container's host and id base [M5] (12.1).
+from `meta`, or a container's host, with its parameters in its `boot`
+part [M5] (12.1).
 
 - **Identity first:** before anything else the activator makes every
   identity item the request declares and the store lacks (activator.md,
@@ -680,6 +681,12 @@ a soft reboot is to verify.
 - **The slot's own builder is up and has answered its activator:** the
   bless request arrives over the link from the builder the slot's
   activator spawned, after its hello, and that is the answer.
+- **A host's containers never count [M5]:** the failed units counted
+  leave out the nspawn unit, `systemd-nspawn@<container>.service`, of
+  every container the host's activator keeps records for (activator.md,
+  7.1), with no list to write. Each container's slot has its own trial
+  and its own facts (12.3); one bad container must not roll its host
+  back.
 - **Task checks join in M5** (operating.md, section 3).
 
 ### 7.2 Who asks
@@ -740,6 +747,11 @@ An engine may hold a bless while a canary bakes (wire.md, 5.4: an
 - **The table gains one state,** `held`, between `on trial` and
   `blessed`, with `on trial`'s cells but for `bless` (released: `blessed`)
   and `hold` (same attempt: done).
+- **A container's bless is held the same way [M5]:** the engine may hold
+  it, and the `bless` order releases it. Its end is the host's
+  activator's deadline, kept in the marker as the window is (12.3): at
+  the hold's ceiling the activator falls the container back, a restart
+  on its old slot.
 
 ### 7.5 Re-bless
 
@@ -942,12 +954,44 @@ default and `b` the slot in question:
   - the identity and secrets are the container's target's, made and
     kept by the host's activator, so a container no longer shares its
     host's machine-id.
-- **Its slot record** (2.2) has no kernel, command line or boot; it
-  records the id base the slot was shifted to.
+- **Its parameters arrive in its `boot` part** (format.md, 3.5;
+  render.md, 4.3): the id base, the binds, the capabilities and the
+  network. Its slot record (2.2) holds them where a host's holds a
+  kernel and a command line, and its nspawn settings are written from
+  them. They enter the prepare key as any slot part does, so a change to
+  one prepares a new slot of the same output, which the host tries by a
+  restart (12.2), since nspawn reads its settings only when it starts.
+- **A new id base needs fresh data.** The shift writes the new slot in
+  the new range, but the container's persistent subvolumes stay owned
+  in the old one, which the old slot needs to fall back to. So the
+  activator refuses a place whose base is not the owner of the roots of
+  the container's existing persistent subvolumes, each made owned by
+  the container's root (machine.md, 3.4), and names them. A person
+  deletes them, and the container starts again from scratch, as every
+  machine does (README, section 7).
 - **The host's nspawn settings,** written by the host's activator from
-  typed data into `/run/systemd/nspawn/<container>.nspawn`:
-  `PrivateUsers=`, `ReadOnly=yes`, `Bind=` lines for the slot's `/var`
-  and the persistent subvolumes, from `/run/hearth-activator/top`. The root is
+  the slot's parameters into `/run/systemd/nspawn/<container>.nspawn`:
+
+  ```
+  # /run/systemd/nspawn/chat-prod.nspawn, written by rhi-prod's activator for slot b (slots.md, 12.1)
+  [Exec]
+  PrivateUsers=327680
+  LinkJournal=try-host
+  Capability=<name>                                             one per capability
+  [Files]
+  ReadOnly=yes
+  Bind=/run/hearth-activator/top/@chat-prod.b.var:/var
+  Bind=/run/hearth-activator/top/@chat-prod.<name>:<path>       one per data entry
+  BindReadOnly=<source>:<path>                                  one per bind; Bind= if not read-only
+  [Network]
+  VirtualEthernet=no                                            or Bridge=<bridge> for network veth [M6]
+  ```
+
+  A settings file in `/run/systemd/nspawn/` takes full effect, and
+  `systemd-nspawn@.service` runs nspawn with `--settings=override`, so
+  these lines win over the unit's own `--link-journal=try-guest` and
+  `--network-veth`. `LinkJournal=try-host` keeps the container's journal
+  in its host's (operating.md, section 5). The root is
   found at `/run/machines/<container>`, a link to the slot's root (that
   nspawn's image search includes `/run/machines` is to verify). That
   top-level mount is `nodev,nosuid,noexec` (machine.md, 3.2); whether
@@ -991,6 +1035,13 @@ There is no kernel, no soft reboot and no one-shot.
 - **The window is the host's activator's:** no dead-man runs in a
   container, so the activator falls the container back itself when the
   trial's window ends with no bless.
+- **A held bless** is a host's (7.4), ended at its ceiling by the
+  host's activator, as the window is.
+- **Its trial and facts are its own,** never its host's: the host's
+  minimal bless leaves out its containers' nspawn units (7.1), and a
+  container that fails to start when its host boots is reported in its
+  own facts, running none on its default, while the host's trial goes
+  on.
 - **On failure,** the host's activator points the link back and restarts
   the old slot.
 - **A container's first slot** is tried with no other slot running, the
@@ -1052,6 +1103,32 @@ A container's facts are its host's activator's, read from outside:
   and the watchdog (5.5; the window is the activator's, 12.3), the
   kernel's rule (6.1), and the BIOS boot counter (8.4).
 
+### 12.7 A container removed from its host's spec
+
+A container leaves its host's spec when its target is deleted from the
+repository or placed on another host. The host's builder then finds,
+in the activator's facts, a container whose target its spec no longer
+names (`target.containers`, format.md, 3.5), and asks its activator to
+remove it (activator.md, 5.16):
+
+1. **Stop it:** `systemctl stop systemd-nspawn@<container>.service`;
+   remove its link in `/run/machines` and its settings in
+   `/run/systemd/nspawn/`.
+2. **Delete its slots:** each slot's subvolumes, nested ones first
+   (5.1), then their records, manifests and any marker, then the
+   container's own record, so no host start links it again.
+3. **Keep its data:** its persistent subvolumes stay, unmounted and
+   reported as orphaned as any target's data is (machine.md, 3.4),
+   until a person deletes them; its identity and secrets stay with them.
+
+- **Its outputs are then unpinned:** no slot holds them, so the store
+  may collect them (store.md, section 7).
+- **Each step is idempotent,** and a removal cut anywhere is finished
+  by asking again; a container already gone is done.
+- **A container placed on another host starts there from scratch:**
+  its new host prepares a first slot with no data and makes its
+  identity anew; nothing moves between hosts.
+
 ## 13. Its world
 
 `hearth-domain-slots` runs in domain worlds on the fake machine
@@ -1069,7 +1146,8 @@ with:
   that never blesses, a firmware quirk, a torn FAT or NVRAM write;
 - **a host's containers [M5]** on the fake machine's nspawn (testing.md,
   3.12): units that start or fail, failed units inside, a host reboot
-  or an activator crash mid-trial, checked against 12.6's invariant.
+  or an activator crash mid-trial, a container removed from the spec
+  (12.7), checked against 12.6's invariant.
 
 The referee checks section 4's invariant after every event, every cell
 of the table is reached (transition coverage), and every request gets
@@ -1146,15 +1224,6 @@ section 7).
   to each container's range, or once with idmapped mounts; how a pool
   names several containers of one target; whether nspawn finds images in
   `/run/machines`. Depends on M5's pool design and operating.md's checks.
-- **A container's parameters and its prepare key [M5]:** where its id
-  base, binds and capabilities are declared (format.md, section 13), and
-  whether a change to them prepares a new slot, as a new base needs a
-  new shift; depends on that format.
-- **A container that fails to start on its host's trial [M5]:** its unit,
-  started by the host's activator (12.2), counts as a failed unit
-  against the host's own minimal bless unless the host lists it in
-  `bless.ignore_failed`; whether a container should fail its host's
-  trial depends on how often a host's change breaks its containers.
 - **nspawn's binds from the activator's top-level mount [M5]:** whether
   a root and a `/var` bound from `/run/hearth-activator/top`, mounted
   `nodev,nosuid,noexec`, keep those flags (to verify); if they do,

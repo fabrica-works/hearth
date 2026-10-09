@@ -106,7 +106,7 @@ a machine                             │
 | `hearth retry <target>` | clears the target's refusals, so the pass may try those slots again (4.4) | the builder | operators | refused |
 | `hearth credential <file>` | replaces the builder's read credential for the repository (3.8) | the builder | operators | yes |
 | `hearth bootstrap …` | partitions, formats and makes the first slot from a live system (machine.md, section 8); its arguments are 3.8's | in-process, as root | root | yes, before the daemon exists |
-| `hearth secrets import <path>…` | imports secrets and identity into the secret store (activator.md, 5.8), then asks the builder to read its facts afresh | in-process, as root | root | refused but at bootstrap |
+| `hearth secrets import <path>…` | imports secrets into the secret store (activator.md, 5.8), then asks the builder to read its facts afresh | in-process, as root | root | refused but at bootstrap |
 | `hearth identity` | the public halves of the machine's identity, to record as data (format.md, section 8) | the builder, from the activator's facts | anyone | yes |
 | `hearth logs [--unit <u>] [--since <d>] [-n <lines>]` | a bounded window of the journal, read locally (section 7); M3 | the builder, in `systemd-journal` | operators | yes |
 | `hearth shell [a\|b] [-- <argv>]` | a read-only view of a slot (3.7) | in-process, started as root | root | yes, locally |
@@ -138,8 +138,8 @@ a machine                             │
   its containers with it; `status` lists every target the machine runs.
   A container's `trial` returns with its restart's outcome
   (activator.md, 5.16), and its host blesses it later (slots.md, 12.3).
-  How `logs` reads a container's journal is open (operating.md,
-  section 10).
+  `logs --target <t>` reads a container's journal from the host's, by
+  the container's machine-id (operating.md, section 5).
 - **The command set is os's, folded into one tool.** `render` and `diff`
   replace `manifest`; `build` replaces `deploy install`; `status`
   replaces `deploy info`, `ek info` and `provision drift`; `prepare`,
@@ -261,8 +261,8 @@ a machine                             │
   rename, then the index, with the store's generation bumped once for
   the command and conditional on the index it read, so two imports
   never lose each other's writes. It reads files named on the command
-  line, or a directory of them, by secret name. It imports identity
-  too, so a machine moved from os keeps its SSH host keys. It prints the
+  line, or a directory of them, by secret name. It imports no identity,
+  which the activator makes (activator.md, 5.7). It prints the
   target's declared secrets with present or missing, never a value.
   Then, if a daemon answers, it asks the builder over the socket to
   read its facts afresh; that request carries nothing but itself.
@@ -319,23 +319,17 @@ the table of the machine's configuration it writes; 8.2 lists its
 steps. Its syntax is this:
 
 ```
-hearth bootstrap --disk <device> [--wipe | --adopt-os <label> [--map <os path>=<name>]…]
+hearth bootstrap --disk <device> [--wipe]
                  --target <target>
                  --repository <url> [--repo-credential <file>]
                  --revision <commit | branch> [--every <d>] [--trial auto|manual]
-                 [--secrets <directory>] [--data <name>=<directory>]…
+                 [--secrets <directory>]
                  [--operator <uid>]…
                  [--engine <address> --trust <file> [--credential <file>]]     [M4]
 ```
 
 - **`--disk`, `--wipe`:** the disk to partition, and leave to wipe one
   that is not blank (machine.md, 8.2, steps 1 to 3).
-- **`--adopt-os`, `--map`:** take over an os machine without a wipe:
-  keep os's slot `<label>` as the default, and turn os's persistent
-  data into the target's `data` entries by the mappings given
-  (machine.md, 8.6).
-- **`--data`:** copy a directory into a new persistent subvolume before
-  the first prepare (machine.md, 8.6).
 - **`--target`, `--repository`, `--revision`, `--every`, `--trial`,
   `--operator`:** the machine's configuration (machine.md, 8.1). The
   revision is a commit or a branch, as `hearth revision` takes them; a
@@ -609,6 +603,10 @@ be made or run, so its prepare key is refused.
 - **A container's first slot** is prepared and tried by its host's pass
   like any other, with nothing to fall back to (slots.md, 12.3); its
   secrets are imported for its own target (3.6).
+- **A container the spec no longer places on the host** is removed in
+  the same pass, before the host's own target: the builder asks its
+  activator to stop it and delete its slots, which unpins their outputs,
+  and its data stays, reported as orphaned (slots.md, 12.7).
 
 ## 5. The wire [M4]
 
@@ -816,9 +814,14 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
   activates the container (4.7): prepare, activate and roll back are
   keyed and conditional as above, on the container's own facts, and an
   activation is a restart (slots.md, 12.2), answered `begun` before it.
-- **A held bless and a restart of a unit** for a container are open
-  (section 11): a host's hold ends by a timer in its trial slot
-  (slots.md, 7.4), which a container has not.
+- **A held bless** is a host's (slots.md, 7.4): `activate` with `bless:
+  held for at most d`, released by `bless`; at the ceiling the host's
+  activator falls the container back, a restart on its old slot, as at
+  its window's end (slots.md, 12.3).
+- **A restart of a unit** is the host's order with the container's
+  target: the unit is one inside the container, keyed and conditional
+  on its invocation as above, read and restarted through
+  `systemctl --machine=<container>` (activator.md, 5.9).
 
 **For every order:**
 
@@ -983,7 +986,7 @@ Application kinds of skein's channel; each belongs to one direction.
 
   | Read | Window | From |
   |---|---|---|
-  | `journal` | units; since and until, as durations ago; priority; at most N entries; after a cursor | `journalctl --output=json --no-pager --after-cursor=… --lines=…`, run by the builder, parsed by `hearth-protocol-systemd` |
+  | `journal` | target; units; since and until, as durations ago; priority; at most N entries; after a cursor | `journalctl --output=json --no-pager --after-cursor=… --lines=…`, run by the builder, parsed by `hearth-protocol-systemd`; a container's [M5] with `--directory=/var/log/journal/<its machine-id>` (operating.md, section 5) |
   | `signals` | names; since; resolution | hearth's own ring of samples (operating.md, section 5) |
   | `checks` | check ids; since | each check's history (operating.md, section 5) |
   | `facts` | names | afresh, as the hello's |
@@ -1148,15 +1151,3 @@ wire, not in traits: another backend is another daemon speaking it.
   window (a time of day), when a machine needs one.
 - **Changing a machine's mode** between standalone and an engine without
   a new bootstrap; it depends on how identity is issued (5.3).
-- **A container that leaves its host's spec [M5],** removed from the
-  repository or placed on another host: whether the host stops it, and
-  what becomes of its slots and of its data, which only a person deletes
-  (machine.md, 3.4); it depends on how a container moves between hosts.
-- **Holding a container's bless [M5]:** a host's hold ends by a timer
-  in its trial slot (slots.md, 7.4); a container's would be its host
-  activator's deadline, as its window is (slots.md, 12.3); it depends on
-  whether an engine bakes canaries in containers.
-- **Restarting a unit of a container [M5]:** a unit inside it, through
-  `systemctl --machine=`, or the container's own nspawn unit, or both as
-  two forms of the order; it depends on what the run side's policies
-  restart.

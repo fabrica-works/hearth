@@ -466,7 +466,6 @@ A scenario picks the machine's kind:
 | `efi-ovmf` | OVMF as Incus runs it | the same; prunes and reorders `BootOrder`'s options at every boot | iTCO |
 | `efi-forgetful` | UEFI that loses its variables at a drawn boot | the same, and the removable path `\EFI\BOOT\BOOTX64.EFI` | none |
 | `bios` [M3b] | SeaBIOS | msdos; GRUB's core in the post-MBR gap; all of GRUB on the FAT partition (machine.md, section 5) | iTCO on q35 |
-| `os` | either firmware, as os left it | os's slots, ESP files, entries and `/.manifest/boot.json`, for adoption (machine.md, section 8) | as its kind |
 
 **EFI variables:**
 
@@ -641,8 +640,9 @@ kernel (slots.md, section 12):
 - **nspawn as a unit:** `systemd-nspawn@<c>.service` starts a container
   only if `/run/machines/<c>` links to a directory and
   `/run/systemd/nspawn/<c>.nspawn` exists; it reads `PrivateUsers=`,
-  `ReadOnly=` and `Bind=` from it, and fails otherwise, as one started
-  at boot before its link would.
+  `ReadOnly=`, `Bind=`, `BindReadOnly=`, `Capability=`,
+  `VirtualEthernet=` and `LinkJournal=` from it, and fails otherwise,
+  as one started at boot before its link would.
 - **A container is a view and a PID 1:** the slot's root, read-only,
   with its binds, seen through an id map of the container's range (3.4);
   the fake PID 1 of 3.7 runs inside it, with its units, failed units and
@@ -1011,7 +1011,6 @@ were reused, what was fetched.
 | Scenario | What happens | What must hold |
 |---|---|---|
 | bootstrap | from a live system on a second disk, the client, as root, bootstraps the empty disk (machine.md, section 8); the VM boots it | slot a is blessed and the default; two entries per slot, normal and trial; only a's normal entry in `BootOrder` |
-| adopting os | a VM that os installed (its `provision` and `deploy`, run once and snapshotted); `hearth bootstrap --adopt-os` (machine.md, section 8), then hearth's first trial, made to panic by `test-panic` | os's running slot stays the default throughout; the failed first trial falls back to os |
 | prepare, soft reboot, bless | a config change: b prepared, a soft reboot into it, the minimal bless (slots.md, section 7) | b running, its normal entry first in `BootOrder`; no trial left |
 | a packages change that keeps the kernel | a new version of an extras package: b's packages layer rebuilt, its initramfs rebuilt with the same inputs | slots.md 6.1's rule holds, so a soft reboot, then the bless |
 | a kernel change | a mirror bump that changes the kernel: b prepared, `BootNext` to b's trial entry, a reboot, the bless | before the bless, `BootNext` gone and `BootCurrent` b's trial entry; then b the default |
@@ -1037,6 +1036,10 @@ Containers [M5], in a host VM:
 | a container's checks | a check of a unit and a probe, run by the host's hearth (operating.md, 2.9) | reported as the host's facts, naming the container's target |
 | a pool host | one output, several containers (slots.md, 12.4's lean) | one build and one shift; a snapshot per container; each container's files owned as nspawn maps them |
 | a host and its container in one revision | both specs change | the container's trial first, the host's last, since the host's may reboot the machine (wire.md, 4.7) |
+| a container's parameters change | a bind added to its placement | a new slot of the same output, its settings with the bind, tried by a restart (slots.md, 12.1) |
+| a container that fails on its host's trial | the host's trial boots and the container's unit fails | the host is blessed all the same; the container's facts report it (slots.md, 7.1) |
+| a container's journal | entries written inside the container, read by the host's builder while it runs and after it stops | read from `/var/log/journal/<its machine-id>` on the host's journal subvolume; recorded: whether journald inside writes there under its id range (operating.md, section 5) |
+| a container removed | the revision drops the container's target | its unit stopped, its slots deleted and their outputs unpinned; its persistent subvolumes reported orphaned (slots.md, 12.7) |
 
 A hang that only the watchdog ends needs a kernel that stops; how to
 cause one in a VM is open (section 11).
@@ -1195,7 +1198,6 @@ same repository (7.3).
 | hostile tree shapes | activator, slots | an output whose `/var`, `/etc` or kernel is a symbolic link, or with a FIFO where `/etc/passwd` should be | prepare refuses each, since every slot path is resolved with `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS` and `RESOLVE_NO_XDEV` (3.2); nothing outside the slot is read or written |
 | a cut between walk and record | store, system | a power cut after a layer's walk and before its record; then, later, a published layer found corrupt (3.10) | `syncfs` precedes the record (store.md, 4.2), so a recorded layer is whole; the startup scan deletes the staging layer (store.md, 4.4); a corrupt layer found later is deleted and rebuilt, not refused |
 | `systemd-container` | build | the closure holds `systemd-container`, whose tmpfiles make `Q /var/lib/machines` | with the setup hook's directories, the layer holds a directory; without them, a nested subvolume, which the walk refuses (store.md, 4.1) |
-| adopting os | disk, boot, system | an `os` machine (3.7) adopted with `hearth bootstrap --adopt-os` (machine.md, section 8); hearth's first trial fails | os's running slot stays the default until hearth's first bless; the failed trial falls back to os, and os's slots and entries are untouched |
 | a snapshot bump that keeps the kernel | system | 8.3's soft-reboot rule | a soft reboot, then the bless |
 
 ## 9. Budgets and costs
@@ -1270,7 +1272,7 @@ finding, as a failing check is.
 |---|---|---|---|---|
 | M1 | step; domain (render, builder); machine (config, template, git, mmdebstrap); protocol (builder and tools); simulated (builder); real loop (render, real git); end to end (render, diff) | files with owners and modes; processes; the universe's index at snapshot timestamps | git; mmdebstrap `--simulate` | conformance: resolve, git; the mirror's indexes |
 | M2 | domain (store, build, tree); system (builder and tree helper); machine (dpkg, tree); protocol (tree helper); real loop (tree helper, process groups) | btrfs and its ownership rule; ids, maps of several extents, namespaces, cgroups, sandboxes; `openat2`'s flags; attributes, inodes, ctimes; the full universe, `systemd-container` included; full disks; power cuts on files and subvolumes, and `syncfs` | mmdebstrap's bootstrap; `apt-helper`; dpkg-query; the target's systemd tools and `tar` | conformance: bootstrap in both modes, extras, fetch, query, the target's tools, the btrfs rules; real builds |
-| M3 | domain (converge, slots, boot, disk, activator); system (the pair joins); machine (link, efi, systemd, keygen, client); protocol (link, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; cues; an os machine to adopt | efibootmgr; systemctl at run time; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools | VM tier on OVMF; conformance: firmware, host keys |
+| M3 | domain (converge, slots, boot, disk, activator); system (the pair joins); machine (link, efi, systemd, keygen, client); protocol (link, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; cues | efibootmgr; systemctl at run time; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools | VM tier on OVMF; conformance: firmware, host keys |
 | M3b | machine (grub) | SeaBIOS; msdos and the post-MBR gap; GRUB on FAT, its environment pair, its boot counter, saves that fail, and the slots' fragments | grub-editenv; grub-install | VM tier on SeaBIOS; conformance: env file, GRUB |
 | M4 | protocol (the wire, on `skein-fake-channel`); machine (wire) | — | `hearth-fake-engine` (4.6); systemd-run, for a held bless's timer | — |
 | M5 | domain (checks); containers and pool hosts | units' states and signals; containers on a host (3.12) | systemctl restarting a unit, a container's nspawn unit and `--machine=`; systemd-run's checks | VM tier: bless with checks; containers in a host VM (7.3) |

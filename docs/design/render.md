@@ -226,7 +226,9 @@ and step 4 reads other targets of the same environment.
 - **Placements are read the same way:** `target.containers` holds the
   environment's targets placed on this one (format.md, 3.5). A
   container's `on` must name a target of its environment that is not a
-  container; a build environment has none (format.md, 3.4).
+  container; a build environment has none (format.md, 3.4). The
+  containers placed on one host must have id ranges that overlap
+  neither each other nor the builder's [M5] (format.md, 3.5).
 - **No cycle is possible:** exports depend only on their own task's
   settings and on `target` (format.md, 8.1).
 - **An error in another target's exports fails this render too,** naming
@@ -341,7 +343,7 @@ overwrote silently, in alphabetical order of task.
 | `config` | output | the file tree; users; presets; tmpfiles; `customize.sh` | the config key |
 | `data` | slot | persistent subvolumes and their mounts | no key |
 | `secrets` | slot | secret files, password secrets and identity items, by name | no key |
-| `boot` | slot | the kernel's command-line parameters | no key |
+| `boot` | slot | the kernel's command-line parameters; a container's parameters instead [M5] | no key |
 | `checks` [M5] | other | the target's checks (operating.md, section 2) | no key |
 | `exports` | other | what this target publishes to its environment | no key; read by other targets' renders |
 | `meta` | | target, base, member, environment, placement | no key |
@@ -441,13 +443,18 @@ secrets
   files                map secret name → { path, mode, owner, group }
   passwords            map user → secret name
   identity             map item → { kind, algorithm?, path, public_path?, mode, owner, group }
-boot                   list of parameters, in order; empty for a container
+boot                   list of parameters, in order; for a container [M5], its parameters instead:
+                         { ids, binds: map path → { source, read_only }, capabilities, network, bridge? }
 ```
 
 - **Slot parts never enter a layer key:** changing one makes a new slot of
   the same output (slots.md, section 5).
 - **A container's slot parts are its own,** placed by its host's
   activator into the container's slot on the host [M5] (slots.md, 12.1).
+  Its `boot` part holds no command line, since it has no kernel, but
+  the parameters its placement gives nspawn (format.md, 3.5): what
+  starts the slot, as a host's command line is, so a change to them
+  prepares a new slot of the same output.
 - **The secrets part holds names, never values.** Beside secret files it
   carries password secrets and identity items, the two other things the
   activator writes into a slot from the secret store (format.md,
@@ -459,7 +466,7 @@ boot                   list of parameters, in order; empty for a container
 exports                map task → map name → value; and [M5] the task's probes with `from`, rendered
 checks                 from M3, the units whose failure does not block a bless (format.md, 5.13);
                        [M5] the target's checks, and the probes it runs for others (3.9; operating.md, section 2)
-meta                   { target, base, member?, environment, placement { kind, firmware?, hardware?, on? } }
+meta                   { target, base, member?, environment, placement { kind, firmware?, hardware?, on?, and a container's parameters [M5] } }
 ```
 
 - **Exports have a digest** so a target's own diff shows what it
@@ -759,7 +766,7 @@ error
 |---|---|
 | decode | not JSON, a duplicate key, a fraction, invalid UTF-8, a template's syntax, an unknown filter, a limit exceeded |
 | repository | a document out of place, an environment that does not exist, a submodule, a stray file in a task |
-| composition | two targets of one name, `null` for a task in a default, `placement` in a base, a container's `on` that names a container or a target of another environment |
+| composition | two targets of one name, `null` for a task in a default, `placement` in a base, a container's `on` that names a container or a target of another environment; [M5] a container's parameters on another kind, or an id range that overlaps another's (format.md, 3.5) |
 | schema | an undeclared setting, a wrong type, a missing required setting, an undeclared read, a bad default |
 | evaluation | an undefined value used, a type error in an expression, an overflow, a `for_each` that is not a map or list |
 | guard | a false `requires`, with its message |

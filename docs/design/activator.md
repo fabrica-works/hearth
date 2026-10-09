@@ -78,7 +78,7 @@ open is in section 10.
 | output key | a digest; a layer and a record of that name exist in the store (6.1) |
 | label | `a` or `b` |
 | target | the machine record's target; or [M5] a container whose placement's `on` is that target, by the request's `meta` |
-| a container's id base [M5], when its slot is shifted to one | 64 Ki aligned; its range clear of the builder's (store.md, 9.2) and of the host's other containers' (slots.md, 12.1) |
+| a container's parameters [M5], its `boot` part (slots.md, 12.1) | the id base 64 Ki aligned, its range clear of the builder's (store.md, 9.2) and of the host's other containers', and the owner of the roots of the container's existing persistent subvolumes; binds' paths absolute and normal, a source never the top level, `/run/hearth-activator`, `/var/lib/hearth` or anything beneath them, at most 32 binds; capabilities by name from the kernel's list; a bridge an interface name |
 | `data` entries | machine.md, 3.4 |
 | secret and identity paths | absolute and normal; not beneath a `data` path, `/var/lib/hearth`, `/.hearth`, `/proc`, `/sys`, `/dev`, `/run` or `/tmp`; not a path the activator writes itself (`/etc/fstab`, `/etc/machine-id`, `/etc/shadow`) |
 | secret modes | at most `0777`: no setuid, setgid or sticky bit; nothing for others to read |
@@ -365,7 +365,7 @@ builder collects nothing until the first `Welcome` has told it these.
 | hold, and release, a bless | the builder of the slot on trial, for an engine | conditional | M4 |
 | run a check | the builder, for operating's checks | idempotent: a reading | M5 |
 | restart a unit | the builder, for an engine | keyed by the order's key; conditional on the unit's `InvocationID` | M5 |
-| place, trial, bless, fall back and roll back of a container's slot (5.16) | the host's builder | as the machine's own: place keyed by the prepare key, the rest conditional | M5 |
+| place, trial, bless, hold, fall back and roll back of a container's slot, and removing a container (5.16) | the host's builder | as the machine's own: place keyed by the prepare key, the rest conditional; remove idempotent | M5 |
 | partition and format | bootstrap in-process; the lab as an effect | conditional | M3; M6 as an effect |
 | back up: snapshot, send, receive | the builder, on the data's period, or for a peer | keyed: the sequence; send idempotent | M6 |
 | restore | the builder, for an engine | keyed by the order's key; conditional on the data's UUID | M6 |
@@ -393,9 +393,11 @@ Place {
 }
 ```
 
-For a container's slot [M5], `meta` is `{ kind: container, target, on,
-id base }`, `on` checked against the machine record (2.2); `kernel` is
-absent and `boot` empty (5.16).
+For a container's slot [M5], `meta` is `{ kind: container, target, on
+}`, `on` checked against the machine record (2.2); `kernel` is absent,
+and `boot` holds the container's parameters instead of tokens: `{ ids,
+binds, capabilities, network, bridge? }`, at most 32 binds (slots.md,
+12.1).
 
 - **Effects:** slots.md, section 5, steps 5.1 to 5.7: identity first,
   then the prepare key, which covers the window and the units allowed
@@ -509,8 +511,8 @@ through the builder.
 
 - **Input:** files named on the command line, or a directory of them,
   whose relative paths are secret names (format.md, section 9), each
-  value at most 1 MiB; and identity items, so a machine moved from os
-  keeps its SSH host keys (wire.md, 3.6).
+  value at most 1 MiB. Identity is never imported: 5.7 makes it, fresh
+  on every machine.
 - **Effects:** each value whose digest is new is written as
   `secrets/<target>/<name>@<generation>`, `0600`, through a temporary
   file, synced and renamed; then the index (the store's generation, and
@@ -545,9 +547,13 @@ RestartUnit { unit, invocation }
   `hearth-trial*`, `hearth-check-*`); that the unit is one the running
   slot's spec ships or enables is the builder's check (operating.md,
   section 6).
-- **For a container's target [M5],** whether the unit is one inside the
-  container (`systemctl --machine=`) or the container's own nspawn unit
-  is open (wire.md, section 11).
+- **For a container's target [M5],** the same operation with the
+  container's target named, `RestartUnit { target, unit, invocation }`:
+  the unit is one inside the container, its `InvocationID` read with
+  `systemctl --machine=<container> show --property=InvocationID --value
+  <unit>`, then `systemctl --machine=<container> restart <unit>`. The
+  container's own nspawn unit is never named: only the host's activator
+  starts and stops it (5.16).
 
 ### 5.10 Partition and format
 
@@ -617,6 +623,8 @@ HoldBless { slot, attempt, until }        Bless { slot, attempt }        release
   slots.md, 7.4's; a `Bless` releases it as in 5.3.
 - **A crash** finds the marker `held` and its transient timer still
   armed: nothing to redo.
+- **A container's [M5]** is held the same way, with no timer: its end is
+  the activator's own deadline, as a container's window is (5.16).
 
 ### 5.14 Run a check [M5]
 
@@ -668,18 +676,20 @@ Fault { experiment, kind, targets, parameters, until }        Unfault { experime
 
 ### 5.16 A container's slots [M5]
 
-Place, trial, bless, fall back and roll back (5.1 to 5.5) on a
-container's slot, asked by the host's builder with the container's
-target (2.2). The effects are slots.md, section 12's; none touches the
-boot partition or NVRAM.
+Place, trial, bless, hold, fall back and roll back (5.1 to 5.5, 5.13)
+on a container's slot, and removing a container, asked by the host's
+builder with the container's target (2.2). The effects are slots.md,
+section 12's; none touches the boot partition or NVRAM.
 
 | Operation | Effects | Recovery class |
 |---|---|---|
 | place | section 5's steps with a container's differences (slots.md, 12.1) | keyed: the prepare key |
 | trial | the marker; the slot's nspawn settings and link, each by rename; `systemctl restart systemd-nspawn@<container>.service`; the poll (slots.md, 12.2 and 12.3) | conditional on the container's running slot, default and the slot's prepare key; a repeat by attempt gets the first answer |
 | bless | the criterion, read from the host; the record `blessed`; the marker removed; the default recorded (7.1) | conditional |
+| hold, and release | the marker `held`, with the hold's end as the activator's deadline in place of the window's; a `Bless` releases it (slots.md, 7.4) | conditional |
 | fall back | the default's settings and link back, a restart, the record `fell back` | conditional |
 | roll back | a trial of the other blessed slot | conditional |
+| remove | `systemctl stop` on its unit; its link and settings removed; its slots' subvolumes, records, manifests and marker deleted, then its record; its persistent subvolumes, identity and secrets kept (slots.md, 12.7) | idempotent: a container with no record is done |
 
 - **A trial is answered after its restart,** not before a reboot: done
   once the unit is stably active, the slot `on trial`; failed once it is
@@ -687,7 +697,11 @@ boot partition or NVRAM.
 - **The window is the activator's own deadline,** kept in the marker:
   at its end with no bless, the activator falls the container back
   itself, after its own restart too, since no dead-man runs in a
-  container.
+  container. A held bless's ceiling is kept and enforced the same way.
+- **Remove names a container the host's spec no longer places on it;**
+  the builder checks that against its render, as it checks a unit
+  against the spec (5.9), and the activator refuses the host's own
+  target.
 
 ## 6. Verification
 

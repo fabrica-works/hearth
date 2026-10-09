@@ -242,6 +242,11 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 | `firmware` | enum `efi`, `bios` | how it boots (machine.md, sections 4 and 5); never for a container |
 | `hardware` | string | the profile tasks key hardware data by: `7th-gen`, `incus`, `ionos`, `serverhino`, `vultr`; never for a container |
 | `on` | target | for a container only: its host, a target of the same environment that is not a container; absent for a build environment, which no host runs (artifacts.md, 2.3) [M6] |
+| `ids` | int | for a container on a host [M5]: the base of its 64 Ki id range, nspawn's `PrivateUsers=` (3.5) |
+| `binds` | map | for a container on a host [M5]: host paths bound into it, keyed by the path inside, each `{ "source": path, "read_only": bool }`, `read_only` true by default |
+| `capabilities` | set of names | for a container on a host [M5]: capabilities added to nspawn's default set, such as `CAP_NET_ADMIN`; none by default |
+| `network` | enum `host`, `veth` | for a container on a host [M5]: `host` by default, the host's own network; `veth`, a veth pair whose host end joins `bridge` [M6] |
+| `bridge` | string | for `network: veth` only: the host's bridge [M6] |
 
 - **Placement is data of the environment** (draft/brainstorm.md, 7.7). It
   may appear in `envs/<env>.json` and in a base-env layer or its members,
@@ -254,9 +259,10 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 - **What placement decides by itself:** the bootstrap variant
   (render.md, 4.2), and that a container has no kernel, so its initramfs
   modules and boot parameters must be empty: its packages part has no
-  initramfs and its boot part is empty, and render refuses a module or a
-  parameter on it (render.md, 7.2). The `boot` task, which installs the
-  kernel, refuses a container by a guard of its own (5.4).
+  initramfs, its boot part holds its container parameters instead of a
+  command line (3.5), and render refuses a module or a parameter on it
+  (render.md, 7.2). The `boot` task, which installs the kernel, refuses a
+  container by a guard of its own (5.4).
 - **Everything else that differs by placement is task data** that reads
   `target.placement`: the gettys masked in containers, the initramfs
   modules per hardware profile, EFI's tools (5.10).
@@ -293,9 +299,32 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   it alone and never mounted on its host (slots.md, 12.1), so its host
   needs no such user; a host task that must know a container's user
   reads it from the container's exports (section 8).
-- **How a host runs a container** (its slots, its user-namespace ids, its
-  binds) is slots.md, section 12 [M5]; the fields it needs join
-  `placement` then (section 13).
+- **A container's parameters are placement fields** [M5] (3.4): its id
+  base, its binds, its capabilities and its network. A target's file
+  sets them with the rest of its placement:
+
+  ```json
+  { "placement": { "kind": "container", "on": "rhi-prod", "ids": 327680 } }
+  ```
+
+  - **Render puts them in the container's `boot` part,** a slot part,
+    which for a container holds them instead of a command line
+    (render.md, 4.3). So a change to one changes the slot's prepare key
+    and prepares a new slot of the same output, which its host tries by
+    a restart, since nspawn reads them only when it starts (slots.md,
+    12.1 and 12.2).
+  - **Render checks their form:** a base aligned to 64 Ki and clear of
+    the builder's range (store.md, 9.2) and of the other containers'
+    placed on the same host; binds whose two paths are absolute and
+    normal; capability names from the kernel's list. The host's
+    activator checks them again (activator.md, 2.2).
+  - **They are refused on anything but a container on a host:** a host
+    and a build environment have none.
+- **How a host runs a container** (its slots, the shift into its ids,
+  its nspawn settings) is slots.md, section 12 [M5].
+- **A container's journal is its host's** [M5]: nspawn links it into
+  the host's persistent journal subvolume (operating.md, section 5), so
+  the `core` task declares no `journal` entry on a container (5.7).
 
 ### 3.6 Clusters
 
@@ -774,8 +803,9 @@ nothing.
   }
   ```
 
-  The ids are whatever the fleet's machines already hold, read from a
-  running slot's `/etc/passwd`; a new machine then gets the same.
+  The ids are the task's, fixed once and the same on every machine.
+  Every machine is installed fresh (README, section 7), so they need
+  match no os machine's.
 - **`subordinate` ranges** are the one thing sysusers cannot make. Render
   writes `/etc/subuid` and `/etc/subgid` from them into the file tree,
   and refuses two ranges that overlap; no task ships either file.
@@ -826,14 +856,20 @@ nothing.
 
   ```json
   {
-    "data": { "journal": { "path": "/var/log/journal", "mode": "2755", "group": "systemd-journal" } },
+    "data": {
+      "journal": {
+        "if": "target.placement.kind != 'container'",
+        "path": "/var/log/journal", "mode": "2755", "group": "systemd-journal"
+      }
+    },
     "groups": { "systemd-journal": { "from": "package", "gid": 999 } }
   }
   ```
 
   The group owns persistent data, so its id is fixed (5.6); 999 is
   what systemd's sysusers gives it on the fleet's machines today, to
-  verify.
+  verify. A container has no `journal` entry: its journal lives in its
+  host's (3.5) [M5].
 
   and iwd's state, bound from `…/iwd` only when the Wi-Fi task was
   present, is the `wifi` task's:
@@ -1028,6 +1064,9 @@ declares it (render.md, 7.2):
 - **A container's list holds as a host's [M5]:** its host reads the
   container's failed units from outside during its trial (slots.md,
   12.3).
+- **A container never counts against its host [M5]:** the host's
+  minimal bless leaves out its containers' nspawn units without any
+  list, since each container's slot has its own trial (slots.md, 7.1).
 
 ## 6. The schema
 
@@ -1754,15 +1793,9 @@ artifacts.md (7.3) cite it.
   with containers in M5 (slots.md, section 12). It depends too on where
   preseeds load: mmdebstrap runs no essential hook for `custom`, and
   runs it for `essential` (build.md, 5.5).
-- **A host's container parameters** (the user-namespace base, binds,
-  capabilities, the network: the fleet's are host networking, a pool's
-  faults need veth pairs, operating.md, section 8) as `placement`
-  fields, and whether they enter the prepare key, since a new base
-  needs a new shift (slots.md, 12.1); and a lab pool's containers, which
-  its engine places rather than a repository [M5].
-- **A build environment's placement** [M6]: a container with no `on`
-  (3.4), or a kind of its own; it depends on whether anything else
-  about it ever differs from a container's.
+- **A lab pool's containers** [M5], which its engine places rather than
+  a repository: how their placement, parameters included (3.5), reaches
+  the pool host; it depends on M5's pool design.
 - **The `incus` module list** for a lab VM booting from its own disk, to
   verify on the VM tier (machine.md, section 7; testing.md, section 7).
 - **Whether interpolation and `for_each` in declarations are enough,** or
@@ -1780,10 +1813,6 @@ artifacts.md (7.3) cite it.
   resolved only by build, which fails on an unknown name. Whether render
   should check those too depends on how often a wrong owner reaches a
   build.
-- **The fixed ids of package users and groups** (`postfix`,
-  `systemd-journal`, `ssl-cert`) must be read from the fleet's running
-  machines before their first hearth slot; it depends on bootstrap
-  carrying them over (machine.md, section 8).
 - **`wireguard-key`** waits for keys made in-process, an ask of skein
   (9.3).
 - **Several backup peers in one environment** [M6]: which one a target

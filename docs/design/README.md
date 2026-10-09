@@ -105,7 +105,7 @@ every milestone, from the first (testing.md, section 10).
 |---|---|---|---|
 | M1 | Render | specs with digests; the rendered diff of any change | format.md, but for checks and artifacts; render.md; the client's render and diff |
 | M2 | Build | outputs keyed by digest, built unprivileged, layer by layer | store.md, but for peers; build.md; the tree helper |
-| M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, and os is retired on it | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; wire.md's client and standalone mode; a minimal bless |
+| M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, installed from scratch | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; wire.md's client and standalone mode; a minimal bless |
 | M3b | BIOS | BIOS machines, which most IaaS providers offer | machine.md's BIOS path; slots.md's trial through GRUB |
 | M4 | The wire | hearth as a system behind an engine | wire.md's wire, facts and events |
 | M5 | Operating | the machine's end of the run side | operating.md, but for backups; checks as task data; containers and pool hosts (slots.md, section 12) |
@@ -410,6 +410,10 @@ that last:
 - **No converter from os's format:** configurations are written again.
   os's golden files inform render's tests but are not its oracle
   (render.md, section 9).
+- **Everything starts from scratch:** configurations are written again
+  and machines are installed fresh, `x1-prod` included, by `hearth
+  bootstrap` on a wiped disk, with identity generated anew; no part of
+  hearth migrates os's data or machines (machine.md, section 8).
 - **Root tests run on Incus VMs** with their own disk and OVMF, until the
   lab exists (testing.md, section 7).
 - **Standalone mode follows a desired revision set locally:** a commit,
@@ -470,11 +474,6 @@ that last:
 - **Package indices come from the resolution:** apt's verified,
   decompressed `Packages` files are kept by digest and served from the
   local repository; the fetch gets only packages (build.md, section 5).
-- **os machines are adopted, not wiped:** `hearth bootstrap --adopt-os`
-  keeps os's running slot as the default, takes its data subvolumes over
-  and tries hearth's first slot in os's other slot, so a failed first
-  trial falls back to os. This is how `x1-prod` leaves os (machine.md,
-  section 8).
 - **Failed units a target expects** are listed as task data
   (`bless.ignore_failed`); the minimal bless counts only the others
   (format.md, section 5; slots.md, 7.1).
@@ -488,6 +487,23 @@ that last:
 - **A container's `/var` is per slot,** as a host's: the bash fleet's
   persistent `.var` becomes data entries, and a container's identity and
   secrets are its own target's, kept by its host (slots.md, 12.1).
+- **A container's parameters are placement fields [M5]:** its id range,
+  binds, capabilities and network, rendered into its `boot` part, so a
+  change prepares a new slot of the same output (format.md, 3.5;
+  slots.md, 12.1).
+- **A container never fails its host's bless [M5]:** the host's minimal
+  criterion leaves out its containers' nspawn units; each container's
+  slot has its own trial and facts (slots.md, 7.1).
+- **A container's journal is in its host's [M5]:** `LinkJournal=try-host`,
+  under the container's own machine-id, read by the host's builder as
+  its own (operating.md, section 5).
+- **A container removed from its host's spec [M5]** is stopped and its
+  slots deleted; its data stays, orphaned, until a person deletes it
+  (slots.md, 12.7).
+- **A container's orders are a host's [M5]:** a held bless ends at its
+  ceiling in a fall back run by the host's activator, and a unit's
+  restart goes through `systemctl --machine=` (slots.md, 7.4;
+  activator.md, 5.9).
 - **A build environment is a container with no host** [M6]: its output
   is only a sandbox's root, never an nspawn container (artifacts.md,
   2.3; format.md, 3.4).
@@ -550,12 +566,6 @@ Each document lists its own. The ones that reach across:
 - one generation for the whole secret store, so any import prepares
   every target's slot again, or one per target (activator.md);
 - whether a container runs a hearth of its own (slots.md, 12.5);
-- a container's parameters (its id range, binds, capabilities, network)
-  as placement fields, and whether a change to them prepares a new slot
-  (format.md; slots.md);
-- where a container's journal lives, and how its host reads it
-  (operating.md);
-- adopting an os host that runs containers (machine.md);
 - a blessed EFI default that later stops booting panic-loops, since the
   firmware falls through only when a load fails: keeping the previous
   slot first in `BootOrder` and arming `BootNext` at each healthy start
