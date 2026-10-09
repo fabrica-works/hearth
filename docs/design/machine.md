@@ -45,7 +45,7 @@ in section 12.
 - **tiny-initramfs stays,** configured per hardware profile: no
   automatic modules, an explicit list, no build host's microcode. It finds the
   root by UUID and panics on any error, which `panic=10` turns into a
-  reboot. Debian has orphaned it.
+  reboot. hearth uses Debian's package, in trixie and in forky.
 - **Bootstrap is one command, run as root from a live system:**
   partition, format, make the top level, build as the unprivileged
   `hearth` user, place the output into slot `a`, write its boot files,
@@ -693,16 +693,16 @@ A soft reboot skips the initramfs, so the activator mounts
 `/run/nextroot` as tiny-initramfs would have mounted the root
 (slots.md, 6.2).
 
-### 7.5 Orphaned
+### 7.5 Debian's package
 
-- **Upstream's last commit is from 2016;** Debian orphaned it on
-  2026-08-02 (#1143475). trixie has 0.1-6.1; 0.1-8 (2026-09-10) is a QA
-  upload that moved it to musl.
-- **It stays for the MVP:** it boots the fleet today with the lists
-  above, and it is about 2.3k lines of C.
-- **Later:** vendored, which also allows a root timeout shorter than
-  180 seconds, or replaced by hearth's own minimal init, which could
-  mount an idmapped root (section 12; README, section 9).
+- **hearth uses Debian's `tiny-initramfs` as it is:** trixie has
+  0.1-6.1 and forky 0.1-8. It has been stable for years, and it boots
+  the fleet today with the lists above.
+- **Its maintenance:** upstream's last commit is from 2016, and Debian
+  orphaned the package on 2026-08-02 (#1143475); 0.1-8 is a QA upload.
+  Its stability is why it is used, not a reason to replace it. Should
+  Debian drop it, it is about 2.3k lines of C, and hearth could carry
+  it.
 
 ## 8. Bootstrap and disks
 
@@ -1039,9 +1039,6 @@ slots.md, section 4's, judged by booting the firmware and GRUB models:
 
 ## 12. What is open
 
-- **tiny-initramfs:** vendored, or replaced by hearth's own init;
-  depends on what its module lists and its 180-second root timeout cost
-  in practice (README, section 9).
 - **Secure Boot:** an enrolled key signing kernels or unified kernel
   images, or shim's chain; depends on which machines require it
   (README, section 9).

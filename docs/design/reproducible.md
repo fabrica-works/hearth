@@ -307,9 +307,9 @@ run IaC code safely. The retrofit adds what build.md (8.6) does not set,
   logs out of every output. The retrofit adds only what reproducibility
   needs, from the gate's findings; the first candidate is man-db's
   index, above.
-- **Fixes outside the list:** the initramfs (row 4), by patching mktirfs
-  in a vendored tiny-initramfs (machine.md, 7.5), or by hearth making
-  the image itself; `.pyc` files and shadow's last-change
+- **Fixes outside the list:** the initramfs (row 4), by a fix to mktirfs
+  sent to Debian's tiny-initramfs (machine.md, 7.5), or by hearth
+  clamping the tree mktirfs packs; `.pyc` files and shadow's last-change
   day, by `SOURCE_DATE_EPOCH` (5.1).
 
 ### 5.4 The order of work
@@ -492,9 +492,8 @@ built, not reproduced      two digests; an open finding names the differing path
 - **Which tools honour it on trixie:** systemd-sysusers 257 and shadow
   4.17.4 for the last-change day, dh-python's `py3compile` for hash-based
   `.pyc` files. Seen on sid; to verify on trixie.
-- **The initramfs:** a patch to mktirfs in a vendored tiny-initramfs, or
-  hearth's own image; it depends on machine.md's decision (7.5, and
-  README.md, section 9).
+- **The initramfs:** a fix to mktirfs sent to Debian, or hearth clamping
+  the tree mktirfs packs before it runs (machine.md, 7.5).
 - **depmod's indexes:** whether `modules.dep.bin` and its siblings are
   the same for the same modules (to verify); a soft reboot after a
   snapshot bump depends on it while the modules are judged by digest

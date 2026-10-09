@@ -402,8 +402,9 @@ that last:
   its activator (slots.md, section 7).
 - **Secure Boot off** for now: a Debian kernel cannot boot from a direct
   stub entry under it (machine.md, section 9).
-- **tiny-initramfs stays,** configured explicitly per placement, though
-  Debian has orphaned it (machine.md, section 7).
+- **tiny-initramfs is the initramfs,** Debian's package, configured
+  explicitly per placement: it is in trixie and in forky, and it has
+  been stable for years (machine.md, section 7).
 - **No converter from os's format:** configurations are written again.
   os's golden files inform render's tests but are not its oracle
   (render.md, section 9).
@@ -526,8 +527,6 @@ Each document lists its own. The ones that reach across:
 - who posts the rendered diff at a change's head, and how (render.md);
 - the checks' format, and what a check may do on a production machine
   (operating.md);
-- tiny-initramfs, orphaned: vendored, or replaced by hearth's own init
-  (machine.md);
 - signing kernels for Secure Boot (machine.md);
 - firmware that discards its variables, as Vultr's does (machine.md);
 - whether the activator hashes every output it places again, or trusts
