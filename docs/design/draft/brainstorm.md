@@ -4,7 +4,7 @@ Draft, 2026-10-09. It records the direction of a design discussion
 on 2026-10-09, the first about hearth. It starts from temper's
 `factory.md` (a draft vision of the whole software factory) and from os
 (`~/src/rust/os`), whose tools hearth replaces. Nothing here is adopted.
-Section 10 is the order of building; section 11 lists what is open.
+Section 11 is the order of building; section 12 lists what is open.
 
 ## 1. In one page
 
@@ -31,9 +31,13 @@ Section 10 is the order of building; section 11 lists what is open.
   to the old slot on its own.
 - **An output holds nothing unique and nothing secret,** so it can be
   shared between machines and served by digest.
+- **After a rollout, hearth is the machine's end of operating it.** It
+  runs the target's checks, sends facts up, keeps logs and metrics on
+  the machine for whoever asks, and carries out a small set of
+  operational effects (section 9).
 - **Reproducible builds are deferred.** They are a level of trust, and
   can be retrofitted without changing the store, the wire or the slots
-  (section 9).
+  (section 10).
 
 ## 2. Where it comes from
 
@@ -85,7 +89,10 @@ that machine and keeps the warm state: caches and earlier outputs.
   - *disk:* partitioning and formatting, for bootstrap and the lab's
     throwaway machines (os's `provision`);
   - *drift:* the live slot compared with the output it came from;
-  - later, *artifacts* (the second recipe) and *faults* (section 5.2).
+  - *checks:* the target's health checks and the machine's own signals,
+    in a bounded window (section 9);
+  - later, *artifacts* (the second recipe), *backups* (9.4) and
+    *faults* (section 5.2).
 - **Protocol:**
   - the wire (section 5.3);
   - **each external tool is a protocol:** an argument vector goes down;
@@ -286,10 +293,11 @@ empty → preparing → prepared → trial → blessed
     is unchanged;
   - by a one-shot boot otherwise: EFI's `BootNext`, or systemd-boot with
     unified kernel images, which counts boots itself. BIOS machines with
-    GRUB are the awkward case (section 11).
-- **Bless:** once the new slot is healthy, the boot default moves to
-  it. hearth blesses its own slot, so a broken hearth release cannot
-  bless itself and cannot strand a machine.
+    GRUB are the awkward case (section 12).
+- **Bless:** once the new slot passes the target's checks (9.1), the
+  boot default moves to it. hearth blesses its own slot, so a broken
+  hearth release cannot bless itself and cannot strand a machine. The
+  engine may hold a bless while a canary bakes.
 - **Fall back:** any failure during the trial ends in a full reboot,
   which boots the default, still the old slot.
 - **Which slot runs is read from the mount table,** not from
@@ -298,11 +306,76 @@ empty → preparing → prepared → trial → blessed
 - **Three facts, kept apart:** the slot running, the boot default, and
   the slot on trial.
 
-## 9. Reproducible builds: deferred
+## 9. Operating
+
+What follows a rollout, for as long as a target runs. hearth is the
+machine's end of it; the rest is the run side's (temper's `factory.md`,
+section 9).
+
+### 9.1 One definition of healthy
+
+- **Each task declares its checks,** as data in the IaC repository:
+  what healthy means for what the task installs. For postfix: its unit
+  active, a message sent and delivered, its DKIM signature verified,
+  TLS offered, the relay closed.
+- **The same checks serve four uses.** Proving, deploying and operating
+  are one activity at different stakes (`factory.md`, section 3):
+  - the lab's experiments, on throwaway machines;
+  - blessing a slot (section 8);
+  - a rollout's bake;
+  - watching the target for as long as it runs.
+- **Where a check runs:** a check of the machine runs on it, by its
+  hearth. A check of the service as its users see it (SMTP from
+  elsewhere, DNS, a certificate close to expiry) runs from another
+  machine, by that machine's hearth.
+
+### 9.2 Facts go up; telemetry is fetched
+
+- **Decisions get small typed facts,** over the channel: each check's
+  result, resource alarms (disk, memory, pressure), units that fail,
+  drift. Liveness costs nothing: a machine that stops redialling is
+  down.
+- **Logs and metrics stay on the machine.** The journal already lives
+  on a persistent subvolume (`@<target>.srv.core/journal`), so it
+  outlives slot switches. hearth keeps a bounded window of the
+  machine's signals and of its checks' results, and serves both when
+  asked: a triage agent or a person reads them through the engine.
+- **No central store for metrics or logs, to start.** If history across
+  the fleet is needed later, that store is a service the factory
+  deploys from its own IaC, like any other.
+
+### 9.3 What touches a machine
+
+Work after a rollout is of three kinds:
+
+- **Changes, through temper:** security updates (a bump of the Debian
+  snapshot), configuration fixes, capacity.
+- **Operational effects,** keyed and granted by policy. They start
+  small, with two: *roll back* (a slot switch, section 8) and *restart a
+  unit*. Any other waits until it is needed.
+- **The run side's standing procedures:** convergence, certificate
+  renewal, backups.
+
+Nothing else touches a machine: no shell, and no hand.
+
+### 9.4 Persistent data
+
+os gives data a layout (`@<target>.srv.data` and its siblings) and
+nothing more.
+
+- **Backups:** read-only snapshots of a target's data subvolumes, on a
+  period, sent to a backup peer as incremental streams against the
+  previous one.
+- **Restore** becomes an effect when backups are built, granted by
+  policy like the others.
+- **Restore drills are experiments** on the run side's own throwaway
+  machines: production's data never enters the lab.
+
+## 10. Reproducible builds: deferred
 
 They are a level of trust, and can be retrofitted later.
 
-### 9.1 Why builds differ today
+### 10.1 Why builds differ today
 
 - **Time:** every file `deploy` writes gets the build's mtime, and
   nothing sets `SOURCE_DATE_EPOCH`.
@@ -318,7 +391,7 @@ They are a level of trust, and can be retrofitted later.
   never match, so "identical" has to mean the same tree, not the same
   image.
 
-### 9.2 Kept from day one
+### 10.2 Kept from day one
 
 These are not about trust:
 
@@ -332,7 +405,7 @@ These are not about trust:
 - **Outputs are trusted per plane:** a machine fetches only from its own
   plane's builders, so the lab's outputs never reach production.
 
-### 9.3 Given up meanwhile
+### 10.3 Given up meanwhile
 
 - **The lab tests a build of the same inputs,** not the bytes production
   runs.
@@ -341,7 +414,7 @@ These are not about trust:
   known differences, or waits. Only the packages layer needs it (6.2,
   item 2).
 
-### 9.4 Retrofitting
+### 10.4 Retrofitting
 
 - `SOURCE_DATE_EPOCH` per layer, derived from the layer's key (the
   Debian snapshot's timestamp), never from the commit, so an unchanged
@@ -359,7 +432,7 @@ These are not about trust:
   report as the finding, and is reported to Debian. A layer that cannot
   be fixed degrades alone, to "built, not reproduced".
 
-### 9.5 What Debian proves
+### 10.5 What Debian proves
 
 - **Package builds** are reproducible for most of the archive, which
   does not matter here: hearth installs Debian's binaries, pinned and
@@ -375,7 +448,7 @@ These are not about trust:
 - **So Debian proves the machinery every installation runs** (dpkg,
   debconf, triggers, systemd's presets, ldconfig, ca-certificates,
   Python's byte-compilation), not the server packages hearth installs.
-  The lab's gate (9.4) proves those.
+  The lab's gate (10.4) proves those.
 - **Pinned inputs help:** Debian's live-image rebuilds must fit within a
   six-hour archive synchronisation; hearth's inputs are a snapshot, fixed
   for good.
@@ -389,18 +462,19 @@ and
 [13.3](https://lists.reproducible-builds.org/pipermail/rb-general/2025-November/003947.html);
 mmdebstrap's manual, on `SOURCE_DATE_EPOCH` and its cleanup.
 
-## 10. Order of building
+## 11. Order of building
 
 1. **render,** checked against os's golden files;
 2. **the store, with layers;**
 3. **builds;**
 4. **slots,** with trial and bless;
 5. **the wire;**
-6. **artifacts and peers.**
+6. **checks,** with facts up and telemetry served on demand;
+7. **artifacts, peers and backups.**
 
 The fake machine grows alongside, from the first step.
 
-## 11. Open questions
+## 12. Open questions
 
 - **`/var` and layers.** dpkg's database lives in `/var`, and os splits
   `@<target>.var` off after the packages phase. How a layer pairs a root
@@ -414,9 +488,13 @@ The fake machine grows alongside, from the first step.
   btrfs, where it cannot write its environment block (to check).
 - **The initramfs:** os uses tiny-initramfs; whether it stays, and how
   it fits unified kernel images.
-- **Health for blessing:** hearth's local check (systemd's
-  `boot-complete.target`), or the engine's verdict from observability for
-  a canary that bakes; probably both, the engine able to hold a bless.
+- **Checks:** their format as task data; how a check of the service
+  as users see it names the machine it runs from; what a check may do
+  on a production machine (a message really sent and delivered).
+- **Operational effects** beyond rolling back and restarting a unit,
+  when one is needed.
+- **Backups:** periods and retention, where the backup peer lives, and
+  whether streams are encrypted for it.
 - **Identity:** how a machine proves who it is to its engine and to its
   plane's secret store (`factory.md`, section 14).
 - **The template engine:** exactly which part of Jinja the tasks use,
