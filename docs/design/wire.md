@@ -31,10 +31,11 @@ milestone first reports each fact and event. What is open is in section
   A slot that fell back is never tried again on its own. A local hold
   stops new passes.
 - **The wire is skein's channel, dialled out by hearth** (section 5).
-  The hello comes first and carries the facts: slots, the three facts,
+  The hello comes first and carries the facts: slots, the four facts,
   versions, costs, and the answers the engine has yet to acknowledge. A
   reboot is a redial, and the hello after it is how the engine learns
-  whether an activation held or fell back.
+  whether an activation held or fell back; a live activation respawns
+  the builder, which redials too.
 - **Orders follow jig's recovery classes** (5.4). prepare is keyed;
   activate, bless and roll back are conditional on the facts decided
   from; restart a unit is keyed by the order's key, which hearth keeps.
@@ -94,12 +95,12 @@ a machine                             │
 | `hearth render <target> [--at <rev>] [--repo <path>]` | renders the target at a revision; prints the spec's parts with their digests (render.md, section 4) | the builder, from its own clone; in-process with `--repo` or a local path (3.5) | anyone | yes |
 | `hearth diff <from> <to> [--target <t>] [--repo <path>]` | the rendered diff: per target and part, what changed (render.md, section 6) | as `render` | anyone | yes |
 | `hearth build <target> [--at <rev>]` | builds the output; prints each layer's key, whether it was found or built, and its costs | the builder, or in-process with a store of one's own | operators; anyone with their own store | yes |
-| `hearth status [--check]` | each target's slots, the three facts, the last trial, drift, the desired revision, the pass and the hold | the builder, which reads the activator's facts afresh | anyone | yes |
+| `hearth status [--check]` | each target's slots, the four facts, the last trial, drift, how a prepared slot would be activated and why not live, the desired revision, the pass and the hold | the builder, which reads the activator's facts afresh | anyone | yes |
 | `hearth revision` | shows the desired revision | the builder | anyone | shows the engine's last order |
 | `hearth revision set <commit>` | sets the desired revision to a commit | the builder | operators | refused |
 | `hearth revision follow <branch> [--every <d>] [--trial auto\|manual]` | follows a branch, polled every `d` | the builder | operators | refused |
 | `hearth prepare [--at <rev>]` | prepares the inactive slot; keyed by target and revision | the builder, then the activator | operators | refused |
-| `hearth trial` | tries the prepared slot; conditional on the facts read | the builder, then the activator | operators | refused |
+| `hearth trial [--how auto\|live\|full]` | tries the prepared slot: live when eligible, else by a soft or a one-shot reboot (slots.md, 6.1); conditional on the facts read | the builder, then the activator | operators | refused |
 | `hearth rollback` | rolls back to the other slot (slots.md, section 9); conditional on the facts read | the builder, then the activator | operators | refused |
 | `hearth hold [--reason <text>]` | holds convergence (4.5) | the builder | operators | refused |
 | `hearth release` | releases the hold | the builder | operators | refused |
@@ -118,7 +119,7 @@ a machine                             │
   change slots or the desired revision exit 69 (3.3): the engine
   decides.
 - **The conditional commands decide from what they read.** `trial` and
-  `rollback` first read the three facts, then send the order with them
+  `rollback` first read the four facts, then send the order with them
   as its condition: "try `b`, from `a` running and `a` the default".
   If anything moved in between, the activator refuses and the client
   exits 1, printing the facts as they now are.
@@ -128,7 +129,13 @@ a machine                             │
 - **`trial` returns once the activator has taken the trial,** just
   before the machine reboots or soft reboots into the slot. The outcome
   is read after the reboot with `hearth status`: blessed, or fell back.
-  The client cannot outlive the reboot it asked for.
+  The client cannot outlive the reboot it asked for. A live trial
+  returns once the units are acted on, before the builder is spawned
+  anew; `status` then shows it on live trial, live-blessed, or fell back
+  (live). `--how live` asks for live only and exits 1, with the rules
+  that fail, when the change is not eligible.
+- **`rollback` while live** is the live fall back (slots.md, 8.5): back
+  to the files that ran before, with no reboot.
 - **There is no `bless` command.** The hearth in the new slot blesses
   it (slots.md, 7.2); only an engine releases a bless it held (5.4). A
   person never blesses by hand.
@@ -370,9 +377,10 @@ hearth bootstrap --disk <device> [--wipe]
   revision follow <branch> --every <d>`. The interval is at least a
   minute, so a fleet of followers does not hammer the forge.
 - **`trial: manual`** stops each pass at a prepared slot and waits for
-  `hearth trial`. A workstation such as `x1-prod`, the MVP's machine,
-  reboots when its user chooses, not when a commit lands. `auto` tries
-  at once and suits servers.
+  `hearth trial`, live changes included. A workstation such as
+  `x1-prod`, the MVP's machine, reboots, or changes under its user's
+  feet, when its user chooses, not when a commit lands. `auto` tries at
+  once, live when eligible, and suits servers.
 - **The target is the activator's,** in its machine record
   (activator.md, 7.1), and the repository the builder's; both are
   written at bootstrap (3.8). The client changes the revision, never
@@ -413,7 +421,9 @@ rendering    the spec S                                  comparing    the output
 comparing    the running slot is blessed but is not      re-blessing  ask the activator to bless it again
              the default: a cut bless, or the firmware                (slots.md, 2.3 and section 7)
              fell through to it
-             S equals the running slot                   waiting      converged
+             S equals what runs: the running slot, or    waiting      converged
+             the live state's prepare key
+             (slots.md, section 3)
              S's prepare key is refused (4.4)            waiting      reported; wait for another key
              S equals the prepared, untried slot         trying
              otherwise                                   building
@@ -424,8 +434,20 @@ building     the output, keyed K                         preparing    ask the ac
              a failure                                   waiting      back off, refuse, or wait (4.4)
 preparing    prepared                                    trying       or waiting, if trials are manual
              refused or failed                           waiting      back off, refuse, wait or rebuild (4.4)
-trying       the activator took the trial                (reboot)     a reboot or a soft reboot into the
+trying       eligible (slots.md, 6.7), how auto or live  (respawn)    ask the activator to try live with the
+                                                                      plan: delta, swap, units (slots.md, 6.8);
+                                                                      a new builder is spawned over them
+             not eligible, or live refused or failed     trying       ask an ordinary trial, the plan's
+             before the swap                                          reasons kept as a fact
+             the activator took the trial                (reboot)     a reboot or a soft reboot into the
                                                                       slot (slots.md, section 6)
+
+over the live state, after the respawn
+blessing     settled, the minimal bless holds            waiting      ask the activator to bless live: the
+             (slots.md, 6.8, L7)                                      one-shot set to the slot's trial entry
+             a touched unit failed, the criterion        waiting      ask the live fall back (slots.md, 8.5);
+             failed, or the window nearly over                        refuse b's prepare key
+             the activator fell back live at L6          waiting      refuse b's prepare key
 
 in the new slot, after the reboot
 blessing     the minimal bless holds (slots.md, 7.1)     waiting      ask the activator to bless
@@ -469,12 +491,20 @@ waiting      the activator reports "fell back" from b    waiting      refuse b's
   desktop often carries one that fails routinely; the target lists it
   in `bless.ignore_failed`, and the minimal bless counts only the
   others (format.md; slots.md, 7.1).
-- **Activation is the cheapest that covers the change.** The activator
-  chooses a soft reboot or a one-shot reboot by slots.md, 6.1's rule
-  (the kernel's digests and its command line), and `status` shows which
-  a prepared slot needs. Its reboot is a clean `systemctl reboot` with
+- **Activation is the cheapest that covers the change.** Live first,
+  when slots.md, 6.7's rules hold: the builder plans it from the two
+  outputs' tree files and the live parts of the running and the new
+  spec (render.md, 4.4), and the activator checks again. Otherwise the
+  activator chooses a soft reboot or a one-shot reboot by
+  slots.md, 6.1's rule (the kernel's digests and its command line).
+  `status` shows which a prepared slot needs, and why it is not live. A
+  reboot is a clean `systemctl reboot` with
   `SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT=1` (slots.md, 6.3); only the dead-man
-  uses `systemctl reboot -ff`.
+  and a failed live fall back use `systemctl reboot -ff`.
+- **A live bless ends the pass converged** with the base still the
+  default: the next boot, whenever it comes, is the new slot's ordinary
+  trial, whose own pass begins in `blessing` (slots.md, 6.8, L9). The
+  pass makes no reboot for it.
 - **Effects are keyed or conditional.** prepare is keyed by target and
   revision; a trial is conditional on the facts the pass read. A pass
   that restarts in the middle finds what it made and goes on.
@@ -511,7 +541,8 @@ be made or run, so its prepare key is refused.
 | out of space | operational | an alarm; collection (store.md, 7.2); back off |
 | a secret the spec declares is missing at prepare (slots.md, 5.4) | configuration | wait for the secret store's generation to change: an import |
 | the activator found a layer that does not match its record (activator.md, section 6) | none: the store is corrupt | never a refusal: the builder hashes the layer again and, if it is corrupt, deletes it and its descendants and builds again (store.md, 4.4) |
-| the trial fell back: no bless within the window, or a failed unit `bless.ignore_failed` does not list | refused | refuse the prepare key |
+| the trial fell back: no bless within the window, or a failed unit `bless.ignore_failed` does not list; or a live trial fell back (slots.md, 8.5) | refused | refuse the prepare key |
+| a change not eligible for live, or a live trial whose delta failed to build or verify (slots.md, 6.7 and 6.8) | none: not an error | an ordinary trial; why it was not live is a fact |
 
 - **Backoff** applies to operational failures only. It is jittered and
   doubles from 1 minute to a ceiling of an hour (starting values), and
@@ -566,7 +597,8 @@ be made or run, so its prepare key is refused.
   changes the prepare key (slots.md, 2.2 and 5.4), and prepares a new
   slot from the output it already holds: no build, a snapshot and a
   shift (slots.md, 5.1 and 5.2), then a trial, which is a soft reboot
-  when the kernel is unchanged.
+  when the kernel is unchanged; never live, since a rotated secret is
+  not in the output's diff (slots.md, 6.7, rule 2).
 - **A rotation that falls back** refuses only its own prepare key (4.4).
   The running slot, at the older generation, stays; the next import
   bumps the generation again and makes another key to try.
@@ -586,13 +618,17 @@ be made or run, so its prepare key is refused.
   container is a target of the host's revision, rendered, built and
   placed by the host's builder, in the host's store (build.md,
   section 2).
-- **A container's trial is a restart on its new root,** watched, with a
-  fall back to the old root if it does not come up healthy, as the bash
+- **A container's trial is live when eligible** (slots.md, 12.8), the
+  host's activator swapping the overlays inside the container's mount
+  namespace and acting on its units through `systemctl --machine=`.
+  **Otherwise it is a restart on its new root,** watched, with a fall
+  back to the old root if it does not come up healthy, as the bash
   fleet's `switch-container` does (slots.md, 12.2 and 12.3). The host's
-  hearth judges it from outside; no hearth runs in the container in M5
-  (slots.md, 12.5).
+  hearth judges both from outside; no hearth runs in the container in
+  M5 (slots.md, 12.5).
 - **Its bless is in the same pass.** Where a host's pass ends at its
-  reboot, a container's goes on: once the restart has answered, the pass
+  reboot, a container's goes on: once the restart or the live swap has
+  answered, the pass
   waits for the minimal criterion and the container's blessing checks,
   read from the host, and asks the host's activator to bless, or to fall
   back on a failed unit that counts (slots.md, 12.3). A container's
@@ -655,8 +691,9 @@ Hello
                   the identity's and secret store's generations; slot tree digest,
                   secrets counted by H(name, generation) (slots.md, 2.2);
                   the revision, from the builder's records; drift; age
-    boot          running, default, trial: a label or none (slots.md, section 3)
-    last trial    slot; output key; blessed | held | fell back | rolled back; age
+    boot          running, default, trial: a label or none; live: the delta's slot and prepare key,
+                  or none (slots.md, section 3)
+    last trial    slot; output key; kind; blessed | held | live-blessed | fell back | rolled back; age
   orders        in flight: key, attempt, stage
                 answered, not yet acknowledged: key, attempt, outcome
   identity      per target, the public halves: SSH host keys, the machine-id
@@ -665,7 +702,7 @@ Hello
 ```
 
 - **Facts, read afresh.** The builder asks its activator for the slots
-  and the three facts when it composes the hello, never from a cache.
+  and the four facts when it composes the hello, never from a cache.
   The hello is a fresh read the engine's connector can decide on (jig's
   `connectors.md`, 5.1).
 - **No time crosses the wire; only durations do** (temper's
@@ -683,11 +720,17 @@ Hello
   | running `b`, default `b`, no trial; `b` blessed | `b` held, and is blessed |
   | running `a`, default `a`, no trial; `b` fell back | `b` fell back; `a` runs |
   | running `a`, default `a`, no trial; `b` prepared, no record of its trial | the activation never began |
+| running `a`, default `a`, live `b`, trial `b` in phase `running`; `b` on live trial | `b`'s files run live over `a`; its live bless is pending |
+| running `a`, default `a`, live `b`; `b` live-blessed, the one-shot its trial entry | `b` passed live; its next boot is its trial |
+| running `a`, default `a`, no live, no trial; `b` fell back, kind live | `b`'s live trial fell back; `a`'s files run, with no reboot |
 
 - **A container's activation [M5] drops no channel:** its host stays
   up, so its outcome reaches the engine as fact updates while the
   channel is open, and the same table reads its facts in any later
   hello.
+- **A host's live activation drops the channel once,** when the builder
+  is spawned anew after the swap (slots.md, 6.8, L6); the new builder's
+  hello carries the live fact, and the rest arrives as fact updates.
 - **Bounded.** The hello's size follows from the limits: targets per
   machine, slots per target, orders kept, identity entries. Its largest
   body is in the terms.
@@ -736,7 +779,7 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
 | Order | Fields | Form | Class |
 |---|---|---|---|
 | prepare | target; revision; the expected output key, optional; sources [M6] (section 8) | creation | keyed, by target and revision |
-| activate | target; slot; the running slot and the default decided from; bless: when healthy, or held for at most a duration | transition | conditional, on the running slot and the default |
+| activate | target; slot; how: `auto`, `live` or `full`; the running slot, the default and the live state decided from; bless: when healthy, or held for at most a duration | transition | conditional, on the running slot, the default and the live state |
 | bless | target; slot | transition | conditional, on that slot running on trial, healthy, its bless held |
 | roll back | target; the running slot and the default decided from | transition | conditional, on the running slot and the default |
 | restart a unit [M5] | target; unit | transition | keyed, by the order's key, which hearth keeps; conditional at the activator on the unit's invocation (activator.md, 5.9) |
@@ -759,9 +802,10 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
   and answers it `superseded`. Once the activator has begun placing the
   slot, the first finishes, and the second is refused `busy`.
 - **Outcomes:** prepared, with the slot, the output key, the slot parts'
-  digests and the activation it needs (a soft reboot, a reboot, or a
-  restart for a container); superseded; refused (`busy`, `mismatch`);
-  failed, with the stage and the typed reason.
+  digests and the activation it needs (live, a soft reboot, a reboot,
+  or a restart for a container; when not live, the rules that fail);
+  superseded; refused (`busy`, `mismatch`); failed, with the stage and
+  the typed reason.
 
 **activate.**
 
@@ -777,6 +821,17 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
   bakes: its semantics are slots.md, 7.4, and the activator's operation
   activator.md, 5.13. The engine then sends `bless` or `roll back`, and
   the hello shows the slot as held (5.2).
+- **`how`** is slots.md, 6.1's: `auto` is live when eligible, else a
+  soft or a one-shot reboot; `live` is live only, refused with the rules
+  that fail when the change is not eligible, so an engine can keep
+  reboots for a window of its own; `full` is a one-shot reboot.
+- **A live activation's `begun`** is recorded before the swap and sent
+  before the builder is spawned anew. A held live bless releases into
+  the live bless; `roll back` while live is the live fall back
+  (slots.md, 8.5). The live bless leaves the default where it was: the
+  slot becomes the default only at its native boot's bless, which the
+  hello after that boot shows, whenever the engine or a person reboots
+  the machine.
 
 **bless.**
 
@@ -813,7 +868,8 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
 - **Orders reach its host's hearth,** which builds, prepares and
   activates the container (4.7): prepare, activate and roll back are
   keyed and conditional as above, on the container's own facts, and an
-  activation is a restart (slots.md, 12.2), answered `begun` before it.
+  activation is live when eligible (slots.md, 12.8), or a restart
+  (slots.md, 12.2), answered `begun` before it.
 - **A held bless** is a host's (slots.md, 7.4): `activate` with `bless:
   held for at most d`, released by `bless`; at the ceiling the host's
   activator falls the container back, a restart on its old slot, as at
@@ -933,8 +989,10 @@ Application kinds of skein's channel; each belongs to one direction.
 | `machine` | fact | target; architecture; firmware; `SecureBoot`; the booted kernel; boot id; soft reboots; watchdog; firmware quirks seen (activator.md, 4.3) | activator | M3 |
 | `release` | fact | hearth's version; the wire versions spoken | builder | M3 |
 | `slot` | fact | target; label; state; output key; prepare key; slot parts' digests; the identity's and secret store's generations; the trial window [M5]; the slot's tree digest, in which each secret's contents count as `H(name, generation)`, never the value; age (slots.md, 2.2); the revision, from the builder's records | activator | M3 |
-| `boot` | fact | per target: running, default, trial (slots.md, section 3) | activator | M3 |
-| `trial` | fact | the last trial: slot; attempt; kind; phase reached; outcome; age | activator | M3 |
+| `boot` | fact | per target: running, default, trial, live (slots.md, section 3) | activator | M3 |
+| `live` | fact | per target, the live state: base; delta; the slot and prepare key it carries, or none; hierarchies overlaid; whether the mount table agrees with the live record (slots.md, 2.4) | activator | M3 |
+| `trial` | fact | the last trial: slot; attempt; kind (live, soft reboot, reboot, restart); phase reached; outcome; for a live one, the step that failed and the units acted on; age | activator | M3 |
+| `activation` | fact | per target, how its prepared slot would be activated: live with its unit plan, or a soft reboot, a reboot or a restart, and when not live, why: the rules of slots.md, 6.7 that fail, with their first paths or units, bounded | builder | M3 |
 | `data` | fact | persistent subvolumes: present, mounted, orphaned | activator | M3 |
 | `drift` | fact | per slot: clean, or the stable ids of what differs (slots.md, section 10) | activator | M3 |
 | `identity` | fact | per target, public halves: SSH host keys (type, key), the machine-id | activator | M3 |
@@ -952,7 +1010,10 @@ Application kinds of skein's channel; each belongs to one direction.
 | `fault` | fact | a pool host's active faults, each with its end (operating.md, section 8) | activator | M6 |
 | `artifact` | fact | an artifact's key: its tree digest, or failed; its costs (artifacts.md, 5.6 and 5.7) | builder | M6 |
 | `prepared` | event | slot; output key | builder | M3 |
-| `trial begun` | event | slot; soft reboot or reboot | activator | M3 |
+| `trial begun` | event | slot; soft reboot or reboot; why it was not live | activator | M3 |
+| `live trial begun` | event | slot; base; delta; the units stopped, reloaded, restarted and started | activator | M3 |
+| `live-blessed` | event | slot; the one-shot set to its trial entry; the default unmoved | activator | M3 |
+| `fell back (live)` | event | slot; the step and the reason; whether the replay held or `reboot -ff` followed | activator | M3 |
 | `bless held` | event | slot; the hold's end (slots.md, 7.4) | activator | M4 |
 | `blessed` | event | slot | activator | M3 |
 | `fell back` | event | from slot; to slot | activator | M3 |
@@ -1056,8 +1117,8 @@ wire, not in traits: another backend is another daemon speaking it.
 | a target, a revision | a base in an environment; a commit of the IaC repository (format.md) |
 | an output, by key | the config layer, on software and packages layers, on btrfs (store.md) |
 | parts, by name and digest | packages, software, config, data, secrets, boot: names the engine's policy may match ("caution follows what changed", temper's `factory.md`, 6.3), never interprets |
-| a slot, by label, and the three facts | `@<target>.<label>` and its `/var`; `BootNext`, `BootOrder`, GRUB's env (machine.md); for a container, its link and the default its host records [M5] (slots.md, 12.6) |
-| an activation: soft reboot, reboot, restart | `systemctl soft-reboot` into `/run/nextroot`; `systemctl reboot` with `SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT=1` (slots.md, section 6); a container's restart |
+| a slot, by label, and the four facts | `@<target>.<label>` and its `/var`; `BootNext`, `BootOrder`, GRUB's env (machine.md); a delta subvolume and overlays in the mount table; for a container, its link and the default its host records [M5] (slots.md, 12.6) |
+| an activation: live, soft reboot, reboot, restart | overlays swapped beneath `/etc`, `/usr` and `/opt` with the units acted on (slots.md, 6.8); `systemctl soft-reboot` into `/run/nextroot`; `systemctl reboot` with `SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT=1` (slots.md, section 6); a container's restart |
 | a unit, by name | a systemd unit of the running slot |
 | a check, by id, with its result | a unit, a command or a probe (operating.md) |
 | drift, by stable ids | a slot compared with its record |
@@ -1066,8 +1127,9 @@ wire, not in traits: another backend is another daemon speaking it.
 - **Never at the wire:** a package, a resolution, a layer's name, a
   subvolume, an EFI variable, a tool's text.
 - **A part's name is a label.** The engine reads that `config` changed
-  and `packages` did not, to choose a soft reboot and a short bake; it
-  needs to know nothing of dpkg.
+  and `packages` did not, to expect a live change or a soft reboot and a
+  short bake; it needs to know nothing of dpkg. Why a change is not
+  live comes as rule numbers and paths, never as Debian's terms.
 
 ## 10. Its world
 
@@ -1086,8 +1148,10 @@ wire, not in traits: another backend is another daemon speaking it.
   The seed draws: commits that change nothing, change config, or break
   render; build steps that fail; power cuts at every stage of a pass,
   of a prepare and of a trial; trials that hang, panic or fail the
-  minimal bless; imports of secrets; holds and releases; [M5] a host's
-  containers, their trials failing or cut by a host reboot. Its
+  minimal bless; imports of secrets; holds and releases; changes
+  eligible for live and not, live trials whose reload fails, cut at
+  every phase, and later changes while live; [M5] a host's containers,
+  their trials failing or cut by a host reboot, live or not. Its
   invariants:
   - the machine always boots a blessed slot or a trial that ends, and
     each container starts on one [M5];
@@ -1096,6 +1160,8 @@ wire, not in traits: another backend is another daemon speaking it.
   - a slot that runs but is not the default is blessed again before
     any prepare;
   - a hold starts nothing new, and never keeps a trial alive;
+  - a trial is live exactly when slots.md, 6.7 allows, and a live bless
+    never moves the default;
   - at most one prepare and one trial per machine at a time;
   - backoff and polling stay within their bounds; a pass for an old
     generation never acts.
@@ -1111,7 +1177,8 @@ wire, not in traits: another backend is another daemon speaking it.
   - every outcome reaches the engine, by an answer or in a hello, until
     acknowledged;
   - after any reboot, the hello's facts tell held, fell back or never
-    began, and agree with the fake machine;
+    began, and agree with the fake machine; after a live activation's
+    respawn, they tell on live trial, live-blessed or fell back (live);
   - one channel per machine; no fact before the hello; facts only with
     room;
   - the dial's backoff stays jittered and bounded.
@@ -1149,5 +1216,9 @@ wire, not in traits: another backend is another daemon speaking it.
   the machine's identity depends on 5.3.
 - **Trials on a timetable:** whether `trial: manual` grows a maintenance
   window (a time of day), when a machine needs one.
+- **Live changes on a manual machine:** a manual machine applies them
+  only on `hearth trial` (4.1); whether it should apply them at once and
+  wait only for reboots depends on how often a live change surprises
+  the person at the machine.
 - **Changing a machine's mode** between standalone and an engine without
   a new bootstrap; it depends on how identity is issued (5.3).

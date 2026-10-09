@@ -60,18 +60,18 @@ in section 12.
 
 | Kind | Firmware | Disk, boot partition | How a slot is tried | Watchdog | Examples | Milestone |
 |---|---|---|---|---|---|---|
-| bare metal on EFI | the vendor's UEFI | NVMe; ESP | soft reboot, or `BootNext` | iTCO where the chipset has it (to verify per machine) | `x1-prod` | M3 |
-| Incus VM with its own disk | OVMF | a virtio disk; ESP | soft reboot, or `BootNext` | iTCO on q35 | the VM tier's machines (testing.md, section 7) | M3 |
-| IaaS VM on BIOS | the provider's BIOS | a virtio disk; FAT environment partition | soft reboot, or `next_entry` | none known | `rhi-prod`, `ion-prod`, `mail-prod` | M3b |
+| bare metal on EFI | the vendor's UEFI | NVMe; ESP | live, soft reboot, or `BootNext` | iTCO where the chipset has it (to verify per machine) | `x1-prod` | M3 |
+| Incus VM with its own disk | OVMF | a virtio disk; ESP | live, soft reboot, or `BootNext` | iTCO on q35 | the VM tier's machines (testing.md, section 7) | M3 |
+| IaaS VM on BIOS | the provider's BIOS | a virtio disk; FAT environment partition | live, soft reboot, or `next_entry` | none known | `rhi-prod`, `ion-prod`, `mail-prod` | M3b |
 | IaaS VM on EFI, NVRAM unreliable | the provider's UEFI | a virtio disk; ESP | open (9.4) | none known | vul | later |
-| container | none: the host's kernel | slots on the host's top level | restart | the host's | `chat-prod` on `rhi-prod`; `mail-lab` in a lab pool | M5 |
+| container | none: the host's kernel | slots on the host's top level | live, or restart | the host's | `chat-prod` on `rhi-prod`; `mail-lab` in a lab pool | M5 |
 | VM with a virtiofs root | Incus direct kernel boot | slots on the pool host's top level | stop, repoint, start | the host's | the bash fleet's lab | later |
 
 ### 2.1 Bare metal on EFI
 
 The MVP's machine is `x1-prod`, a laptop with an NVMe disk. It runs os
 today, with direct EFI-stub entries labelled `a` and `b`, and already
-shows the three facts apart: running slot `b`, `BootOrder` default `a`.
+shows the facts apart: running slot `b`, `BootOrder` default `a`.
 hearth installs it afresh on a wiped disk, as every machine (section 8):
 nothing of os's is kept. A person is at hand, so a hang no watchdog
 covers is recoverable; the machine is held to the same invariants as
@@ -166,6 +166,7 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 ├── @x1-prod.a.var          slot a's /var           a reflink copy of that output's /var
 ├── @x1-prod.b              slot b's root
 ├── @x1-prod.b.var          slot b's /var
+├── @x1-prod.live.3         a live delta            only while a live state exists (slots.md, 6.6)
 ├── @x1-prod.journal        a persistent subvolume  one per data entry its tasks declare
 ├── @x1-prod.data           a persistent subvolume
 ├── @hearth.store           the builder's store     owned by hearth, 0700; its layers nested in it (store.md, section 2)
@@ -178,6 +179,7 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 | `@<target>.<label>` | the output's `/`; read-only flag set at the end of prepare | prepare: a snapshot (slots.md, 5.1) | the next prepare of that slot |
 | `@<target>.<label>.var` | the output's `/var`, `0:0 0755` | prepare (slots.md, 5.3) | the next prepare of that slot, nested subvolumes first |
 | `@<target>.<name>` | `0:0 0755` when made, seeded from the output's content at its path | bootstrap, or the first prepare that declares it (slots.md, 5.3) | never by hearth (3.4) |
+| `@<target>.live.<n>` | holds `etc`, `usr` and `opt` with the new slot's metadata: its changed files as reflinks, and 0/0 whiteouts; read-only once verified | a live trial (slots.md, 6.8, L1) | the native bless of its slot, a live fall back, or the start that finds no record naming it |
 | `@hearth.store` | `hearth:hearth 0700` | bootstrap | never |
 | `@hearth.state` | `0:0 0700` | bootstrap | never |
 | `@hearth.backups` [M6] | `0:0 0700`; holds `<target>.<name>/<seq>`, read-only snapshots, its own and, on a backup peer, those it receives | the first backup | each snapshot by retention (operating.md, 7.3) |
@@ -221,6 +223,8 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 | `/run/hearth-activator/top` | the top level, `subvolid=5` | the activator, when it starts | `nodev,nosuid,noexec`; `/run/hearth-activator` is `0700`, root's |
 | `/run/hearth-activator/boot` | the boot partition | the activator, for each write, then unmounted | `vfat`, `umask=0077,nodev,nosuid,noexec` |
 | `/run/nextroot` | a slot's root, for a soft reboot | the activator (slots.md, section 6) | `ro,subvol=/@x1-prod.a` |
+| `/run/hearth-activator/layers` | a clone of the top level: the live overlays' layers | the activator, when it starts | `ro`, private; without `noexec` and `nosuid` (slots.md, 6.8) |
+| `/etc`, `/usr`, `/opt`, while a live state runs | overlayfs, source `hearth-live`: a delta over the running slot's directory | the activator (slots.md, 6.8) | `ro,nodev`; `nosuid` on `/etc` only |
 
 - **The store and the state hang below `/var`,** which is per slot, so
   each slot's `/var` gets their mount points at prepare (slots.md, 5.3).
@@ -273,11 +277,12 @@ UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /srv/data              btrfs  subvol=
   `before` are reserved after a data name for restores [M6].
 - **A `data` entry** (format.md, section 5) has a name and a path. The
   name is one segment of lowercase letters, digits and `-`, at most 32
-  bytes, neither `a` nor `b`. The path is absolute and normal, beneath
-  `/srv`, `/var` or `/home`, not `/var/lib/hearth` or beneath it, and not
-  beneath another entry's path: persistent subvolumes are siblings,
-  mounted flat. At most 64 entries. Render refuses an entry that breaks
-  a rule, and the activator refuses it again (activator.md, 2.2).
+  bytes, neither `a`, `b` nor `live`, which names live deltas. The path
+  is absolute and normal, beneath `/srv`, `/var` or `/home`, not
+  `/var/lib/hearth` or beneath it, and not beneath another entry's path:
+  persistent subvolumes are siblings, mounted flat. At most 64 entries.
+  Render refuses an entry that breaks a rule, and the activator refuses
+  it again (activator.md, 2.2).
 - **A persistent subvolume's contents belong to its tasks:** it is made
   with a root of `0:0 0755`, seeded with what the output holds at its
   path, so packages' files there are not hidden by an empty mount

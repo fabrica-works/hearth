@@ -23,8 +23,8 @@ section 10.
   instruction sequences; the domain never parses.
 - **A spec is parts with digests.** Output parts (packages, software,
   config) enter layer keys; slot parts (data, secrets, boot) never do;
-  checks and exports are the others; meta names the target. Each digest
-  is SHA-256 over store.md's canonical encoding.
+  checks, exports and live are the others; meta names the target. Each
+  digest is SHA-256 over store.md's canonical encoding.
 - **Resolution is the one slow step,** and it is remembered.
   `mmdebstrap --simulate --mode=chrootless` resolves a packages part to a
   pinned closure (each package's name, version, architecture, archive
@@ -274,6 +274,7 @@ Render compares the concrete declarations of all the target's tasks:
 | a path in the tree under a data path | never: the mount would hide it |
 | a download's path | one task only; never overlapping another's, nor a path of the tree |
 | users, groups, presets, tmpfiles lines, preseeds, boot parameters | several tasks only identically |
+| a path a `live` entry covers | several entries, of one task or several: their consumers are a union (format.md, 5.14) |
 | a uid or gid; a subordinate range | one user or group; ranges never overlap |
 | packages, initramfs modules | a union |
 
@@ -287,6 +288,11 @@ overwrote silently, in alphabetical order of task.
   encoded canonically and digested.
 - **Render also gives the resolution key** (5.1), and the layer keys when
   the store already holds that key's resolution (4.5).
+- **The live part maps each covered path to its consumers,** from every
+  task's `live` entries (format.md, 5.14): the eligibility input that
+  only a spec holds. Render decides nothing about a change: the builder
+  pairs two specs' live parts with two outputs' tree files when it plans
+  a trial (slots.md, 6.7).
 - **The output is the spec.** Every file it names is in the store's
   cache by digest, static files from step 1 and rendered ones from
   step 6, where a build finds them. Specs are never stored: a builder
@@ -345,6 +351,7 @@ overwrote silently, in alphabetical order of task.
 | `secrets` | slot | secret files, password secrets and identity items, by name | no key |
 | `boot` | slot | the kernel's command-line parameters; a container's parameters instead [M5] | no key |
 | `checks` [M5] | other | the target's checks (operating.md, section 2) | no key |
+| `live` | other | the consumers of the target's paths, for live changes (format.md, 5.14) | no key; read by the builder to plan a live trial |
 | `exports` | other | what this target publishes to its environment | no key; read by other targets' renders |
 | `meta` | | target, base, member, environment, placement | no key |
 
@@ -464,6 +471,8 @@ boot                   list of parameters, in order; for a container [M5], its p
 
 ```
 exports                map task → map name → value; and [M5] the task's probes with `from`, rendered
+live                   map path → list of { task, unit?, action }, in path order; a path ending in `/`
+                       covers its subtree (format.md, 5.14)
 checks                 from M3, the units whose failure does not block a bless (format.md, 5.13);
                        [M5] the target's checks, and the probes it runs for others (3.9; operating.md, section 2)
 meta                   { target, base, member?, environment, placement { kind, firmware?, hardware?, on?, and a container's parameters [M5] } }
@@ -474,6 +483,9 @@ meta                   { target, base, member?, environment, placement { kind, f
   whose content changes.
 - **Meta enters no key:** two targets whose output parts agree share an
   output, whatever their names.
+- **The live part enters no key, not even the prepare key:** how a
+  change is applied is not what a slot holds, so a change to `live`
+  entries alone builds and prepares nothing.
 
 ### 4.5 Keys
 
@@ -706,7 +718,8 @@ rebuild
 - **Time,** when the builder has built the target before, is its last
   recorded cost for each layer to rebuild. Whether activation needs a
   reboot is known only after the build, from the kernel's and the
-  initramfs's digests (slots.md, section 6).
+  initramfs's digests (slots.md, section 6), and whether it can be live,
+  from the two outputs' tree files and the live parts (slots.md, 6.7).
 
 ### 6.3 Printed
 

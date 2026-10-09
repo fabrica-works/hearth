@@ -370,6 +370,18 @@ This extends slots.md, section 7.
   read from its host (slots.md, 12.3). Its window is computed the same
   way and kept by its host's activator, which falls it back at the end,
   since no dead-man runs in a container.
+- **A live trial's checks join its settle** (slots.md, 6.8, L7). From
+  the swap on, the new slot's blessing checks run back to back at
+  `trial_interval`, as on any trial; the live bless waits for the settle
+  period and for every one of them to pass (slots.md, 7.6). Its window
+  is the base's, whose dead-man ends it, so a change whose new window
+  would be longer than the base's is not live (slots.md, 6.7, rule 10).
+  A failing check is waited for until a margin before that window ends;
+  then the builder asks the live fall back (slots.md, 8.5), which needs
+  no reboot, and the dead-man stays the backstop.
+- **A live bless is not the last word:** the slot's native boot is a
+  trial of its own (slots.md, 6.8, L9), and its blessing checks run
+  again there before the default moves.
 - **After the bless, checks only report.** Every check runs at its
   interval, blessing and watching alike. A check that starts failing on
   a blessed slot is a fact and an event; hearth rolls nothing back. In

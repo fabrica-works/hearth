@@ -36,7 +36,8 @@ render.md. Open questions are in section 13.
   settings and their schema, what it reads from other tasks, packages
   and preseeds, initramfs modules, software, files with modes and owners,
   users, presets, tmpfiles, persistent data, secret files, identity, boot
-  parameters, exports, and its escape hatches with their order.
+  parameters, exports, the units that consume its files when they change
+  live, and its escape hatches with their order.
 - **Every setting is declared:** a type, a default or `optional`, and one
   line of documentation. An undeclared setting, a wrong type, a missing
   required setting and an undeclared read are errors, with their file and
@@ -519,6 +520,7 @@ nothing.
 | `exports` | facts for the environment's other targets | exports | 8 |
 | `checks` [M5] | what healthy means | checks | 11 |
 | `bless` | units whose failure does not block a bless | checks | 5.13 |
+| `live` | the units that consume its paths, and what each does when they change with no reboot | live | 5.14 |
 
 ### 5.2 Entries
 
@@ -851,6 +853,13 @@ nothing.
   (machine.md, 3.4). The rest of `/` stays immutable.
 - **Names are per target:** two tasks declaring one name is a collision
   (render.md, 3.7).
+- **Data keeps a program's default path.** An entry is mounted where
+  the program already looks, as Debian ships it, so no configuration
+  changes for it: journald writes `/var/log/journal`, iwd keeps its
+  networks in `/var/lib/iwd`. os did the same by binding the
+  directories `/srv/core/journal` and `/srv/core/iwd`, of one
+  `@<target>.srv.core` subvolume, onto those paths; hearth gives each
+  its own subvolume, mounted there.
 - The journal, which the bash fleet and os bound from a hard-coded
   `@<target>.srv.core/journal`, is the `core` task's:
 
@@ -871,14 +880,22 @@ nothing.
   verify. A container has no `journal` entry: its journal lives in its
   host's (3.5) [M5].
 
-  and iwd's state, bound from `…/iwd` only when the Wi-Fi task was
-  present, is the `wifi` task's:
+- iwd's state, its known networks and their passphrases, which os bound
+  from `/srv/core/iwd` only when the Wi-Fi task was present, is the
+  `wifi` task's, at iwd's own default path:
 
   ```json
-  { "data": { "iwd": { "path": "/var/lib/iwd", "mode": "0700" } } }
+  {
+    "doc": "Wi-Fi through iwd, its known networks kept across slots.",
+    "packages": { "iwd": {} },
+    "data": { "iwd": { "path": "/var/lib/iwd", "mode": "0700" } }
+  }
   ```
 
-  On x1-prod they are `@x1-prod.journal` and `@x1-prod.iwd`.
+  iwd runs as root, so the root-owned default needs no fixed id; the
+  mode keeps the passphrases from other users. On x1-prod the two are
+  `@x1-prod.journal` and `@x1-prod.iwd`, and neither journald nor iwd
+  is configured to find them.
 
 ### 5.8 Escape hatches
 
@@ -977,6 +994,8 @@ declares it (render.md, 7.2):
 | preseeds of type `password` | they leave the password in `/var/cache/debconf/passwords.dat` | build.md, 9.2 |
 | a secret or identity file owned by user `hearth`, or by a group `hearth` belongs to (`systemd-journal`); a secret's mode readable by others | the builder must never read a secret | activator.md, section 2; 9.1 |
 | an owner of a data path, a secret or an identity file without a fixed id; a download's owner other than `root` or a package user with a fixed id | ids that move between builds; no sysusers user exists when software is placed | 5.6; 10.1 |
+| `live` entries that name a never-live unit or path (5.14); a `unit` with `none`, or none with another action; a path outside `/etc`, `/usr` and `/opt` | a never-live unit must not be acted on live, and a change elsewhere is never live | 5.14; slots.md, 6.7 |
+| presets and links that enable `systemd-sysext.service` or `systemd-confext.service`; anything under `/etc/extensions`, `/usr/lib/confexts`, `/usr/local/lib/confexts`, `/var/lib/extensions` or `/var/lib/confexts` | nothing may merge extensions over hearth's live overlays, at boot or after a soft reboot, a container's included, which has no `hearth` task to disable them | 5.12; slots.md, 6.6 |
 
 ### 5.12 The hearth task
 
@@ -1027,7 +1046,11 @@ declares it (render.md, 7.2):
         "subordinate": { "base": 262144, "count": 65536 }
       }
     },
-    "presets": { "hearth-activator.service": { "action": "enable" } }
+    "presets": {
+      "hearth-activator.service": { "action": "enable" },
+      "systemd-sysext.service": { "action": "disable" },
+      "systemd-confext.service": { "action": "disable" }
+    }
   }
   ```
 
@@ -1043,6 +1066,11 @@ declares it (render.md, 7.2):
   ids packages take below 1000 (to verify against the fleet's packages).
 - **`systemd-journal`** lets the builder read the journal for telemetry
   (wire.md, section 7).
+- **`systemd-sysext` and `systemd-confext` are disabled.** Debian's
+  `90-systemd.preset` enables both; hearth makes its live overlays
+  itself (slots.md, 6.6), and a boot service that merged an extension
+  would stack it over them, or over a root it was not made for after a
+  soft reboot.
 - **The tools** hearth runs as child processes come from Debian: git
   for render, mmdebstrap and `newuidmap` for builds (store.md, 9.3), and
   `ssh-keygen` for the activator's host keys (9.3).
@@ -1067,6 +1095,117 @@ declares it (render.md, 7.2):
 - **A container never counts against its host [M5]:** the host's
   minimal bless leaves out its containers' nspawn units without any
   list, since each container's slot has its own trial (slots.md, 7.1).
+
+### 5.14 Live changes
+
+A change applies live, with no reboot, only if every path it changes
+has a consumer: a unit to act on, or a declaration that none is needed
+(slots.md, 6.7, rule 7). A task declares its own. Without one the
+change takes an ordinary trial, a soft reboot or a reboot; that is never
+an error.
+
+- **`live` is a map of entries keyed by name,** with `if` and
+  `for_each` (5.2):
+
+  | Field | Type | Default | Meaning |
+  |---|---|---|---|
+  | `unit` | unit name | required, but with `none` | the systemd unit that reads the paths |
+  | `action` | enum `reload`, `restart`, `reload-or-restart`, `start`, `none` | required | what happens to the unit once the change is mounted |
+  | `paths` | list of absolute paths under `/etc`, `/usr` or `/opt` | required | what it consumes; a path ending in `/` covers its subtree |
+
+  | Action | For | Done |
+  |---|---|---|
+  | `reload` | a daemon that reads its configuration again on `ExecReload=`: postfix, nginx, sshd | `systemctl reload` after the swap; a reload that fails, as sshd's on a bad `sshd_config`, fails the live trial |
+  | `restart` | a daemon whose binary, libraries or data change, or that reads its configuration only at start | for a changed path under `/usr` or `/opt`, stopped before the swap and started after, so the old binary never reads new files; for one under `/etc` only, restarted after |
+  | `reload-or-restart` | a unit that may lack a reload | `systemctl reload-or-restart` after the swap |
+  | `start` | a unit whose run applies the change: a oneshot, a timer | `systemctl start` after the swap |
+  | `none` | inert files, read afresh at every use: a command-line tool, its manual, data a short-lived command reads | nothing |
+
+- **Postfix,** whose configuration a reload applies, in the `mail` task:
+
+  ```json
+  {
+    "live": {
+      "postfix": { "unit": "postfix.service", "action": "reload", "paths": ["/etc/postfix/", "/etc/mailname"] }
+    }
+  }
+  ```
+
+- **An in-house service shipped as software under `/opt`,** whose new
+  binary needs a restart, in a `stoa` task:
+
+  ```json
+  {
+    "software": {
+      "stoa": {
+        "url": "https://git.ekanayaka.io/ai/stoa/releases/download/v0.4.0/stoa-x86_64-linux.tar.gz",
+        "sha256": "…", "unpack": "tar", "strip": 1, "path": "/opt/stoa"
+      }
+    },
+    "files": {
+      "/etc/systemd/system/stoa.service": {},
+      "/etc/stoa/stoa.json": { "template": "templates/stoa.json.j2" }
+    },
+    "presets": { "stoa.service": { "action": "enable" } },
+    "live": {
+      "stoa": { "unit": "stoa.service", "action": "restart", "paths": ["/opt/stoa/", "/etc/stoa/"] }
+    }
+  }
+  ```
+
+  A new release under `/opt/stoa` stops the service before the swap and
+  starts it after; a change to `stoa.json` alone restarts it after. Its
+  unit file needs no entry (below).
+- **A command-line tool,** ripgrep from 10.1, which no unit runs:
+
+  ```json
+  { "live": { "ripgrep": { "action": "none", "paths": ["/opt/ripgrep/"] } } }
+  ```
+
+- **Several consumers may cover one path,** in one task or several: a
+  certificate under `/etc/ssl/certs/` read by postfix and nginx runs
+  both reloads. Render takes their union (render.md, 3.7).
+- **A deleted path's consumer** is declared by the running slot's spec,
+  where the path still exists; every other path's by the new spec.
+- **Consumers hearth knows itself,** which no task declares:
+
+  | Path | Consumer |
+  |---|---|
+  | a unit file or drop-in in `etc/systemd/system/` or `usr/lib/systemd/system/` | its unit: `daemon-reload`, then restarted if it runs, started if new and wanted, stopped before the swap if its file goes |
+  | a `.wants/` or `.requires/` link | the unit it names: started when the link comes, stopped before the swap when it goes |
+  | `etc/passwd`, `etc/group`, `etc/shadow`, `etc/gshadow`, `etc/subuid`, `etc/subgid` | the accounts, entries only added (slots.md, 6.7, rule 5); `nscd --invalidate` if nscd runs |
+  | `usr/lib/tmpfiles.d/hearth.conf` | `systemd-tmpfiles --create` on that file (rule 6) |
+  | D-Bus policy in `usr/share/dbus-1/system.d/` and `etc/dbus-1/system.d/` | `systemctl reload dbus` |
+  | `usr/lib/sysusers.d/hearth.conf`, `usr/lib/systemd/system-preset/00-hearth.preset` | none: their effects, account lines and unit links, are in the change already (build.md, 7.2 and 7.5) |
+
+- **Never live.** A change to any of these takes an ordinary trial,
+  whatever a task declares, and render refuses a `live` entry that names
+  one (5.11). Boot-time and PID 1 configuration, read only at boot or
+  at PID 1's re-exec:
+
+  ```
+  etc/systemd/system.conf  etc/systemd/system.conf.d/  usr/lib/systemd/system.conf.d/
+  etc/systemd/system-generators/  usr/lib/systemd/system-generators/
+  etc/systemd/system-environment-generators/  usr/lib/systemd/system-environment-generators/
+  etc/udev/  usr/lib/udev/  etc/modprobe.d/  usr/lib/modprobe.d/  etc/modules
+  etc/modules-load.d/  usr/lib/modules-load.d/  etc/sysctl.conf  etc/sysctl.d/  usr/lib/sysctl.d/
+  etc/binfmt.d/  usr/lib/binfmt.d/  etc/kernel/  usr/lib/kernel/  usr/lib/modules/
+  etc/initramfs-tools/  etc/tiny-initramfs/  etc/crypttab  etc/default/grub  etc/fstab
+  etc/hostname  etc/localtime  etc/locale.conf  etc/vconsole.conf  etc/machine-id
+  etc/os-release  usr/lib/os-release
+  ```
+
+  and the services that must not restart live:
+
+  | What | Units and paths | Why |
+  |---|---|---|
+  | systemd's own | every unit the `systemd` packages ship; `etc/systemd/*.conf`, their `.d/` directories and `usr/lib/systemd/*.conf.d/` (journald, logind, networkd, resolved, timesyncd and the rest) | PID 1's and its daemons' state does not survive a careless restart |
+  | the core services | `dbus.service` and `dbus.socket` (their policy files are allowed, with a reload of dbus); `systemd-logind`, `systemd-journald`, `systemd-udevd`, `systemd-networkd`, `NetworkManager`; `getty@`, `serial-getty@`, `console-getty`; `apparmor.service` and `etc/apparmor.d/` | a restart ends sessions, loses logs, devices or the network; a profile needs `apparmor_parser -r` (slots.md, section 15) |
+  | hearth itself, for now | every file of the `hearth` task (5.12) and every path 5.11 reserves | until live changes are proven (slots.md, section 15) |
+
+- **What the declarations cost:** nothing in any key. The `live` part
+  enters no layer key and no prepare key (render.md, 4.4), so declaring
+  consumers builds nothing and prepares nothing.
 
 ## 6. The schema
 
@@ -1781,6 +1920,7 @@ artifacts.md (7.3) cite it.
 | `copy` from a workspace | `file` settings, from the repository (6.2) |
 | variant maps (never implemented) | maps of objects |
 | hard-coded preseeds, journal and iwd, gettys, snapshot host | task data (5.10) |
+| `deploy patch`, rewriting a running root's `/etc` | live changes: a prepared slot's delta mounted over the running one, its consumers declared (5.14; slots.md, 6.6) |
 
 ## 13. What is open
 
@@ -1825,3 +1965,7 @@ artifacts.md (7.3) cite it.
 - **A static file whose name ends in `.j2`** must be written as a
   template wrapped in `raw`; whether that is enough depends on what
   tasks ship.
+- **Live consumers by inference:** whether a unit's `ExecStart=` path
+  or its `ConfigurationDirectory=` could name its consumers without a
+  `live` entry (5.14); it depends on how many entries the fleet's tasks
+  need once written.

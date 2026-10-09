@@ -41,6 +41,14 @@ open. Each part has a document of its own beside this one.
   fall back. A new slot runs once; the boot default moves only when the
   slot's own hearth blesses it (a container's, its host's), and any
   failure during the trial ends in a reboot into the old default.
+- **Configuration and in-house software change live** (slots.md, 6.6):
+  when a change touches only `/etc`, `/usr` and `/opt` over the same
+  packages, and every changed path has a declared consumer, the
+  activator mounts a delta of the new slot over the running one with an
+  atomic swap and reloads or restarts the declared units, with no
+  reboot; a failure puts the old files back. Its bless arms the new
+  slot's trial for the next boot, so the default still moves only after
+  a native boot.
 - **Nothing unique and nothing secret in an output,** so outputs can be
   shared between machines. Identity and secrets are written into a slot
   when it is prepared, from a root-only store on the machine.
@@ -76,8 +84,8 @@ open. Each part has a document of its own beside this one.
 6. **machine.md:** what a machine looks like: disks and partitions, the
    btrfs top level, how each kind of machine boots, the initramfs,
    bootstrap.
-7. **slots.md:** a slot's life: the three facts, prepare, trial, bless,
-   fall back, roll back, drift, containers.
+7. **slots.md:** a slot's life: the four facts, prepare, trial (live
+   changes included), bless, fall back, roll back, drift, containers.
 8. **activator.md:** the privilege boundary: the process pair, the link,
    the activator's operations and what it verifies.
 9. **wire.md:** hearth's faces: the command-line client, standalone
@@ -123,7 +131,7 @@ section 7), peers, artifacts and backups.
 - nothing unique and nothing secret in an output (build.md, section 9);
 - render a pure function of the revision and the target, exports
   included (render.md);
-- the slots' three facts and their state machine (slots.md);
+- the slots' four facts and their state machine (slots.md);
 - every effect keyed or conditional, even while the client is the only
   one to ask (wire.md);
 - the privilege split, from the first slot (activator.md).
@@ -199,6 +207,7 @@ hearth-protocol-state         the activator's records, the trial marker, the slo
 hearth-protocol-units         fstab, the trial's units, the watchdog's drop-in           M3
 hearth-protocol-efi           EFI variables from efivarfs; efibootmgr's argument vectors  M3
 hearth-protocol-systemd       systemctl, systemd-run and the journal's queries            M3
+hearth-protocol-proc          /proc/<pid>/mountinfo and cgroup: mounts, overlays, units   M3
 hearth-protocol-keygen        ssh-keygen and the other identity tools                     M3
 hearth-protocol-client        the client's records                                        M3
 hearth-protocol-grub          grub-editenv, GRUB's configuration and env                  M3b
@@ -255,7 +264,7 @@ hearth-<name>-world           the other worlds, under tests/
 | setting, schema | a value a task reads; the task's declaration of its settings: names, types, defaults, a line each |
 | export | a fact a task publishes to the other targets of its environment |
 | spec | what a target is at a revision, rendered: parts with digests |
-| part | a piece of a spec with its own digest: meta, packages, software, config, data, secrets, boot, checks, exports |
+| part | a piece of a spec with its own digest: meta, packages, software, config, data, secrets, boot, checks, exports, live |
 | resolution | the pinned package closure a packages part resolves to, remembered by its key |
 | digest | SHA-256 over a canonical encoding |
 | key | what a layer or a resolution is named by: the digest of its inputs; a layer's is cumulative |
@@ -273,7 +282,8 @@ hearth-<name>-world           the other worlds, under tests/
 | persistent subvolume | a target's data that outlives its slots, mounted at a path a task declares |
 | secret store | root-only, on the machine: the target's secrets and the machine's identity |
 | identity | what makes a machine itself: its machine-id, its host keys |
-| running, default, trial | the three facts: the slot running, the boot default, the slot on trial (slots.md, section 3); a container's, read by its host (slots.md, 12.6) |
+| running, default, trial, live | the four facts: the slot running, the boot default, the slot on trial, and the live state over the running slot (slots.md, section 3); a container's, read by its host (slots.md, 12.6) |
+| live change, delta, live bless | a trial with no reboot: a delta of the new slot (`@<target>.live.<n>`) mounted over the running slot's `/etc`, `/usr` and `/opt`, the declared units acted on; its bless arms the new slot's native trial (slots.md, 6.6 and 7.6) |
 | prepare, trial, bless, fall back, roll back | a slot's transitions (slots.md, section 4) |
 | boot partition | the FAT partition the firmware or GRUB writes: the ESP on EFI, GRUB's env on BIOS (machine.md) |
 | builder, activator, link | the two processes, and the pipe pair that joins them (activator.md) |
@@ -332,6 +342,18 @@ that last:
   output at prepare, so dpkg's database travels with its slot. State that
   outlives a slot lives in persistent subvolumes per target, at paths the
   tasks declare (format.md, section 5; machine.md, section 3).
+- **Live changes, with hearth's own overlays** (slots.md, 6.6 to 6.9;
+  format.md, 5.14), built in M3, a container's in M5. A change confined
+  to `/etc`, `/usr` and `/opt`, over the same packages layer, with a
+  declared consumer for every changed path, is applied with no reboot:
+  a delta of the prepared slot, mounted over the running slot, the
+  declared units reloaded, restarted or started. The activator mounts
+  the overlays itself, with the new mount API and `MOVE_MOUNT_BENEATH`,
+  not through `systemd-sysext` and `systemd-confext`, whose refresh is
+  not atomic, whose mismatches are silent and whose search paths
+  survive a soft reboot. The live bless arms the new slot's trial
+  (`BootNext`, or `next_entry`) rather than moving the default, so every
+  slot still boots natively on trial before it becomes the default.
 - **Boot follows os, and adds the trial.**
   - EFI: the ESP holds each slot's kernel and initramfs, booted by a
     direct EFI-stub entry per slot. A trial is a `BootNext`; a bless
@@ -398,7 +420,8 @@ that last:
   watchdog where there is one, and a dead-man timer in the trial slot
   that forces a reboot unless the slot's hearth blesses it first
   (slots.md, section 6); a container's, by its host's activator at its
-  window's end (slots.md, 12.3).
+  window's end (slots.md, 12.3); a live trial's, by the running slot's
+  own dead-man, started from `/run` (slots.md, 6.8).
 - **A minimal bless until checks exist:** the boot reaches its target
   with no failed unit, and the slot's own hearth is up and talking to
   its activator (slots.md, section 7).
@@ -479,11 +502,13 @@ that last:
   (format.md, section 5; slots.md, 7.1).
 - **A host runs its containers [M5]:** its builder builds their outputs,
   its activator prepares their slots on its top level, starts each at
-  every start from the default it recorded, and tries a new slot by a
-  restart, judged from outside with the minimal bless read through
-  `systemctl --machine=`; the host's builder blesses it. No hearth runs
-  in a container, which has no `hearth` task, while whether one should
-  stays open (slots.md, section 12; format.md, 5.12).
+  every start from the default it recorded, and tries a new slot live
+  when the change is eligible, inside the container's mount namespace
+  (slots.md, 12.8), or else by a restart, judged from outside with the
+  minimal bless read through `systemctl --machine=`; the host's builder
+  blesses it. No hearth runs in a container, which has no `hearth`
+  task, while whether one should stays open (slots.md, section 12;
+  format.md, 5.12).
 - **A container's `/var` is per slot,** as a host's: the bash fleet's
   persistent `.var` becomes data entries, and a container's identity and
   secrets are its own target's, kept by its host (slots.md, 12.1).
@@ -529,6 +554,9 @@ user (`testing-strategy.md`, section 9). From the earliest:
 | redialling and identity on the channel's TLS client | the wire | M4 |
 | `syncfs` | a layer's data durable before its record | M2 |
 | `openat2` with `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS` and `RESOLVE_NO_XDEV`; `FICLONE` | prepare resolving and copying a slot's paths safely | M3 |
+| the new mount API: `fsopen`, `fsconfig`, `fsmount`, `move_mount` with `MOVE_MOUNT_BENEATH`, `open_tree`, `mount_setattr`; `umount2` with `MNT_DETACH`; walking a detached mount through its descriptor | live changes: overlays built aside, verified, swapped beneath and back (slots.md, 6.8) | M3 |
+| `mknodat` of a 0/0 character device | a live delta's whiteouts | M3 |
+| `setns` into another process's mount namespace, from a child | a container's live swap (slots.md, 12.8) | M5 |
 | cgroup v2: making, delegating and moving into subtrees, and spawning into one | sandboxes' limits; the builder's subtree | M2 |
 | generating Ed25519 and X25519 keys in-process | identity without tools from a slot | later |
 | HTTP ranges and file-backed bodies | bytes by digest | M6 |
@@ -566,6 +594,13 @@ Each document lists its own. The ones that reach across:
 - one generation for the whole secret store, so any import prepares
   every target's slot again, or one per target (activator.md);
 - whether a container runs a hearth of its own (slots.md, 12.5);
+- live changes on a real machine: real ids, PID 1, D-Bus and AppArmor
+  around a swap, overlays across soft reboots, `BootNext` kept for days
+  (slots.md, section 15; testing.md, 7.3);
+- hearth's own release applied live, once live changes are proven
+  (slots.md, section 15);
+- whether a manual machine applies live changes at once and waits only
+  for reboots (wire.md);
 - a blessed EFI default that later stops booting panic-loops, since the
   firmware falls through only when a load fails: keeping the previous
   slot first in `BootOrder` and arming `BootNext` at each healthy start

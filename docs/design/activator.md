@@ -4,8 +4,9 @@ Provisional, 2026-10-09. The privilege boundary of a machine: what the
 activator trusts and what it never does, the process pair it forms with
 its builder, the link between them, its closed list of operations, how
 it verifies what it is asked to place, its state, and the tools it
-drives. M3 builds it, with the operations a slot needs; restarting a
-unit is M5, and disks as an effect and backups are M6. The slots it
+drives. M3 builds it, with the operations a slot needs, live changes
+included; restarting a unit and a container's operations are M5, and
+disks as an effect and backups are M6. The slots it
 carries are slots.md's, the layout it writes is machine.md's. What is
 open is in section 10.
 
@@ -28,6 +29,11 @@ open is in section 10.
   activator snapshots it first and checks the snapshot, so the builder
   cannot swap it; the shift's walk recomputes the tree digest, which
   must equal the record's.
+- **It carries live changes itself** (5.17 to 5.19): it builds a
+  verified delta of a prepared slot, mounts it over the running slot's
+  `/etc`, `/usr` and `/opt` with the new mount API, acts on the units
+  the builder's plan names, and falls back without a reboot, or with
+  `reboot -ff` when a step of the fall back fails.
 - **Secrets never cross the link.** They enter the secret store from a
   root process (an import run in-process by the client) and leave it
   only into a slot. The builder sees names and the store's generation.
@@ -86,6 +92,7 @@ open is in section 10.
 | secret names, identity kinds | format.md, section 9; kinds from the closed list of 5.7 |
 | `boot` tokens | machine.md, 6.2 |
 | unit names [M5] | systemd's unit name syntax, at most 256 bytes; never hearth's own |
+| a live plan's units (5.17) | systemd's unit name syntax, at most 256 bytes; at most 256 in all; never hearth's own nor a never-live one (format.md, 5.14) |
 | a check [M5] | a user of the running slot, never `root`; capabilities from a closed list; an absolute program path and at most 64 arguments of at most 4 KiB in all (operating.md, 2.4) |
 | a fault [M6] | a kind from 5.15's closed list, typed parameters within bounds, an end; only on a lab pool host |
 
@@ -116,9 +123,10 @@ changes nothing.
 
 ### 2.4 Where it writes
 
-- **The top level:** this target's slot subvolumes, and its persistent
-  subvolumes when they are missing; on a host, its containers' too
-  [M5]. Nothing else there.
+- **The top level:** this target's slot subvolumes, its live deltas
+  `@<target>.live.<n>` (slots.md, 6.6), and its persistent subvolumes
+  when they are missing; on a host, its containers' too [M5]. Nothing
+  else there.
 - **For containers [M5]:** their nspawn settings in
   `/run/systemd/nspawn/` and their links in `/run/machines/`
   (slots.md, 12.1).
@@ -133,7 +141,9 @@ changes nothing.
   subvolume (5.11, 5.12), and on a lab pool host its faults' rules
   (5.15).
 - **The running slot:** nothing, since it is sealed; it changes systemd's
-  state through `systemctl`, and that only.
+  state through `systemctl`, and, for a live change, mounts read-only
+  overlays over its `/etc`, `/usr` and `/opt` (slots.md, 6.8), which
+  write nothing either.
 
 ### 2.5 What the builder never gets
 
@@ -203,6 +213,9 @@ WantedBy=multi-user.target
   (machine.md, 8.2).
 - **`KillMode=control-group`:** stopping the activator stops everything
   in both, so no builder outlives the activator that spawned it.
+- **No sandboxing,** no `PrivateMounts=` and no `Protect*=`: the
+  activator must run in the host's mount namespace, or its live
+  overlays would land in a namespace of its own (slots.md, 6.8).
 
 ### 3.2 Spawning the builder
 
@@ -237,6 +250,11 @@ runs at bootstrap, where the client process is the activator
 - **During a trial,** the slot's builder must come up to bless. One that
   keeps crashing never blesses, and the dead-man ends the trial
   (slots.md, 6.5).
+- **Once on purpose, in a live trial:** after the units are acted on
+  (slots.md, 6.8, L6) the activator answers, closes the link and spawns
+  a new builder with no wait, so the live bless comes from a builder
+  started in the new files. A build in flight ends with it, and the
+  next pass starts it again.
 
 ### 3.4 Shutdown
 
@@ -310,9 +328,11 @@ one higher than the last:
 
 - **the machine:** target, firmware, `SecureBoot`, the booted kernel,
   the boot id, soft reboots, firmware quirks seen;
-- **the three facts:** running, default, trial (slot, attempt, kind,
-  phase) (slots.md, section 3), per target: the machine's own, and on a
-  host each container's [M5] (slots.md, 12.6);
+- **the four facts:** running, default, trial (slot, attempt, kind,
+  phase), and live (base, delta, the slot and prepare key it carries,
+  hierarchies, whether the mount table agrees with the live record)
+  (slots.md, section 3), per target: the machine's own, and on a host
+  each container's [M5] (slots.md, 12.6);
 - **each slot,** its containers' included: state, output, prepare key,
   reported tree digest (slots.md, 5.7; never the full one, which covers
   secrets' digests), kernel digests (slots.md, 6.1), part digests,
@@ -359,6 +379,9 @@ builder collects nothing until the first `Welcome` has told it these.
 | bless, and re-bless | the builder of the slot on trial, or of a blessed slot that is not the default | conditional | M3 |
 | fall back | the builder | conditional | M3 |
 | roll back | the builder, for a person or an engine | conditional | M3 |
+| try live (5.17) | the builder | conditional, on the slot's prepare key, the running slot, the default and the live state; a repeat by attempt gets the first answer | M3; a container's M5 |
+| bless live (5.18) | the builder running over the live state | conditional | M3 |
+| the live fall back (5.19) | the builder; the activator itself when an action fails | conditional | M3 |
 | report facts, and drift | the builder | read only | M3 |
 | generate identity | the builder; prepare; bootstrap | idempotent | M3 |
 | import secrets | the client as root, in-process | idempotent | M3 |
@@ -465,7 +488,8 @@ RollBack { to, attempt, expect { running, default, record of to } }
 ```
 
 - **Effects:** slots.md, section 9: a trial of the other blessed slot,
-  then its own bless.
+  then its own bless. While a live state runs, it is the live fall back
+  (5.19).
 
 ### 5.6 Report facts, and drift
 
@@ -688,7 +712,8 @@ section 12's; none touches the boot partition or NVRAM.
 | bless | the criterion, read from the host; the record `blessed`; the marker removed; the default recorded (7.1) | conditional |
 | hold, and release | the marker `held`, with the hold's end as the activator's deadline in place of the window's; a `Bless` releases it (slots.md, 7.4) | conditional |
 | fall back | the default's settings and link back, a restart, the record `fell back` | conditional |
-| roll back | a trial of the other blessed slot | conditional |
+| roll back | a trial of the other blessed slot; while live, the live fall back | conditional |
+| try live, bless live, the live fall back | slots.md, 12.8: the delta on the host's top level, the swap by a child that enters the container's mount namespace, the units through `systemctl --machine=`, the live bless recording the container's next start as `b`'s trial | as the machine's own |
 | remove | `systemctl stop` on its unit; its link and settings removed; its slots' subvolumes, records, manifests and marker deleted, then its record; its persistent subvolumes, identity and secrets kept (slots.md, 12.7) | idempotent: a container with no record is done |
 
 - **A trial is answered after its restart,** not before a reboot: done
@@ -702,6 +727,72 @@ section 12's; none touches the boot partition or NVRAM.
   the builder checks that against its render, as it checks a unit
   against the spec (5.9), and the activator refuses the host's own
   target.
+
+### 5.17 Try live
+
+```
+TryLive {
+  slot, attempt
+  change      Digest                         the change from the base's output to the new slot's (slots.md, 6.7), in store.md, 3.5's form
+  plan        stop                [ unit ]   before the swap
+              reload              [ unit ]
+              restart             [ unit ]
+              reload or restart   [ unit ]
+              start               [ unit ]
+              then                { daemon reload, tmpfiles, dbus, accounts: bool }
+  expect      { prepare key, running, default, live: delta | none }
+}
+```
+
+- **Effects:** slots.md, 6.8, L1 to L6: the change recomputed and
+  checked (6.5), the delta built and verified, the base's dead-man
+  armed, the units stopped, the hierarchies swapped, the units acted on.
+  The rule-11 units are added to the restarts.
+- **Done,** after L6: the plan as acted on and each job's result; then
+  the activator spawns a new builder (3.3), whose `Welcome` shows the
+  slot `on live trial`.
+- **Refused:** invalid, stale, busy; not eligible, naming the rules of
+  slots.md, 6.7 that fail, and the builder then asks `Try`.
+- **Failed:** at L1 or L2, the delta deleted and nothing on the machine
+  changed; at L3 to L5, the stopped units started again and the trial
+  disarmed, the slot `prepared`; at L6, a job failed and the live fall
+  back ran (5.19), the answer saying whether it held or ended in
+  `reboot -ff`.
+- **A crash** is resolved from the journal and the marker's phase
+  (slots.md, section 11): before arming, the delta deleted; after,
+  `reboot -ff`.
+
+### 5.18 Bless live
+
+```
+BlessLive { slot, attempt }
+```
+
+- **Effects:** slots.md, 7.6: the checks, the record `live-blessed`, the
+  one-shot to the slot's trial entry, the marker's phase, the base's
+  dead-man stopped. The default does not move.
+- **Refused** while the settle, a unit or the criterion does not hold,
+  saying which part; the builder asks again, or asks to fall back.
+- **Asking again** with the attempt finds it done; a cut is finished at
+  start from the journal.
+
+### 5.19 The live fall back
+
+```
+FallBack { slot, attempt }        on a slot on live trial, or live-blessed
+```
+
+- **Effects:** slots.md, 8.5: the units L6 started stopped, the swap
+  back, the actions replayed under the old files, every job checked,
+  then the dead-man stopped and the slot `fell back`. For a
+  `live-blessed` slot, its one-shot is cleared and the base's dead-man
+  armed again first.
+- **Run by the activator itself** inside `TryLive` when an action of L6
+  fails, and asked by the builder otherwise; a roll back while live is
+  this (5.5).
+- **Any failed step is `reboot -ff`,** and the next start records the
+  outcome. Done once the files that ran before run again and every job
+  held.
 
 ## 6. Verification
 
@@ -778,6 +869,35 @@ What the activator checks before a place request becomes a slot.
   container whose `on` is not the machine record's target, or whose id
   range overlaps the builder's or another container's (2.2).
 
+### 6.5 The merged view
+
+What the activator checks before a live trial arms (slots.md, 6.8, L1
+and L2):
+
+- **The change is its own.** It diffs the two slots' manifests itself,
+  leaving out each slot's own files (slots.md, 5.4 and 5.5), and the
+  digest must equal the request's. The delta is built from its own
+  diff, never from paths the builder sent.
+- **The rules it can read:** slots.md, 6.7's rules 1 to 5 from the
+  layer records, the slot records and the two slots' account files,
+  through the parsers of 2.3; rule 8 for the plan's units; rule 10 from
+  the kernel's release and the mount table; rule 11 from
+  `/proc/<pid>/mountinfo` and `/proc/<pid>/cgroup` of every process.
+  Rules 6, 7 and 9 read the specs and the store, and stay the
+  builder's.
+- **The delta is built through descriptors:** `b`'s paths resolved
+  beneath `b`'s root with `openat2` and `RESOLVE_BENEATH`,
+  `RESOLVE_NO_SYMLINKS` and `RESOLVE_NO_XDEV`, the delta's beneath the
+  delta's; nothing made but directories, regular files, links and the
+  whiteouts.
+- **The merged view is walked** through the detached overlays'
+  descriptors, before anything is mounted where a process sees it, and
+  must equal the expected manifest field by field (slots.md, 6.8, L2).
+  A difference fails the trial with the first paths, never a content.
+- **The mount table is read back** after every swap and at every start,
+  by `hearth-protocol-proc` (8.1): what runs is what the kernel says,
+  not what the activator meant.
+
 ## 7. Its state
 
 ### 7.1 Layout
@@ -797,6 +917,9 @@ What the activator checks before a place request becomes a slot.
 ├── trial/
 │   └── x1-prod.b                           the trial marker, only while a trial runs (slots.md, 6.4);
 │                                           the dead-man is armed from /run and the command line instead
+├── live/
+│   ├── x1-prod                             the live record, while a live state exists (slots.md, 2.4)
+│   └── x1-prod.manifest                    the merged view's expected entries
 ├── identity/
 │   └── x1-prod/                            generation, machine-id, SSH host keys, the backup key [M6], public halves
 ├── secrets/
@@ -804,13 +927,15 @@ What the activator checks before a place request becomes a slot.
 │       ├── index                           the store's generation; each name's value file, digest, size
 │       └── <name>@<generation>             one value per file, 0600
 └── containers/ [M5]
-    └── chat-prod                           on rhi-prod: the container's default slot, and its id base
+    └── chat-prod                           on rhi-prod: the container's default slot, its id base,
+                                            and a live-blessed slot's "next start is its trial" (slots.md, 12.8)
 ```
 
 - **A host keeps its containers' records beside its own [M5],** each by
   the container's target: `slots/chat-prod.a`, `trial/chat-prod.b`,
-  `identity/chat-prod/`, `secrets/chat-prod/`. The default has a record
-  of its own, since no firmware holds it (slots.md, 12.6).
+  `live/chat-prod`, `identity/chat-prod/`, `secrets/chat-prod/`. The
+  default has a record of its own, since no firmware holds it
+  (slots.md, 12.6).
 
 ### 7.2 Records
 
@@ -845,6 +970,9 @@ reboot), and cleared when the operation ends.
 | trial, roll back | by the marker's phase and the facts (slots.md, section 4) |
 | bless | the record says `blessed`: remove the marker, move the default (re-bless), stop the dead-man; otherwise the slot stays on trial |
 | fall back | by the marker and the facts |
+| try live | at L1 or L2: the delta deleted, the slot `prepared`; from L3, by the marker's phase: `arming` disarmed, later `reboot -ff` (slots.md, section 11) |
+| bless live | the record says `live-blessed`: set the one-shot, set the marker's phase, stop the base's dead-man; otherwise the slot stays on live trial |
+| the live fall back | `reboot -ff`, unless its last step was done |
 | generate identity | remove `.new` |
 | hold a bless [M4] | the marker `held` and its transient timer: nothing to redo |
 | run a check [M5] | the transient unit, collected by systemd: run it again |
@@ -861,21 +989,30 @@ At every start, after a boot, a soft reboot or a crash:
 
 1. **mount the top level** at `/run/hearth-activator/top`, unless it is mounted;
    find the disk and the boot partition from
-   `/sys/fs/btrfs/<fs uuid>/devices/`;
+   `/sys/fs/btrfs/<fs uuid>/devices/`; then the live layers' source,
+   `/run/hearth-activator/layers`: a clone of the top level, private,
+   read-only, without `noexec` and `nosuid` (slots.md, 6.8);
 2. **read** the machine record, the slot records, the marker, the
    journal and the boot record;
 3. **read the facts:** running, default, the one-shot, `BootCurrent`,
-   the boot id, soft reboots, `SecureBoot` (slots.md, section 3);
+   the boot id, soft reboots, `SecureBoot`, and the live fact from the
+   mount table against the live record (slots.md, section 3);
 4. **on a new boot id,** record the booted kernel: the running slot's
    kernel digests (slots.md, 6.1);
 5. **recover the journal's operation** (7.3);
-6. **apply the start events** to both slots (slots.md, section 4);
+6. **apply the start events** to both slots (slots.md, section 4): a
+   live trial past arming in this boot, or a live record whose base
+   still runs but whose overlays disagree with it (a person's soft
+   reboot), ends here in `reboot -ff`, before anything else; a live
+   record whose base no longer runs, or whose overlays a reboot
+   dropped, is removed;
 7. **repair what a firmware or a cut left:** an environment pair that
    disagrees (machine.md, 5.5); hearth's entries out of order in
    `BootOrder`; a normal entry of a blessed slot that the firmware
    pruned, made again; the dead-man of a running slot that is blessed,
    stopped; on BIOS, `tries` reset when the running default meets the
-   criterion (slots.md, 8.4);
+   criterion (slots.md, 8.4); each delta subvolume that neither the live
+   record nor the marker names, deleted;
 8. **start the containers** [M5]: each container's settings and link
    that `/run` lacks, from its recorded default, then `systemctl start`
    on its unit (slots.md, 12.2);
@@ -893,15 +1030,16 @@ domain sees only typed values.
 
 | Crate | Format | Way |
 |---|---|---|
-| `hearth-protocol-link` | the link's records (4.1) | both |
-| `hearth-protocol-state` (new) | the records of `@hearth.state` (7.1), the trial marker, the slot record inside the root (slots.md, 2.2) | both |
+| `hearth-protocol-link` | the link's records (4.1), `TryLive`'s plan included (5.17) | both |
+| `hearth-protocol-state` (new) | the records of `@hearth.state` (7.1), the trial marker, the live record and its manifest (slots.md, 2.4), the slot record inside the root (slots.md, 2.2) | both |
 | `hearth-protocol-accounts` (new) | `/etc/passwd`, `/etc/group`, `/etc/shadow` lines | read; `/etc/shadow` written |
 | `hearth-protocol-units` (new) | fstab (machine.md, 3.3), the trial's units and the watchdog's drop-in (slots.md, 5.5); a container's nspawn settings [M5] (slots.md, 12.1) | written |
 | `hearth-protocol-xattr` (new) | `security.capability` v2 and v3, POSIX ACL values (slots.md, 5.2) | both |
 | `hearth-protocol-tree` | the store's layer records and tree files, read; the slot manifest, a tree file (store.md, 6.2 and 6.3) | both |
 | `hearth-protocol-efi` | efivarfs variables and `EFI_LOAD_OPTION` (machine.md, 4.5); efibootmgr's argument vectors | both |
 | `hearth-protocol-grub` [M3b] | `grub.cfg`, a slot's fragment, the environment block (machine.md, section 5); grub-editenv's and grub-install's argument vectors | both |
-| `hearth-protocol-systemd` | systemctl's and systemd-run's lines: states, counts, ids, failed units, `Result` | read |
+| `hearth-protocol-systemd` | systemctl's and systemd-run's lines: states, counts, ids, failed units, `Result`; a job's outcome, and `ActiveState`, `InvocationID`, `NRestarts` and `MainPID` per unit (slots.md, 6.8) | read |
+| `hearth-protocol-proc` (new) | `/proc/<pid>/mountinfo` lines: mount ids, parents, mount points, propagation, fstype, source and options, an overlay's layers included; `/proc/<pid>/cgroup`, a process's unit | read |
 | `hearth-protocol-keygen` | ssh-keygen's argument vector and public line | both |
 
 `hearth-protocol-activator` is the protocol layer: it routes these
@@ -914,13 +1052,16 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 |---|---|---|---|
 | btrfs ioctls: `SNAP_CREATE_V2`, `SUBVOL_CREATE_V2`, `SNAP_DESTROY_V2`, `SUBVOL_SETFLAGS`, `GET_SUBVOL_INFO`, `GET_SUBVOL_ROOTREF`; `FICLONE` | snapshots, slots, sealing, the running slot; cloning `/var` and seeding data | skein's ring adapter: a closed list of synchronous ioctls (an ask of skein, README, 8.1) | typed results |
 | files: `openat2` with `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS` and `RESOLVE_NO_XDEV`; stat without following, readlink, extended attributes, chown, chmod, mkdir, symlink, link, unlink, rmdir, `Store` | the shift, `/var`, the slot's files, the state | skein's io, with the records hearth asks for (README, 8.1) | typed results |
+| mounts: `fsopen`, `fsconfig`, `fsmount`, `move_mount` with `MOVE_MOUNT_BENEATH`, `open_tree`, `mount_setattr`, `umount2` with `MNT_DETACH`; `mknodat` of a 0/0 character device; `setns` into a container's mount namespace [M5], in a child | live overlays: the layers' source, the swap and the swap back, the whiteouts (slots.md, 6.8 and 12.8) | skein's io, asks of skein (README, 8.1) | typed results; the mount table through `hearth-protocol-proc` |
 | efivarfs reads | entries, `BootOrder`, `BootNext`, `BootCurrent`, `SecureBoot` | `hearth-protocol-efi` | typed variables |
 | `/usr/bin/efibootmgr` | create, delete, `--bootnext`, `--delete-bootnext`, `--bootorder` | `hearth-protocol-efi` | success, or exit and tail |
 | `/usr/bin/grub-editenv` [M3b] | `set` and `unset` in `env.0`, then `env.1` | `hearth-protocol-grub` | success, or exit and tail |
 | `/usr/sbin/grub-install` [M3b] | bootstrap, once | `hearth-protocol-grub` | success, or exit and tail |
 | `/usr/bin/mount`, `/usr/bin/umount` | the top level, the boot partition, `/run/nextroot` | `hearth-protocol-activator` | success, or exit and tail |
-| `/usr/bin/systemctl` | `soft-reboot`, `reboot`, `is-system-running`, `list-units --state=failed`, `show`, `stop`; `restart` [M5]; for a container [M5], `start`, `restart` and `is-active` of `systemd-nspawn@<container>.service`, and `is-system-running` and `list-units` with `--machine=<container>`; `--machine=<container> kill` [M6] | `hearth-protocol-systemd` | a state, a count, an id, a list of units |
+| `/usr/bin/systemctl` | `soft-reboot`, `reboot`, `is-system-running`, `list-units --state=failed`, `show`, `stop`; for a live trial, `start` and `stop` of the base's dead-man, `daemon-reload`, `reload`, `restart`, `reload-or-restart`, `start` and `stop` of the plan's units (slots.md, 6.8); `restart` [M5]; for a container [M5], `start`, `restart` and `is-active` of `systemd-nspawn@<container>.service`, and `is-system-running` and `list-units` with `--machine=<container>`; `--machine=<container> kill` [M6] | `hearth-protocol-systemd` | a state, a count, an id, a list of units |
 | `/usr/bin/systemd-run` | the hold's timer [M4]; checks as transient units, `--machine=<container>` for a container's [M5] | `hearth-protocol-systemd` | the unit's exit status and `Result`, nothing of its output |
+| `/usr/bin/systemd-tmpfiles` | `--create /usr/lib/tmpfiles.d/hearth.conf` in a live trial (slots.md, 6.8) | `hearth-protocol-activator` | success, or exit and tail |
+| `/usr/sbin/nscd` | `--invalidate passwd` and `group`, in a live trial, when nscd runs | `hearth-protocol-activator` | success, or exit and tail |
 | `/usr/bin/ssh-keygen` | identity's host keys | `hearth-protocol-keygen` | success; the keys as files |
 | `/usr/sbin/wipefs`, `/usr/sbin/parted`, `/usr/sbin/partprobe`, `/usr/bin/udevadm`, `/usr/sbin/mkfs.vfat`, `/usr/sbin/mkfs.btrfs`, `/usr/sbin/useradd`, `/usr/sbin/usermod` | bootstrap; disks as an effect [M6] | `hearth-protocol-activator` | success, or exit and tail |
 | `/usr/bin/btrfs` `send`, `receive`, `qgroup limit` [M6] | backups and restores; a full-disk fault | `hearth-protocol-activator` | a stream, and success |
@@ -979,6 +1120,14 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 - **The VM tier** runs the real pair on an Incus VM: bootstrap, a
   prepare, both kinds of trial, a bless, a dead-man fall back
   (testing.md, section 7).
+- **Live changes** (M3): the fake machine's mount namespaces, overlays
+  and PID 1's jobs (testing.md, 3.13), with a scripted builder that
+  asks `TryLive` with plans that lie (a change digest that differs, a
+  never-live unit), and faults at every phase: a job that fails, a unit
+  that dies in the settle, a crash or a power cut from L1 to L9, a
+  person's soft reboot. Invariants: slots.md, section 4's, the live ones
+  included; no swap before L2's walk passed; every swap read back; the
+  activator never leaves the host's mount namespace.
 - **Later operations join with their milestones:** a held bless that
   ends at its deadline [M4]; checks whose transient units fail, time out
   or never start, and a host's containers prepared, tried, blessed and
@@ -1020,4 +1169,8 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 - **The shift's walk in the activator's loop:** skein's file driver runs
   one request at a time, so a long walk shares the loop with the link;
   whether facts stay timely during a prepare, or the walk moves to a
-  child, depends on measurement.
+  child, depends on measurement. A live trial's L2 walk asks the same.
+- **The child that enters a container's mount namespace [M5]:** the
+  activator's own binary spawned with a fixed argument, as the builder
+  is, or skein spawning straight into a namespace; depends on what
+  skein's contained process trees offer (README, 8.1).

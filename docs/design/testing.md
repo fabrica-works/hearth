@@ -37,9 +37,10 @@ milestone. What is open is in section 11.
   own step.
 - **What needs root runs on Incus VMs** (section 7) with their own disk,
   OVMF, Secure Boot off and an iTCO watchdog: bootstrap, trials, every
-  fallback, power cuts. It stays outside the gate until the lab exists.
+  fallback, power cuts, and live changes with real overlays and real
+  services. It stays outside the gate until the lab exists.
 - **Every world checks hearth's promises** (section 8): a crash leaves
-  the default booting a blessed slot; the three facts agree with the
+  the default booting a blessed slot; the four facts agree with the
   machine; no secret and no identity in an output; a sealed layer never
   changes; nothing unverified is placed; every order gets one answer.
 - **Costs are behaviour** (section 9): worlds hold hearth's cost facts
@@ -655,6 +656,50 @@ kernel (slots.md, section 12):
   host's activator makes its link again; a power cut stops every
   container with its host.
 
+### 3.13 Mounts, overlays and live changes [M3]
+
+What a live change (slots.md, 6.6 to 6.9) needs of the machine. The
+mounts and overlayfs are the generic half's; PID 1's jobs are hearth's
+half's.
+
+- **Mount namespaces and propagation:** each namespace a tree of
+  mounts, each `shared`, `private` or `slave`; a mount made in a shared
+  one appears in its peers and its slaves. systemd's services hold slave
+  copies with binds of their own (`ProtectSystem=`, `ReadOnlyPaths=`,
+  `InaccessiblePaths=`), as the units in a scenario declare.
+- **The new mount API:** `fsopen`, `fsconfig` and `fsmount` give a
+  detached mount that no namespace shows, walkable through its
+  descriptor; `move_mount` attaches it, with `MOVE_MOUNT_BENEATH` under
+  the current top, refused on a scenario's kernel older than 6.5, as
+  `lowerdir+` is before 6.8; `umount2(MNT_DETACH)` removes a mount at
+  once while open files and working directories keep it; `open_tree`
+  clones and `mount_setattr` changes a clone's flags; `setns` moves a
+  process into another namespace [M5]. `/proc/<pid>/mountinfo` is
+  rendered from the tree, as the kernel renders it.
+- **overlayfs, read-only:** lower layers stacked, topmost first; a 0/0
+  character device hides a path, a whole directory included; a
+  directory takes the topmost layer's attributes; a kind change needs no
+  marker; a file reports its layer's device and inode, a directory the
+  overlay's. A write to a layer while it is merged is a finding the
+  referee reports, since the kernel leaves it undefined.
+- **Propagation's two traps,** as measured on the kernel: a lazy unmount
+  of a shared peer of a layer's source tears the overlay down; an
+  overlay propagated into a service's namespace shadows that service's
+  own mount beneath it until the service restarts.
+- **PID 1's jobs:** `daemon-reload`, `stop`, `start`, `restart`,
+  `reload` and `reload-or-restart`, each job with a result; a unit's
+  `ActiveState`, `InvocationID` and `NRestarts`. A reload whose
+  `ExecReload=` fails leaves the unit active and the job failed; a new
+  `.wants` link starts nothing until started; a unit whose file is gone
+  stays loaded while active. dbus and nscd are units with a reload.
+- **Soft reboots and overlays:** with `/run/nextroot`, the old root's
+  overlays go with it; a person's soft reboot without it keeps the
+  overlays on `/etc` and `/usr` and drops `/opt`'s. Both are to verify
+  (7.3), so until then the seed draws either.
+- **Cues** (8.2) that only a live trial meets: `test-reload-fails`,
+  whose `ExecReload=` fails when its configuration says so, and
+  `test-dies-later`, which dies a drawn time after it starts.
+
 ## 4. The fakes of tools
 
 ### 4.1 One face
@@ -699,7 +744,8 @@ out   bytes on stdout and stderr, in chunks over the world's time: progress;
 | the target's tools: `systemd-sysusers`, `systemd-tmpfiles`, `systemctl preset-all` with `SYSTEMD_OFFLINE=1`, `tar` | `hearth-protocol-builder`'s generic machine | users, files and preset links made in the layer, as its root, inside it | a tool missing from the target; a failure with a tail | M2 |
 | git | `hearth-protocol-git` | render.md 2.2's `rev-parse`, `ls-tree` and `cat-file --batch` on a repository, and the fetch of wire.md, section 4 | a remote unreachable; a revision missing; a branch rewritten; a stall | M1 |
 | efibootmgr | `hearth-protocol-efi` | writes only: creates at a fixed number, deletes, `--bootnext`, `--delete-bootnext`, `--bootorder`, on the variables of efivarfs | the variable store full; efivarfs not writable; a number already taken | M3 |
-| systemctl, at run time | `hearth-protocol-systemd` | `soft-reboot`, `reboot`, `reboot -ff`, `is-system-running`, `show`, `stop`; `restart` [M5]; a container's nspawn unit and `--machine=` (3.12) [M5] | a unit that fails; a job that times out; a container that never comes up | M3 |
+| systemctl, at run time | `hearth-protocol-systemd` | `soft-reboot`, `reboot`, `reboot -ff`, `is-system-running`, `show`, `stop`; for a live trial, `daemon-reload`, `start`, `reload`, `restart` and `reload-or-restart` on PID 1's jobs (3.13); `restart` [M5]; a container's nspawn unit and `--machine=` (3.12) [M5] | a unit that fails; a job that times out; a reload that fails; a container that never comes up | M3 |
+| systemd-tmpfiles and nscd, at run time | `hearth-protocol-activator` | a live trial's `--create` of `hearth.conf` in the running `/var`; nscd's `--invalidate` | a line that fails; nscd absent | M3 |
 | systemd-run | `hearth-protocol-systemd` | the hold's timer [M4]; a check's transient unit (operating.md, 2.4), and with `--machine=` in a container [M5] | the unit refused; a timeout; an out-of-memory kill | M4 |
 | ssh-keygen | `hearth-protocol-keygen` | activator.md 5.7's host key: a private and a `.pub` file, their bytes from the seed | a full disk | M3 |
 | the activator's others: mount, umount, cp, and bootstrap's disk tools | `hearth-protocol-activator` | their effects on the fake machine's mounts, files and disks (activator.md, section 8) | a failure with a tail | M3 |
@@ -858,7 +904,14 @@ table, the builder refused a snapshot and a freeze of a layer its range
 owns and the tree helper allowed them; a frozen root that cannot be
 renamed into another directory; a snapshot keeping inode numbers and
 ctimes; chown clearing setuid and capabilities; a capability's root id
-set in a namespace; ACL ids; a map of two extents. Each case names the
+set in a namespace; ACL ids; a map of two extents; and 3.13's mounts,
+in a user and mount namespace of the regular user's own: a delta of
+puts and 0/0 whiteouts merged over a base giving the new tree exactly,
+for adds, changes, deletions, kind changes, links and modes; a
+directory taking the topmost layer's attributes; a beneath-swap with
+no window under readers in a loop; the propagation traps. Real owners,
+setuid bits, capabilities and `trusted.*` attributes through an overlay
+need root, and wait for the VM tier (7.3). Each case names the
 rule it checks. No running kernel can check
 the crash model, as skein's `kv.md` says of its own: it rests on the
 sources it cites, and the VM tier's power cuts (7.3) test hearth, not
@@ -1011,7 +1064,7 @@ were reused, what was fetched.
 | Scenario | What happens | What must hold |
 |---|---|---|
 | bootstrap | from a live system on a second disk, the client, as root, bootstraps the empty disk (machine.md, section 8); the VM boots it | slot a is blessed and the default; two entries per slot, normal and trial; only a's normal entry in `BootOrder` |
-| prepare, soft reboot, bless | a config change: b prepared, a soft reboot into it, the minimal bless (slots.md, section 7) | b running, its normal entry first in `BootOrder`; no trial left |
+| prepare, soft reboot, bless | a change that cannot be live, such as a drop-in in `/etc/sysctl.d/` (format.md, 5.14): b prepared, a soft reboot into it, the minimal bless (slots.md, section 7) | b running, its normal entry first in `BootOrder`; no trial left |
 | a packages change that keeps the kernel | a new version of an extras package: b's packages layer rebuilt, its initramfs rebuilt with the same inputs | slots.md 6.1's rule holds, so a soft reboot, then the bless |
 | a kernel change | a mirror bump that changes the kernel: b prepared, `BootNext` to b's trial entry, a reboot, the bless | before the bless, `BootNext` gone and `BootCurrent` b's trial entry; then b the default |
 | fallback after a panic | the revision adds the `test-panic` task (8.2) | the trial panics; `panic=N` reboots into a, which records that b fell back |
@@ -1023,6 +1076,34 @@ were reused, what was fetched.
 | a power cut in trial and bless | kills just after `BootNext` is set, and between the steps of the bless: journal, `blessed`, marker removed, default moved, dead-man stopped | the default boots a blessed slot |
 | BIOS [M3b] | the bootstrap, a one-shot trial, a fallback after a panic, and a cut while the activator writes the environment pair, on SeaBIOS | `next_entry` consumed in both files before the kernel; the default boots a blessed slot |
 | BIOS, a blessed default that panics [M3b] | after a bless, the harness arms `test-panic` through a flag in a persistent subvolume, so the default panics at every boot | GRUB's boot counter answers (machine.md, section 5), and the machine reaches the other blessed slot without a person |
+
+Live changes, on the same VMs (slots.md, 6.6 to 6.9):
+
+| Scenario | What happens | What must hold |
+|---|---|---|
+| a config change applied live, with a reload | a new line in the `ssh` task's drop-in, its `live` entry `reload` on `ssh.service` | no reboot; `/etc` an overlay with source `hearth-live`; `ssh` reloaded, its main process the same; `b` live-blessed; `BootNext` `b`'s trial entry and `BootOrder` unchanged; drift's `slot.live.*` clean |
+| an in-house binary under `/opt`, with a restart | a `test-service` task whose download under `/opt/test-service` is a new release, its `live` entry `restart` | the unit stopped before the swap and started after; the new binary answers with its version; the old one never ran with the new files |
+| an added file and a deleted file | the revision adds a file under `/etc` and deletes one under `/opt`, both covered | the merged view equals `b`'s, field by field; the whiteout hides the deleted file; L2's walk and `slot.live.tree` pass |
+| a failed reload | an `sshd_config` drop-in that `sshd -t` rejects | the reload job fails while the unit stays active; the live fall back: files back, `ssh` reloaded again, `fell back (live)`; no reboot; `b`'s prepare key refused |
+| a crash at each live phase | `kill -9` of the activator at L1, L2, L3, L4, L5, L6, L7 and L8 in turn | before arming: `b` `prepared`, the delta deleted; from `armed` to `running`: `reboot -ff` into `a`, then `fell back`; after the live bless: `live-blessed` kept |
+| a power cut at each live phase | `incus stop --force` at the same points, and after the live bless | `a` boots natively and `b` fell back, or `prepared` if it was not armed; after the live bless, `b`'s trial boots |
+| a person's soft reboot while live | `systemctl soft-reboot` with no next root, after a live bless | the start finds the overlays disagreeing with the live record and reboots with `-ff`; recorded: which overlays survived the soft reboot |
+| the next native boot as the trial | after a live bless, the harness reboots the VM | `BootCurrent` `b`'s trial entry; `b` blessed and the default; the delta deleted; no overlay |
+| a later live change, and its fall back | `c` while `b` is live-blessed, then `c`'s reload fails | `c` prepared into `b`; its delta against `a`; the fall back swaps back to `b`'s delta; the next boot runs `a` |
+| a sandboxed service | a unit with `InaccessiblePaths=` beneath `/etc`, unchanged by the change | restarted by slots.md, 6.7's rule 11, and seeing its sandbox's view after |
+| not live | a change to `/etc/sysctl.d/`, a new package, a renumbered user | an ordinary trial; the `activation` fact names the rule that failed |
+
+The VM tier also settles what slots.md, section 15 lists as to verify
+for live changes, on trixie's systemd 257 and forky's 262: real ids,
+setuid programs, capabilities and ACLs through the overlay;
+`MOVE_MOUNT_BENEATH` from PID 1's shared root, with real sandboxed
+services; `daemon-reload` and the dynamic `etc.mount`, `usr.mount` and
+`opt.mount` units around a swap; overlays across soft reboots; the
+base's dead-man started after boot; `BootNext` kept over days and
+consumed by a power cut; timing on a tree of 100k inodes; Debian's
+specifics (AppArmor, dbus's `ReloadConfig`, glibc rereading
+`nsswitch.conf`, `hosts` and `resolv.conf`); and whether a lower mount's
+`noexec` reaches the merged files.
 
 Containers [M5], in a host VM:
 
@@ -1040,6 +1121,9 @@ Containers [M5], in a host VM:
 | a container that fails on its host's trial | the host's trial boots and the container's unit fails | the host is blessed all the same; the container's facts report it (slots.md, 7.1) |
 | a container's journal | entries written inside the container, read by the host's builder while it runs and after it stops | read from `/var/log/journal/<its machine-id>` on the host's journal subvolume; recorded: whether journald inside writes there under its id range (operating.md, section 5) |
 | a container removed | the revision drops the container's target | its unit stopped, its slots deleted and their outputs unpinned; its persistent subvolumes reported orphaned (slots.md, 12.7) |
+| a container's change applied live | a config change with a `reload` entry, in a container target | the overlays in the container's mount namespace, none in the host's; the unit reloaded through `systemctl --machine=`; the host's state records the container's next start as `b`'s trial (slots.md, 12.8) |
+| a container's live fall back | the container's reload fails, then a step of the fall back is made to fail | the files back and the units acted on again; then a restart of the container on its default |
+| a container's next start after a live bless | the harness restarts the host VM | the container starts on `b`'s trial, which its host blesses; the delta deleted |
 
 A hang that only the watchdog ends needs a kernel that stops; how to
 cause one in a VM is open (section 11).
@@ -1098,9 +1182,13 @@ section 10; operating.md, section 9; artifacts.md, section 8.
   `/proc/sysrq-trigger`, at once or when a flag file exists in a
   persistent subvolume; `test-hang` blocks the boot's target;
   `test-mount-fails` adds a mount that cannot succeed; `test-unit-fails`
-  fails. The VM tier meets the real effect; the fake PID 1 knows these
-  units by name and plays the same one. A scenario is then one
-  repository at every tier, as temper's CI follows content.
+  fails; for live changes, `test-reload-fails` fails its reload when
+  its configuration says so, `test-dies-later` dies a while after it
+  starts, and `test-service` is an in-house service under `/opt` that
+  answers with its version. The VM tier meets the real effect; the
+  fake PID 1 knows these units by name and plays the same one. A
+  scenario is then one repository at every tier, as temper's CI follows
+  content.
 - **The referee** (testing-strategy.md, section 7) watches the machine's
   ledger and hearth's facts, events and answers, never hearth's state.
   Its stimuli: a power cut, a reboot, the builder killed, the client
@@ -1120,12 +1208,13 @@ section 10; operating.md, section 9; artifacts.md, section 8.
   host start, each container's link names a slot whose record says
   blessed, or none before its first bless; a link to a slot on trial
   never outlives its trial (slots.md, 12.6).
-- **The three facts stay consistent** (slots.md, section 3). At every
+- **The four facts stay consistent** (slots.md, section 3). At every
   settle, and with every fact hearth reports, the world compares them
   with the machine's ground truth: running is the subvolume the fake
   booted; default is what its firmware would boot; trial is the
-  activator's marker. For a container [M5], running is the subvolume of
-  its root, and default the record its host keeps.
+  activator's marker; live is the fake's mount table. For a container
+  [M5], running is the subvolume of its root, and default the record
+  its host keeps.
 - **No secret and no identity in an output.** Secrets, machine-ids and
   keys in worlds are drawn from the seed, and the world knows each. It
   searches every layer, record, fact, event, trace and build step's
@@ -1161,6 +1250,16 @@ section 10; operating.md, section 9; artifacts.md, section 8.
   reboot; a bump that changes a module takes a full one.
 - **Build steps stay in their sandbox.** A step reaches only its view,
   and no network (3.5).
+- **Live exactly when allowed.** The world computes slots.md, 6.7's
+  rules on its own from the fake trees and specs, and each trial is live
+  exactly when they hold; the merged view after every swap equals the
+  live record's manifest, which equals the new slot's files under the
+  three trees.
+- **A live state never moves the default.** No live bless writes
+  `BootOrder` or `default`; after every reboot or power cut no overlay
+  remains, and the firmware boots a blessed slot or the trial entry a
+  live bless armed; and every live trial ends within the base's window,
+  by the live bless, the live fall back or a reboot.
 
 ### 8.4 The strategy's checks
 
@@ -1199,6 +1298,10 @@ same repository (7.3).
 | a cut between walk and record | store, system | a power cut after a layer's walk and before its record; then, later, a published layer found corrupt (3.10) | `syncfs` precedes the record (store.md, 4.2), so a recorded layer is whole; the startup scan deletes the staging layer (store.md, 4.4); a corrupt layer found later is deleted and rebuilt, not refused |
 | `systemd-container` | build | the closure holds `systemd-container`, whose tmpfiles make `Q /var/lib/machines` | with the setup hook's directories, the layer holds a directory; without them, a nested subvolume, which the walk refuses (store.md, 4.1) |
 | a snapshot bump that keeps the kernel | system | 8.3's soft-reboot rule | a soft reboot, then the bless |
+| a reload that fails | slots, system | `test-reload-fails` in a live trial | the live fall back: files back, units reloaded again, `fell back (live)`, no reboot |
+| a cut at every live phase | activator, system | a crash of the activator, and a power cut, at each step from L1 to L9 (slots.md, 6.8) | before arming, `prepared`; after, `reboot -ff` and `fell back`; after the live bless, its trial at the next boot; the default always a blessed slot |
+| a later live change that falls back | slots, system | `c` while `b` is live-blessed, its reload failing | the delta against `a`; the swap back to `b`'s delta, which no slot holds any more; the next boot runs `a` |
+| a person's soft reboot while live | slots, system | a soft reboot with no next root, the seed drawing which overlays survive | the start runs `reboot -ff`; nothing runs a half-overlaid tree past it |
 
 ## 9. Budgets and costs
 
@@ -1272,10 +1375,10 @@ finding, as a failing check is.
 |---|---|---|---|---|
 | M1 | step; domain (render, builder); machine (config, template, git, mmdebstrap); protocol (builder and tools); simulated (builder); real loop (render, real git); end to end (render, diff) | files with owners and modes; processes; the universe's index at snapshot timestamps | git; mmdebstrap `--simulate` | conformance: resolve, git; the mirror's indexes |
 | M2 | domain (store, build, tree); system (builder and tree helper); machine (dpkg, tree); protocol (tree helper); real loop (tree helper, process groups) | btrfs and its ownership rule; ids, maps of several extents, namespaces, cgroups, sandboxes; `openat2`'s flags; attributes, inodes, ctimes; the full universe, `systemd-container` included; full disks; power cuts on files and subvolumes, and `syncfs` | mmdebstrap's bootstrap; `apt-helper`; dpkg-query; the target's systemd tools and `tar` | conformance: bootstrap in both modes, extras, fetch, query, the target's tools, the btrfs rules; real builds |
-| M3 | domain (converge, slots, boot, disk, activator); system (the pair joins); machine (link, efi, systemd, keygen, client); protocol (link, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; cues | efibootmgr; systemctl at run time; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools | VM tier on OVMF; conformance: firmware, host keys |
+| M3 | domain (converge, slots, boot, disk, activator); system (the pair joins); machine (link, efi, systemd, keygen, client, proc); protocol (link, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode and its jobs; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; mount namespaces, the new mount API and overlayfs (3.13); cues | efibootmgr; systemctl at run time, its unit verbs included; systemd-tmpfiles; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools | VM tier on OVMF, live changes included; conformance: firmware, host keys, overlays in a user namespace |
 | M3b | machine (grub) | SeaBIOS; msdos and the post-MBR gap; GRUB on FAT, its environment pair, its boot counter, saves that fail, and the slots' fragments | grub-editenv; grub-install | VM tier on SeaBIOS; conformance: env file, GRUB |
 | M4 | protocol (the wire, on `skein-fake-channel`); machine (wire) | — | `hearth-fake-engine` (4.6); systemd-run, for a held bless's timer | — |
-| M5 | domain (checks); containers and pool hosts | units' states and signals; containers on a host (3.12) | systemctl restarting a unit, a container's nspawn unit and `--machine=`; systemd-run's checks | VM tier: bless with checks; containers in a host VM (7.3) |
+| M5 | domain (checks); containers and pool hosts | units' states and signals; containers on a host (3.12); `setns` into a container's mount namespace | systemctl restarting a unit, a container's nspawn unit and `--machine=`; systemd-run's checks | VM tier: bless with checks; containers in a host VM, live changes included (7.3) |
 | M6 | domain (artifacts, backups); protocol (bytes by digest, between builders) | send streams and a backup peer; faults as effects; virtual disks | — | real builds: artifacts |
 | later | identity beyond SSH host keys | — | wg, for WireGuard keys | — |
 
@@ -1316,6 +1419,11 @@ VM tier its one real machine relies on.
   2.14's env block, systemd 262). It depends on which suites hearth's
   targets run.
 - **The ceilings outside the gate** (9.2): provisional until measured.
+- **Live changes on a real machine:** every item slots.md, section 15
+  lists as to verify, run as 7.3's scenarios. Until then the fake
+  machine follows the kernel's and systemd's sources (257 to 262) as
+  read for this design, and where a behaviour is unknown (overlays
+  across a person's soft reboot) the seed draws each answer.
 - **Differential checks:** whether a scenario must end the same at every
   tier it runs at, as temper also asks. It depends on how much the
   referee can observe in the real tiers.
