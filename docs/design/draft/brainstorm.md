@@ -4,7 +4,7 @@ Draft, 2026-10-09. It records the direction of a design discussion
 on 2026-10-09, the first about hearth. It starts from temper's
 `factory.md` (a draft vision of the whole software factory) and from os
 (`~/src/rust/os`), whose tools hearth replaces. Nothing here is adopted.
-Section 11 is the order of building; section 12 lists what is open.
+Section 12 is the order of building; section 13 lists what is open.
 
 ## 1. In one page
 
@@ -15,6 +15,10 @@ Section 11 is the order of building; section 12 lists what is open.
 - **It replaces os.** os's four tools (`manifest`, `deploy`,
   `provision`, `ek`) become one domain in one daemon. os stays a
   reference for its features and its golden files, not for its code.
+- **os's IaC format stays, with tweaks** for agents and digests: a
+  schema per task, every input in the repository, merging that can
+  remove, data shared between targets through exports, and the rendered
+  diff on every change (section 7).
 - **It is built on skein** and follows `programming-model.md`: one
   loop, step functions, and a domain complete enough to run whole on a
   fake machine. The heavy work stays in child processes.
@@ -34,10 +38,10 @@ Section 11 is the order of building; section 12 lists what is open.
 - **After a rollout, hearth is the machine's end of operating it.** It
   runs the target's checks, sends facts up, keeps logs and metrics on
   the machine for whoever asks, and carries out a small set of
-  operational effects (section 9).
+  operational effects (section 10).
 - **Reproducible builds are deferred.** They are a level of trust, and
   can be retrofitted without changing the store, the wire or the slots
-  (section 10).
+  (section 11).
 
 ## 2. Where it comes from
 
@@ -85,13 +89,13 @@ that machine and keeps the warm state: caches and earlier outputs.
     collecting what nothing pins;
   - *build:* plans how to make an output from a spec, from the closest
     layer it has;
-  - *slots:* prepare, trial, bless, fall back (section 8);
+  - *slots:* prepare, trial, bless, fall back (section 9);
   - *disk:* partitioning and formatting, for bootstrap and the lab's
     throwaway machines (os's `provision`);
   - *drift:* the live slot compared with the output it came from;
   - *checks:* the target's health checks and the machine's own signals,
-    in a bounded window (section 9);
-  - later, *artifacts* (the second recipe), *backups* (9.4) and
+    in a bounded window (section 10);
+  - later, *artifacts* (the second recipe), *backups* (10.4) and
     *faults* (section 5.2).
 - **Protocol:**
   - the wire (section 5.3);
@@ -191,10 +195,10 @@ same wire. Inside, hearth is Debian on btrfs, and says so.
 
 ### 6.1 Kept
 
-- **The configuration model:** hosts as a base, environments and an
-  overlay, composed in that order; tasks; strict JSON; inert templates;
+- **The configuration model:** hosts as a base and environments,
+  composed in that order; tasks; strict JSON; inert templates;
   `etc.json`'s declarative rules and `require` guards. It is the IaC
-  language, and it is good.
+  language, and it stays, with section 7's tweaks.
 - **The spec split into parts,** with package resolution pinned to a
   snapshot of snapshot.debian.org and reused while its hash is
   unchanged.
@@ -232,11 +236,11 @@ same wire. Inside, hearth is Debian on btrfs, and says so.
    secrets are delivered at activation (a separate mount, or systemd's
    credentials) under the machine's own identity, and a random seed is
    made at first boot.
-4. **Slots get a state machine** (section 8).
+4. **Slots get a state machine** (section 9).
 5. **ek folds into hearth.** The helper on a live host is the daemon.
 6. **Typed facts and events** replace the tab-separated output (5.3).
 7. **The fleet leaves the code.** Four details of one fleet are in os's
-   code and move into tasks:
+   code and move into tasks (with the magic task names of 7.9):
    - `host.hardware == "7th-gen"` switching on non-free components;
    - the Europe/Lisbon timezone and en_US locale preseeds;
    - the persistent `@<target>.srv.core/journal` and `iwd` directories;
@@ -246,7 +250,10 @@ same wire. Inside, hearth is Debian on btrfs, and says so.
    inert template engine of its own, for the Jinja subset the tasks use.
    What ports is the design and the tests: os's golden files become
    render's conformance suite, and os serves as an oracle while hearth
-   catches up, the same configuration giving the same parts.
+   catches up, the same configuration giving the same parts. Where
+   section 7 changes the format, a converter migrates os's configurations
+   (lists to maps, `___` names to trees, the overlay to layers), and the
+   comparison holds on the converted ones.
 
 ### 6.3 Dropped
 
@@ -260,8 +267,165 @@ same wire. Inside, hearth is Debian on btrfs, and says so.
   names its targets.
 - **`--resolved`:** the fake machine's package universe takes its place.
 - **Specs committed to git:** they are derived, never stored.
+- **`--overlay`:** every input lives in the repository (7.3).
+- **Templates completed at deploy** (`when: "deploy"`): render knows
+  everything they read (7.9).
 
-## 7. Paying only for what changed
+## 7. The IaC format
+
+os's configuration and task formats (os's `config-format.md` and
+`task-format.md`) fit the factory better than most IaC formats:
+configuration is declarative data; templates cannot run anything;
+rendering is deterministic and cheap; a task bundles everything about
+one concern; variants are thin; secrets are named by path only. Their
+best property for the factory comes first (7.1), then the tweaks they
+need, most important first. The first four (7.2 to 7.5) matter most:
+the schema and the merging make agents' edits safe, every input in the
+repository makes the digests and GitOps hold, and exports make clusters
+possible.
+
+### 7.1 The rendered diff on every change
+
+Determinism pays off here. Every change
+to an IaC repository carries its rendered diff, per target and per part:
+"this commit changes `/etc/postfix/main.cf` on mail-lab and mail-prod,
+and nothing else". It is what agents and people review, posted at the
+change's head as a status is. Rendering needs no secrets and no machine,
+so any hearth can produce it.
+
+### 7.2 A schema per task
+
+- **Today a task's settings are whatever its templates read,** and an
+  undefined name counts as false. An agent's typo (`ssh.alow`) silently
+  drops a file instead of failing.
+- **Each task declares its settings:** names, types, defaults, and a line
+  of documentation each. Render rejects a setting the task does not
+  declare and a value of the wrong type.
+- **What it gives:** defaults in one place rather than in templates;
+  most `require` guards become types (`syncthing.type` is one of a
+  list); each task is documented for the agents that edit it.
+- **Undefined stays falsy only for optional settings the schema
+  declares.** A name no schema declares is an error.
+
+### 7.3 Every input in the repository
+
+- **A spec is a function of the revision and the target, nothing
+  else.** That is what makes its digests mean something and the
+  repository's main branch the desired state.
+- **So os's `--overlay` goes.** An overlay passed when rendering is an
+  input outside git. The original fleet repository had already dropped
+  it.
+- **Its legitimate uses become layers in the repository,** composed in
+  this order:
+
+  ```
+  fleet.json                       defaults for every target
+  hosts/<host>/<host>.json         the host's base
+  envs/<env>.json                  defaults for every target in <env>
+  hosts/<host>/<host>-<env>.json   the host in that environment
+  ```
+
+  An environment's defaults come after a host's base, so the lab's
+  certificate authority, domain and mail sink apply to every lab
+  variant; the host's own environment file comes last, for what is
+  particular to it.
+
+### 7.4 Merging that removes and replaces
+
+- **Today lists concatenate:** a variant can add to a base's list, but
+  cannot drop or replace an entry. Thin variants then turn into
+  duplicated ones.
+- **JSON Merge Patch's rules instead** (RFC 7386): objects merge key by
+  key, `null` deletes a key, anything else replaces, lists included.
+- **Collections become maps keyed by name** (users, keys, peers), so a
+  variant adds, overrides or removes one entry. A base:
+
+  ```json
+  { "users": { "alice": { "uid": 1000 }, "bob": { "uid": 1001 } } }
+  ```
+
+  and a lab variant that removes bob and adds a tester:
+
+  ```json
+  { "users": { "bob": null, "tester": { "uid": 1100 } } }
+  ```
+
+- **Variant maps** (os's per-role overrides) keep working: they are
+  objects.
+
+### 7.5 Exports: data between targets
+
+- **Today targets cannot read each other's data,** and the original
+  fleet copies it by hand: each host's vpn configuration carries its
+  peer's public key.
+- **The factory needs it everywhere:** VPN meshes, DNS zones, a
+  cluster's members knowing each other, checks run from another machine
+  (10.1).
+- **A task declares exports:** the facts other targets in the same
+  environment may read, such as an address or a public key. A template
+  reads its peers' exports; the vpn task loops over every target in its
+  environment that has the vpn task.
+- **The coupling stays narrow.** Only exported facts cross, so a change
+  to one changes exactly the specs that read it, and the digests follow.
+- **Secrets are never exported.** A public key may be; its private key
+  stays a secret.
+
+### 7.6 Clusters
+
+- **One base, several members.** stoa-1, stoa-2 and stoa-3 share a base
+  and each have their own data (an index, an address); each sees the
+  others through exports.
+- **The lab's experiments name clusters** (`factory.md`, 8.1), and a
+  revision with several hosts maps to several targets (`factory.md`,
+  5.3).
+
+### 7.7 What a target is, apart from where it runs
+
+- **Today a file's place decides the kind:**
+  `hosts/<host>/<host>-<env>.json` is a host; `hosts/<host>/machines/<name>.json` is a container, which
+  stands alone, with no base and no environments.
+- **The factory runs one target in different places:** mail-lab in a
+  container of a lab pool, mail-prod on a VM. So containers compose a
+  base and environments as hosts do, and placement (bare metal, a VM, a
+  container on a named host) is data of the environment.
+- **Placement changes the build:** a container has no kernel or
+  bootloader and bootstraps differently. That difference is part of the
+  lab's gap, known and measured (`factory.md`, 5.3).
+- **Which containers a host runs** is data in that host's
+  configuration, as the original fleet's `machines` task already has
+  it.
+
+### 7.8 New kinds of task data
+
+- **Checks** (10.1): what healthy means for what the task installs.
+- **Software built in the factory.** Beside today's downloads
+  (`{name, version, url, sha256}`), software may name an artifact: by
+  digest, pinned by a change as a snapshot bump is; or "built from this
+  head", which the lab resolves to a digest before rendering
+  (`factory.md`, 8.5).
+
+### 7.9 Smaller tweaks
+
+- **Real directory trees.** `tasks/ssh/etc/ssh/sshd_config.d/local.conf`,
+  not `tasks/ssh/etc/ssh___sshd_config.d___local.conf`: agents and
+  diffs read real paths.
+- **No templates completed at deploy.** What they read (the spec's
+  metadata) is known when rendering. Templates completed at activation
+  stay, limited to the slot's own variables (its label).
+- **Explicit settings in place of magic task names.** Today the
+  `container` task changes how the system is bootstrapped (now
+  placement, 7.7), the `desktop` task adds apt's `contrib` component, and
+  `host.hardware == "7th-gen"` adds `non-free`; apt's components become a
+  setting.
+- **Jinja's syntax stays,** since agents know it from Ansible and Salt,
+  as a strict subset in hearth's own engine (6.2, item 8).
+- **Shell fragments become the exception.** `customize.sh` and
+  `software.sh` stay as escape hatches; the common cases become
+  declarative: systemd presets, users (`sysusers.d`), software unpacked
+  to a path.
+- **Strict JSON stays,** with `_note` for annotations.
+
+## 8. Paying only for what changed
 
 `factory.md`'s rule (section 6) holds as it is: every piece of work is
 keyed by the digests of its inputs, part by part, and redone only for
@@ -277,7 +441,7 @@ the parts whose digests changed. In hearth:
 - **Caches:** apt-cacher-ng for packages; earlier outputs and their
   layers; software downloads by digest.
 
-## 8. Slots
+## 9. Slots
 
 ```
 empty → preparing → prepared → trial → blessed
@@ -293,8 +457,8 @@ empty → preparing → prepared → trial → blessed
     is unchanged;
   - by a one-shot boot otherwise: EFI's `BootNext`, or systemd-boot with
     unified kernel images, which counts boots itself. BIOS machines with
-    GRUB are the awkward case (section 12).
-- **Bless:** once the new slot passes the target's checks (9.1), the
+    GRUB are the awkward case (section 13).
+- **Bless:** once the new slot passes the target's checks (10.1), the
   boot default moves to it. hearth blesses its own slot, so a broken
   hearth release cannot bless itself and cannot strand a machine. The
   engine may hold a bless while a canary bakes.
@@ -306,13 +470,13 @@ empty → preparing → prepared → trial → blessed
 - **Three facts, kept apart:** the slot running, the boot default, and
   the slot on trial.
 
-## 9. Operating
+## 10. Operating
 
 What follows a rollout, for as long as a target runs. hearth is the
 machine's end of it; the rest is the run side's (temper's `factory.md`,
 section 9).
 
-### 9.1 One definition of healthy
+### 10.1 One definition of healthy
 
 - **Each task declares its checks,** as data in the IaC repository:
   what healthy means for what the task installs. For postfix: its unit
@@ -321,7 +485,7 @@ section 9).
 - **The same checks serve four uses.** Proving, deploying and operating
   are one activity at different stakes (`factory.md`, section 3):
   - the lab's experiments, on throwaway machines;
-  - blessing a slot (section 8);
+  - blessing a slot (section 9);
   - a rollout's bake;
   - watching the target for as long as it runs.
 - **Where a check runs:** a check of the machine runs on it, by its
@@ -329,7 +493,7 @@ section 9).
   elsewhere, DNS, a certificate close to expiry) runs from another
   machine, by that machine's hearth.
 
-### 9.2 Facts go up; telemetry is fetched
+### 10.2 Facts go up; telemetry is fetched
 
 - **Decisions get small typed facts,** over the channel: each check's
   result, resource alarms (disk, memory, pressure), units that fail,
@@ -344,21 +508,21 @@ section 9).
   the fleet is needed later, that store is a service the factory
   deploys from its own IaC, like any other.
 
-### 9.3 What touches a machine
+### 10.3 What touches a machine
 
 Work after a rollout is of three kinds:
 
 - **Changes, through temper:** security updates (a bump of the Debian
   snapshot), configuration fixes, capacity.
 - **Operational effects,** keyed and granted by policy. They start
-  small, with two: *roll back* (a slot switch, section 8) and *restart a
+  small, with two: *roll back* (a slot switch, section 9) and *restart a
   unit*. Any other waits until it is needed.
 - **The run side's standing procedures:** convergence, certificate
   renewal, backups.
 
 Nothing else touches a machine: no shell, and no hand.
 
-### 9.4 Persistent data
+### 10.4 Persistent data
 
 os gives data a layout (`@<target>.srv.data` and its siblings) and
 nothing more.
@@ -371,11 +535,11 @@ nothing more.
 - **Restore drills are experiments** on the run side's own throwaway
   machines: production's data never enters the lab.
 
-## 10. Reproducible builds: deferred
+## 11. Reproducible builds: deferred
 
 They are a level of trust, and can be retrofitted later.
 
-### 10.1 Why builds differ today
+### 11.1 Why builds differ today
 
 - **Time:** every file `deploy` writes gets the build's mtime, and
   nothing sets `SOURCE_DATE_EPOCH`.
@@ -391,7 +555,7 @@ They are a level of trust, and can be retrofitted later.
   never match, so "identical" has to mean the same tree, not the same
   image.
 
-### 10.2 Kept from day one
+### 11.2 Kept from day one
 
 These are not about trust:
 
@@ -405,7 +569,7 @@ These are not about trust:
 - **Outputs are trusted per plane:** a machine fetches only from its own
   plane's builders, so the lab's outputs never reach production.
 
-### 10.3 Given up meanwhile
+### 11.3 Given up meanwhile
 
 - **The lab tests a build of the same inputs,** not the bytes production
   runs.
@@ -414,7 +578,7 @@ These are not about trust:
   known differences, or waits. Only the packages layer needs it (6.2,
   item 2).
 
-### 10.4 Retrofitting
+### 11.4 Retrofitting
 
 - `SOURCE_DATE_EPOCH` per layer, derived from the layer's key (the
   Debian snapshot's timestamp), never from the commit, so an unchanged
@@ -432,7 +596,7 @@ These are not about trust:
   report as the finding, and is reported to Debian. A layer that cannot
   be fixed degrades alone, to "built, not reproduced".
 
-### 10.5 What Debian proves
+### 11.5 What Debian proves
 
 - **Package builds** are reproducible for most of the archive, which
   does not matter here: hearth installs Debian's binaries, pinned and
@@ -448,7 +612,7 @@ These are not about trust:
 - **So Debian proves the machinery every installation runs** (dpkg,
   debconf, triggers, systemd's presets, ldconfig, ca-certificates,
   Python's byte-compilation), not the server packages hearth installs.
-  The lab's gate (10.4) proves those.
+  The lab's gate (11.4) proves those.
 - **Pinned inputs help:** Debian's live-image rebuilds must fit within a
   six-hour archive synchronisation; hearth's inputs are a snapshot, fixed
   for good.
@@ -462,9 +626,10 @@ and
 [13.3](https://lists.reproducible-builds.org/pipermail/rb-general/2025-November/003947.html);
 mmdebstrap's manual, on `SOURCE_DATE_EPOCH` and its cleanup.
 
-## 11. Order of building
+## 12. Order of building
 
-1. **render,** checked against os's golden files;
+1. **render,** with section 7's format, checked against os's golden
+   files on converted configurations;
 2. **the store, with layers;**
 3. **builds;**
 4. **slots,** with trial and bless;
@@ -474,7 +639,7 @@ mmdebstrap's manual, on `SOURCE_DATE_EPOCH` and its cleanup.
 
 The fake machine grows alongside, from the first step.
 
-## 12. Open questions
+## 13. Open questions
 
 - **`/var` and layers.** dpkg's database lives in `/var`, and os splits
   `@<target>.var` off after the packages phase. How a layer pairs a root
@@ -499,6 +664,17 @@ The fake machine grows alongside, from the first step.
   plane's secret store (`factory.md`, section 14).
 - **The template engine:** exactly which part of Jinja the tasks use,
   and so what render's own engine takes.
+- **The schema's form:** a file per task beside its templates, and how
+  it states types (enumerations, maps keyed by name, references to
+  secrets).
+- **Exports:** how a task declares them, and whether any crosses an
+  environment (the lab never reads production's, and the reverse
+  seems as safe to forbid).
+- **Clusters:** how a base declares its members, and how members are
+  named as targets.
+- **The rendered diff:** who posts it at a change's head (the lab, CI,
+  or temper's gate), and how it is shown when a change touches many
+  targets.
 - **The fake machine's home:** shared with temper, so in skein or a
   crate of its own.
 - **Disk provisioning as an effect:** for the lab's throwaway machines
