@@ -5,9 +5,10 @@ activator trusts and what it never does, the process pair it forms with
 its builder, the link between them, its closed list of operations, how
 it verifies what it is asked to place, its state, and the tools it
 drives. M3 builds it, with the operations a slot needs, live changes
-included; restarting a unit and a container's operations are M5, and
-disks as an effect and backups are M6. The slots it
-carries are slots.md's, the layout it writes is machine.md's. What is
+included; restarting a unit, snapshots and restores of data, and a
+container's operations are M5; backups and disks as an effect are M6.
+The slots it carries are slots.md's, the layout it writes is
+machine.md's. What is
 open is in section 10.
 
 ## 1. In one page
@@ -75,17 +76,19 @@ open is in section 10.
   (`programming-model.md`, section 8).
 - **Typed values only:** keys, labels, names, tokens and a few paths.
   The activator derives every other path itself: an output's from its
-  key, a slot's from the machine's target and the label, a persistent
-  subvolume's from its name, a secret's from the store's layout. No
-  request names a store path, a subvolume or a device.
+  key, a slot's from the machine's target and the label, a class's
+  from the target and the class, an entry's directory from its class
+  and name, a snapshot's from the class and the sequence, a secret's
+  from the store's layout. No request names a store path, a subvolume
+  or a device.
 
 | Input | Rule |
 |---|---|
 | output key | a digest; a layer and a record of that name exist in the store (6.1) |
 | label | `a` or `b` |
 | target | the machine record's target; or [M5] a container whose placement's `on` is that target, by the request's `meta` |
-| a container's parameters [M5], its `boot` part (slots.md, 12.1) | the id base 64 Ki aligned, its range clear of the builder's (store.md, 9.2) and of the host's other containers', and the owner of the roots of the container's existing persistent subvolumes; binds' paths absolute and normal, a source never the top level, `/run/hearth-activator`, `/var/lib/hearth` or anything beneath them, at most 32 binds; capabilities by name from the kernel's list; a bridge an interface name |
-| `data` entries | machine.md, 3.4 |
+| a container's parameters [M5], its `boot` part (slots.md, 12.1) | the id base 64 Ki aligned, its range clear of the builder's (store.md, 9.2) and of the host's other containers', and the owner of the roots of the container's existing class subvolumes; binds' paths absolute and normal, a source never the top level, `/run/hearth-activator`, `/var/lib/hearth` or anything beneath them, at most 32 binds; capabilities by name from the kernel's list; a bridge an interface name |
+| `data` entries | machine.md, 3.4: a name, a class (`core`, `data` or `cache`) and a path; at most 64; a class's policies only for `core` and `data`, every period at least 10 minutes, every bucket's count from 1 to 1000 |
 | secret and identity paths | absolute and normal; not beneath a `data` path, `/var/lib/hearth`, `/.hearth`, `/proc`, `/sys`, `/dev`, `/run` or `/tmp`; not a path the activator writes itself (`/etc/fstab`, `/etc/machine-id`, `/etc/shadow`) |
 | secret modes | at most `0777`: no setuid, setgid or sticky bit; nothing for others to read |
 | owners and groups | names found in the slot's own `/etc/passwd` and `/etc/group`; for a secret or identity file, never `hearth` nor a group `hearth` belongs to |
@@ -124,9 +127,10 @@ changes nothing.
 ### 2.4 Where it writes
 
 - **The top level:** this target's slot subvolumes, its live deltas
-  `@<target>.live.<n>` (slots.md, 6.6), and its persistent subvolumes
-  when they are missing; on a host, its containers' too [M5]. Nothing
-  else there.
+  `@<target>.live.<n>` (slots.md, 6.6), and its class subvolumes and
+  entries' directories when they are missing; its snapshots in
+  `@hearth.snapshots` and a restore's renames [M5]; on a host, its
+  containers' too [M5]. Nothing else there.
 - **For containers [M5]:** their nspawn settings in
   `/run/systemd/nspawn/` and their links in `/run/machines/`
   (slots.md, 12.1).
@@ -137,9 +141,8 @@ changes nothing.
 - **NVRAM:** this target's four entries, `BootNext` and `BootOrder`.
 - **`@hearth.state`, `/run/hearth-activator` and `/run/nextroot`;**
   and it makes `/run/hearth/` for the builder (3.2).
-- **From M6:** `@hearth.backups`, a restore's renames of a persistent
-  subvolume (5.11, 5.12), and on a lab pool host its faults' rules
-  (5.15).
+- **From M6:** on a backup peer, `@hearth.backups` (5.11), and on a lab
+  pool host its faults' rules (5.15).
 - **The running slot:** nothing, since it is sealed; it changes systemd's
   state through `systemctl`, and, for a live change, mounts read-only
   overlays over its `/etc`, `/usr` and `/opt` (slots.md, 6.8), which
@@ -337,7 +340,9 @@ one higher than the last:
   reported tree digest (slots.md, 5.7; never the full one, which covers
   secrets' digests), kernel digests (slots.md, 6.1), part digests,
   generations, last trial and its outcome;
-- **persistent subvolumes:** present, mounted, orphaned;
+- **data:** each class subvolume present and mounted; each entry's
+  directory present and bound; orphans; and [M5] per class its
+  snapshots, newest and oldest, and the next one due;
 - **identity:** per target, its generation and public halves;
 - **secrets:** the names the spec declares, each present or missing,
   and the store's generation; never values or digests;
@@ -390,8 +395,9 @@ builder collects nothing until the first `Welcome` has told it these.
 | restart a unit | the builder, for an engine | keyed by the order's key; conditional on the unit's `InvocationID` | M5 |
 | place, trial, bless, hold, fall back and roll back of a container's slot, and removing a container (5.16) | the host's builder | as the machine's own: place keyed by the prepare key, the rest conditional; remove idempotent | M5 |
 | partition and format | bootstrap in-process; the lab as an effect | conditional | M3; M6 as an effect |
-| back up: snapshot, send, receive | the builder, on the data's period, or for a peer | keyed: the sequence; send idempotent | M6 |
-| restore | the builder, for an engine | keyed by the order's key; conditional on the data's UUID | M6 |
+| snapshot and prune a class (5.11) | the activator itself, on the class's period | keyed: the sequence; a prune is idempotent | M5 |
+| send, receive (5.11) | the builder, on the backup's period, or for a peer | send idempotent; receive keyed by the snapshot | M6 |
+| restore an entry or a class (5.12) | the builder, for a person or an engine | keyed by the order's key; conditional on the class subvolume's UUID | M5; from the peer M6 |
 | apply, and remove, a fault | the builder of a lab pool host, for the lab's engine | apply keyed by the experiment; remove idempotent | M6 |
 
 ### 5.1 Place
@@ -402,7 +408,9 @@ Place {
   output      Key                          the output's name in the store
   tree        Digest                       its tree digest, as its record gives it
   kernel      { version, image, initramfs, modules, initramfs inputs: Digest }   slots.md, 6.1
-  data        [ { name, path, backup? { peer, recipient } } ] at most 64; backup [M6]: operating.md, 7.2
+  data        entries    [ { name, class, path } ]                                   at most 64
+              policies   per class, core or data: { snapshots? { every, keep } [M5],
+                         backup? { every, keep, peer, recipient } [M6] }   operating.md, section 7
   users       [ name ]                                        package users the tasks declare (format.md, 5.6), at most 256
   secrets     files       [ { name, path, mode, owner, group } ]                     at most 256
               passwords   [ { user, name } ]                                         at most 64
@@ -416,11 +424,12 @@ Place {
 }
 ```
 
-For a container's slot [M5], `meta` is `{ kind: container, target, on
-}`, `on` checked against the machine record (2.2); `kernel` is absent,
-and `boot` holds the container's parameters instead of tokens: `{ ids,
-binds, capabilities, network, bridge? }`, at most 32 binds (slots.md,
-12.1).
+For a container's slot [M5], `meta` is
+`{ kind: container, target, on }`, `on` checked against the machine
+record (2.2); `kernel` is absent, and `boot` holds the container's
+parameters instead of tokens:
+`{ ids, binds, capabilities, network, bridge? }`, at most 32 binds
+(slots.md, 12.1).
 
 - **Effects:** slots.md, section 5, steps 5.1 to 5.7: identity first,
   then the prepare key, which covers the window and the units allowed
@@ -440,8 +449,10 @@ binds, capabilities, network, bridge? }`, at most 32 binds (slots.md,
   the digest differs; an id is out of range; a path that must be a
   directory or a regular file is not; a secret is missing, or readable
   by `hearth`; an owner or a package user is unknown; a parent directory
-  is missing; the disk is full; a tool failed (which, its exit, its
-  tail). No error carries a file's content.
+  is missing; an entry's directory is orphaned in another of the
+  target's classes, so the entry changed class (machine.md, 3.4); the
+  disk is full; a tool failed (which, its exit, its tail). No error
+  carries a file's content.
 - **A crash** leaves the slot `preparing`; the next start deletes it,
   and the builder asks again.
 
@@ -523,9 +534,9 @@ Identity { target, items: [ { item, kind, algorithm } ] }
   reports so that people and agents can record them as data in the
   repository (format.md, section 8).
 - **A crash** leaves a `.new` directory, removed at the next start.
-- **Prepare asks for it first,** before it computes its key (slots.md,
-  section 5), so a new item never causes a second prepare; bootstrap
-  does the same.
+- **Prepare asks for it first,** before it computes its key
+  (slots.md, section 5), so a new item never causes a second prepare;
+  bootstrap does the same.
 
 ### 5.8 Import secrets
 
@@ -569,8 +580,8 @@ RestartUnit { unit, invocation }
   an uncertain restart is resolved by reading it again.
 - **Never hearth's own units** (`hearth-activator.service`,
   `hearth-trial*`, `hearth-check-*`); that the unit is one the running
-  slot's spec ships or enables is the builder's check (operating.md,
-  section 6).
+  slot's spec ships or enables is the builder's check
+  (operating.md, section 6).
 - **For a container's target [M5],** the same operation with the
   container's target named, `RestartUnit { target, unit, invocation }`:
   the unit is one inside the container, its `InvocationID` read with
@@ -592,46 +603,61 @@ RestartUnit { unit, invocation }
   conditional on a blank disk (no partition table, no signature), or on
   one that already holds exactly these identifiers, which is then done.
 
-### 5.11 Back up [M6]
+### 5.11 Snapshots [M5] and backups [M6]
 
 ```
-Snapshot { target, name, seq }        Send { target, name, seq, parent }        Receive { from, name, seq }
+Snapshot { target, class, seq }      the activator's own, on the class's period
+Send { target, class, seq, parent }      Receive { from, class, seq }      [M6]
 ```
 
-- **Snapshot:** a read-only snapshot of `@<target>.<name>` into
-  `@hearth.backups/<target>.<name>/<seq>` (`BTRFS_IOC_SNAP_CREATE_V2`
-  with the read-only flag), atomic and crash-consistent. Keyed by
+- **Snapshot,** by the activator itself: when a class's deadline comes
+  (operating.md, 7.1), a read-only snapshot of `@<target>.<class>` into
+  `@hearth.snapshots/<target>.<class>/<seq>` (`BTRFS_IOC_SNAP_CREATE_V2`
+  with the read-only flag), atomic and crash-consistent. The policy is
+  the running slot's record's (slots.md, 2.2), never a request's; a
+  container's class follows its host's (slots.md, 12.1). Keyed by
   `<seq>`, which only grows: a snapshot of that sequence means done.
-- **Send:** `btrfs send -p <parent> <seq>`, or without `-p` the first
-  time, piped into `age --encrypt --recipient <recipient>` before any
-  byte reaches the builder, then handed to it over a pipe made for the
-  transfer, never the link. The recipient is the peer's backup key, from
-  the sending slot's record (slots.md, 2.2), never from the request, so
-  the builder cannot redirect a stream to a key of its own. Idempotent: a
-  send the peer has not confirmed is sent again. The semantics are
-  operating.md, 7.2's.
-- **Receive,** on the backup peer: the ciphertext from its builder, piped
-  into `age --decrypt -i <its backup key>` and then `btrfs receive` into
-  `@hearth.backups/<from>.<name>/`, accepted only from a target the
-  peer's spec names; what the peer keeps at rest is operating.md, 7.3's.
-  Keyed by the received snapshot: one already there, read-only, is
-  confirmed again; a partial one is deleted and received again.
-- **Pruning** follows operating.md, 7.1 and 7.3.
+  Then the class's record (7.1) gains it, and the next deadline is set.
+- **Prune,** after every snapshot: each snapshot that no bucket keeps
+  and the backup does not need (operating.md, 7.3) is deleted with
+  `SNAP_DESTROY_V2`, then dropped from the record. Idempotent: a
+  snapshot already gone is done. No request can prune: the builder
+  never decides what a machine's history loses.
+- **Send** [M6]: `btrfs send -p <parent> <seq>`, or without `-p` the
+  first time, piped into `age --encrypt --recipient <recipient>` before
+  any byte reaches the builder, then handed to it over a pipe made for
+  the transfer, never the link. The recipient is the peer's backup key,
+  from the class's policy in the sending slot's record (slots.md, 2.2),
+  never from the request, so the builder cannot redirect a stream to a
+  key of its own. Idempotent: a send the peer has not confirmed is sent
+  again. The semantics are operating.md, 7.2's.
+- **Receive** [M6], on the backup peer: the ciphertext from its builder,
+  piped into `age --decrypt -i <its backup key>` and then `btrfs
+  receive` into `@hearth.backups/<from>.<class>/`, accepted only from a
+  target the peer's spec names; what the peer keeps at rest is
+  operating.md, 7.3's. Keyed by the received snapshot: one already
+  there, read-only, is confirmed again; a partial one is deleted and
+  received again.
 
-### 5.12 Restore [M6]
+### 5.12 Restore [M5]
 
 ```
-Restore { target, name, seq, expect { uuid } }
+Restore { target, class, entry?, seq, expect { uuid } }
 ```
 
-- **Keyed by the order's key and conditional on the data subvolume's
-  UUID** being the one decided from. Its steps (a writable snapshot as
-  `@<target>.<name>.restoring`, the swap recorded, two renames, a full
-  reboot) are operating.md, 7.4's; the names, machine.md, 3.1's.
-- **A snapshot the machine lacks** arrives from the peer encrypted to
-  this target's own backup key; the activator pipes `age --decrypt -i
-  <its backup key>` into `btrfs receive`, so plaintext exists only
-  between two activators.
+- **Keyed by the order's key and conditional on the class subvolume's
+  UUID** being the one decided from. With `entry`, one entry's
+  directory is copied back out of the snapshot and swapped in by name;
+  without, the class's subvolume is swapped for a writable snapshot of
+  it. Both then reboot, or restart a container. The steps are
+  operating.md, 7.4's; the names, machine.md, 3.1 and 3.4's.
+- **The copy is the activator's own walk** through descriptors, with
+  `FICLONE` (slots.md, 5.3): no `cp`, and nothing resolved outside the
+  snapshot and the class.
+- **A snapshot the machine lacks** [M6] arrives from the peer encrypted
+  to this target's own backup key; the activator pipes `age --decrypt -i
+  <its backup key>` into `btrfs receive`, into its own
+  `@hearth.snapshots`, so plaintext exists only between two activators.
 - **A cut between the renames** is finished or undone at the next start
   from the recorded swap (7.3).
 
@@ -690,8 +716,8 @@ Fault { experiment, kind, targets, parameters, until }        Unfault { experime
   engine says; refused everywhere else (operating.md, section 8).
 - **Kinds, each a fixed operation with typed parameters,** never a
   command line from the engine; their mechanisms (nftables, `tc netem`,
-  `systemctl --machine kill`, a qgroup limit) are operating.md,
-  section 8's.
+  `systemctl --machine kill`, a qgroup limit) are
+  operating.md, section 8's.
 - **Apply is keyed by the experiment:** a fault already applied under
   that key is found. **Remove is idempotent.**
 - **Every fault ends at `until`,** which the activator keeps and
@@ -700,10 +726,10 @@ Fault { experiment, kind, targets, parameters, until }        Unfault { experime
 
 ### 5.16 A container's slots [M5]
 
-Place, trial, bless, hold, fall back and roll back (5.1 to 5.5, 5.13)
-on a container's slot, and removing a container, asked by the host's
-builder with the container's target (2.2). The effects are slots.md,
-section 12's; none touches the boot partition or NVRAM.
+Place, trial, bless, hold, fall back and roll back (5.1 to 5.5, 5.13) on
+a container's slot, and removing a container, asked by the host's
+builder with the container's target (2.2). The effects are
+slots.md, section 12's; none touches the boot partition or NVRAM.
 
 | Operation | Effects | Recovery class |
 |---|---|---|
@@ -714,7 +740,7 @@ section 12's; none touches the boot partition or NVRAM.
 | fall back | the default's settings and link back, a restart, the record `fell back` | conditional |
 | roll back | a trial of the other blessed slot; while live, the live fall back | conditional |
 | try live, bless live, the live fall back | slots.md, 12.8: the delta on the host's top level, the swap by a child that enters the container's mount namespace, the units through `systemctl --machine=`, the live bless recording the container's next start as `b`'s trial | as the machine's own |
-| remove | `systemctl stop` on its unit; its link and settings removed; its slots' subvolumes, records, manifests and marker deleted, then its record; its persistent subvolumes, identity and secrets kept (slots.md, 12.7) | idempotent: a container with no record is done |
+| remove | `systemctl stop` on its unit; its link and settings removed; its slots' subvolumes, records, manifests and marker deleted, then its record; its class subvolumes, their snapshots, its identity and secrets kept (slots.md, 12.7) | idempotent: a container with no record is done |
 
 - **A trial is answered after its restart,** not before a reboot: done
   once the unit is stably active, the slot `on trial`; failed once it is
@@ -909,6 +935,9 @@ and L2):
 ├── boot                                    the booted kernel: boot id, its digests (slots.md, 6.1)
 ├── journal                                 the operation in flight, and its step (7.3)
 ├── facts                                   quirks seen, drift's last results, last costs
+├── snapshots/ [M5]
+│   └── x1-prod.data                        the class's snapshots: each sequence, its time, the buckets that keep it,
+│                                           and [M6] sent, confirmed by the peer; the next deadline
 ├── slots/
 │   ├── x1-prod.a                           slot record (slots.md, 2.2)
 │   ├── x1-prod.a.manifest                  one entry per path of the sealed root
@@ -979,8 +1008,9 @@ reboot), and cleared when the operation ends.
 | restart a unit [M5] | read the invocation id: changed means done |
 | a container's trial, bless or fall back [M5] | by the marker and the facts, with the link and settings in `/run` (slots.md, 12.3) |
 | partition and format [M6] | look for the identifiers: found means done |
-| back up [M6] | look for the snapshot, or the received one: found means done; a send not confirmed is sent again |
-| restore [M6] | the recorded swap: finish it, or undo it, then reboot |
+| snapshot, prune [M5] | look for the snapshot by its sequence: found means done; prune again |
+| send, receive [M6] | look for the received snapshot: found means done; a send not confirmed is sent again |
+| restore [M5] | before the swap is recorded, delete the copy or the writable snapshot (`.restoring`); after, the recorded swap: finish it, or undo it, then reboot |
 | a fault [M6] | look for it by the experiment's key; its end still holds |
 
 ### 7.4 Start
@@ -1015,7 +1045,9 @@ At every start, after a boot, a soft reboot or a crash:
    record nor the marker names, deleted;
 8. **start the containers** [M5]: each container's settings and link
    that `/run` lacks, from its recorded default, then `systemctl start`
-   on its unit (slots.md, 12.2);
+   on its unit (slots.md, 12.2); and set each class's snapshot deadline
+   from its record and the running slot's policies, a snapshot missed
+   while the machine was down taken at once (operating.md, 7.1) [M5];
 9. **spawn the builder;** its `Welcome` carries the facts.
 
 Every step is idempotent, so a crash during the start repeats it.
@@ -1031,7 +1063,7 @@ domain sees only typed values.
 | Crate | Format | Way |
 |---|---|---|
 | `hearth-protocol-link` | the link's records (4.1), `TryLive`'s plan included (5.17) | both |
-| `hearth-protocol-state` (new) | the records of `@hearth.state` (7.1), the trial marker, the live record and its manifest (slots.md, 2.4), the slot record inside the root (slots.md, 2.2) | both |
+| `hearth-protocol-state` (new) | the records of `@hearth.state` (7.1), the trial marker, the live record and its manifest (slots.md, 2.4), the classes' snapshot records [M5], the slot record inside the root (slots.md, 2.2) | both |
 | `hearth-protocol-accounts` (new) | `/etc/passwd`, `/etc/group`, `/etc/shadow` lines | read; `/etc/shadow` written |
 | `hearth-protocol-units` (new) | fstab (machine.md, 3.3), the trial's units and the watchdog's drop-in (slots.md, 5.5); a container's nspawn settings [M5] (slots.md, 12.1) | written |
 | `hearth-protocol-xattr` (new) | `security.capability` v2 and v3, POSIX ACL values (slots.md, 5.2) | both |
@@ -1050,7 +1082,7 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 
 | Tool | For | Protocol | What the domain gets |
 |---|---|---|---|
-| btrfs ioctls: `SNAP_CREATE_V2`, `SUBVOL_CREATE_V2`, `SNAP_DESTROY_V2`, `SUBVOL_SETFLAGS`, `GET_SUBVOL_INFO`, `GET_SUBVOL_ROOTREF`; `FICLONE` | snapshots, slots, sealing, the running slot; cloning `/var` and seeding data | skein's ring adapter: a closed list of synchronous ioctls (an ask of skein, README, 8.1) | typed results |
+| btrfs ioctls: `SNAP_CREATE_V2`, `SUBVOL_CREATE_V2`, `SNAP_DESTROY_V2`, `SUBVOL_SETFLAGS`, `GET_SUBVOL_INFO`, `GET_SUBVOL_ROOTREF`; `FICLONE` | snapshots, slots, sealing, the running slot; cloning `/var`, seeding entries and restoring one; classes, their snapshots and pruning [M5] | skein's ring adapter: a closed list of synchronous ioctls (an ask of skein, README, 8.1) | typed results |
 | files: `openat2` with `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS` and `RESOLVE_NO_XDEV`; stat without following, readlink, extended attributes, chown, chmod, mkdir, symlink, link, unlink, rmdir, `Store` | the shift, `/var`, the slot's files, the state | skein's io, with the records hearth asks for (README, 8.1) | typed results |
 | mounts: `fsopen`, `fsconfig`, `fsmount`, `move_mount` with `MOVE_MOUNT_BENEATH`, `open_tree`, `mount_setattr`, `umount2` with `MNT_DETACH`; `mknodat` of a 0/0 character device; `setns` into a container's mount namespace [M5], in a child | live overlays: the layers' source, the swap and the swap back, the whiteouts (slots.md, 6.8 and 12.8) | skein's io, asks of skein (README, 8.1) | typed results; the mount table through `hearth-protocol-proc` |
 | efivarfs reads | entries, `BootOrder`, `BootNext`, `BootCurrent`, `SecureBoot` | `hearth-protocol-efi` | typed variables |
@@ -1064,7 +1096,7 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 | `/usr/sbin/nscd` | `--invalidate passwd` and `group`, in a live trial, when nscd runs | `hearth-protocol-activator` | success, or exit and tail |
 | `/usr/bin/ssh-keygen` | identity's host keys | `hearth-protocol-keygen` | success; the keys as files |
 | `/usr/sbin/wipefs`, `/usr/sbin/parted`, `/usr/sbin/partprobe`, `/usr/bin/udevadm`, `/usr/sbin/mkfs.vfat`, `/usr/sbin/mkfs.btrfs`, `/usr/sbin/useradd`, `/usr/sbin/usermod` | bootstrap; disks as an effect [M6] | `hearth-protocol-activator` | success, or exit and tail |
-| `/usr/bin/btrfs` `send`, `receive`, `qgroup limit` [M6] | backups and restores; a full-disk fault | `hearth-protocol-activator` | a stream, and success |
+| `/usr/bin/btrfs` `send`, `receive`, `qgroup limit` [M6] | backups, and a restore from the peer; a full-disk fault | `hearth-protocol-activator` | a stream, and success |
 | `/usr/bin/age`, `/usr/bin/age-keygen` [M6] | encrypting a backup stream, decrypting one received; the backup key | `hearth-protocol-activator`; the recipient line, `hearth-protocol-keygen` | a stream, and success; the `age1…` recipient |
 | `/usr/sbin/nft`, `/usr/sbin/tc` [M6] | partition, latency and loss faults on a pool host | `hearth-protocol-activator` | success, or exit and tail |
 
@@ -1090,7 +1122,7 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 
 - **The root's world:** `hearth-domain-activator` with its children
   (`hearth-domain-slots`, `hearth-domain-boot`, `hearth-domain-disk`;
-  `hearth-domain-backups` from M6) on the fake machine and the fakes of
+  `hearth-domain-backups` from M5) on the fake machine and the fakes of
   section 8, with a scripted builder on the link side: requests at every
   moment, stale conditions, repeated attempts, a builder that crashes,
   hangs or never blesses (testing.md, sections 3 and 8).
@@ -1131,8 +1163,10 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 - **Later operations join with their milestones:** a held bless that
   ends at its deadline [M4]; checks whose transient units fail, time out
   or never start, and a host's containers prepared, tried, blessed and
-  fallen back across crashes and host reboots [M5]; a restore cut
-  between its renames, and faults that outlive their engine [M6].
+  fallen back across crashes and host reboots, snapshots and prunes cut
+  at every step, and a restore of an entry or a class cut between its
+  renames [M5]; sends and receives cut mid-stream, and faults that
+  outlive their engine [M6].
 
 ## 10. What is open
 

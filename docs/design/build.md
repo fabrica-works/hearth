@@ -163,10 +163,9 @@ plan(spec)
   nothing a mirror serves. Resolution kept the indices apt verified in
   the cache instead (store.md, 6.4); a resolution whose kept indices the
   cache lacks is made again (render.md, section 5).
-- **How:** `apt-helper download-file` with `<uri> <target>
-  SHA256:<hex>` triples, at most 256 a run, into `staging/<key>/`; each
-  file is then renamed into `cache/<sha256>` with its record (store.md,
-  6.5).
+- **How:** `apt-helper download-file` with `<uri> <target> SHA256:<hex>`
+  triples, at most 256 a run, into `staging/<key>/`; each file is then
+  renamed into `cache/<sha256>` with its record (store.md, 6.5).
 - **URIs** join a source's URI with a package's `Filename`. Only `http` and `https` are allowed: with a `file:` URI
   `apt-helper` links the local file instead of fetching.
 - **Checked before kept:** `apt-helper` verifies the SHA-256 and leaves
@@ -314,7 +313,7 @@ mmdebstrap
   path, a secret or an identity file, package users included; the
   packages part carries the package users' lines (render.md, 4.2),
   since they change what this layer builds. A snapshot bump then cannot
-  renumber them under their persistent subvolumes: `adduser --system`
+  renumber them under their data entries: `adduser --system`
   finds the user and keeps it, and the config layer's sysusers lines
   carry the same ids (7.2).
   - **Why the extract hook, not the setup hook:** base-passwd's preinst
@@ -445,8 +444,8 @@ H("initramfs",
   fixed id, and render refuses any other owner. Its URL is a fetch hint
   beside the part, outside the digest.
 - **Fetched as in 5.1,** into the same cache, unless the cache has it.
-  An artifact by key [M6] comes from the store instead (artifacts.md,
-  7.3).
+  An artifact by key [M6] comes from the store instead
+  (artifacts.md, 7.3).
 - **Recorded:** the software layer's record lists the SHA-256 of each
   download it placed, and the tree digest of each artifact [M6], so
   collection keeps them while the layer is kept (store.md, 6.2 and 7.5).
@@ -475,8 +474,8 @@ H("initramfs",
   the software part lists them (render.md, 4.2), each in a sandbox of
   its own: pivoted into the layer, offline, as the namespace's root,
   `/bin/sh -eu /run/hearth/script`, with the target's shell and tools.
-- **It names a download by the path it was placed at** (format.md,
-  5.8); nothing of the builder's is visible (8.6).
+- **It names a download by the path it was placed at** (format.md, 5.8);
+  nothing of the builder's is visible (8.6).
 - **os ran it outside the chroot,** with the host's tools against
   `$ROOTDIR` and a writable host cache.
 
@@ -511,11 +510,11 @@ H("initramfs",
 - **Ids are fixed where format.md requires them:** a user or group that
   owns a data path, a secret or an identity file has its uid and gid in
   its line, the same a package user was seeded with (5.5), so a snapshot
-  bump renumbers nothing a persistent subvolume holds. A package user
+  bump renumbers nothing a data entry holds. A package user
   gets no line: the package made it (render.md, 4.2).
 - **Passwords are locked** (`!*`). A password hash is a secret: the
-  activator applies it to the slot's shadow file at prepare (slots.md,
-  5.4).
+  activator applies it to the slot's shadow file at prepare
+  (slots.md, 5.4).
 - **At boot** `systemd-sysusers.service` finds the users made, and with
   `/etc` read-only it writes nothing.
 
@@ -549,9 +548,9 @@ H("initramfs",
   `-E` excludes `/dev`, `/proc`, `/run` and `/sys`. A line for `/etc` or
   `/usr` takes effect in the root, read-only at boot, where the line
   then finds its work done; one for `/var` lands in the output's
-  `/var`, which every slot copies; one for a persistent subvolume's path
-  is applied again at boot, on the mounted subvolume; lines for `/run`
-  and `/tmp` wait for boot.
+  `/var`, which every slot copies; one for a data entry's path is
+  applied again at boot, through the entry's bind, on its directory in
+  its class; lines for `/run` and `/tmp` wait for boot.
 - **The types are format.md's (5.6),** less what it reserves (5.11):
   lines that would make a nested subvolume in a layer (store.md, 4.1),
   or write into the read-only root at every boot and fail its bless
@@ -589,8 +588,8 @@ H("initramfs",
   `/usr/bin/systemd-sysusers` is the target's, at the target's systemd
   version, with its configuration. os ran the host's with `--root`.
 - **A target without the tool** (no systemd, yet users declared) fails
-  the step with "not found"; render may refuse it earlier (render.md,
-  section 7).
+  the step with "not found"; render may refuse it earlier
+  (render.md, section 7).
 - **The packages step is the one exception:** the builder's mmdebstrap,
   apt and `dpkg-deb` unpack the essential set, and every maintainer
   script then runs chrooted with the target's binaries. The
@@ -741,15 +740,15 @@ the packages step: a tool root                    every other step: the layer as
 - **The builder's cgroups.** On a machine the activator's unit has
   `Delegate=yes`; the activator moves itself into a leaf, `activator/`,
   and makes `builder/`, owned by `hearth`, with `memory` and `pids`
-  enabled, for the builder and everything it starts (activator.md,
-  section 3). On a developer's machine the client runs under `systemd-run
-  --user --scope -p Delegate=yes`. cgroup v2 lets no cgroup with
-  controllers enabled for its children hold processes itself (the
-  no-internal-processes rule), so the builder moves itself into a leaf,
-  `builder/self/`, enables both controllers in `builder/`'s
-  `cgroup.subtree_control`, and gives each sandbox, fetch and tree helper
-  a leaf of its own beside it, named by a token and removed once empty.
-  The limits above are written to those leaves.
+  enabled, for the builder and everything it starts
+  (activator.md, section 3). On a developer's machine the client runs
+  under `systemd-run --user --scope -p Delegate=yes`. cgroup v2 lets no
+  cgroup with controllers enabled for its children hold processes itself
+  (the no-internal-processes rule), so the builder moves itself into a
+  leaf, `builder/self/`, enables both controllers in `builder/`'s
+  `cgroup.subtree_control`, and gives each sandbox, fetch and tree
+  helper a leaf of its own beside it, named by a token and removed once
+  empty. The limits above are written to those leaves.
 - **Stopping is skein's three steps:** the termination signal to the
   first process, then to every process, then a kill of the cgroup. A
   step is over when its cgroup is empty (`cgroup.events`), and only
@@ -912,10 +911,10 @@ with its tail.
 
 ### 10.5 Recordings
 
-- **Every machine is tested against real runs** (testing.md, section
-  4): the argument vector, the environment, the bytes of stdout and
-  stderr as they came, the exit status, recorded by the conformance tier
-  on the local mirror (testing.md, section 5).
+- **Every machine is tested against real runs** (testing.md, section 4):
+  the argument vector, the environment, the bytes of stdout and stderr
+  as they came, the exit status, recorded by the conformance tier on the
+  local mirror (testing.md, section 5).
 - **They replace os's hand-written fixtures** (a 17-line `Inst` sample,
   a 22-line failure log), and are recorded again when a tool moves.
 
@@ -964,12 +963,12 @@ with its tail.
 ## 13. Its world
 
 - **`hearth-domain-build`'s world** runs the build's domain with the
-  store's (or a scripted store) on the fake machine (testing.md,
-  section 3). Its fakes: mmdebstrap, installing a seeded universe from a
-  local repository, with users made by maintainer scripts, conffiles, a
-  kernel, and output from recordings; the fetcher; `dpkg-query`; the
-  target's systemd tools and `tar`; scripts in temper's shell subset;
-  the tree helper.
+  store's (or a scripted store) on the fake machine
+  (testing.md, section 3). Its fakes: mmdebstrap, installing a seeded
+  universe from a local repository, with users made by maintainer
+  scripts, conffiles, a kernel, and output from recordings; the fetcher;
+  `dpkg-query`; the target's systemd tools and `tar`; scripts in
+  temper's shell subset; the tree helper.
 - **Faults from the seed:** a 404, a mismatch or a stall in a fetch; a
   maintainer script that fails; a full disk; a step past its deadline;
   a step that leaves an offender; a power cut mid-step.

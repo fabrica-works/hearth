@@ -48,11 +48,11 @@ section 10.
 - **A repository:** a git directory, of two kinds:
   - **a local one,** which `hearth render` and `hearth diff` name with
     `--repo` or a path: the client renders it in its own process, with
-    its own user's access, and never hands the path to a daemon (wire.md,
-    section 3);
+    its own user's access, and never hands the path to a daemon
+    (wire.md, section 3);
   - **the builder's own clone,** `@hearth.store/repo/`, which the daemon
-    fetches and renders, and the only repository it renders (wire.md,
-    section 4).
+    fetches and renders, and the only repository it renders
+    (wire.md, section 4).
 - **A revision:** a commit id, or a ref name that render resolves to a
   commit id once, first. Everything after names the commit.
 - **Targets:** one, several, or every target of the revision.
@@ -132,8 +132,8 @@ Exceeding a limit is an error of the revision, with the path at fault.
   variable. The URL never carries a credential.
 - **The read credential is the builder's own,** never a secret of the
   secret store: a forge token or a deploy key kept in the store under
-  `credentials/`, 0700, user `hearth`, imported at bootstrap (machine.md,
-  section 8), and given to git by a fixed variable:
+  `credentials/`, 0700, user `hearth`, imported at bootstrap
+  (machine.md, section 8), and given to git by a fixed variable:
   - over HTTPS, `GIT_ASKPASS=/usr/lib/hearth/askpass`, a program the
     hearth task ships that prints `hearth` for a username and the token
     in `<store>/credentials/token` for a password;
@@ -220,9 +220,9 @@ and step 4 reads other targets of the same environment.
 
 - **For each task whose exports a task of this target reads,** render
   composes every target of the environment that has that task, validates
-  that task's settings there, and evaluates its exports (format.md,
-  section 8). Each target's exports are computed once per revision and
-  shared by all their readers.
+  that task's settings there, and evaluates its exports
+  (format.md, section 8). Each target's exports are computed once per
+  revision and shared by all their readers.
 - **Placements are read the same way:** `target.containers` holds the
   environment's targets placed on this one (format.md, 3.5). A
   container's `on` must name a target of its environment that is not a
@@ -269,7 +269,7 @@ Render compares the concrete declarations of all the target's tasks:
 | What | Rule |
 |---|---|
 | a path in the file tree | one task only, even with identical content |
-| a data name; a data path | one task only |
+| a data name, within the target and across classes; a data path | one task only |
 | a secret's or identity's path | one task only, and never a path of the tree |
 | a path in the tree under a data path | never: the mount would hide it |
 | a download's path | one task only; never overlapping another's, nor a path of the tree |
@@ -309,11 +309,11 @@ overwrote silently, in alphabetical order of task.
   renders them into its own checks part (operating.md, 2.6). A change to
   one probe changes the probed target's and its probers' parts, and no
   other.
-- **Refused at render:** a `blessing` check with `from`; a `from` that no
-  target of the environment has; a command check whose `user` is `root`,
-  or is neither `nobody`, a sysusers user nor a package user a task of
-  the target declares (format.md, 5.6; operating.md, 2.2; activator.md,
-  section 5).
+- **Refused at render:** a `blessing` check with `from`; a `from` that
+  no target of the environment has; a command check whose `user` is
+  `root`, or is neither `nobody`, a sysusers user nor a package user a
+  task of the target declares (format.md, 5.6; operating.md, 2.2;
+  activator.md, section 5).
 
 ### 3.10 Costs
 
@@ -347,7 +347,7 @@ overwrote silently, in alphabetical order of task.
 | `packages` | output | sources, the request, the variant, preseeds, the initramfs, apt's options | the packages key, and the resolution key |
 | `software` | output | downloads by digest and where each is placed; artifacts by key [M6]; `software.sh` | the software key |
 | `config` | output | the file tree; users; presets; tmpfiles; `customize.sh` | the config key |
-| `data` | slot | persistent subvolumes and their mounts | no key |
+| `data` | slot | data entries, each a directory in a class, bound at its path; each class's snapshot and backup policies | no key |
 | `secrets` | slot | secret files, password secrets and identity items, by name | no key |
 | `boot` | slot | the kernel's command-line parameters; a container's parameters instead [M5] | no key |
 | `checks` [M5] | other | the target's checks (operating.md, section 2) | no key |
@@ -391,11 +391,11 @@ config
   scripts              list of { task, order, content digest }        customize.sh, in order
 ```
 
-- **The variant is a function of placement,** never a task (format.md,
-  3.4): os chose it from a `container` task in render and from the
-  target's kind in deploy, which disagreed. A container's variant
-  changes its resolution key (5.1), so a host and its container never
-  share a packages layer.
+- **The variant is a function of placement,** never a task
+  (format.md, 3.4): os chose it from a `container` task in render and
+  from the target's kind in deploy, which disagreed. A container's
+  variant changes its resolution key (5.1), so a host and its container
+  never share a packages layer.
 - **A container's packages part has no initramfs,** and render refuses
   a task's module on it, as it refuses a boot parameter (format.md, 3.4;
   7.2): with no kernel there is nothing to configure.
@@ -445,7 +445,10 @@ config
 ### 4.3 Slot parts
 
 ```
-data                   map name → { path, backup? [M6] { every, keep, peer, recipient } }
+data
+  entries              map name → { class: core | data | cache, path }
+  policies             map class (core, data) → { snapshots? { every, keep } [M5],
+                         backup? { every, keep, peer, recipient } [M6] }
 secrets
   files                map secret name → { path, mode, owner, group }
   passwords            map user → secret name
@@ -462,10 +465,18 @@ boot                   list of parameters, in order; for a container [M5], its p
   the parameters its placement gives nspawn (format.md, 3.5): what
   starts the slot, as a host's command line is, so a change to them
   prepares a new slot of the same output.
+- **The data part's entries are the tasks' `data` entries,** a name, a
+  class and a path each (format.md, 5.7); mode and owners go to the
+  config part's tmpfiles lines instead (4.2). **Its policies are the
+  `hearth` task's `snapshots` and `backups` settings** (format.md, 5.12),
+  by class, a backup's peer and recipient read from the `backup_peer`
+  task's exports (format.md, 8.7). A host carries every class's policy
+  its settings give, used or not, since its containers' classes follow
+  them; a container's data part carries none (slots.md, 12.1).
 - **The secrets part holds names, never values.** Beside secret files it
   carries password secrets and identity items, the two other things the
-  activator writes into a slot from the secret store (format.md,
-  section 9; slots.md, 5.4).
+  activator writes into a slot from the secret store
+  (format.md, section 9; slots.md, 5.4).
 
 ### 4.4 Other parts and meta
 
@@ -738,8 +749,8 @@ ion-prod                                            nothing to build
 2 of 11 targets change; 9 are unchanged.
 ```
 
-- The client prints it as text, or as JSON for agents (wire.md,
-  section 3). The typed diff is the same either way.
+- The client prints it as text, or as JSON for agents
+  (wire.md, section 3). The typed diff is the same either way.
 - The coupling is visible: carbon-prod changes because it reads ion-prod's
   exports, and carbon-lab does not, because exports stay in their
   environment.

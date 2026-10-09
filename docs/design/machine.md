@@ -16,19 +16,23 @@ in section 12.
   GRUB and its environment. Everything else is a subvolume at the btrfs
   top level.
 - **The top level holds only subvolumes, named by target:** two slots,
-  each a root and a `/var`; a persistent subvolume per `data` entry; the
-  builder's store; the activator's state; backups [M6]. A host's
-  containers have their slots and persistent subvolumes there too, under
-  their own targets' names [M5]. Slots and persistent subvolumes are
-  siblings, never nested, and only the activator mounts the top level.
+  each a root and a `/var`; up to three class subvolumes for persistent
+  data, `core`, `data` and `cache`; the builder's store; the
+  activator's state; local snapshots [M5]; received backups [M6]. A
+  host's containers have their slots and classes there too, under their
+  own targets' names [M5]. Slots and classes are siblings, never nested,
+  and only the activator mounts the top level.
+- **Persistent data is a directory per `data` entry in its class's
+  subvolume,** bound at the path its task declares: one subvolume per
+  class, as os and the bash fleet had, so a snapshot is a class's and
+  atomic across its services.
 - **The root is read-only twice over:** its subvolume is sealed
   read-only when prepare ends, and it is mounted `ro`. `/var`, the
-  persistent subvolumes, the store and the state are writable mounts
-  beside it.
+  classes, the store and the state are writable mounts beside it.
 - **fstab is the activator's, written from typed data** at prepare: the
-  filesystem by UUID, the slot's own subvolumes, the persistent
-  subvolumes at the paths their tasks declare. No template, and no
-  device in an output.
+  filesystem by UUID, the slot's own subvolumes, the classes at
+  `/srv/<class>`, and a bind per entry at the path its task declares.
+  No template, and no device in an output.
 - **EFI boots each slot's kernel directly.** The ESP holds
   `\vmlinuz.<target>.<label>` and `\initrd.img.<target>.<label>`; each
   slot has two `Boot####` entries at fixed numbers, normal and trial,
@@ -119,7 +123,7 @@ reliable there; 9.4 gives the lean.
 ### 2.5 Containers [M5]
 
 No kernel, no boot partition, no entries: a container's slots and
-persistent subvolumes are subvolumes on its host's top level, prepared
+class subvolumes are subvolumes on its host's top level, prepared
 by the host's activator, and activating one restarts its nspawn unit
 (slots.md, section 12). Sections 4 to 7 and 9 do not apply to it; no
 fstab mounts anything of it (3.3), and it is never bootstrapped (8.4).
@@ -167,38 +171,54 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 ├── @x1-prod.b              slot b's root
 ├── @x1-prod.b.var          slot b's /var
 ├── @x1-prod.live.3         a live delta            only while a live state exists (slots.md, 6.6)
-├── @x1-prod.journal        a persistent subvolume  one per data entry its tasks declare
-├── @x1-prod.data           a persistent subvolume
+├── @x1-prod.core           the core class          one directory per entry: journal, iwd
+├── @x1-prod.data           the data class          one directory per entry: home-free
 ├── @hearth.store           the builder's store     owned by hearth, 0700; its layers nested in it (store.md, section 2)
 ├── @hearth.state           the activator's state   root, 0700 (activator.md, section 7)
-└── @hearth.backups [M6]    data snapshots          root, 0700: <target>.<name>/<seq>, read-only (operating.md, 7.1)
+├── @hearth.snapshots [M5]  class snapshots         root, 0700: <target>.<class>/<seq>, read-only (operating.md, 7.1)
+└── @hearth.backups [M6]    received backups        root, 0700, on a backup peer: <from>.<class>/<seq> (operating.md, 7.3)
 ```
 
 | Subvolume | Its root inode | Made by | Removed by |
 |---|---|---|---|
 | `@<target>.<label>` | the output's `/`; read-only flag set at the end of prepare | prepare: a snapshot (slots.md, 5.1) | the next prepare of that slot |
 | `@<target>.<label>.var` | the output's `/var`, `0:0 0755` | prepare (slots.md, 5.3) | the next prepare of that slot, nested subvolumes first |
-| `@<target>.<name>` | `0:0 0755` when made, seeded from the output's content at its path | bootstrap, or the first prepare that declares it (slots.md, 5.3) | never by hearth (3.4) |
+| `@<target>.<class>`: `core`, `data`, `cache` | `0:0 0755`; one directory per `data` entry of the class, each seeded once from the output's content at the entry's path | the first prepare that declares an entry of the class (slots.md, 5.3) | never by hearth (3.4) |
 | `@<target>.live.<n>` | holds `etc`, `usr` and `opt` with the new slot's metadata: its changed files as reflinks, and 0/0 whiteouts; read-only once verified | a live trial (slots.md, 6.8, L1) | the native bless of its slot, a live fall back, or the start that finds no record naming it |
 | `@hearth.store` | `hearth:hearth 0700` | bootstrap | never |
 | `@hearth.state` | `0:0 0700` | bootstrap | never |
-| `@hearth.backups` [M6] | `0:0 0700`; holds `<target>.<name>/<seq>`, read-only snapshots, its own and, on a backup peer, those it receives | the first backup | each snapshot by retention (operating.md, 7.3) |
-| `@<target>.<name>.restoring` [M6] | a writable snapshot of a backup | a restore (operating.md, 7.4) | renamed to `@<target>.<name>` by the restore's swap |
-| `@<target>.<name>.before.<seq>` [M6] | the data a restore replaced | the restore's swap | an operator or the engine |
+| `@hearth.snapshots` [M5] | `0:0 0700`; a directory `<target>.<class>` per class snapshotted, holding read-only snapshots `<seq>`, this machine's own, for its targets and its containers' | the first snapshot | each snapshot by its class's retention, or once sent and no longer needed (operating.md, 7.1) |
+| `@hearth.backups` [M6] | `0:0 0700`; `<from>.<class>/<seq>`, read-only snapshots received from the targets that send to this backup peer | a backup peer's first receive | each by the sender's retention (operating.md, 7.3) |
+| `@<target>.<class>.restoring` [M5] | a writable snapshot of one of the class's snapshots | a class's restore (operating.md, 7.4) | renamed to `@<target>.<class>` by the restore's swap |
+| `@<target>.<class>.before.<seq>` [M5] | the class a restore replaced | the restore's swap | an operator or the engine |
 
+- **One tree for both snapshots and backups:** `@hearth.snapshots`
+  holds this machine's own snapshots of its classes, whatever took
+  them, and each snapshot's record says whether the local policy keeps
+  it, whether it was sent, and whether the peer confirmed it
+  (activator.md, 7.1). When the local and the backup period meet, one
+  snapshot serves both; an incremental send's parent is a local
+  snapshot the backup keeps; and one walk prunes them all. What a
+  backup peer receives from others goes to `@hearth.backups` instead:
+  another target's data, kept by its sender's retention, which no local
+  policy may prune and no local restore lists.
 - **A host's containers [M5]** add the same names under their own
   targets: on `rhi-prod`, `@chat-prod.a`, `@chat-prod.a.var`,
-  `@chat-prod.b`, `@chat-prod.b.var` and `@chat-prod.<name>` for each
-  of its `data` entries, beside the host's own (slots.md, 12.1). Its
-  journal has no subvolume of its own: it lives in the host's
-  (operating.md, section 5). The table above holds for them, the
-  host's activator acting for the container; os's `@<target>.machines`
-  under `/var/lib/machines` has no successor.
+  `@chat-prod.b`, `@chat-prod.b.var`, and `@chat-prod.data` and the
+  other classes its `data` entries use, beside the host's own
+  (slots.md, 12.1), and their snapshots in the host's
+  `@hearth.snapshots`. Its journal has no entry of its own: it lives in
+  the host's (operating.md, section 5). The table above holds for them,
+  the host's activator acting for the container; os's
+  `@<target>.machines` under `/var/lib/machines` has no successor.
 - **Slots exist once prepared:** os made empty placeholders at format
   time; hearth makes a slot by snapshot, so `@x1-prod.b` is absent until
   the first prepare into `b`. No build happens at the top level: os's
   `@T`, `@T.var` and `@T.install` are layers in the store now
-  (store.md, section 4).
+  (store.md, section 4). Classes, too, exist once an entry uses them:
+  os made `@T.srv`, `@T.srv.core`, `@T.srv.data` and `@T.srv.cache` at
+  format time; hearth makes `@x1-prod.cache` only when an entry is
+  `cache`, and has no `@T.srv`, since `/srv` is the root's.
 - **In a slot, nested subvolumes appear only at runtime,** made by
   systemd in its `/var` (`/var/lib/machines`, `/var/lib/portables`), and
   are deleted before their `.var`, found with
@@ -219,7 +239,8 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 | `/var` | `@<target>.<label>.var` | systemd, from fstab | `nodev,nosuid` |
 | `/var/lib/hearth/state` | `@hearth.state` | systemd, from fstab | `nodev,nosuid,noexec` |
 | `/var/lib/hearth/store` | `@hearth.store` | systemd, from fstab | `nodev,nosuid,noatime` (store.md, 9.1) |
-| each `data` path | `@<target>.<name>` | systemd, from fstab | `nodev,nosuid` |
+| `/srv/core`, `/srv/data`, `/srv/cache`, each class some entry uses | `@<target>.<class>` | systemd, from fstab | `nodev,nosuid` |
+| each `data` path but `/srv/<class>/<name>` | a bind of `/srv/<class>/<name>`, the entry's directory | systemd, from fstab, after its source's mount | `bind`; the class mount's `nodev,nosuid` carried over (to verify) |
 | `/run/hearth-activator/top` | the top level, `subvolid=5` | the activator, when it starts | `nodev,nosuid,noexec`; `/run/hearth-activator` is `0700`, root's |
 | `/run/hearth-activator/boot` | the boot partition | the activator, for each write, then unmounted | `vfat`, `umask=0077,nodev,nosuid,noexec` |
 | `/run/nextroot` | a slot's root, for a soft reboot | the activator (slots.md, section 6) | `ro,subvol=/@x1-prod.a` |
@@ -230,6 +251,15 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
   each slot's `/var` gets their mount points at prepare (slots.md, 5.3).
   systemd orders a mount after its parent path's (systemd.mount(5)), so
   fstab needs no `x-systemd.requires-mounts-for=`.
+- **A bind waits for its source:** systemd orders a bind mount after the
+  mount of the path it binds from, as well as after its own parent's,
+  so `/var/log/journal` comes up after both `/srv/core` and `/var`. A
+  class mount that fails fails its binds, and the boot isolates
+  `emergency.target` rather than start a service on the slot's own copy
+  of the path (slots.md, 5.3).
+- **The snapshots are not mounted:** a person reads one through
+  `hearth shell`, read-only (wire.md, 3.7), and `@hearth.snapshots`
+  stays the activator's.
 - **The store is `nosuid`:** it holds setuid binaries owned by the
   builder's range, behind a `0700` root. Builds run as root inside their
   namespaces and need no setuid binary (build.md, section 8).
@@ -247,25 +277,34 @@ holds no fstab of its own; the activator replaces whatever is there.
 ```
 # /etc/fstab of slot x1-prod.b, written by hearth's activator at prepare (machine.md, 3.3)
 UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /                      btrfs  subvol=/@x1-prod.b,ro                   0  0
+UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /srv/core              btrfs  subvol=/@x1-prod.core,nodev,nosuid     0  0
+UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /srv/data              btrfs  subvol=/@x1-prod.data,nodev,nosuid     0  0
 UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /var                   btrfs  subvol=/@x1-prod.b.var,nodev,nosuid     0  0
 UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /var/lib/hearth/state  btrfs  subvol=/@hearth.state,nodev,nosuid,noexec 0  0
 UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /var/lib/hearth/store  btrfs  subvol=/@hearth.store,nodev,nosuid,noatime 0  0
-UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /var/log/journal       btrfs  subvol=/@x1-prod.journal,nodev,nosuid  0  0
-UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /srv/data              btrfs  subvol=/@x1-prod.data,nodev,nosuid     0  0
+/srv/data/home-free                         /home/free             none   bind                                    0  0
+/srv/core/iwd                               /var/lib/iwd           none   bind                                    0  0
+/srv/core/journal                           /var/log/journal       none   bind                                    0  0
 ```
 
-- **Lines in path order,** so a parent's line comes first and the file
-  is a function of its inputs.
+- **Lines in a fixed order:** the subvolumes' mounts in path order,
+  then the binds in path order of their targets, so the file is a
+  function of its inputs. The order of lines decides nothing: systemd
+  orders the mounts by their paths and a bind by its source.
 - **The filesystem by UUID,** never by device: the device name differs
   between a live system, a rescue system and the machine itself, and a
   provider may change it.
+- **A bind by its source's path,** `/srv/<class>/<name>`, so a restore
+  that swaps a directory's name or a class's subvolume is mounted at the
+  next boot with no fstab to change (operating.md, 7.4).
 - **Every mount point already exists** in the sealed root or in the
   slot's `/var`, because a read-only root cannot get one later, and
-  systemd would otherwise try to create it (slots.md, 5.3 and 5.5).
+  systemd would otherwise try to create it (slots.md, 5.3 and 5.5):
+  `/srv/<class>` for each class used, and each bind's path.
 - **A container is in no fstab [M5].** Its host's fstab holds the
   host's own lines only; nspawn makes the container's root and binds its
-  `/var` and persistent subvolumes from the activator's mount of the top
-  level, as the host's nspawn settings say (slots.md, 12.1). The
+  `/var` and its entries' directories from the activator's mount of the
+  top level, as the host's nspawn settings say (slots.md, 12.1). The
   container's own `/etc/fstab` is written with no line, so its systemd
   mounts nothing.
 
@@ -273,24 +312,45 @@ UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /srv/data              btrfs  subvol=
 
 - **Target names** are lowercase letters, digits and `-`, with no dot,
   since `.` separates the parts of a subvolume's name; `hearth` is
-  reserved for `@hearth.*`. Labels are `a` and `b`; `restoring` and
-  `before` are reserved after a data name for restores [M6].
-- **A `data` entry** (format.md, section 5) has a name and a path. The
-  name is one segment of lowercase letters, digits and `-`, at most 32
-  bytes, neither `a`, `b` nor `live`, which names live deltas. The path
-  is absolute and normal, beneath `/srv`, `/var` or `/home`, not
-  `/var/lib/hearth` or beneath it, and not beneath another entry's path:
-  persistent subvolumes are siblings, mounted flat. At most 64 entries.
-  Render refuses an entry that breaks a rule, and the activator refuses
-  it again (activator.md, 2.2).
-- **A persistent subvolume's contents belong to its tasks:** it is made
-  with a root of `0:0 0755`, seeded with what the output holds at its
-  path, so packages' files there are not hidden by an empty mount
-  (slots.md, 5.3); the slot's own `tmpfiles.d` lines set owners and
-  modes at boot, by name. A container's `0:0` is its own root, in the
-  ids its slots are shifted to (slots.md, 12.1) [M5].
-- **A data entry that disappears keeps its subvolume,** unmounted and
-  reported as orphaned; deleting persistent data is a person's decision
+  reserved for `@hearth.*`. After a target, `a`, `b`, `core`, `data`,
+  `cache` and `live` are the only names, and after a class `restoring`
+  and `before` are reserved for restores [M5].
+- **A `data` entry** (format.md, 5.7) has a name, a class and a path.
+  The name is one segment of lowercase letters, digits and `-`, at most
+  32 bytes, unique within its target across classes, and names the
+  entry's directory in its class's subvolume. The path is absolute and
+  normal, beneath `/srv`, `/var` or `/home`, not `/var/lib/hearth` or
+  beneath it, not beneath another entry's path, and beneath
+  `/srv/core`, `/srv/data` or `/srv/cache` only as the entry's own
+  `/srv/<class>/<name>`, which needs no bind. At most 64 entries a
+  target, each a line of fstab at most. Render refuses an entry that
+  breaks a rule, and the activator refuses it again (activator.md, 2.2).
+- **A class's contents belong to its entries:** the subvolume is made
+  with a root of `0:0 0755`, and each entry's directory when the class
+  lacks it, seeded with what the output holds at the entry's path, so
+  packages' files there are not hidden by an empty bind (slots.md, 5.3);
+  the slot's own `tmpfiles.d` lines set owners and modes at boot, by
+  name. A container's `0:0` is its own root, in the ids its slots are
+  shifted to (slots.md, 12.1) [M5].
+- **Beside an entry's directory,** only a prepare's `<name>.new` while
+  it seeds (slots.md, 5.3), and a restore's `<name>.restoring` and
+  `<name>.before.<seq>` (operating.md, 7.4); entry names hold no dot,
+  so none of these is ever an entry.
+- **An entry that disappears keeps its directory,** unbound and
+  reported as orphaned; a class left with no entry keeps its subvolume,
+  unmounted, orphaned too, and its snapshots. Deleting persistent data
+  is a person's decision (section 12).
+- **An entry that changes class moves no data:** its directory stays in
+  the old class, and the new one would get a fresh, seeded directory.
+  So the activator refuses a place whose entry has no directory in its
+  class but an orphaned one of its name in another of the target's
+  classes, and names it; a person moves it, a reflink copy within one
+  filesystem (`cp --reflink`), or deletes it.
+- **Why a subvolume per class and not per entry:** a class is a policy's
+  unit, so a snapshot is atomic across every service in it; there are
+  three subvolumes to snapshot, prune and mount instead of one per
+  entry; and fstab grows by one bind per entry. A subvolume per entry,
+  for one that needs a policy, a quota or a restore of its own, is open
   (section 12).
 
 ## 4. EFI boot
@@ -892,8 +952,8 @@ host's own target only. From its first boot, the host's hearth builds
 and prepares each container's first slot as any change (wire.md, 4.7),
 and tries it with nothing to fall back to (slots.md, 12.3). A
 container's secrets are imported for its own target (wire.md, 3.6),
-before or after: a missing secret only makes its prepare wait (wire.md,
-4.4).
+before or after: a missing secret only makes its prepare wait
+(wire.md, 4.4).
 
 ### 8.5 Disks as an effect [M6]
 
@@ -984,8 +1044,9 @@ machine (testing.md, section 3), which models for them:
 
 The fakes of the tools in sections 4, 5 and 8 take their argument
 vectors and act on that machine (testing.md, section 4); their
-conformance cases run the real tools in the VM tier (testing.md,
-sections 5 and 7): efibootmgr against OVMF, GRUB against SeaBIOS [M3b].
+conformance cases run the real tools in the VM tier
+(testing.md, sections 5 and 7): efibootmgr against OVMF, GRUB against
+SeaBIOS [M3b].
 
 The invariants every world checks (testing.md, section 8), beside
 slots.md, section 4's, judged by booting the firmware and GRUB models:
@@ -1015,8 +1076,13 @@ slots.md, section 4's, judged by booting the firmware and GRUB models:
   one-shot is possible.
 - **tiny-initramfs takes no build host's microcode,** and its module
   lists are task settings instead of a template branching on hardware.
-- **The top level holds only subvolumes,** with persistent ones from
-  tasks, flat; and the root is sealed, not only mounted `ro`.
+- **The top level holds only subvolumes,** flat; and the root is
+  sealed, not only mounted `ro`.
+- **Persistent data keeps os's classes, declared per entry.** os made
+  `@T.srv` and `@T.srv.{core,data,cache}` at format time and bound
+  `journal` and `iwd` from a template; hearth makes `@T.core`, `@T.data`
+  and `@T.cache` when an entry uses them, binds each entry from the
+  fstab it writes, and snapshots by class itself instead of snapper.
 - **Firmware state is read from efivarfs,** not from efibootmgr's text.
 - **Bootstrap is one command** with an unprivileged build, instead of
   `format`, `deploy install` under sudo, `prepare-rootfs` and `boot`.
@@ -1050,8 +1116,13 @@ slots.md, section 4's, judged by booting the firmware and GRUB models:
 - **Owners of persistent data:** users made by maintainer scripts get
   dynamic uids, which may differ between outputs; depends on build.md
   and format.md pinning them.
-- **Deleting orphaned persistent subvolumes:** an operational effect or
-  a person's command; depends on operating.md, section 6.
+- **Deleting orphaned data:** an entry's directory, or a class with no
+  entry left, by an operational effect or a person's command; depends
+  on operating.md, section 6.
+- **A subvolume per entry:** `"subvolume": true` on an entry that needs
+  its own snapshot policy, quota or restore unit, made `@<target>.<name>`
+  and mounted at its path as before classes; not in the design, a
+  possible later addition if a service needs one (3.4).
 - **Re-targeting a machine,** or two targets on one disk: the layout
   allows it, bootstrap and entries assume one; depends on the factory's
   need.

@@ -34,8 +34,10 @@ open. Each part has a document of its own beside this one.
   closed list of operations. The activator starts the builder and
   listens to nothing else.
 - **Immutable roots.** A slot's root (`/usr`, `/etc` and the rest) is
-  mounted read-only. Only the slot's own `/var` and the persistent
-  subvolumes its tasks declare are writable. Nothing on a running machine
+  mounted read-only. Only the slot's own `/var` and the data its tasks
+  declare are writable: a directory per entry in one of the target's
+  three class subvolumes, `core`, `data` and `cache`, bound at the
+  entry's path and snapshotted by class. Nothing on a running machine
   is changed in place: a fix is a new slot.
 - **Slots try before they commit** (slots.md): prepare, trial, bless,
   fall back. A new slot runs once; the boot default moves only when the
@@ -91,7 +93,7 @@ open. Each part has a document of its own beside this one.
 9. **wire.md:** hearth's faces: the command-line client, standalone
    mode, the wire to an engine, bytes by digest.
 10. **operating.md:** after a rollout: checks, facts, telemetry,
-    operational effects, backups.
+    operational effects, snapshots and backups.
 11. **testing.md:** how `testing-strategy.md` applies to hearth: the fake
     machine, the fakes of tools, the tiers and their budgets.
 12. **artifacts.md:** the second recipe: an artifact from a build
@@ -116,13 +118,13 @@ every milestone, from the first (testing.md, section 10).
 | M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, installed from scratch | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; wire.md's client and standalone mode; a minimal bless |
 | M3b | BIOS | BIOS machines, which most IaaS providers offer | machine.md's BIOS path; slots.md's trial through GRUB |
 | M4 | The wire | hearth as a system behind an engine | wire.md's wire, facts and events |
-| M5 | Operating | the machine's end of the run side | operating.md, but for backups; checks as task data; containers and pool hosts (slots.md, section 12) |
+| M5 | Operating | the machine's end of the run side | operating.md, but for backups; checks as task data; local snapshots of each class, and restores from them (operating.md, section 7); containers and pool hosts (slots.md, section 12) |
 | M6 | The rest | the full vision | artifacts.md; peers; backups; faults; disks as an effect |
 | later | Reproducible builds | a level of trust | reproducible.md |
 
 **The MVP needs no parity with os.** M3 leaves out on purpose: BIOS,
-containers, the wire, task checks (a minimal bless stands in, slots.md,
-section 7), peers, artifacts and backups.
+containers, the wire, task checks (a minimal bless stands in,
+slots.md, section 7), peers, artifacts and backups.
 
 **What it must get right anyway,** because changing it later is costly:
 
@@ -160,8 +162,8 @@ a machine
   root.
 - **The client runs the builder's domain in-process** when no daemon
   runs, on a developer's machine (M1, M2), and whenever it renders a
-  local repository: the daemon renders only its own clone (wire.md,
-  section 3).
+  local repository: the daemon renders only its own clone
+  (wire.md, section 3).
 - **Bootstrap runs the activator's code in-process,** as root from a
   live system, and it spawns a builder over a link as the daemon does
   (machine.md, section 8).
@@ -188,7 +190,7 @@ hearth-domain-activator       the activator's root (activator.md)               
 ├── hearth-domain-slots       slot state, prepare, trial, bless, fall back, drift         M3
 ├── hearth-domain-boot        boot entries and files: EFI, then GRUB (machine.md)         M3
 ├── hearth-domain-disk        partitions, filesystems, the top level (machine.md)         M3
-├── hearth-domain-backups     data snapshots and streams (operating.md)                   M6
+├── hearth-domain-backups     class snapshots, restores; from M6, streams (operating.md)  M5
 └── hearth-domain-faults      a pool host's faults (operating.md)                         M6
 hearth-domain-tree            walks, digests, change sets: the tree helper's, and the shift's (store.md)  M2
 
@@ -279,7 +281,9 @@ hearth-<name>-world           the other worlds, under tests/
 | slot | where a machine runs an output: a root and its own `/var`, labelled `a` or `b` |
 | slot record | what a slot holds and how it was prepared: its output, its digests, its own tree digest after the shift |
 | shift | rewriting a placed tree's owners from the builder's id range to real ids |
-| persistent subvolume | a target's data that outlives its slots, mounted at a path a task declares |
+| class | a kind of persistent data, `core`, `data` or `cache`, with one subvolume per target, `@<target>.<class>`, mounted at `/srv/<class>`, and a snapshot and backup policy of its own (format.md, 5.7) |
+| data entry | a target's data that outlives its slots: a directory in its class's subvolume, bound at the path a task declares |
+| snapshot, backup | a read-only snapshot of a class, kept on the machine by its policy [M5]; one sent to the backup peer, encrypted [M6] (operating.md, section 7) |
 | secret store | root-only, on the machine: the target's secrets and the machine's identity |
 | identity | what makes a machine itself: its machine-id, its host keys |
 | running, default, trial, live | the four facts: the slot running, the boot default, the slot on trial, and the live state over the running slot (slots.md, section 3); a container's, read by its host (slots.md, 12.6) |
@@ -340,8 +344,22 @@ that last:
   slot of the same output (format.md, section 9; slots.md, 5.4).
 - **A slot is a read-only root and its own `/var`,** copied from the
   output at prepare, so dpkg's database travels with its slot. State that
-  outlives a slot lives in persistent subvolumes per target, at paths the
-  tasks declare (format.md, section 5; machine.md, section 3).
+  outlives a slot lives in data entries, at paths the tasks declare
+  (format.md, section 5; machine.md, section 3).
+- **Persistent data by class** (format.md, 5.7 and 5.12;
+  machine.md, section 3; operating.md, section 7). A target has one
+  subvolume per class, `@<target>.core`, `@<target>.data` and
+  `@<target>.cache`, made only when an entry uses it and mounted at
+  `/srv/core`, `/srv/data` and `/srv/cache`, os's and the bash fleet's
+  layout. Each `data` entry is a directory in its class, named by the
+  entry, bound at the path its task declares from the fstab the
+  activator writes; tasks declare a path and a class, never a subvolume.
+  Snapshots and backups are policies of the `hearth` task, by class:
+  local snapshots [M5] and sends to the backup peer [M6], never of
+  `cache`. A snapshot of a class is atomic across its services; one
+  entry is restored by copying its directory out of a snapshot, a class
+  by swapping its subvolume. A subvolume per entry is not in the design
+  (machine.md, section 12).
 - **Live changes, with hearth's own overlays** (slots.md, 6.6 to 6.9;
   format.md, 5.14), built in M3, a container's in M5. A change confined
   to `/etc`, `/usr` and `/opt`, over the same packages layer, with a
@@ -393,13 +411,13 @@ that last:
   packages step runs in a tool root and mmdebstrap chroots into the
   layer; the steps above it run in the layer itself; none has a network
   (build.md, 8.1 to 8.5). Only the fetch, by SHA-256 through
-  `apt-helper`, reaches the network, in a cgroup of its own (build.md,
-  5.1).
+  `apt-helper`, reaches the network, in a cgroup of its own
+  (build.md, 5.1).
 - **The builder's subordinate range starts at 262144,** 65536 ids long,
   clear of systemd-nspawn's automatic range and of the fleet's
   containers' ranges (store.md, 9.2). The `hearth` user is declared by
-  the hearth task, which every target but a container has (format.md,
-  5.12).
+  the hearth task, which every target but a container has
+  (format.md, 5.12).
 - **The kernel is unchanged** when the kernel image, the modules' tree,
   the initramfs's inputs (not its bytes, which are not reproducible) and
   the command line without the slot's own tokens all are; then a soft
@@ -414,8 +432,8 @@ that last:
   it listens to nothing else (activator.md, section 3).
 - **Which slot runs** is read from the root subvolume's identity
   (`BTRFS_IOC_GET_SUBVOL_INFO` on `/`), cross-checked with the slot
-  record inside the root; never from `/proc/cmdline` (slots.md,
-  section 3).
+  record inside the root; never from `/proc/cmdline`
+  (slots.md, section 3).
 - **Trials always end:** `panic=N` on a trial's command line, a hardware
   watchdog where there is one, and a dead-man timer in the trial slot
   that forces a reboot unless the slot's hearth blesses it first
@@ -441,14 +459,14 @@ that last:
   lab exists (testing.md, section 7).
 - **Standalone mode follows a desired revision set locally:** a commit,
   or a branch to follow, with `trial: auto|manual`, so a laptop such as
-  `x1-prod` reboots into a new slot only when its user chooses (wire.md,
-  4.1).
+  `x1-prod` reboots into a new slot only when its user chooses
+  (wire.md, 4.1).
 - **A machine follows an engine or converges alone, never both**
   (wire.md, 3.1 and 3.8).
 - **A bless can be held** by the engine while a canary bakes; the
   `bless` order releases it, and a timer that does not depend on hearth
-  ends a hold that outlives its ceiling (slots.md, 7.4; activator.md,
-  5.13; wire.md, 5.4).
+  ends a hold that outlives its ceiling (slots.md, 7.4;
+  activator.md, 5.13; wire.md, 5.4).
 - **Render failures fall into three classes:** a configuration error
   waits for another commit; an operational failure (git, the
   resolution, a fetch) is retried with backoff; an output that failed
@@ -462,11 +480,11 @@ that last:
 - **Owners of persistent data have fixed ids.** Every user or group that
   owns a data path, a secret or an identity file has a fixed uid or gid,
   package users included, seeded before any package is configured, so a
-  rebuild from scratch never renumbers what a data subvolume holds
+  rebuild from scratch never renumbers what a data entry holds
   (format.md, 5.6; build.md, 5.5).
-- **A persistent subvolume is seeded once,** from the output's tree at
-  its path, when it is first made, so it never hides what packages put
-  there (slots.md, section 5).
+- **A data entry is seeded once,** from the output's tree at its path,
+  when its directory is first made in its class, so its bind never hides
+  what packages put there (slots.md, 5.3).
 - **Trials end even in emergency mode:** the trial units survive
   isolation, and arm from a `/run` marker or a `hearth.trial=` token on
   the command line, never from a mount; each EFI slot has a normal and a
@@ -480,8 +498,8 @@ that last:
   (wire.md, 4.4).
 - **Prepare never follows a link the output plants:** every slot path is
   resolved beneath the snapshot's root without symlinks, and an output
-  of the wrong shape is refused (slots.md, section 5; activator.md,
-  section 6).
+  of the wrong shape is refused (slots.md, section 5;
+  activator.md, section 6).
 - **The boundary, stated honestly:** the activator keeps secrets from
   the builder and confines it to closed operations, but a compromised
   builder is root at the next trial, since it can place an output whose
@@ -490,8 +508,8 @@ that last:
 - **Identity in M3 is SSH host keys,** made with `ssh-keygen`; WireGuard
   keys wait for in-process generation (format.md, 9.3).
 - **The repository's read credential is the builder's own,** imported at
-  bootstrap and kept in the store, never in the secret store (render.md,
-  2.2).
+  bootstrap and kept in the store, never in the secret store
+  (render.md, 2.2).
 - **A layer is durable before it is recorded:** `syncfs` on the store
   between its walk and its record (store.md, section 4).
 - **Package indices come from the resolution:** apt's verified,
@@ -530,8 +548,8 @@ that last:
   restart goes through `systemctl --machine=` (slots.md, 7.4;
   activator.md, 5.9).
 - **A build environment is a container with no host** [M6]: its output
-  is only a sandbox's root, never an nspawn container (artifacts.md,
-  2.3; format.md, 3.4).
+  is only a sandbox's root, never an nspawn container
+  (artifacts.md, 2.3; format.md, 3.4).
 
 ## 8. What hearth asks of others
 
@@ -567,8 +585,8 @@ user (`testing-strategy.md`, section 9). From the earliest:
   hearth builds it first, under `testing/`. Its generic half (files,
   processes, programs on an argument-vector face) moves into skein as a
   kit when temper needs it; hearth's half (btrfs, namespaces, firmware,
-  the package universe) stays as `hearth-fake-machine` (testing.md,
-  3.11).
+  the package universe) stays as `hearth-fake-machine`
+  (testing.md, 3.11).
 
 ### 8.3 The factory
 

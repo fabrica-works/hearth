@@ -3,11 +3,12 @@
 Provisional, 2026-10-09. What hearth does on a machine after a rollout,
 for as long as a target runs: the checks that say what healthy means, a
 slot blessed by them, the facts it sends up, the telemetry it keeps and
-serves, the operational effects it carries out, backups, and the faults
-a lab's pool host injects. It is the machine's end of the run side
-(temper's `factory.md`, section 9); the rest is the engine's. M5 builds
-it; backups and faults are M6's and say so. What is open is in section
-10.
+serves, the operational effects it carries out, snapshots and backups
+of its data, and the faults a lab's pool host injects. It is the
+machine's end of the run side (temper's `factory.md`, section 9); the
+rest is the engine's. M5 builds it, local snapshots and restores
+included; backups and faults are M6's and say so. What is open is in
+section 10.
 
 ## 1. In one page
 
@@ -31,18 +32,21 @@ it; backups and faults are M6's and say so. What is open is in section
   alarms (disk, memory, pressure), failed units, drift, costs. Liveness
   costs nothing: a machine that stops redialling is down.
 - **Telemetry stays on the machine** (section 5), in bounded windows:
-  the journal, on a persistent subvolume a task declares, a container's
-  in its host's; hearth's own samples of the machine's signals; each
+  the journal, in a data entry a task declares, a container's in its
+  host's; hearth's own samples of the machine's signals; each
   check's history. It is served when asked (wire.md, section 7). There
   is no central store to start.
-- **Two operational effects, keyed or conditional** (section 6): roll
-  back, and restart a unit. Policy is the engine's. Any other waits until
-  it is needed.
-- **Backups are the activator's** [M6] (section 7): read-only snapshots
-  of a target's data subvolumes on a period, sent incrementally with
-  `btrfs send` to a backup peer, encrypted for the peer before any byte
-  reaches the builder; restore is an effect; drills are experiments on
-  the run side's own throwaway machines.
+- **Three operational effects, keyed or conditional** (section 6): roll
+  back, restart a unit, and restore data. Policy is the engine's. Any
+  other waits until it is needed.
+- **Snapshots and backups are the activator's, by class** (section 7):
+  read-only snapshots of each class of a target's data, `core` and
+  `data`, on the period the `hearth` task sets, kept and pruned on the
+  machine [M5], and sent incrementally with `btrfs send` to a backup
+  peer, encrypted for the peer before any byte reaches the builder
+  [M6]. A snapshot is atomic across every service in its class.
+  Restoring one entry or a whole class is an effect; drills are
+  experiments on the run side's own throwaway machines.
 - **Faults are a pool host's effects** [M6] (section 8): a partition,
   latency, a killed process, a full disk, each with an end, granted only
   by the lab's policy and refused by any hearth that is not a lab pool
@@ -142,8 +146,7 @@ The postfix task, its checks and the user its command check runs as:
 - **Render refuses** an unknown field, a field of another kind, a
   `blessing` check with `from` (section 3), a command run as `root` or
   as a `user` no task declares, `nobody` aside (2.1), and a `from` that
-  names a task no target of the environment has (2.6; render.md,
-  3.9).
+  names a task no target of the environment has (2.6; render.md, 3.9).
 
 ### 2.3 A unit active
 
@@ -188,7 +191,7 @@ The postfix task, its checks and the user its command check runs as:
 - **With which privileges:** none, unless the check lists them from the
   activator's closed list; no new privileges; the whole file system
   read-only (`ProtectSystem=strict` over a root that is read-only
-  anyway, and `/var` and the persistent subvolumes read-only too); the
+  anyway, and `/var` and the data entries read-only too); the
   state, the activator's mounts and every declared secret and identity
   path inaccessible, whatever their owners; its own `/tmp`; no network
   unless it says so; bounded memory, tasks and time.
@@ -234,12 +237,13 @@ The postfix task, its checks and the user its command check runs as:
 ### 2.6 Probes from another target
 
 - **A probe with `from` runs on the targets that play that role.** A
-  role is a task, as exports are read by task (format.md, 8.2): `"from":
-  "prober"` names the targets of the environment that have the `prober`
-  task. Render exports such a probe with its task's exports, rendered,
-  with the target it probes; each target of the environment that has the
-  task `from` names reads those probes, as exports are read (render.md,
-  3.4), and renders them into its own `checks` part (render.md, 3.9).
+  role is a task, as exports are read by task (format.md, 8.2):
+  `"from": "prober"` names the targets of the environment that have the
+  `prober` task. Render exports such a probe with its task's exports,
+  rendered, with the target it probes; each target of the environment
+  that has the task `from` names reads those probes, as exports are read
+  (render.md, 3.4), and renders them into its own `checks` part
+  (render.md, 3.9).
 - **So the coupling stays narrow and the digests follow.** A change to
   `mail-prod`'s public probe changes `mail-prod`'s and its probers'
   `checks` parts, and nothing else.
@@ -315,8 +319,8 @@ facts, naming the container's target.
   criterion (slots.md, 12.3) and as its `units` fact (section 4).
 - **To verify:** that `--machine=` reaches a container that
   `systemd-nspawn@.service` started, as machined registers it, and
-  whether it needs a system bus inside the container (slots.md,
-  section 15).
+  whether it needs a system bus inside the container
+  (slots.md, section 15).
 
 ## 3. Blessing with checks
 
@@ -333,8 +337,8 @@ This extends slots.md, section 7.
 - **Blessing checks are local:** units, commands, and probes the target
   runs itself. A probe from another target cannot see a trial slot's
   hearth, so render refuses `blessing` with `from` (2.2). Under an
-  engine, the engine may hold the bless while such probes bake (wire.md,
-  5.4).
+  engine, the engine may hold the bless while such probes bake
+  (wire.md, 5.4).
 - **`error` blocks the bless; `skip` does not.** A check that cannot be
   judged cannot prove health. A check that errors everywhere is a bug the
   lab finds first, since it runs the same checks.
@@ -393,8 +397,8 @@ This extends slots.md, section 7.
 ## 4. Facts up
 
 What decisions need, small and typed, sent when they change and only
-while the channel has room (wire.md, 5.6). The catalogue is wire.md,
-section 6.
+while the channel has room (wire.md, 5.6). The catalogue is
+wire.md, section 6.
 
 - **Check results** (section 2): each check's state and last result.
 - **Resource alarms,** sampled every 10 s, each with a level (`warning`,
@@ -402,12 +406,12 @@ section 6.
 
   | Alarm | Source | Default thresholds |
   |---|---|---|
-  | disk | `df --block-size=1 --output=size,avail` on the store's file system and on each persistent subvolume's mount | free below 10 % or 5 GiB: warning; below 5 % or 1 GiB: critical |
+  | disk | `df --block-size=1 --output=size,avail` on the store's file system and on each class's mount | free below 10 % or 5 GiB: warning; below 5 % or 1 GiB: critical |
   | memory | `MemAvailable` in `/proc/meminfo` | below 10 %: warning; below 5 %: critical |
   | pressure | `/proc/pressure/{cpu,memory,io}`, `avg60` | `some` above 20 %: warning; `full` above 10 % (memory, io): critical |
 
-  - Thresholds are the `alarms` setting of the hearth task (format.md,
-    5.12), so a target tunes its own.
+  - Thresholds are the `alarms` setting of the hearth task
+    (format.md, 5.12), so a target tunes its own.
   - **Hysteresis:** an alarm is raised after 3 samples past its
     threshold and cleared after 6 back within it, so a flapping value
     does not flood the channel.
@@ -441,10 +445,11 @@ Logs and metrics stay on the machine, in bounded windows, served to
 whoever asks (wire.md, section 7; `hearth logs`). A triage agent or a
 person reads them through the engine.
 
-- **The journal lives on a persistent subvolume a task declares,** so it
-  outlives slot switches: the `core` task's `journal` entry, mounted at
-  `/var/log/journal` with group `systemd-journal`, which is
-  `@x1-prod.journal` on x1-prod (format.md, 5.7; machine.md, 3.1).
+- **The journal lives in a data entry a task declares,** so it outlives
+  slot switches: the `core` task's `journal` entry, the directory
+  `/srv/core/journal` of `@x1-prod.core` on x1-prod, bound at
+  `/var/log/journal` with group `systemd-journal` (format.md, 5.7;
+  machine.md, 3.3).
   - The task sets journald's `Storage=persistent`, `SystemMaxUse=` and
     `MaxRetentionSec=` from its settings. The bash fleet relied on the
     directory's existence and capped it at 100 MB and a week.
@@ -452,15 +457,15 @@ person reads them through the engine.
     `RequiresMountsFor=/var/log/journal`, as os's host task does with a
     drop-in.
   - The journal's directory is `/var/log/journal/<machine-id>`. The
-    machine-id is identity, written into every slot at prepare (slots.md,
-    5.4), so every slot of the target writes one journal.
+    machine-id is identity, written into every slot at prepare
+    (slots.md, 5.4), so every slot of the target writes one journal.
   - **A container's journal lives in its host's** [M5]. The host's
     activator writes `LinkJournal=try-host` into the container's nspawn
     settings (slots.md, 12.1), so nspawn makes
     `/var/log/journal/<the container's machine-id>` in the host's
-    persistent journal subvolume and binds it into the container at the
-    same path. The container's `core` task declares no `journal` entry
-    (format.md, 5.7).
+    journal, the `journal` entry's directory in its `core` class, and
+    binds it into the container at the same path. The container's `core`
+    task declares no `journal` entry (format.md, 5.7).
   - The container's machine-id is its identity, made once and kept by
     its host's activator (slots.md, 5.4 and 12.1), so every slot of the
     container writes one journal. nspawn refuses to link a journal whose
@@ -482,10 +487,10 @@ person reads them through the engine.
   - The ring is on disk, so a reboot keeps what led up to it.
 - **Each check's history:** its last 1,024 results, a ring per check in
   the builder's state, beside the signals.
-- **Served on demand,** by bounded reads of a window (wire.md, section
-  7). Nothing is pushed. The builder reads the journal itself, as
-  `hearth` in the group `systemd-journal` (activator.md, 3.2; format.md,
-  5.12).
+- **Served on demand,** by bounded reads of a window
+  (wire.md, section 7). Nothing is pushed. The builder reads the journal
+  itself, as `hearth` in the group `systemd-journal` (activator.md, 3.2;
+  format.md, 5.12).
 - **No central store for metrics or logs to start.** If history across
   the fleet is needed later, it is a service the factory deploys from
   its own IaC, behind an observability connector of its own (temper's
@@ -495,13 +500,14 @@ person reads them through the engine.
 
 Work after a rollout is a change through temper, an operational effect,
 or one of the run side's standing procedures (convergence, certificate
-renewal, backups). The operational effects start with two (wire.md, 5.4
-defines their orders):
+renewal, snapshots and backups). The operational effects start with three
+(wire.md, 5.4 defines their orders):
 
 | Effect | Class | Condition or key |
 |---|---|---|
 | roll back | conditional | the running slot and the default the engine decided from (slots.md, section 9; activator.md, 5.5) |
 | restart a unit | keyed by the order's key, kept by hearth; conditional at the activator | the unit's `InvocationID` read when the order was taken (activator.md, 5.9); only a unit the running slot's spec ships or enables |
+| restore data [M5] | keyed by the order's key; conditional | the class subvolume's UUID the engine decided from; one entry or a whole class, from a snapshot by its sequence (7.4; activator.md, 5.12) |
 
 - **Policy is the engine's.** Who may roll back or restart, when, and
   whether a person must accept it first are authority's (jig's
@@ -513,69 +519,73 @@ defines their orders):
   blessed slot through its host (slots.md, 12.3), and a restart names a
   unit inside the container, restarted through `systemctl --machine=`
   (activator.md, 5.9).
-- **In standalone mode,** `hearth rollback` is the client's (wire.md,
-  3.1). A person on the machine restarts a unit with `systemctl` as
-  root; hearth does not wrap it.
+- **In standalone mode,** `hearth rollback` and `hearth restore` are
+  the client's (wire.md, 3.1). A person on the machine restarts a unit
+  with `systemctl` as root; hearth does not wrap it.
 - **Any other effect waits until one is needed,** such as a reload or
   draining a service.
 
-## 7. Backups [M6]
+## 7. Snapshots [M5] and backups [M6]
 
-A target's data belongs to its services, not to the builder, so backing
-it up is the activator's work, and it may use `btrfs send`, which needs
-root. os gives data a layout and nothing more; the bash fleet has no
-off-machine backup of service data at all, and snapper missed
-`/srv/data` and was off on rhi for lack of disk.
+A target's data belongs to its services, not to the builder, so
+snapshotting it and backing it up is the activator's work, and it may
+use `btrfs send`, which needs root. Data is kept by class
+(format.md, 5.7): `core`, `data` and `cache`, one subvolume each, with a
+policy per class, as os's and the bash fleet's layout intended. The bash
+fleet relied on snapper, which missed `/srv/data` and was off on rhi for
+lack of disk, and had no off-machine backup of service data at all.
 
-### 7.1 Snapshots
+### 7.1 Snapshots [M5]
 
-- **What:** each persistent subvolume whose `data` entry declares a
-  `backup`, with its period and retention (format.md, 5.7):
-
-  ```json
-  "data": {
-    "mail": {
-      "path": "/srv/mail",
-      "backup": { "every": "1h", "keep": { "hourly": 24, "daily": 14, "weekly": 8 } }
-    }
-  }
-  ```
-
-- **How:** on its period, the activator takes a read-only snapshot,
+- **What:** each class the `hearth` task's `snapshots` setting names
+  (format.md, 5.12), whole: a snapshot of `@mail-prod.data` holds
+  postfix's spool and the mailboxes as they were at one instant. `cache`
+  never.
+- **How:** on the class's period, from the running slot's data policies
+  (slots.md, 2.2), the activator itself takes a read-only snapshot,
   atomic and crash-consistent, as a power cut would leave the data, with
-  `BTRFS_IOC_SNAP_CREATE_V2` and the read-only flag (activator.md, 5.11),
-  the equivalent of:
+  `BTRFS_IOC_SNAP_CREATE_V2` and the read-only flag
+  (activator.md, 5.11), the equivalent of:
 
   ```
-  btrfs subvolume snapshot -r <top>/@mail-prod.mail <top>/@hearth.backups/mail-prod.mail/<seq>
+  btrfs subvolume snapshot -r <top>/@mail-prod.data <top>/@hearth.snapshots/mail-prod.data/<seq>
   ```
 
   `<top>` is the top level, mounted by the activator at
-  `/run/hearth-activator/top` (machine.md, 3.2). `@hearth.backups` is a
-  top-level subvolume, root's, mode 0700, from M6 (machine.md, 3.1).
-  `<seq>` only grows, and keys the snapshot: one of that sequence means
-  done (activator.md, 5.11). The activator's record names each
-  snapshot's sequence, age and whether the peer holds it.
-- **Locally, only what sending needs:** the newest snapshot, and the
-  newest the peer has confirmed, which the next incremental send needs
-  as its parent. The rest of the retention is the peer's.
+  `/run/hearth-activator/top` (machine.md, 3.2). `@hearth.snapshots` is
+  a top-level subvolume, root's, mode 0700 (machine.md, 3.1). `<seq>`
+  only grows, and keys the snapshot: one of that sequence means done.
+  The activator's record of the class names each snapshot's sequence,
+  time, which policies keep it, and its backup state [M6].
+- **No builder is needed:** the activator keeps each class's deadline
+  itself, from its records, after its restarts too, so snapshots go on
+  while the builder is down or the machine is on trial.
+- **On the machine, for a person:** `hearth snapshots` lists them, and
+  `hearth shell --snapshot <class>@<seq>` shows one read-only, as any
+  slot is shown (wire.md, 3.1 and 3.7), so a file can be copied out by
+  hand.
 - **Crash-consistent only.** A service whose files are consistent only
   at rest needs more (a quiescing command before the snapshot); that is
   open.
-- **A container's data** sits on its host's top level (slots.md, 12.1),
-  so the host's activator snapshots and sends it as its own, under the
-  container's target, to the backup peer of the container's environment.
+- **A container's classes** sit on its host's top level
+  (slots.md, 12.1), so the host's activator snapshots them by its own
+  policies, into its own `@hearth.snapshots`, under the container's
+  target.
 
-### 7.2 Sending
+### 7.2 Sending [M6]
 
+- **What:** each class the `hearth` task's `backups` setting names, on
+  its period: the activator takes a snapshot then, unless the local
+  policy took one at that moment, and sends it.
 - **Incremental, against the parent the peer holds:**
 
   ```
-  btrfs send -p <top>/@hearth.backups/mail-prod.mail/<parent> <top>/@hearth.backups/mail-prod.mail/<seq>
+  btrfs send -p <top>/@hearth.snapshots/mail-prod.data/<parent> <top>/@hearth.snapshots/mail-prod.data/<seq>
   ```
 
   A full send (no `-p`) only the first time, or when the peer has lost
-  the parent.
+  the parent. The parent is a local snapshot the backup keeps: the
+  newest the peer has confirmed, whatever the local retention says.
 - **To a backup peer:** a target of the same environment that has the
   `backup_peer` task, a role as exports read roles (format.md, 8.2).
   Render gives each target its peer through that task's exports, and
@@ -595,64 +605,100 @@ off-machine backup of service data at all, and snapper missed
     an X25519 key made once with `age-keygen` (activator.md, 5.7), whose
     public half is a fact, recorded in the repository and exported by
     the peer's `backup_peer` task (format.md, 8.4 and 8.7).
-  - **The recipient reaches the activator at prepare,** in the sending
-    slot's `data` part, rendered from that export, and is kept in the
-    slot record: a send request names a data subvolume and a sequence,
-    never a recipient, so the builder cannot redirect a stream to a key
-    of its own.
+  - **The recipient reaches the activator at prepare,** in the class's
+    policy in the sending slot's `data` part, rendered from that export,
+    and is kept in the slot record: a send request names a class and a
+    sequence, never a recipient, so the builder cannot redirect a stream
+    to a key of its own.
 - **The path of the ciphertext:** over a pipe made for the transfer
   (not the link) to the builder, which sends it to the peer's builder
   over HTTP (`hearth-protocol-http`); the peer's builder hands it to its
   activator, which runs `age --decrypt --identity <its backup key>`
-  into `btrfs receive <top>/@hearth.backups/mail-prod.mail/` and
+  into `btrfs receive <top>/@hearth.backups/mail-prod.data/` and
   confirms. Only the two activators see plaintext.
 - **To verify:** `age` on trixie, and that it streams a large input in
   bounded memory (its format encrypts in 64 KiB chunks).
-- **Facts:** per data subvolume, the last snapshot's age, the last sent,
-  the peer and the bytes (`backup`, wire.md, section 6). An alarm when
-  the last confirmed send is older than two periods.
+- **Facts:** per class, the last snapshot's age, the last sent, the
+  peer and the bytes (`backup`, wire.md, section 6). An alarm when the
+  last confirmed send is older than two periods.
 
 ### 7.3 Retention
 
-- **The peer keeps independent subvolumes,** one per received snapshot,
-  and deletes by its buckets (`hourly`, `daily`, `weekly`): any snapshot
-  can go without breaking another, since an incremental stream needs its
-  parent only when it is received.
+- **Local, by bucket [M5]:** a class's `keep` names how many to keep
+  per bucket, `hourly`, `daily`, `weekly` and `monthly`; a snapshot is
+  kept while it is the newest of one of the buckets kept. After every
+  snapshot the activator prunes the rest, with `SNAP_DESTROY_V2`.
+- **The backup keeps what sending needs [M6]:** a snapshot not yet
+  confirmed by the peer, and the newest confirmed, the next send's
+  parent, are kept whatever the local buckets say; a class with backups
+  and no local policy keeps only those.
+- **The peer keeps independent subvolumes [M6],** one per received
+  snapshot, and deletes by the sender's buckets: the backup's `keep`,
+  or the class's local one. Any snapshot can go without breaking
+  another, since an incremental stream needs its parent only when it is
+  received.
 - **At rest the peer holds plaintext subvolumes,** trusted within its
   plane. Keeping the ciphertext streams as files instead, so the peer
   never sees the data, is the alternative in section 10.
+- **Snapshots cost space as data changes:** the disk alarm (4) covers
+  the class mounts and the top level, and a class whose snapshots fill
+  the disk is a policy to change, not something hearth prunes on its
+  own.
 
-### 7.4 Restore
+### 7.4 Restore [M5]
 
-- **An effect, granted by policy** like the others, keyed by the order's
-  key and conditional on the data subvolume being the one decided from
-  (its UUID, reported in the `backup` fact). It is an operation of the
-  activator [M6] (activator.md, 5.12).
-- **The lean:** a swap of names, then a reboot.
+- **An effect, granted by policy** like the others (section 6), keyed
+  by the order's key and conditional on the class subvolume being the
+  one decided from (its UUID, reported in the `data` fact). It is
+  an operation of the activator (activator.md, 5.12). In standalone
+  mode, `hearth restore` asks for it (wire.md, 3.1).
+- **From a local snapshot [M5], or from the peer [M6]:** a snapshot the
+  machine no longer has is first received from the peer, which sends it
+  encrypted to this target's own backup key, as in 7.2, into this
+  machine's `@hearth.snapshots`.
+- **One entry: its directory copied back out of a snapshot,** then a
+  swap of names, then a reboot:
 
   ```
-  1. receive the snapshot from the peer, if the machine lacks it: the peer's activator
-     sends it encrypted to this target's own backup key, as in 7.2   age, btrfs receive
-  2. make it writable:   snapshot <seq>  →  <top>/@mail-prod.mail.restoring
-  3. record the swap (old UUID, new UUID, step) in the activator's records
-  4. rename  @mail-prod.mail            →  @mail-prod.mail.before.<seq>
-     rename  @mail-prod.mail.restoring  →  @mail-prod.mail
-  5. a clean full reboot, `systemctl reboot` with SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT=1
+  1. copy, sharing extents:  <top>/@hearth.snapshots/mail-prod.data/<seq>/mail  →  <top>/@mail-prod.data/mail.restoring
+  2. record the swap (the class's UUID, the entry, the step) in the activator's records
+  3. rename  mail            →  mail.before.<seq>
+     rename  mail.restoring  →  mail                  both within @mail-prod.data
+  4. a clean full reboot
+  ```
+
+  The copy is slots.md, 5.3's walk through descriptors, with `FICLONE`.
+  The reboot is needed because the bind and every service hold the old
+  directory until then; fstab names the source by path
+  (machine.md, 3.3), so the restored one is bound at the next boot.
+- **A class: the swap of subvolumes:**
+
+  ```
+  1. make it writable:   snapshot <top>/@hearth.snapshots/mail-prod.data/<seq>  →  <top>/@mail-prod.data.restoring
+  2. record the swap (old UUID, new UUID, step) in the activator's records
+  3. rename  @mail-prod.data            →  @mail-prod.data.before.<seq>
+     rename  @mail-prod.data.restoring  →  @mail-prod.data
+  4. a clean full reboot, `systemctl reboot` with SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT=1
      (slots.md, 6.3): fstab names the subvolume by name (machine.md, 3.3),
-     so the restored one is mounted
+     so the restored one is mounted, and every bind of the class with it
   ```
 
-  The services keep writing to the old subvolume until the reboot, and
-  those writes are what a restore discards. A power cut between the two
-  renames is finished or undone at startup from the record. For a
-  container's data, step 5 is a restart of the container instead, which
-  binds the subvolume by name again (slots.md, 12.2).
-- **The old data is kept** as `@mail-prod.mail.before.<seq>` until an
-  operator or the engine removes it. Both names, `.restoring` and
-  `.before.<seq>`, are in machine.md, 3.1's layout from M6, so drift's
-  `machine.subvolumes` check expects them (slots.md, section 10).
+- **Either way, the services keep writing** to the old data until the
+  reboot, and those writes are what a restore discards. A power cut
+  between the two renames is finished or undone at startup from the
+  record. For a container's data, the reboot is a restart of the
+  container instead, which binds the entries by path again
+  (slots.md, 12.2).
+- **The old data is kept** as `mail.before.<seq>` or
+  `@mail-prod.data.before.<seq>` until an operator or the engine
+  removes it. Both forms are in machine.md, 3.1 and 3.4's layout, so
+  drift expects them (slots.md, section 10).
+- **One entry from a class snapshot restores that entry only:** the
+  other services of the class keep their present data, so a restore
+  that must agree across services (postfix's queue and the mailboxes)
+  restores the class.
 
-### 7.5 Drills
+### 7.5 Drills [M6]
 
 - **Restore drills are experiments on the run side's own throwaway
   machines.** The run side's engine creates a machine in its own pool,
@@ -681,7 +727,7 @@ off-machine backup of service data at all, and snapper missed
   | partition | nftables rules on the host's bridge dropping traffic between two containers' interfaces |
   | latency, loss | `tc qdisc replace dev <veth> root netem delay <d> loss <p>` on a container's host-side interface |
   | a killed process | `systemctl --machine=<container> kill --signal=SIGKILL <unit>` |
-  | a full disk | a qgroup limit on the container's data subvolume (`btrfs qgroup limit`), which needs quotas enabled on the file system |
+  | a full disk | a qgroup limit on the container's `data` class subvolume (`btrfs qgroup limit`), which needs quotas enabled on the file system |
 
 - **The network faults need a pool's containers on networks of their
   own** (veth pairs and a bridge), where the fleet's containers share
@@ -715,17 +761,24 @@ off-machine backup of service data at all, and snapper missed
     hides, or sends a byte of its output to the builder;
   - alarms follow their hysteresis; the signals' and history's rings
     stay within their sizes; every telemetry read is bounded.
-- **The backups' world** runs `hearth-domain-backups` on the fake
-  machine, which models read-only snapshots, received UUIDs and send
-  streams, and a fake peer. It cuts the power mid-snapshot, mid-send,
-  mid-receive and between a restore's renames, and makes a peer lose a
-  parent. Its invariants:
+- **The backups' world** [M5] runs `hearth-domain-backups` on the fake
+  machine, which models class subvolumes, entries' binds, read-only
+  snapshots and, from M6, received UUIDs, send streams and a fake peer.
+  Two services write into one class while snapshots are taken; the
+  world cuts the power mid-snapshot, mid-prune, mid-copy of an entry's
+  restore and between a restore's renames, and from M6 mid-send and
+  mid-receive, and makes a peer lose a parent. Its invariants:
+  - a snapshot holds both services' files as of one instant, and never
+    a `cache` class;
+  - retention keeps every bucket's newest, and nothing else but what
+    sending needs;
+  - a restore is finished or undone after any power cut, an entry's
+    touching no other entry of its class;
   - no byte of a stream reaches a builder before `age` has encrypted
-    it, and every stream's recipient is the one its slot record names;
-  - the snapshot the peer last confirmed is never deleted locally;
-  - a lost parent leads to a full send, never a broken chain;
-  - a restore is finished or undone after any power cut;
-  - retention keeps every bucket's newest.
+    it, and every stream's recipient is the one its slot record names
+    [M6];
+  - the snapshot the peer last confirmed is never deleted locally, and
+    a lost parent leads to a full send, never a broken chain [M6].
 - **The faults' world:** every fault ends at its end; none is applied
   outside a lab pool host; removing twice is harmless.
 - **Conformance and the VM tier** (testing.md, sections 5 and 7): the
@@ -740,8 +793,13 @@ off-machine backup of service data at all, and snapper missed
   under which rule; it depends on the run side's policy and on the
   lab's experiments needing the same checks.
 - **The quiescing of data before a snapshot:** whether a `data` entry
-  may declare a command to run first, for services that are not
-  crash-safe; it depends on the services hearth hosts.
+  may declare a command to run before its class is snapshotted, for
+  services that are not crash-safe; it depends on the services hearth
+  hosts.
+- **Restoring an entry without a reboot:** stopping the units that use
+  the entry, swapping its directory and remounting its bind; it depends
+  on hearth knowing those units, as `live` entries name them for files
+  (format.md, 5.14).
 - **Backups at rest on the peer:** whether the peer keeps the
   ciphertext streams as files, needing no root and never seeing the
   data, at the cost of retention keeping whole chains between periodic
@@ -760,7 +818,7 @@ off-machine backup of service data at all, and snapper missed
   through skein's TLS client (to verify what it exposes).
 - **Thresholds and windows:** the alarms' and the checks' defaults are
   starting values, to tune on real machines.
-- **Operational effects beyond the two,** when one is needed.
+- **Operational effects beyond the three,** when one is needed.
 - **Faults' mechanisms** on the pool host: the exact nftables and `tc`
   recipes, and whether qgroups cost too much to leave enabled; it
   depends on the lab's pool hosts (machine.md).

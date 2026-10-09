@@ -150,15 +150,16 @@ render.md. Open questions are in section 13.
 | base, environment, member | `[a-z0-9]`, then `[a-z0-9-]`, not ending in `-` | no dot |
 | target | made from them (3.1), at most 63 bytes | no dot; never `hearth` |
 | task, setting, object field | `[a-z]`, then `[a-z0-9_]` | identifiers in expressions |
-| data | `[a-z]`, then `[a-z0-9-]`, at most 32 bytes | never `a` or `b` |
+| data | `[a-z]`, then `[a-z0-9-]`, at most 32 bytes | names a directory in its class (5.7); no dot |
 | secret | segments of `[a-z0-9._-]` joined by `/`, at most 255 bytes | no `.` or `..` segment |
 | key of a map setting | any string of 1 to 255 bytes | |
 
 - **No dots in target names.** The btrfs top level names a target's
-  subvolumes `@<target>.<label>` and `@<target>.<name>`, and the ESP its
+  subvolumes `@<target>.<label>` and `@<target>.<class>`, and the ESP its
   files `vmlinuz.<target>.<label>` (machine.md, sections 3 and 4); a dot
-  in a target would make them ambiguous. Data names have no dot for the
-  same reason, and `a` and `b` are the slots' labels.
+  in a target would make them ambiguous. Data names have no dot either,
+  so a restore's `<name>.restoring` beside an entry's directory is never
+  an entry (machine.md, 3.4).
 - **`hearth` is never a target,** since `@hearth.store` and `@hearth.state`
   share the top level.
 - **Tasks and settings are identifiers,** so `tasks.core.domain` and
@@ -292,14 +293,15 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   but no `hearth` task (5.12) and nothing that needs a kernel (3.4); the
   gettys masked by the `core` task (5.10). Its `data` entries, identity
   and secrets are its own target's, kept by its host's activator: its
-  persistent subvolumes sit on the host's top level, and its machine-id
-  is no longer its host's (slots.md, 12.1).
+  class subvolumes sit on the host's top level, and its machine-id is no
+  longer its host's (slots.md, 12.1).
 - **Users are not mirrored** [M5]. The bash fleet declared
   carbon-forge's `runner:600` on carbon too, with a home inside the
-  container's `/srv`. A container's persistent subvolumes are bound into
-  it alone and never mounted on its host (slots.md, 12.1), so its host
-  needs no such user; a host task that must know a container's user
-  reads it from the container's exports (section 8).
+  container's `/srv`. A container's entries are bound into it alone,
+  from its own class subvolumes, and never mounted on its host
+  (slots.md, 12.1), so its host needs no such user; a host task that
+  must know a container's user reads it from the container's exports
+  (section 8).
 - **A container's parameters are placement fields** [M5] (3.4): its id
   base, its binds, its capabilities and its network. A target's file
   sets them with the rest of its placement:
@@ -312,8 +314,8 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
     which for a container holds them instead of a command line
     (render.md, 4.3). So a change to one changes the slot's prepare key
     and prepares a new slot of the same output, which its host tries by
-    a restart, since nspawn reads them only when it starts (slots.md,
-    12.1 and 12.2).
+    a restart, since nspawn reads them only when it starts
+    (slots.md, 12.1 and 12.2).
   - **Render checks their form:** a base aligned to 64 Ki and clear of
     the builder's range (store.md, 9.2) and of the other containers'
     placed on the same host; binds whose two paths are absolute and
@@ -324,8 +326,9 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 - **How a host runs a container** (its slots, the shift into its ids,
   its nspawn settings) is slots.md, section 12 [M5].
 - **A container's journal is its host's** [M5]: nspawn links it into
-  the host's persistent journal subvolume (operating.md, section 5), so
-  the `core` task declares no `journal` entry on a container (5.7).
+  the host's journal entry, `/srv/core/journal`
+  (operating.md, section 5), so the `core` task declares no `journal`
+  entry on a container (5.7).
 
 ### 3.6 Clusters
 
@@ -369,6 +372,12 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
     "snapshot": { "archive": "20261001T030405Z", "security": "20261001T031522Z" }
   },
   "core": { "domain": "ekanayaka.io" },
+  "hearth": {
+    "snapshots": {
+      "core": { "every": "1d", "keep": { "daily": 7 } },
+      "data": { "every": "1h", "keep": { "hourly": 24, "daily": 14, "weekly": 8 } }
+    }
+  },
   "locale": { "timezone": { "area": "Europe", "zone": "Lisbon" }, "locale": "en_US.UTF-8" },
   "ssh": {
     "port": 10127,
@@ -393,7 +402,6 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   "boot": { "params": { "audit": { "param": "audit=0" } } },
   "users": { "accounts": { "free": { "uid": 1000, "groups": ["sudo"], "password": "users/free.passwd" } } },
   "wifi": {},
-  "snapper": {},
   "desktop": { "user": "free" }
 }
 ```
@@ -408,9 +416,11 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 }
 ```
 
-- **x1-prod's tasks:** core, host, locale, boot, users, wifi, snapper,
-  desktop and firmware. Not ssh: `fleet.json` set its port and keys, but
-  defaults add no task.
+- **x1-prod's tasks:** core, host, locale, boot, users, wifi, desktop
+  and firmware, and `hearth`, which render adds (5.12). Not ssh:
+  `fleet.json` set its port and keys, but defaults add no task. No
+  `snapper` task, as os had: `fleet.json`'s `hearth` settings snapshot
+  its `core` and `data` classes (5.12).
 - **Its sources:** forky, main, contrib and non-free-firmware, with no
   updates or security pocket, from the archive snapshot of `fleet.json`.
 
@@ -513,7 +523,7 @@ nothing.
 | `presets` | systemd presets | config | 5.6 |
 | `tmpfiles` | tmpfiles.d lines | config | 5.6 |
 | `scripts` | `customize.sh` and `software.sh`, and their order | config, software | 5.8 |
-| `data` | persistent subvolumes | data | 5.7 |
+| `data` | persistent data: directories in class subvolumes, bound at their paths | data | 5.7 |
 | `secrets` | secret files | secrets | 9.1 |
 | `identity` | identity items | secrets | 9.3 |
 | `cmdline` | the kernel's command-line parameters | boot | 5.4 |
@@ -727,16 +737,17 @@ nothing.
 - **An entry for a path that `tree/` lacks is an error,** as is a path
   that both `tree/` and a `template`, `copy` or `link` entry give.
 - **Owners are names.** Build resolves them in the layer's own
-  `/etc/passwd` and `/etc/group`, once the users are applied (build.md,
-  section 7); a name it cannot resolve fails the build. `root` is always
-  id 0.
+  `/etc/passwd` and `/etc/group`, once the users are applied
+  (build.md, section 7); a name it cannot resolve fails the build.
+  `root` is always id 0.
 - **A file replaces whatever the packages put at its path,** mode and
   owner included. os kept a packaged file's mode, so a task could not
   tighten a conffile.
 - **Directories a path implies** are created 0755 and root-owned, only
   where the layers beneath lack them; a declared directory sets its own.
-- **Forbidden destinations:** anything under a data path (5.7), which the
-  mount would hide, and the paths hearth reserves (5.11).
+- **Forbidden destinations:** anything under a data path or a class's
+  mount point (5.7), which a mount would hide, and the paths hearth
+  reserves (5.11).
 - One file per user, from a map setting, in `tasks/ssh/task.json`:
 
   ```json
@@ -814,52 +825,79 @@ nothing.
 - **Ids are one user's:** two users or two groups with one id are an
   error.
 - **`presets`** is a map keyed by unit name, with `action`, `enable` or
-  `disable`. Build applies them with the target's own systemctl (build.md,
-  section 7). A unit is masked by a `link` to `/dev/null` in `files`.
+  `disable`. Build applies them with the target's own systemctl
+  (build.md, section 7). A unit is masked by a `link` to `/dev/null` in
+  `files`.
 - **`tmpfiles`** is a map keyed by path, with `type` (enum `d`, `D`, `e`,
   `f`, `f+`, `w`, `w+`, `L`, `L+`, `C`, `z`, `Z`, `r`, `R`), `mode`,
   `owner`, `group`, `age` and `argument`, as tmpfiles.d(5) reads them.
   Build applies them to the image and writes them for every boot
   (build.md, 7.4), which is what directories inside `/var` and the
-  persistent subvolumes need. Lines that make subvolumes, and lines that
+  data entries need. Lines that make subvolumes, and lines that
   write over what is there outside `/var`, are refused (5.11).
 - **Homes live on persistent data:** the users task declares each
   account's home as a `data` entry of its own (5.7, 6.6).
 
 ### 5.7 Data
 
-- **`data` is a map keyed by name; each entry is a persistent subvolume,**
-  `@<target>.<name>` at the btrfs top level (machine.md, section 3),
-  mounted at `path`. It outlives every slot of the target.
+- **Persistent data lives in classes.** A target has up to three class
+  subvolumes at the btrfs top level, `@<target>.core`, `@<target>.data`
+  and `@<target>.cache`, each made only when some entry uses it, and
+  mounted at `/srv/core`, `/srv/data` and `/srv/cache`
+  (machine.md, section 3). They outlive every slot. The classes are os's
+  and the bash fleet's, whose reason was a snapshot policy per class:
+
+  | Class | Holds | Snapshots and backups (5.12) |
+  |---|---|---|
+  | `core` | the machine's own state: the journal, iwd's networks | its own policy, typically daily |
+  | `data` | services' data and people's homes: a mail spool, a database, `/home` | its own policy, typically hourly; the class backed up [M6] |
+  | `cache` | what can be made again: downloads, build caches | never snapshotted, never backed up |
+
+- **`data` is a map keyed by name; each entry is a directory** in its
+  class's subvolume, named by the entry's name (`/srv/core/journal`,
+  `/srv/data/postfix`), and bind-mounted at the path the task declares,
+  from the fstab the activator writes (machine.md, 3.3). An entry never
+  names a subvolume.
 
   | Field | Type | Default |
   |---|---|---|
   | `path` | path | required |
+  | `class` | enum `core`, `data`, `cache` | `data` |
   | `mode` | mode | `0755` |
   | `owner`, `group` | name, with a fixed id (5.6) | `root` |
-  | `backup` [M6] | `{ "every": duration, "keep": { "hourly"…: int } }` | none: no backup (operating.md, section 7) |
 
-- **The activator makes the subvolume** when the top level lacks it, with
-  a root of `0:0 0755`, makes its mount point at prepare, and mounts it
-  (machine.md, 3.4; slots.md, section 5). The data part holds names and
-  paths, a slot part that enters no layer key.
+- **An entry whose path is its class's directory,** `/srv/<class>/<name>`,
+  needs no bind: the class's mount shows it. Any other path beneath
+  `/srv/core`, `/srv/data` or `/srv/cache` is refused.
+- **The activator makes the class subvolume** when the top level lacks
+  it, with a root of `0:0 0755`, and **the entry's directory** when the
+  class lacks it, seeded once from the output's content at the entry's
+  path (slots.md, 5.3), so what packages put there (a database's
+  cluster, a mail spool) is not hidden by an empty bind. The data part
+  holds names, classes and paths, a slot part that enters no layer key.
 - **Mode and owner are applied at every boot:** render turns them into a
-  `tmpfiles` line of type `d` in the config part, which systemd applies
-  in the running slot, where names resolve. So they, unlike the path,
-  enter the config key.
+  `tmpfiles` line of type `d` at the entry's path, which systemd applies
+  in the running slot, through the bind, where names resolve. So they,
+  unlike the path and the class, enter the config key.
 - **Paths** are beneath `/srv`, `/var` or `/home`, never `/var/lib/hearth`
-  or beneath it, and never beneath another entry's path: persistent
-  subvolumes are siblings, mounted flat. A target has at most 64 entries
-  (machine.md, 3.4). The rest of `/` stays immutable.
-- **Names are per target:** two tasks declaring one name is a collision
-  (render.md, 3.7).
-- **Data keeps a program's default path.** An entry is mounted where
-  the program already looks, as Debian ships it, so no configuration
-  changes for it: journald writes `/var/log/journal`, iwd keeps its
-  networks in `/var/lib/iwd`. os did the same by binding the
-  directories `/srv/core/journal` and `/srv/core/iwd`, of one
-  `@<target>.srv.core` subvolume, onto those paths; hearth gives each
-  its own subvolume, mounted there.
+  or beneath it, and never beneath another entry's path. A target has at
+  most 64 entries (machine.md, 3.4). The rest of `/` stays immutable.
+- **Names are per target, across classes:** two entries of one target
+  with one name are a collision (render.md, 3.7), even in two classes.
+  Moving an entry to another class moves no data, so the activator
+  refuses it while the old directory exists (machine.md, 3.4).
+- **Snapshots and backups are by class, never by entry:** their policies
+  are the `hearth` task's settings (5.12). A snapshot is of a whole
+  class subvolume, so it is atomic across every service in the class,
+  postfix's spool and its mailboxes together; one entry is restored by
+  copying its directory out of a snapshot (operating.md, 7.4).
+- **Data keeps a program's default path.** An entry is bound where the
+  program already looks, as Debian ships it, so no configuration changes
+  for it: journald writes `/var/log/journal`, iwd keeps its networks in
+  `/var/lib/iwd`. os did the same, binding the directories
+  `/srv/core/journal` and `/srv/core/iwd` of its `@<target>.srv.core`
+  subvolume onto those paths; hearth keeps the classes and the binds,
+  and declares them per entry.
 - The journal, which the bash fleet and os bound from a hard-coded
   `@<target>.srv.core/journal`, is the `core` task's:
 
@@ -868,7 +906,7 @@ nothing.
     "data": {
       "journal": {
         "if": "target.placement.kind != 'container'",
-        "path": "/var/log/journal", "mode": "2755", "group": "systemd-journal"
+        "class": "core", "path": "/var/log/journal", "mode": "2755", "group": "systemd-journal"
       }
     },
     "groups": { "systemd-journal": { "from": "package", "gid": 999 } }
@@ -888,14 +926,33 @@ nothing.
   {
     "doc": "Wi-Fi through iwd, its known networks kept across slots.",
     "packages": { "iwd": {} },
-    "data": { "iwd": { "path": "/var/lib/iwd", "mode": "0700" } }
+    "data": { "iwd": { "class": "core", "path": "/var/lib/iwd", "mode": "0700" } }
   }
   ```
 
   iwd runs as root, so the root-owned default needs no fixed id; the
-  mode keeps the passphrases from other users. On x1-prod the two are
-  `@x1-prod.journal` and `@x1-prod.iwd`, and neither journald nor iwd
-  is configured to find them.
+  mode keeps the passphrases from other users.
+- A mail server's spool and mailboxes are the `mail` task's, in the
+  `data` class, so one snapshot holds both as they were at one instant:
+
+  ```json
+  {
+    "data": {
+      "postfix": { "path": "/var/spool/postfix" },
+      "mail": { "path": "/var/mail", "mode": "2775", "group": "mail" }
+    },
+    "groups": { "mail": { "from": "package", "gid": 8 } }
+  }
+  ```
+
+  The spool's directory is root's, as Debian ships it, and the queues
+  beneath keep the owners postfix gave them; `mail` is base-passwd's
+  static group.
+- **On x1-prod** the entries make `@x1-prod.core`, with `journal` and
+  `iwd`, and `@x1-prod.data`, with `home-free` (6.6), bound at
+  `/var/log/journal`, `/var/lib/iwd` and `/home/free`; neither journald
+  nor iwd is configured to find them. Its fstab is machine.md, 3.3's
+  example.
 
 ### 5.8 Escape hatches
 
@@ -988,6 +1045,7 @@ declares it (render.md, 7.2):
 | task files at `/etc/passwd`, `/etc/group`, `/etc/shadow`, `/etc/gshadow`, `/etc/subuid`, `/etc/subgid`, `/etc/machine-id`, `/var/lib/dbus/machine-id` | users are declared (5.6); identity is written at prepare | build.md, 7.3 and 9.2 |
 | task files at `/etc/ssh/ssh_host_*_key` and their `.pub`, `/etc/dropbear/dropbear_*_host_key`, anything under `/etc/ssl/private/`, `/var/lib/systemd/random-seed`, `/var/lib/systemd/credential.secret` | identity and secrets: `identity` and `secrets` entries name these paths, files never do | build.md, 9.2 |
 | anything under `/var/lib/hearth/` | the mount points of hearth's state and store | machine.md, 3.4 |
+| anything under `/srv/core`, `/srv/data` or `/srv/cache`; a data path beneath them but `/srv/<class>/<name>` | the class subvolumes' mounts hide what the slot holds there | 5.7; machine.md, 3.4 |
 | anything under `/dev`, `/proc`, `/sys`, `/run`, `/tmp`, `/var/tmp`; a file under `/var/log` that is not empty; `/etc/.git`, `/etc/.etckeeper` | runtime, noise, history | build.md, 9.2 |
 | a task file at `/etc/tiny-initramfs/tiny-initramfs.conf`, so `AUTO_MODULES=yes` and `MICROCODE=yes` cannot reach an output | the packages part's, written before the kernel installs | build.md, 5.5; machine.md, 7.1 |
 | tmpfiles `v`, `q`, `Q`; `w`, `w+`, `f+`, `L+` outside `/var`, `/run` and `/tmp` | a nested subvolume breaks a layer; a write on the read-only root fails at boot | build.md, 7.4 |
@@ -1031,6 +1089,22 @@ declares it (render.md, 7.2):
           "pressure_full_percent": { "critical": 10 }
         },
         "doc": "Resource alarms' thresholds (operating.md, section 4)."
+      },
+      "snapshots": {
+        "type": { "map": { "object": {
+          "every": { "type": "duration", "doc": "How often the class is snapshotted." },
+          "keep": { "type": { "map": "int" }, "doc": "How many to keep per bucket: hourly, daily, weekly, monthly." }
+        } } },
+        "default": {},
+        "doc": "Local snapshots of each class's subvolume, by class: core or data [M5] (operating.md, 7.1)."
+      },
+      "backups": {
+        "type": { "map": { "object": {
+          "every": { "type": "duration", "doc": "How often the class is sent to the backup peer." },
+          "keep": { "type": { "map": "int" }, "optional": true, "doc": "What the peer keeps, per bucket; the class's local keep if absent." }
+        } } },
+        "default": {},
+        "doc": "Backups of each class to the environment's backup peer, by class [M6] (operating.md, 7.2)."
       }
     },
     "packages": { "git": {}, "mmdebstrap": {}, "uidmap": {}, "openssh-client": {} },
@@ -1066,6 +1140,38 @@ declares it (render.md, 7.2):
   ids packages take below 1000 (to verify against the fleet's packages).
 - **`systemd-journal`** lets the builder read the journal for telemetry
   (wire.md, section 7).
+- **Snapshots and backups are declared once, by class** (5.7), normally
+  in `fleet.json` or an environment file:
+
+  ```json
+  {
+    "hearth": {
+      "snapshots": {
+        "core": { "every": "1d", "keep": { "daily": 7 } },
+        "data": { "every": "1h", "keep": { "hourly": 24, "daily": 14, "weekly": 8 } },
+        "cache": null
+      },
+      "backups": { "data": { "every": "1h" } }
+    }
+  }
+  ```
+
+  - **`snapshots`** are local, snapper's role [M5]: the activator takes
+    read-only snapshots of the class's subvolume on the period and
+    prunes them by retention; they stay on the machine, readable by a
+    person and restorable (operating.md, 7.1 and 7.4).
+  - **`backups`** are what is sent to the backup peer, encrypted with
+    `age` [M6] (operating.md, 7.2).
+  - **`cache` is never snapshotted or backed up:** a key other than
+    `core` and `data` is an error, and `"cache": null` only says so,
+    since null deletes (4.1). Buckets are `hourly`, `daily`, `weekly`
+    and `monthly`, each at least 1.
+  - **Render puts them in the data part** (render.md, 4.3), so a change
+    to one prepares a new slot of the same output, which the activator
+    then follows (slots.md, 2.2).
+  - **A container has no `hearth` task:** its classes follow its host's
+    policies, which the host's activator applies to them under the
+    container's target (slots.md, 12.1) [M5].
 - **`systemd-sysext` and `systemd-confext` are disabled.** Debian's
   `90-systemd.preset` enables both; hearth makes its live overlays
   itself (slots.md, 6.6), and a boot service that merged an extension
@@ -1087,11 +1193,11 @@ declares it (render.md, 7.2):
 - **The target's list is the union over its tasks,** in the checks part
   (render.md, 4.4), which holds it from M3. The minimal bless counts only
   the failed units that are not on it (slots.md, 7.1).
-- **A failed unit on the list is still reported** as a fact (operating.md,
-  section 4); it only stops counting against a bless.
+- **A failed unit on the list is still reported** as a fact
+  (operating.md, section 4); it only stops counting against a bless.
 - **A container's list holds as a host's [M5]:** its host reads the
-  container's failed units from outside during its trial (slots.md,
-  12.3).
+  container's failed units from outside during its trial
+  (slots.md, 12.3).
 - **A container never counts against its host [M5]:** the host's
   minimal bless leaves out its containers' nspawn units without any
   list, since each container's slot has its own trial (slots.md, 7.1).
@@ -1342,7 +1448,8 @@ Each with its file and line (render.md, section 7):
 ```
 
 - `hosts/x1/x1.json`'s `"free": {"uid": 1000, "groups": ["sudo"], "password": "users/free.passwd"}`
-  validates, and gets `/bin/bash`; its home is `@x1-prod.home-free`.
+  validates, and gets `/bin/bash`; its home is the directory
+  `home-free` in `@x1-prod.data`, bound at `/home/free`.
 - `"free": {"uid": "1000"}` is a wrong type; `"free": {"shel": "/bin/sh"}`
   an undeclared field; `"free": {}` misses the required `uid`. Each error
   names `hosts/x1/x1.json` and the line.
@@ -1676,11 +1783,12 @@ PersistentKeepalive=25
   }
   ```
 
-- **The backed-up target's render reads it.** A data entry with `backup`
-  (5.7) makes render read `backup_peer`'s exports in the target's
-  environment and put the peer and its recipient into that entry of the
-  data part (render.md, 4.3), where the activator takes it at prepare. A
-  target with backups and no peer that exports a recipient is an error.
+- **The backed-up target's render reads it.** A class that the `hearth`
+  task's `backups` names (5.12) makes render read `backup_peer`'s
+  exports in the target's environment and put the peer and its
+  recipient into that class's policy in the data part (render.md, 4.3),
+  where the activator takes it at prepare. A target with backups and no
+  peer that exports a recipient is an error.
 
 ## 9. Secrets and identity
 
@@ -1920,6 +2028,7 @@ artifacts.md (7.3) cite it.
 | `copy` from a workspace | `file` settings, from the repository (6.2) |
 | variant maps (never implemented) | maps of objects |
 | hard-coded preseeds, journal and iwd, gettys, snapshot host | task data (5.10) |
+| `@T.srv`, `@T.srv.core`, `@T.srv.data`, `@T.srv.cache` made at format time, with `journal` and `iwd` bound by fstab's template; snapper for snapshots | the classes `@<target>.core`, `.data` and `.cache`, made when an entry uses one; each entry a directory bound at its path; snapshots by class, the `hearth` task's (5.7, 5.12) |
 | `deploy patch`, rewriting a running root's `/etc` | live changes: a prepared slot's delta mounted over the running one, its consumers declared (5.14; slots.md, 6.6) |
 
 ## 13. What is open
@@ -1947,6 +2056,10 @@ artifacts.md (7.3) cite it.
   packages layer holds, so a software path that replaces a packaged
   file is caught, if at all, by the build; it depends on build.md's
   scan.
+- **A subvolume per entry,** as `"subvolume": true` on an entry that
+  needs its own snapshot policy, quota or restore unit: not in the
+  design, a possible later addition if a service needs one; it depends
+  on what restoring a single entry and qgroups cost in practice (5.7).
 - **Owners in the file tree:** render checks the owners of data,
   secrets, identity and software against declared users and groups with
   fixed ids (5.6, 5.11), but a file's owner in the config layer is still

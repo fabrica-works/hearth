@@ -58,7 +58,7 @@ is activator.md's. What is open is in section 15.
 - **Roll back is a trial of the other blessed slot,** conditional on
   the facts it was decided from, never a blind move of the default.
 - **Drift compares the live slot with its record,** under stable check
-  ids, leaving out `/var`, the persistent subvolumes and other mounts.
+  ids, leaving out `/var`, the class subvolumes and other mounts.
   Drift is reported, never repaired: a fix is a new slot.
 - **Containers have slots on their host [M5]:** prepared the same way,
   activated by a restart or live with the same mechanics, tried until
@@ -77,9 +77,9 @@ is activator.md's. What is open is in section 15.
   machine's identity, secrets, fstab and units, and splits off `/var`.
   So a slot is not the output, and has a tree digest of its own.
 - **Read-only once prepared.** Its root's subvolume is sealed with the
-  read-only flag, and mounted `ro`; only its `/var` and the persistent
-  subvolumes are written while it runs. Nothing is changed in place: a
-  fix, a new secret or a new command line is a new prepare.
+  read-only flag, and mounted `ro`; only its `/var` and the target's
+  class subvolumes are written while it runs. Nothing is changed in
+  place: a fix, a new secret or a new command line is a new prepare.
 - **One machine runs one target,** so its slots are `@<target>.a` and
   `@<target>.b`. A host's containers have slots of their own on the
   host's top level [M5] (section 12).
@@ -97,8 +97,9 @@ slot record    slots/<target>.<label>
   prepare key        H("prepare", output, data, secrets and boot digests, window, units allowed to fail,
                      the identity's generation, the secret store's generation)
   window, allowed    the trial's window and the units whose failure does not block a bless (7.1)
-  backups [M6]       from the data part, each backed-up subvolume's peer and age recipient:
-                     the only recipient a send may use (activator.md, 5.11; operating.md, 7.2)
+  data policies      from the data part, per class: the snapshot policy [M5], and the backup's
+                     period, peer and age recipient [M6], the only recipient a send may use
+                     (activator.md, 5.11; operating.md, section 7)
   output tree        the output's tree digest, as its store record gives it and the shift found it
   slot tree          the slot's own tree digest: the sealed root after prepare; root-only
   reported tree      the same, each secret and identity file's content digest replaced by
@@ -305,10 +306,10 @@ from `meta`, or a container's host, with its parameters in its `boot`
 part [M5] (12.1).
 
 - **Identity first:** before anything else the activator makes every
-  identity item the request declares and the store lacks (activator.md,
-  5.7), then computes the prepare key (2.2), whose identity generation
-  is then final. A request whose key the slot already holds is answered
-  at once, as done.
+  identity item the request declares and the store lacks
+  (activator.md, 5.7), then computes the prepare key (2.2), whose
+  identity generation is then final. A request whose key the slot
+  already holds is answered at once, as done.
 - **Every path in the slot is resolved from the snapshot's root
   descriptor** with `openat2(RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS |
   RESOLVE_NO_XDEV)` (an ask of skein, README, 8.1), never by a path name
@@ -319,9 +320,9 @@ part [M5] (12.1).
   directories, or whose kernel, initramfs, `/etc/passwd`, `/etc/group`
   or `/etc/shadow` are not regular files, is refused; no error carries
   a file's content.
-- **Each step starts by writing the activator's journal** (activator.md,
-  7.3), so a crash finds the slot `preparing` and deletes it
-  (section 11).
+- **Each step starts by writing the activator's journal**
+  (activator.md, 7.3), so a crash finds the slot `preparing` and deletes
+  it (section 11).
 
 ### 5.1 The snapshot
 
@@ -410,20 +411,28 @@ root can stay read-only.
    activator's own namespace.
 3. **Empty the root's `/var`,** depth first, by `unlinkat` on directory
    descriptors; `/var` itself stays, as the mount point.
-4. **Seed and empty each `data` path.** The first time the activator
-   makes a persistent subvolume, `@x1-prod.<name>` (machine.md, 3.4), it
-   seeds it with the output's content at that path, cloned the same way,
-   so what packages put there (a database's cluster, a mail spool) is
-   not hidden by an empty mount. Then, made or not, the slot's copy at
-   that path is emptied to a mount point. An existing persistent
-   subvolume is never touched.
+4. **Make the classes and the entries' directories** (machine.md, 3.4).
+   For each class an entry of the `data` part uses, make
+   `@x1-prod.<class>` with `BTRFS_IOC_SUBVOL_CREATE_V2` if the top level
+   lacks it, its root `0:0 0755`. For each entry whose directory its
+   class lacks, refuse the place if a directory of its name is orphaned
+   in another of the target's classes; otherwise make it as
+   `<name>.new`, deleting one a cut left, seed it from the output's
+   content at the entry's path, cloned as in step 2, so what packages
+   put there (a database's cluster, a mail spool) is not hidden by an
+   empty bind, and rename it to `<name>`, so a cut never leaves a
+   half-seeded entry under its name. With nothing at that path in the
+   output, it is made `0:0 0755`. An existing directory is never
+   touched. The slot's own copy at the entry's path stays, hidden by the
+   bind.
 5. **Make the mount points** that a sealed root cannot make later:
-   `lib/hearth/state` and `lib/hearth/store` in the slot's `/var`; each
-   `data` path, in the slot's `/var` if it is beneath `/var`, in the root
-   otherwise. Missing parents are made `0:0 0755`.
+   `lib/hearth/state` and `lib/hearth/store` in the slot's `/var`;
+   `srv/<class>` in the root, for each class used; each bind's path, in
+   the slot's `/var` if it is beneath `/var`, in the root otherwise,
+   where the output lacks it. Missing parents are made `0:0 0755`.
 6. **Amend the manifest:** the entries beneath `/var` leave the root's
    manifest for the `/var` manifest, whose digest is the record's `var
-   tree`; the mount points join; the emptied `data` paths leave.
+   tree`; the mount points made join.
 
 A copy, rather than a second snapshot of the output trimmed down to its
 `/var`: trimming would unlink every other file of the output, about
@@ -687,9 +696,9 @@ What the new root finds:
   it still names the old slot, which is why nothing reads it;
 - **`SoftRebootsCount` one higher,** which tells the new activator that
   the root switched;
-- **its own fstab mounted afresh:** its `/var`, the persistent
-  subvolumes, the store and the state; `/` remounted by systemd with
-  fstab's `subvol=` (to verify);
+- **its own fstab mounted afresh:** its `/var`, the classes and their
+  binds, the store and the state; `/` remounted by systemd with fstab's
+  `subvol=` (to verify);
 - **`/run` carried over;** the activator mounts `/run/hearth-activator/top` again
   if the switch dropped it.
 - **No live overlay:** a live state's overlays sit on the old root's
@@ -840,7 +849,7 @@ why (wire.md, section 6).
 | # | Rule | Why | Checked by |
 |---|---|---|---|
 | 1 | **The same packages layer:** both outputs have one packages key | packages, the kernel, its modules, the initramfs's inputs, systemd, dbus and libc stay; a packages change is never live | builder; activator, from the layer records' parents (activator.md, 6.1) |
-| 2 | **The prepare key equal but for the output,** the window and the units allowed to fail: the same `data`, `secrets` and `boot` digests, the same identity and secret store generations | a new mount changes fstab, a new command line changes the boot, a rotated secret is not in the output's diff | both, from the slot records |
+| 2 | **The prepare key equal but for the output,** the window and the units allowed to fail: the same `data`, `secrets` and `boot` digests, the same identity and secret store generations | a new data entry, a class changed or a policy changed alters the `data` part: a new bind changes fstab and the class's directory must be made and seeded at prepare; a new command line changes the boot; a rotated secret is not in the output's diff | both, from the slot records |
 | 3 | **Changes only under `etc/`, `usr/` and `opt/`,** none under `usr/lib/modules/` | `/var` content reaches a slot only at prepare; `/boot` and the modules are packages anyway | both |
 | 4 | **No boot-time or PID 1 configuration** (format.md, 5.14) | read only at boot or at PID 1's re-exec; applied live it is not what a boot does (a removed sysctl is not reverted), so the trial would test the wrong thing | both |
 | 5 | **Users and groups only added:** no line of `passwd`, `group`, `shadow`, `gshadow`, `subuid` or `subgid` removed, no id changed | a renumbering touches files in `/var` and data; a removal strands running processes | builder; activator, with its account parsers (activator.md, 2.3) |
@@ -1035,10 +1044,10 @@ While `b` is `live-blessed` (or a live state outlives its slot, below):
   activator spawned, after its hello, and that is the answer.
 - **A host's containers never count [M5]:** the failed units counted
   leave out the nspawn unit, `systemd-nspawn@<container>.service`, of
-  every container the host's activator keeps records for (activator.md,
-  7.1), with no list to write. Each container's slot has its own trial
-  and its own facts (12.3); one bad container must not roll its host
-  back.
+  every container the host's activator keeps records for
+  (activator.md, 7.1), with no list to write. Each container's slot has
+  its own trial and its own facts (12.3); one bad container must not
+  roll its host back.
 - **Task checks join in M5** (operating.md, section 3).
 
 ### 7.2 Who asks
@@ -1268,9 +1277,10 @@ throughout:
 - **It restores files, not state.** An open file or a working directory
   keeps the new files until closed, a process keeps what it loaded,
   users added keep their files in `/var`, tmpfiles' paths stay, and what
-  was written to `/var` or a data subvolume stays: a data migration is
-  not undone, as with any fall back (8.3). Only a reboot restores
-  process state; nothing restores data.
+  was written to `/var` or a data entry stays: a data migration is not
+  undone, as with any fall back (8.3). Only a reboot restores process
+  state; only a restore from a snapshot brings data back
+  (operating.md, 7.4).
 - **A fell-back slot is refused by its prepare key** (wire.md, 4.4), as
   after any trial, though its `/var` never ran.
 
@@ -1314,9 +1324,11 @@ ids are facts; drift is never repaired in place.
 | `slot.boot.entry` | EFI: the slot's two entries match; BIOS: covered by `slot.root.tree` |
 | `machine.default` | the default is the slot the records say, and blessed |
 | `machine.subvolumes` | every subvolume the layout names exists, and no other `@<target>.*` but a restore's or the deltas the live record and the marker name (machine.md, 3.1) |
-| `machine.data.<name>` | the persistent subvolume exists and is mounted at its path |
+| `machine.class.<class>` | the class subvolume exists and is mounted at `/srv/<class>`, for each class an entry uses |
+| `machine.data.<name>` | the entry's directory exists in its class's subvolume, and its path shows it: bound from `/srv/<class>/<name>`, or that path itself |
+| `machine.data.orphaned` | no directory in a class subvolume but the entries' and a restore's (machine.md, 3.4); each orphan is listed, and reported, never removed |
 
-- **Left out:** the contents of `/var` and of the persistent subvolumes,
+- **Left out:** the contents of `/var` and of the class subvolumes,
   which are meant to change, and anything mounted beneath `/`. The root's
   walk goes through the top level, so it stays on the root's subvolume
   and never sees a live state's overlays, which `slot.live.tree` walks.
@@ -1339,10 +1351,10 @@ ids are facts; drift is never repaired in place.
 ## 11. Crashes and power cuts
 
 The activator writes its journal before each step with effects outside
-the state, and the trial marker before each one-shot (activator.md,
-section 7). Every start reads them, reads the facts, and applies the
-start events of section 4. What each cut leaves, with `a` running and
-default and `b` the slot in question:
+the state, and the trial marker before each one-shot
+(activator.md, section 7). Every start reads them, reads the facts, and
+applies the start events of section 4. What each cut leaves, with `a`
+running and default and `b` the slot in question:
 
 | Step | Activator crash | Power cut |
 |---|---|---|
@@ -1392,19 +1404,29 @@ default and `b` the slot in question:
 ### 12.1 Container slots
 
 - **On the host's top level:** `@<container>.a`, `@<container>.a.var`,
-  `@<container>.b`, `@<container>.b.var`, and its persistent
-  subvolumes, where the container's name is its target's unless a pool
-  runs several of one target.
+  `@<container>.b`, `@<container>.b.var`, and the classes its entries
+  use, `@<container>.core`, `@<container>.data` and
+  `@<container>.cache`, where the container's name is its target's
+  unless a pool runs several of one target.
 - **Its `/var` is per slot,** as a host's. The bash fleet bound a
   persistent `.var` into each container; what a container keeps across
-  slots is a `data` entry of its tasks, as on a host.
+  slots is a `data` entry of its tasks, a directory in one of its
+  classes, as on a host. A container has no `journal` entry: its
+  journal is its host's (operating.md, section 5).
+- **Its classes follow its host's policies** [M5]: a container has no
+  `hearth` task (format.md, 5.12), so the host's activator snapshots its
+  classes by the host's running slot's data policies, into the host's
+  `@hearth.snapshots` under the container's target, and sends them to
+  the backup peer of the container's environment [M6]
+  (operating.md, section 7).
 - **Prepared by the host's activator,** section 5's steps, with these
   differences:
   - the shift writes ids from the container's own range, its
     `PrivateUsers=` base, 64 Ki aligned and clear of the builder's
     range (store.md, 9.2), instead of from 0 (or from 0, with idmapped
-    mounts: 12.4); its persistent subvolumes are owned in the same ids,
-    their root the container's root;
+    mounts: 12.4); its class subvolumes are owned in the same ids,
+    their root the container's root, and so are its entries'
+    directories, seeded from the shifted slot;
   - 5.1 takes nothing out of a firmware's fallbacks, and 5.3 makes no
     mount point for hearth's state and store, which are never bound into
     a container (store.md, 9.4);
@@ -1424,11 +1446,11 @@ default and `b` the slot in question:
   one prepares a new slot of the same output, which the host tries by a
   restart (12.2), since nspawn reads its settings only when it starts.
 - **A new id base needs fresh data.** The shift writes the new slot in
-  the new range, but the container's persistent subvolumes stay owned
-  in the old one, which the old slot needs to fall back to. So the
-  activator refuses a place whose base is not the owner of the roots of
-  the container's existing persistent subvolumes, each made owned by
-  the container's root (machine.md, 3.4), and names them. A person
+  the new range, but the container's class subvolumes stay owned in the
+  old one, which the old slot needs to fall back to. So the activator
+  refuses a place whose base is not the owner of the roots of the
+  container's existing class subvolumes, each made owned by the
+  container's root (machine.md, 3.4), and names them. A person
   deletes them, and the container starts again from scratch, as every
   machine does (README, section 7).
 - **The host's nspawn settings,** written by the host's activator from
@@ -1443,7 +1465,7 @@ default and `b` the slot in question:
   [Files]
   ReadOnly=yes
   Bind=/run/hearth-activator/top/@chat-prod.b.var:/var
-  Bind=/run/hearth-activator/top/@chat-prod.<name>:<path>       one per data entry
+  Bind=/run/hearth-activator/top/@chat-prod.<class>/<name>:<path>  one per data entry, from its class
   BindReadOnly=<source>:<path>                                  one per bind; Bind= if not read-only
   [Network]
   VirtualEthernet=no                                            or Bridge=<bridge> for network veth [M6]
@@ -1453,9 +1475,12 @@ default and `b` the slot in question:
   `systemd-nspawn@.service` runs nspawn with `--settings=override`, so
   these lines win over the unit's own `--link-journal=try-guest` and
   `--network-veth`. `LinkJournal=try-host` keeps the container's journal
-  in its host's (operating.md, section 5). The root is
-  found at `/run/machines/<container>`, a link to the slot's root (that
-  nspawn's image search includes `/run/machines` is to verify). That
+  in its host's (operating.md, section 5). Each entry's directory is
+  bound at its path straight from its class, with no `/srv/<class>`
+  mount inside the container; the ids are the container's own, so no
+  `:idmap` is needed, but for a pool's idmapped roots (12.4). The root
+  is found at `/run/machines/<container>`, a link to the slot's root
+  (that nspawn's image search includes `/run/machines` is to verify). That
   top-level mount is `nodev,nosuid,noexec` (machine.md, 3.2); whether
   nspawn's bind of a root and of `/var` from it keeps those flags is to
   verify (section 15).
@@ -1586,9 +1611,10 @@ remove it (activator.md, 5.16):
 2. **Delete its slots:** each slot's subvolumes, nested ones first
    (5.1), then their records, manifests and any marker, then the
    container's own record, so no host start links it again.
-3. **Keep its data:** its persistent subvolumes stay, unmounted and
-   reported as orphaned as any target's data is (machine.md, 3.4),
-   until a person deletes them; its identity and secrets stay with them.
+3. **Keep its data:** its class subvolumes and their snapshots stay,
+   unmounted and reported as orphaned as any target's data is
+   (machine.md, 3.4), until a person deletes them; its identity and
+   secrets stay with them.
 
 - **Its outputs are then unpinned:** no slot holds them, so the store
   may collect them (store.md, section 7).
@@ -1649,19 +1675,24 @@ by its host's activator from outside, since no hearth runs inside:
 (testing.md, sections 3 and 8), under the activator's root or alone,
 with:
 
-- **the fake machine's top level, firmware and GRUB** (machine.md,
-  section 10), and its models of tiny-initramfs and systemd: a boot
-  reaches its target or not, units fail, `is-system-running` answers, a
-  soft reboot switches roots and keeps the boot id;
+- **the fake machine's top level, firmware and GRUB**
+  (machine.md, section 10), and its models of tiny-initramfs and
+  systemd: a boot reaches its target or not, units fail,
+  `is-system-running` answers, a soft reboot switches roots and keeps
+  the boot id;
 - **a scripted builder** on the link, which asks to place, try, bless,
   fall back and roll back, at awkward moments and with stale conditions;
+- **data by class:** entries added, removed and moved between classes
+  across prepares, so classes are made once, each entry seeded once and
+  never touched again, a moved entry refused, an orphan reported, and
+  every bind mounted after its class (testing.md, 3.7);
 - **faults from the seed** at every step: a crash of the activator, a
   power cut, a kernel that panics or hangs, a unit that fails, a hearth
   that never blesses, a firmware quirk, a torn FAT or NVRAM write;
-- **a host's containers [M5]** on the fake machine's nspawn (testing.md,
-  3.12): units that start or fail, failed units inside, a host reboot
-  or an activator crash mid-trial, a container removed from the spec
-  (12.7), checked against 12.6's invariant;
+- **a host's containers [M5]** on the fake machine's nspawn
+  (testing.md, 3.12): units that start or fail, failed units inside, a
+  host reboot or an activator crash mid-trial, a container removed from
+  the spec (12.7), checked against 12.6's invariant;
 - **live changes** on the fake machine's mounts, overlays and PID 1's
   jobs (testing.md, 3.13): eligible and ineligible changes drawn from
   the seed, a reload that fails, a unit that dies during the settle, a
@@ -1745,9 +1776,14 @@ soft reboot and its fall back, and every live scenario
 - **Holding a bless [M4]:** the `held` state's exact cells, and whether a
   hold survives the activator's restart by its marker alone; depends on
   wire.md, 5.4.
-- **What a fell-back slot leaves for triage:** its journal is in a
-  persistent subvolume only if a task declares one; depends on
+- **What a fell-back slot leaves for triage:** its journal is in the
+  `core` class only if a task declares the `journal` entry; depends on
   operating.md's telemetry.
+- **Data policies in the prepare key:** a change to a class's snapshot
+  or backup policy is a change to the `data` part, so it prepares a new
+  slot of the same output, never live (6.7); whether policies should
+  reach the activator by a request of their own depends on how often
+  they change.
 - **Hashing contents again at prepare,** or trusting the builder's
   records (README, section 9; activator.md, 6.3).
 - **Drift's period and its full depth;** depends on operating.md's

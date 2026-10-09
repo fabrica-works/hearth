@@ -110,7 +110,9 @@ a machine                             │
 | `hearth secrets import <path>…` | imports secrets into the secret store (activator.md, 5.8), then asks the builder to read its facts afresh | in-process, as root | root | refused but at bootstrap |
 | `hearth identity` | the public halves of the machine's identity, to record as data (format.md, section 8) | the builder, from the activator's facts | anyone | yes |
 | `hearth logs [--unit <u>] [--since <d>] [-n <lines>]` | a bounded window of the journal, read locally (section 7); M3 | the builder, in `systemd-journal` | operators | yes |
-| `hearth shell [a\|b] [-- <argv>]` | a read-only view of a slot (3.7) | in-process, started as root | root | yes, locally |
+| `hearth shell [a\|b \| --snapshot <class>@<seq>] [-- <argv>]` | a read-only view of a slot, or of a class's snapshot [M5] (3.7) | in-process, started as root | root | yes, locally |
+| `hearth snapshots [--target <t>]` [M5] | each class's snapshots: sequence, age, the buckets that keep it, and from M6 whether the peer holds it (operating.md, 7.1) | the builder, from the activator's facts | anyone | yes |
+| `hearth restore <entry> \| --class <class> --from <seq> [--target <t>]` [M5] | restores one entry's directory, or a whole class, from a snapshot, then reboots (operating.md, 7.4); conditional on the facts read | the builder, then the activator | operators | refused |
 | `hearth artifact <repository> <recipe> [--at <commit>] [--build]` [M6] | resolves a recipe at a commit to its key and prints the pin; with `--build`, builds it (artifacts.md, 5.7 and 7.1) | the builder, or in-process | anyone; operators to build on the daemon | yes |
 
 - **"With an engine"** is the machine's mode, set at bootstrap (3.8)
@@ -136,13 +138,18 @@ a machine                             │
   that fail, when the change is not eligible.
 - **`rollback` while live** is the live fall back (slots.md, 8.5): back
   to the files that ran before, with no reboot.
+- **`restore` is conditional and reboots,** as `rollback` is: it reads
+  the class subvolume's UUID from the facts, asks the activator with it
+  as the condition, and returns once the activator has swapped the
+  names, just before the reboot (operating.md, 7.4).
 - **There is no `bless` command.** The hearth in the new slot blesses
   it (slots.md, 7.2); only an engine releases a bless it held (5.4). A
   person never blesses by hand.
 - **A host's containers [M5]** are named with `--target <t>`:
-  `prepare`, `trial`, `rollback`, `shell`, `secrets import` and
-  `identity` act on the machine's own target by default, and on one of
-  its containers with it; `status` lists every target the machine runs.
+  `prepare`, `trial`, `rollback`, `restore`, `snapshots`, `shell`,
+  `secrets import` and `identity` act on the machine's own target by
+  default, and on one of its containers with it; `status` lists every
+  target the machine runs.
   A container's `trial` returns with its restart's outcome
   (activator.md, 5.16), and its host blesses it later (slots.md, 12.3).
   `logs --target <t>` reads a container's journal from the host's, by
@@ -280,14 +287,20 @@ a machine                             │
 
 - **A read-only view of a slot, for a person on the machine.** `hearth
   shell b` mounts slot `b` and shows it; with no slot, the slot not
-  running. It replaces os's `ek shell`, which gave a writable view of the
-  running slot and was used to change slots in place.
+  running. `hearth shell --snapshot data@412` shows a class's snapshot
+  instead [M5], `@hearth.snapshots/<target>.data/412`, so a person can
+  read a file as it was and copy it out (operating.md, 7.1); the view
+  is the same, read-only, as `nobody`. It replaces os's `ek shell`,
+  which gave a writable view of the running slot and was used to change
+  slots in place.
 - **How:**
 
   ```
   started as root, in new mount and PID namespaces (mount propagation private):
     mount -o ro,subvol=@<target>.<label>      UUID=<fs uuid>  <dir>
     mount -o ro,subvol=@<target>.<label>.var  UUID=<fs uuid>  <dir>/var
+    or, for a snapshot [M5]:
+    mount -o ro,subvol=@hearth.snapshots/<target>.<class>/<seq>  UUID=<fs uuid>  <dir>
     mount proc (the new PID namespace's) and sysfs, read-only, under <dir>
     mount a tmpfs at <dir>/dev holding only null, zero, tty and urandom
   then chroot into <dir> and drop root at once:
@@ -394,8 +407,8 @@ hearth bootstrap --disk <device> [--wipe]
     `credentials/` beside `state/` (3.8; render.md, 2.2);
   - the hold (4.5), the refused prepare keys (4.4) and the last pass;
   - orders with their outcomes, until acknowledged [M4] (5.5);
-  - the rings of signals and check history [M5] (operating.md,
-    section 5).
+  - the rings of signals and check history [M5]
+    (operating.md, section 5).
 - **Every pass names the generation it serves.** A pass whose
   generation is no longer the desired one stops at its next stage, and a
   new pass starts.
@@ -515,8 +528,8 @@ waiting      the activator reports "fell back" from b    waiting      refuse b's
   one target. In M5 a host runs its containers' targets too (4.7), and
   the loop takes them in a fixed order, one pass each.
 - **One prepare and one trial per machine at a time.** A target has one
-  inactive slot, the store builds within its own bounds (build.md,
-  section 4), and a trial may reboot the whole machine.
+  inactive slot, the store builds within its own bounds
+  (build.md, section 4), and a trial may reboot the whole machine.
 - **A slot-changing command from the client while a pass is in
   `preparing` or `trying` is refused as busy** (exit 75). One that comes
   while the pass fetches, renders or builds stops the pass at its next
@@ -616,8 +629,8 @@ be made or run, so its prepare key is refused.
 - **One desired revision for the machine.** The host and its containers
   converge to the same commit, with the same trial policy (4.1): a
   container is a target of the host's revision, rendered, built and
-  placed by the host's builder, in the host's store (build.md,
-  section 2).
+  placed by the host's builder, in the host's store
+  (build.md, section 2).
 - **A container's trial is live when eligible** (slots.md, 12.8), the
   host's activator swapping the overlays inside the container's mount
   namespace and acting on its units through `systemctl --machine=`.
@@ -694,6 +707,7 @@ Hello
     boot          running, default, trial: a label or none; live: the delta's slot and prepare key,
                   or none (slots.md, section 3)
     last trial    slot; output key; kind; blessed | held | live-blessed | fell back | rolled back; age
+    data          classes and entries, with orphans; per class, its snapshots [M5] and backups [M6]
   orders        in flight: key, attempt, stage
                 answered, not yet acknowledged: key, attempt, outcome
   identity      per target, the public halves: SSH host keys, the machine-id
@@ -783,6 +797,7 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
 | bless | target; slot | transition | conditional, on that slot running on trial, healthy, its bless held |
 | roll back | target; the running slot and the default decided from | transition | conditional, on the running slot and the default |
 | restart a unit [M5] | target; unit | transition | keyed, by the order's key, which hearth keeps; conditional at the activator on the unit's invocation (activator.md, 5.9) |
+| restore [M5] | target; class; entry, optional; the snapshot's sequence; the class subvolume's UUID decided from | transition | keyed, by the order's key; conditional on the class's UUID (activator.md, 5.12) |
 | build an artifact [M6] | its key, or repository, commit and recipe | creation | keyed, by the artifact's key (artifacts.md, 5.7) |
 
 **prepare.**
@@ -841,11 +856,12 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
 
 **roll back.**
 
-- **Switches to the other slot** (slots.md, section 9; activator.md,
-  5.5): a trial of the other blessed slot, then its own bless,
-  conditional on the running slot and the default decided from. Its answer is `begun`,
-  as for activate; the hello after the reboot shows it held. Whether to
-  try the rolled-back output again is the engine's to decide.
+- **Switches to the other slot** (slots.md, section 9;
+  activator.md, 5.5): a trial of the other blessed slot, then its own
+  bless, conditional on the running slot and the default decided from.
+  Its answer is `begun`, as for activate; the hello after the reboot
+  shows it held. Whether to try the rolled-back output again is the
+  engine's to decide.
 
 **restart a unit.**
 
@@ -862,6 +878,15 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
   or enables. hearth's own units, and any other, are refused.
 - **Outcomes:** restarted, with the new invocation; failed, with the
   unit's `Result`; refused.
+
+**restore.**
+
+- **One entry or a whole class, from a snapshot** (operating.md, 7.4):
+  from M5 a snapshot on the machine, from M6 one the peer holds. Its
+  answer is `begun`, as for activate, sent before the reboot, and the
+  hello after it shows the restored class's new UUID in the `data`
+  fact. A container's restore restarts the container
+  instead.
 
 **For a container's target [M5]:**
 
@@ -993,7 +1018,8 @@ Application kinds of skein's channel; each belongs to one direction.
 | `live` | fact | per target, the live state: base; delta; the slot and prepare key it carries, or none; hierarchies overlaid; whether the mount table agrees with the live record (slots.md, 2.4) | activator | M3 |
 | `trial` | fact | the last trial: slot; attempt; kind (live, soft reboot, reboot, restart); phase reached; outcome; for a live one, the step that failed and the units acted on; age | activator | M3 |
 | `activation` | fact | per target, how its prepared slot would be activated: live with its unit plan, or a soft reboot, a reboot or a restart, and when not live, why: the rules of slots.md, 6.7 that fail, with their first paths or units, bounded | builder | M3 |
-| `data` | fact | persistent subvolumes: present, mounted, orphaned | activator | M3 |
+| `data` | fact | per target, each class subvolume present and mounted, and its UUID; each entry's directory present and bound; orphans, by name (machine.md, 3.4) | activator | M3 |
+| `snapshots` | fact | per class: its snapshots, each with its sequence and age; the newest's and oldest's age; the next due; the bytes the class's mount holds (operating.md, 7.1) | activator | M5 |
 | `drift` | fact | per slot: clean, or the stable ids of what differs (slots.md, section 10) | activator | M3 |
 | `identity` | fact | per target, public halves: SSH host keys (type, key), the machine-id | activator | M3 |
 | `secrets` | fact | the secret store's generation; declared secrets missing, by name | activator | M3 |
@@ -1006,7 +1032,7 @@ Application kinds of skein's channel; each belongs to one direction.
 | `units` | fact | per target, the running slot's failed units, with their results; a container's read from its host (operating.md, 2.9) | builder | M5 |
 | `check` | fact | per check: state, last result, reason, slot and output, run by (operating.md, section 2) | builder | M5 |
 | `alarm` | fact | disk, memory, pressure: level, value, threshold (operating.md, section 4) | builder | M5 |
-| `backup` | fact | per data subvolume: last snapshot's age, last sent, peer, bytes (operating.md, section 7) | activator | M6 |
+| `backup` | fact | per class: the last sent and the last confirmed, their ages, the peer, the bytes sent (operating.md, 7.2) | activator | M6 |
 | `fault` | fact | a pool host's active faults, each with its end (operating.md, section 8) | activator | M6 |
 | `artifact` | fact | an artifact's key: its tree digest, or failed; its costs (artifacts.md, 5.6 and 5.7) | builder | M6 |
 | `prepared` | event | slot; output key | builder | M3 |
@@ -1023,7 +1049,9 @@ Application kinds of skein's channel; each belongs to one direction.
 | `unit failed` | event | unit; result | builder | M5 |
 | `check changed` | event | check; from state; to state | builder | M5 |
 | `alarm raised`, `alarm cleared` | event | alarm; value | builder | M5 |
-| `backup sent`, `backup failed` | event | data subvolume; reason | activator | M6 |
+| `snapshot failed` | event | class; reason, such as a full disk | activator | M5 |
+| `restored` | event | class; entry, if one; the snapshot's sequence | activator | M5 |
+| `backup sent`, `backup failed` | event | class; reason | activator | M6 |
 | `fault began`, `fault ended` | event | fault; target | activator | M6 |
 
 - **"Known by"** is the process that owns the fact. The activator's
@@ -1122,6 +1150,7 @@ wire, not in traits: another backend is another daemon speaking it.
 | a unit, by name | a systemd unit of the running slot |
 | a check, by id, with its result | a unit, a command or a probe (operating.md) |
 | drift, by stable ids | a slot compared with its record |
+| data by class and entry; snapshots by sequence | class subvolumes, each entry a directory bound at its path; read-only btrfs snapshots (machine.md, section 3) |
 | costs | per step: time, bytes fetched, cache hits |
 
 - **Never at the wire:** a package, a resolution, a layer's name, a

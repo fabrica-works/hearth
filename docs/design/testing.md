@@ -284,9 +284,9 @@ hearth-fake-machine
 - **`openat2`'s flags are honoured as Linux answers them:**
   `RESOLVE_BENEATH` refuses an escape (EXDEV), `RESOLVE_NO_SYMLINKS` any
   link on the way (ELOOP), `RESOLVE_NO_XDEV` a mount crossed (EXDEV).
-  The activator resolves every path of a slot so (activator.md,
-  section 2), and the fake gives it the same refusals for a hostile
-  tree (8.5).
+  The activator resolves every path of a slot so
+  (activator.md, section 2), and the fake gives it the same refusals for
+  a hostile tree (8.5).
 - **Renames follow the kernel's rule:** a directory moved into another
   directory needs write permission on itself, to rewrite its `..`; a
   rename within one directory needs only that directory's. A frozen
@@ -436,12 +436,12 @@ archive    Installed-Size; the .deb's size and SHA-256, as Packages lists them
 - **The fake initramfs** records which modules it holds, and the fake
   kernel mounts its root only if the disk's driver and btrfs are among
   them (3.7). Its bytes differ at every build while its inputs (the
-  configuration, the modules, the generator) do not, so only slots.md,
-  6.1's rule, which compares the inputs' digest, allows a soft reboot
-  after a rebuild (8.3). With `AUTO_MODULES=yes` the hook inspects the
-  running system, which in a sandbox is the wrong one: render refuses
-  it and the build checks again (build.md, 5.5), and the fake keeps the
-  behaviour so that both checks are tested.
+  configuration, the modules, the generator) do not, so only
+  slots.md, 6.1's rule, which compares the inputs' digest, allows a soft
+  reboot after a rebuild (8.3). With `AUTO_MODULES=yes` the hook
+  inspects the running system, which in a sandbox is the wrong one:
+  render refuses it and the build checks again (build.md, 5.5), and the
+  fake keeps the behaviour so that both checks are tested.
 - **The offenders of build.md, 9.2:** openssh-server's postinst makes
   host keys, ssl-cert's a snakeoil pair, systemd's a machine-id, and a
   trigger writes a log, so the customize hook and the scan have work.
@@ -529,9 +529,11 @@ A scenario picks the machine's kind:
   `hearth-trial.target`'s `JobTimeoutSec=` and `JobTimeoutAction=`, the
   units enabled, their conditions on a path or on the kernel's command
   line, `IgnoreOnIsolate=`, the default target, and fstab's mounts of
-  `/var` and the persistent subvolumes. A unit's outcome is its
-  package's, or its cue's (8.2). The boot reaches its target, or does
-  not.
+  `/var`, the class subvolumes at `/srv/<class>` and the entries' binds.
+  A bind waits for the mount its source lies on and for its own
+  parent's, as systemd orders it, and fails if either fails. A unit's
+  outcome is its package's, or its cue's (8.2). The boot reaches its
+  target, or does not.
 - **A mount that fails** isolates `emergency.target`, which stops every
   unit but those with `IgnoreOnIsolate=yes`, and leaves unmounted what
   the mount would have shown. So the trial's units, which arm from a
@@ -777,8 +779,8 @@ out   bytes on stdout and stderr, in chunks over the world's time: progress;
   `/etc/machine-id`. The customize hook and the scan must catch the
   rest (build.md, 5.6 and 9.3).
 - **Its output** off a terminal is `I:`, `W:` and `E:` lines; with
-  `--verbose`, apt's and dpkg's lines; on failure, the tail of build.md,
-  10.1.
+  `--verbose`, apt's and dpkg's lines; on failure, the tail of
+  build.md, 10.1.
 
 ### 4.4 The other tools
 
@@ -966,8 +968,8 @@ real costs of each step.
 
 - **The real tier's store is a hearth store** that lives across runs in
   the test directory.
-- **The base layer is keyed** by the resolution's digest (store.md,
-  3.3), so it is built once per mirror digest: the first run
+- **The base layer is keyed** by the resolution's digest
+  (store.md, 3.3), so it is built once per mirror digest: the first run
   builds it, later ones find it. An essential bootstrap from a local
   mirror takes about ten seconds; mmdebstrap's README quotes 9.5 on a
   tmpfs.
@@ -983,8 +985,8 @@ real costs of each step.
 - **The builder's own** (store.md, section 9): Linux with unprivileged
   user namespaces, Debian's default; uidmap's `newuidmap` and
   `newgidmap`; cgroup v2 with a subtree delegated to the test user; and
-  skein's contained process trees, which sandboxes wait for (build.md,
-  8.8).
+  skein's contained process trees, which sandboxes wait for
+  (build.md, 8.8).
 - **On a developer's machine** the profile runs under `systemd-run --user
   --scope -p Delegate=yes`, which delegates that subtree for the
   builder's cgroups; a runner's service needs `Delegate=yes` as well.
@@ -1010,9 +1012,9 @@ real costs of each step.
   software step.
 - **The tree helper's walk** of the layer just built against its
   parent's record: only changed files are hashed.
-- **Removing layers:** the tree helper's `delete` where the mount
-  option is set, and thaw, empty and `rmdir` where it is not (store.md,
-  7.3 and 7.4): both paths run.
+- **Removing layers:** the tree helper's `delete` where the mount option
+  is set, and thaw, empty and `rmdir` where it is not (store.md, 7.3 and
+  7.4): both paths run.
 - **A packages layer of its own** only where a test is about packages:
   the extras on the base; and `test-boot`'s, whose `/var/lib/machines`
   must be a directory, not a nested subvolume (8.5).
@@ -1025,9 +1027,9 @@ were reused, what was fetched.
 ### 7.1 The VMs
 
 - **Incus VMs** (q35), each with its own disk: a block volume holding a
-  partition table, an ESP and a btrfs filesystem (machine.md,
-  section 3). Not the old lab's virtiofs boot: firmware, ESP and disk
-  are what the MVP's machine has.
+  partition table, an ESP and a btrfs filesystem
+  (machine.md, section 3). Not the old lab's virtiofs boot: firmware,
+  ESP and disk are what the MVP's machine has.
 - **OVMF, with `security.secureboot=false`.** Incus turns Secure Boot
   on by default, and a Debian kernel cannot boot from a stub entry under
   it (machine.md, section 9).
@@ -1075,7 +1077,22 @@ were reused, what was fetched.
 | a power cut during prepare | a kill at a drawn moment of prepare | a boots; the half-prepared slot is redone or discarded (slots.md, section 11) |
 | a power cut in trial and bless | kills just after `BootNext` is set, and between the steps of the bless: journal, `blessed`, marker removed, default moved, dead-man stopped | the default boots a blessed slot |
 | BIOS [M3b] | the bootstrap, a one-shot trial, a fallback after a panic, and a cut while the activator writes the environment pair, on SeaBIOS | `next_entry` consumed in both files before the kernel; the default boots a blessed slot |
-| BIOS, a blessed default that panics [M3b] | after a bless, the harness arms `test-panic` through a flag in a persistent subvolume, so the default panics at every boot | GRUB's boot counter answers (machine.md, section 5), and the machine reaches the other blessed slot without a person |
+| BIOS, a blessed default that panics [M3b] | after a bless, the harness arms `test-panic` through a flag in a data entry, so the default panics at every boot | GRUB's boot counter answers (machine.md, section 5), and the machine reaches the other blessed slot without a person |
+
+Data by class, on the same VMs (format.md, 5.7; machine.md, section 3;
+operating.md, section 7):
+
+| Scenario | What happens | What must hold |
+|---|---|---|
+| binds after their class | a target with `journal` and `iwd` in `core` and `home-free` in `data` | `/srv/core` and `/srv/data` mounted from `@<target>.core` and `@<target>.data`; each bind up after its class's mount and after `/var`; journald writes `/srv/core/journal/<machine-id>` |
+| seeding | an entry whose path the output fills, `/var/spool/postfix` | its directory made once and seeded by reflink, owners and modes as the output had them; the next prepare leaves it alone; the slot's own copy hidden under the bind |
+| a class that will not mount | the harness renames `@<target>.data` before a boot | the class's mount and every bind of it fail, the boot isolates `emergency.target`, and no service starts on the slot's copy of a path |
+| a snapshot across two services [M5] | two services in `data` append numbered records to their files, without pause, while snapshots are taken | each snapshot holds both files as of one instant: no record in one past what the other had at that instant, beyond what was in flight |
+| retention [M5] | a day of hourly snapshots, with time sped up | each bucket's newest kept, every other snapshot pruned; `cache` never snapshotted |
+| restoring one entry [M5] | `hearth restore mail --from <seq>` | after the reboot, `/var/mail` holds the snapshot's files and `/var/spool/postfix` today's; `mail.before.<seq>` kept beside it |
+| restoring a class [M5] | `hearth restore --class data --from <seq>` | after the reboot, every entry of the class as of the snapshot; `@<target>.data.before.<seq>` kept |
+| a power cut in a restore [M5] | `incus stop --force` between the two renames | the start finishes or undoes the swap from its record, then reboots |
+| reading a snapshot [M5] | `hearth shell --snapshot data@<seq>` | the snapshot's files, read-only, as `nobody` with `CAP_DAC_READ_SEARCH` |
 
 Live changes, on the same VMs (slots.md, 6.6 to 6.9):
 
@@ -1119,8 +1136,8 @@ Containers [M5], in a host VM:
 | a host and its container in one revision | both specs change | the container's trial first, the host's last, since the host's may reboot the machine (wire.md, 4.7) |
 | a container's parameters change | a bind added to its placement | a new slot of the same output, its settings with the bind, tried by a restart (slots.md, 12.1) |
 | a container that fails on its host's trial | the host's trial boots and the container's unit fails | the host is blessed all the same; the container's facts report it (slots.md, 7.1) |
-| a container's journal | entries written inside the container, read by the host's builder while it runs and after it stops | read from `/var/log/journal/<its machine-id>` on the host's journal subvolume; recorded: whether journald inside writes there under its id range (operating.md, section 5) |
-| a container removed | the revision drops the container's target | its unit stopped, its slots deleted and their outputs unpinned; its persistent subvolumes reported orphaned (slots.md, 12.7) |
+| a container's journal | entries written inside the container, read by the host's builder while it runs and after it stops | read from `/var/log/journal/<its machine-id>` in the host's journal entry, in its `core` class; recorded: whether journald inside writes there under its id range (operating.md, section 5) |
+| a container removed | the revision drops the container's target | its unit stopped, its slots deleted and their outputs unpinned; its class subvolumes reported orphaned (slots.md, 12.7) |
 | a container's change applied live | a config change with a `reload` entry, in a container target | the overlays in the container's mount namespace, none in the host's; the unit reloaded through `systemctl --machine=`; the host's state records the container's next start as `b`'s trial (slots.md, 12.8) |
 | a container's live fall back | the container's reload fails, then a step of the fall back is made to fail | the files back and the units acted on again; then a restart of the container on its default |
 | a container's next start after a live bless | the harness restarts the host VM | the container starts on `b`'s trial, which its host blesses; the delta deleted |
@@ -1164,12 +1181,13 @@ cause one in a VM is open (section 11).
 | `hearth-slots-world`, `hearth-boot-world`, `hearth-disk-world` | the activator's children, on firmware, btrfs and disks | M3 |
 | `hearth-activator-world` | the activator's root and its children; the builder scripted | M3 |
 | `hearth-checks-world` | checks, on units and signals | M5 |
-| `hearth-artifacts-world`, `hearth-backups-world` | the second recipe; data snapshots and streams | M6 |
+| `hearth-backups-world` | class snapshots, their retention and restores; from M6, send streams and a backup peer | M5 |
+| `hearth-artifacts-world` | the second recipe | M6 |
 
-Each document's own world section names its scenarios: render.md,
-section 9; store.md, section 11; build.md, section 13; machine.md,
-section 10; slots.md, section 13; activator.md, section 9; wire.md,
-section 10; operating.md, section 9; artifacts.md, section 8.
+Each document's own world section names its scenarios:
+render.md, section 9; store.md, section 11; build.md, section 13;
+machine.md, section 10; slots.md, section 13; activator.md, section 9;
+wire.md, section 10; operating.md, section 9; artifacts.md, section 8.
 
 ### 8.2 Scenarios, cues and the referee
 
@@ -1179,8 +1197,8 @@ section 10; operating.md, section 9; artifacts.md, section 8.
   identities; the faults; the power cuts.
 - **Boots follow content.** The test repositories have tasks that
   install real units: `test-panic` crashes the kernel through
-  `/proc/sysrq-trigger`, at once or when a flag file exists in a
-  persistent subvolume; `test-hang` blocks the boot's target;
+  `/proc/sysrq-trigger`, at once or when a flag file exists in a data
+  entry; `test-hang` blocks the boot's target;
   `test-mount-fails` adds a mount that cannot succeed; `test-unit-fails`
   fails; for live changes, `test-reload-fails` fails its reload when
   its configuration says so, `test-dies-later` dies a while after it
@@ -1302,17 +1320,22 @@ same repository (7.3).
 | a cut at every live phase | activator, system | a crash of the activator, and a power cut, at each step from L1 to L9 (slots.md, 6.8) | before arming, `prepared`; after, `reboot -ff` and `fell back`; after the live bless, its trial at the next boot; the default always a blessed slot |
 | a later live change that falls back | slots, system | `c` while `b` is live-blessed, its reload failing | the delta against `a`; the swap back to `b`'s delta, which no slot holds any more; the next boot runs `a` |
 | a person's soft reboot while live | slots, system | a soft reboot with no next root, the seed drawing which overlays survive | the start runs `reboot -ff`; nothing runs a half-overlaid tree past it |
+| an entry that changes class | slots, system | a revision moves `mail` from `data` to `core` | the place is refused, naming the orphaned directory in `data`; no empty `mail` is seeded in `core` |
+| a cut while seeding | slots, system | a power cut while an entry's `<name>.new` is filled | the next prepare deletes the `.new` and seeds again; no half-seeded entry is ever bound |
+| a snapshot across two services [M5] | backups, system | two writers in one class, snapshots and prunes cut at every step | each snapshot is both writers' state at one instant; retention keeps each bucket's newest |
+| restoring one entry [M5] | backups, system | a restore of `mail` from a snapshot, cut between its renames | finished or undone at start; `postfix`, in the same class, untouched |
 
 ## 9. Budgets and costs
 
 ### 9.1 The two suites
 
-The focused suite takes at most **15 seconds** and the fuzzy suite
-**60 seconds**, wall time on the development machine, idle, as skein's,
+The focused suite takes at most **15 seconds** and the fuzzy suite **60
+seconds**, wall time on the development machine, idle, as skein's,
 smith's and temper's are measured; nextest's global timeouts enforce
-them, and raising one is an explicit decision (testing-strategy.md,
-section 8). temper's gate recorded 1,092 focused tests in 5.2 seconds;
-the budgets hold when the design is cheap from the first step:
+them, and raising one is an explicit decision
+(testing-strategy.md, section 8). temper's gate recorded 1,092 focused
+tests in 5.2 seconds; the budgets hold when the design is cheap from the
+first step:
 
 - **The fakes are small:** a universe of tens of packages, trees of
   hundreds of files, snapshots that copy no bytes, a fake bootstrap in
@@ -1378,8 +1401,8 @@ finding, as a failing check is.
 | M3 | domain (converge, slots, boot, disk, activator); system (the pair joins); machine (link, efi, systemd, keygen, client, proc); protocol (link, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode and its jobs; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; mount namespaces, the new mount API and overlayfs (3.13); cues | efibootmgr; systemctl at run time, its unit verbs included; systemd-tmpfiles; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools | VM tier on OVMF, live changes included; conformance: firmware, host keys, overlays in a user namespace |
 | M3b | machine (grub) | SeaBIOS; msdos and the post-MBR gap; GRUB on FAT, its environment pair, its boot counter, saves that fail, and the slots' fragments | grub-editenv; grub-install | VM tier on SeaBIOS; conformance: env file, GRUB |
 | M4 | protocol (the wire, on `skein-fake-channel`); machine (wire) | — | `hearth-fake-engine` (4.6); systemd-run, for a held bless's timer | — |
-| M5 | domain (checks); containers and pool hosts | units' states and signals; containers on a host (3.12); `setns` into a container's mount namespace | systemctl restarting a unit, a container's nspawn unit and `--machine=`; systemd-run's checks | VM tier: bless with checks; containers in a host VM, live changes included (7.3) |
-| M6 | domain (artifacts, backups); protocol (bytes by digest, between builders) | send streams and a backup peer; faults as effects; virtual disks | — | real builds: artifacts |
+| M5 | domain (checks, backups); containers and pool hosts | units' states and signals; containers on a host (3.12); `setns` into a container's mount namespace; read-only snapshots of class subvolumes and their pruning | systemctl restarting a unit, a container's nspawn unit and `--machine=`; systemd-run's checks | VM tier: bless with checks; containers in a host VM, live changes included (7.3) |
+| M6 | domain (artifacts; backups' sends); protocol (bytes by digest, between builders) | send streams and a backup peer; faults as effects; virtual disks | — | real builds: artifacts |
 | later | identity beyond SSH host keys | — | wg, for WireGuard keys | — |
 
 M1 sets the pattern: every tier up to end to end exists for render
