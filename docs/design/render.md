@@ -975,7 +975,11 @@ Over generated repositories, valid by construction and then mutated:
   scenario compares the closures of both modes (testing.md, 5.2), and
   build.md, 5.7 refuses any build whose installed set differs from its
   closure. If the modes ever disagree, resolution moves to unshare, and
-  render then needs the builder's subordinate range.
+  render then needs the builder's subordinate range. A lead, from
+  mmdebstrap 1.5.7's code: chrootless installs the essential set with
+  `dpkg --force-depends` from outside and the rest with an outside
+  `apt-get install`, while unshare and root skip that last apt step for
+  `--variant=custom`, so the two may diverge for containers' variant.
 - **apt's version and solver:** recorded beside the closure, not keyed.
   Whether a new apt should re-resolve depends on how often closures
   differ in practice, which the costs and conformance will show.
