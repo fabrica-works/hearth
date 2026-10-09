@@ -969,6 +969,13 @@ Over generated repositories, valid by construction and then mutated:
 - **The `Inst` line with several origins** (`(2.41-12 Debian:13.1/stable,
   Debian-Security:13/stable-security [amd64])`), to verify against
   recordings.
+- **Chrootless or unshare for resolution:** os and the bash fleet
+  resolved chrootless and built unshare; a reason for preferring unshare
+  was found once, in experiments, and not recorded. A conformance
+  scenario compares the closures of both modes (testing.md, 5.2), and
+  build.md, 5.7 refuses any build whose installed set differs from its
+  closure. If the modes ever disagree, resolution moves to unshare, and
+  render then needs the builder's subordinate range.
 - **apt's version and solver:** recorded beside the closure, not keyed.
   Whether a new apt should re-resolve depends on how often closures
   differ in practice, which the costs and conformance will show.

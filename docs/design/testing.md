@@ -804,6 +804,7 @@ kernel (testing-strategy.md, section 5).
 | Scenario | The real side | What is compared |
 |---|---|---|
 | resolve | `mmdebstrap --simulate --mode=chrootless` on the local mirror (render.md, 5.2) | the closure: names, architectures, versions; the `Packages` stanzas it left |
+| resolve, both modes | the same requests simulated with `--mode=chrootless` and with `--mode=unshare`, for every variant | the two closures, which must be equal: os and the bash fleet resolved chrootless and built unshare, and a reason once found for preferring unshare was lost (render.md, section 10) |
 | fetch | `apt-helper download-file` on the local mirror, over loopback HTTP | files by digest; a 404's and a mismatch's exit, lines and leftovers |
 | bootstrap | mmdebstrap as build.md (5.4, 8.3) runs it: as the root of a sandbox's user namespace, `--mode=unshare`, chrooted into a staging layer | the installed set; dpkg's status, stanza by stanza; the tree: paths, kinds, modes, owners as the namespace sees them, attributes, link targets, contents by digest |
 | the same, `--mode=root` | the bootstrap again in root mode | the two trees, to settle build.md's open choice (section 15) |
