@@ -960,6 +960,11 @@ were reused, what was fetched.
 - **A serial console,** logged by the harness.
 - **BIOS [M3b]:** `security.csm=true`, which runs SeaBIOS and requires
   Secure Boot off, on an msdos disk laid out as machine.md (5.1) says.
+- **Containers [M5] run inside a VM,** which is their host target: its
+  hearth runs the container targets with systemd-nspawn, as `carbon`,
+  `rhi` and `vul` do (slots.md, section 12). A VM needs no nesting
+  settings for that, unlike an Incus container, and the real tier
+  cannot run them: nspawn needs root.
 
 ### 7.2 Driving them
 
@@ -996,6 +1001,17 @@ were reused, what was fetched.
 | a power cut in trial and bless | kills just after `BootNext` is set, and between the steps of the bless: journal, `blessed`, marker removed, default moved, dead-man stopped | the default boots a blessed slot |
 | BIOS [M3b] | the bootstrap, a one-shot trial, a fallback after a panic, and a cut while the activator writes the environment pair, on SeaBIOS | `next_entry` consumed in both files before the kernel; the default boots a blessed slot |
 | BIOS, a blessed default that panics [M3b] | after a bless, the harness arms `test-panic` through a flag in a persistent subvolume, so the default panics at every boot | GRUB's boot counter answers (machine.md, section 5), and the machine reaches the other blessed slot without a person |
+
+Containers [M5], in a host VM:
+
+| Scenario | What happens | What must hold |
+|---|---|---|
+| a container's slot | a container target placed on the VM's host target: its slot prepared on the host, then its nspawn unit restarted on it (slots.md, 12.1 and 12.2) | the unit stably active, the slot blessed as the container's default in the host's state |
+| a container that fails | `test-unit-fails` inside the container | the trial fails at the first `failed`, and the host's activator restarts the container on its old slot (slots.md, 12.3) |
+| a host reboot during a container's trial | `incus stop --force` mid-trial | the links in `/run` are gone; the host's activator restarts the container on its default |
+| a container's checks | a check of a unit and a probe, run by the host's hearth (operating.md, 2.9) | reported as the host's facts, naming the container's target |
+| a pool host | one output, several containers (slots.md, 12.4) | one build and one shift; a snapshot per container; each container's files owned as nspawn maps them |
+| a host and its container in one revision | both specs change | the container's trial first, the host's last, since the host's may reboot the machine (wire.md, 4.7) |
 
 A hang that only the watchdog ends needs a kernel that stops; how to
 cause one in a VM is open (section 11).
