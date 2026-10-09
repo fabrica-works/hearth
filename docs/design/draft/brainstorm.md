@@ -10,8 +10,8 @@ Section 12 is the order of building; section 13 lists what is open.
 
 - **hearth is the factory's build daemon** (temper's `factory.md`,
   section 7). It makes outputs from inputs, keyed by digest, and runs
-  them in slots. One process runs on every machine: hosts, the lab's
-  pool hosts and its builders.
+  them in slots. It runs on every machine: hosts, the lab's pool hosts
+  and its builders.
 - **It replaces os.** os's four tools (`manifest`, `deploy`,
   `provision`, `ek`) become one domain in one daemon. os stays a
   reference for its features and its golden files, not for its code.
@@ -22,14 +22,22 @@ Section 12 is the order of building; section 13 lists what is open.
 - **It is built on skein** and follows `programming-model.md`: one
   loop, step functions, and a domain complete enough to run whole on a
   fake machine. The heavy work stays in child processes.
+- **Two processes, split by privilege.** An unprivileged builder speaks
+  the wire and runs everything that comes from an IaC repository; a
+  small activator, as root, places outputs into slots, writes boot
+  entries and restarts units (4.1).
+- **Efficient everywhere, tests included, from day 0:** realistic fakes
+  at every boundary, test tiers with budgets, real builds as a regular
+  user, and hearth's own costs reported as facts (4.3).
 - **The engine decides, hearth carries out.** The run side's engine, or
   the lab's, orders a target prepared or activated, and hearth does it.
   With no engine, hearth converges to a pinned revision on its own.
 - **One wire:** skein's channel, dialed out by hearth to its plane's
   engine. Bytes move by digest, outside the channel.
 - **Outputs are layers keyed by digest:** packages, then software, then
-  etc. A change rebuilds only the layers above the lowest one it
-  touched, on a snapshot of the layer beneath.
+  etc, each a read-only btrfs subvolume (4.6). A change rebuilds only the
+  layers above the lowest one it touched, on a snapshot of the layer
+  beneath.
 - **Slots try before they commit.** A new slot boots on trial. The boot
   default moves only when the slot is blessed, so a failure falls back
   to the old slot on its own.
@@ -71,13 +79,27 @@ that machine and keeps the warm state: caches and earlier outputs.
 
 ## 4. The daemon
 
-### 4.1 A process per machine
+### 4.1 Two processes per machine
 
-- **One process per machine, as root, on skein's loop.** It manages
-  disks, subvolumes and boot entries, so it needs no sudo.
+- **The builder, unprivileged.** It speaks the wire, renders, builds,
+  keeps the store, runs the checks and serves telemetry. Everything that
+  comes from an IaC repository runs here, each in a user namespace:
+  mmdebstrap, apt, maintainer scripts, `customize.sh`. In the lab, that
+  includes code nobody has reviewed.
+- **The activator, as root, and small.** It does a fixed set of
+  operations on outputs named by digest: place one into a slot, write
+  boot entries, soft reboot or reboot, restart a unit, partition and
+  format a disk, snapshot data for backups. It runs no IaC code, and
+  listens only to its builder, on a local socket.
+- **One binary, two processes,** each on skein's loop. Tests and the
+  lab's builders need only the builder.
+- **What the builder needs, in general:** a kernel that allows
+  unprivileged user namespaces; the `newuidmap` and `newgidmap` helpers
+  (Debian's `uidmap` package) with a subordinate uid and gid range for
+  its user; and its store on btrfs (4.6).
 - **The heavy work stays in child processes:** mmdebstrap, apt, btrfs,
-  git, efibootmgr. hearth schedules them, bounds how many run at once,
-  and keeps the store.
+  git, efibootmgr. Each process schedules its own, bounds how many run
+  at once, and records what each cost.
 
 ### 4.2 The layers
 
@@ -96,7 +118,9 @@ that machine and keeps the warm state: caches and earlier outputs.
   - *checks:* the target's health checks and the machine's own signals,
     in a bounded window (section 10);
   - later, *artifacts* (the second recipe), *backups* (10.4) and
-    *faults* (section 5.2).
+    *faults* (section 5.2);
+  - *slots*, *disk* and the backups' snapshots are the activator's work;
+    the rest is the builder's.
 - **Protocol:**
   - the wire (section 5.3);
   - **each external tool is a protocol:** an argument vector goes down;
@@ -108,18 +132,62 @@ that machine and keeps the warm state: caches and earlier outputs.
   needed in skein's io to begin with: btrfs and mount are reached
   through their tools. Native records come later, only where they pay.
 
-### 4.3 Tested on a fake machine
+### 4.3 Testing, from day 0
 
-The domain runs whole in worlds of fakes (`testing-strategy.md`). Its
-fake is a machine: subvolumes and snapshots, a package universe drawn
-from the seed, firmware boot variables, reboots and power cuts. A world
-can cut the power during a prepare, fail a boot on trial, fill the disk
-mid-build, or drop the engine during an activation, and check that the
-machine always comes back bootable.
+Efficiency is a principle in every part of hearth, testing included:
+fast tests, all of them runnable as a regular user, designed with the
+code from the first step.
 
-This is the machine fake temper already plans (temper's `testing.md`,
-section 3.2), so the two should share it. os's real tests need sudo and
-feature gates; this is the largest gain in quality over it.
+- **The fake machine.** The domain runs whole in worlds of fakes
+  (`testing-strategy.md`). Its fake is a machine: subvolumes and
+  snapshots, a package universe drawn from the seed, firmware boot
+  variables, reboots and power cuts. A world can cut the power during a
+  prepare, fail a boot on trial, fill the disk mid-build, or drop the
+  engine during an activation, and check that the machine always comes
+  back bootable. This is the machine fake temper already plans (temper's
+  `testing.md`, section 3.2), so the two should share it. os's real
+  tests need sudo and feature gates; this is the largest gain in quality
+  over it.
+- **A realistic fake at every boundary.** Each external tool is a
+  protocol (4.2), so each gets a fake with the same face: an argument
+  vector in; progress, output and an exit code out; effects on the fake
+  machine's files.
+  - Fake mmdebstrap installs from a small package universe modelled on
+    Debian's: base-files, a dpkg status of the real shape, users made by
+    maintainer scripts, conffiles, a kernel package. A fake build gives a
+    small but realistic root filesystem.
+  - Its output follows recordings of real runs (progress lines, failure
+    tails), and the seed draws its faults: a stall, a 404 from the
+    mirror, a maintainer script that fails, a full disk.
+  - The same for apt, `dpkg-query`, btrfs, git, systemctl and
+    efibootmgr.
+- **Fakes kept honest.** A conformance tier runs the same scenarios
+  against the real tool and against its fake, and compares what each
+  leaves: the installed set, dpkg's status, files and their modes. skein
+  holds its simulator and its io_uring backend to one kernel contract
+  the same way.
+- **Tiers, each with a budget** (temper's are 15 seconds for the default
+  suite and a minute for the randomized one):
+  - domain worlds on the fake machine, seeded: milliseconds a scenario,
+    and the bulk of the tests;
+  - protocol parsers against recorded output of the real tools:
+    milliseconds;
+  - render, with package resolution reused by its key: milliseconds.
+    Resolution itself (`mmdebstrap --simulate`) needs no privilege;
+  - real builds as a regular user, against a small pinned local mirror
+    fetched once (mmdebstrap's own test suite runs offline this way),
+    through hearth's own layer cache. The base layer is built once per
+    mirror digest (an essential bootstrap takes 10 to 15 seconds); each
+    test then pays only for its own step, seconds or less. The digest
+    rule is tested on hearth itself.
+- **What needs root runs in the lab:** real slots, boot entries and
+  reboots, on throwaway machines; never in a developer's suite.
+- **The real tier needs** what the builder needs (4.1), with a btrfs
+  directory writable by the test user, mounted with
+  `user_subvol_rm_allowed`.
+- **hearth's costs are facts:** time per step, bytes fetched, cache
+  hits. The lab benchmarks hearth as it does any product, and a
+  regression in hearth's efficiency is a finding.
 
 ### 4.4 Two faces
 
@@ -137,6 +205,34 @@ The factory wants its concepts generic, with os as their first backend.
 hearth keeps the genericity in its wire, not in traits (which the Rust
 subset bans anyway): another backend is another daemon speaking the
 same wire. Inside, hearth is Debian on btrfs, and says so.
+
+### 4.6 The store on btrfs
+
+- **btrfs only.** A layer is a read-only subvolume owned by the builder,
+  made from a writable snapshot of its parent; a slot is a snapshot of
+  an output; deleting a layer is immediate. One mechanism serves builds,
+  slots and backups, as in os.
+- **Unprivileged.** A user creates subvolumes, snapshots the subvolumes
+  it owns, and makes them read-only. Deleting one needs the store's
+  filesystem mounted with `user_subvol_rm_allowed`; without it, the
+  builder empties the subvolume and removes its directory, one unlink
+  per file.
+- **What a step changed** comes from a walk of the new layer against
+  its parent's record: a file whose path, inode and change time all
+  match is unchanged, and only the others are hashed. The walk gives the
+  layer's tree digest (11.2) and its change set.
+- **No btrfs send and receive:** both need root. A layer moves to a peer
+  as its change set (changed files and deletions), and the receiving
+  builder applies it to a snapshot of the parent it already holds
+  (5.3).
+- **Overlay layers were considered:** overlayfs in a user namespace,
+  each layer being an overlay's upper directory. They build on any
+  filesystem and give the change set for free. But they add a second
+  mechanism beside btrfs, which slots and backups need anyway; flattening
+  a stack into a slot is a copy rather than a snapshot; deleting a layer
+  unlinks every file; and a host running on overlay meets whole-file
+  copy-up and hardlink quirks. The factory provisions its own builders,
+  so building on any filesystem is not worth that.
 
 ## 5. Roles
 
@@ -185,8 +281,8 @@ same wire. Inside, hearth is Debian on btrfs, and says so.
   the engine learns that an activation held or fell back; there is no
   other path for a machine coming back.
 - **Bytes move by digest, outside the channel:** an output fetched from
-  a peer or a pool's cache with a plain HTTP GET, or as a btrfs send
-  stream against a parent the receiver already holds. Content-addressed
+  a peer or a pool's cache with a plain HTTP GET, as its change set
+  against a parent the receiver already holds (4.6). Content-addressed
   bytes need no session, and any cache can serve them.
 - **Facts and events are typed.** os's tab-separated output and its
   exit codes go; the command-line client may still print a table.
@@ -382,8 +478,9 @@ so any hearth can produce it.
 ### 7.7 What a target is, apart from where it runs
 
 - **Today a file's place decides the kind:**
-  `hosts/<host>/<host>-<env>.json` is a host; `hosts/<host>/machines/<name>.json` is a container, which
-  stands alone, with no base and no environments.
+  `hosts/<host>/<host>-<env>.json` is a host;
+  `hosts/<host>/machines/<name>.json` is a container, which stands
+  alone, with no base and no environments.
 - **The factory runs one target in different places:** mail-lab in a
   container of a lab pool, mail-prod on a VM. So containers compose a
   base and environments as hosts do, and placement (bare metal, a VM, a
@@ -529,7 +626,9 @@ nothing more.
 
 - **Backups:** read-only snapshots of a target's data subvolumes, on a
   period, sent to a backup peer as incremental streams against the
-  previous one.
+  previous one. The data belongs to the target's services, not to the
+  builder, so this is the activator's work (4.1), and it may use btrfs
+  send, which needs root.
 - **Restore** becomes an effect when backups are built, granted by
   policy like the others.
 - **Restore drills are experiments** on the run side's own throwaway
@@ -637,7 +736,8 @@ mmdebstrap's manual, on `SOURCE_DATE_EPOCH` and its cleanup.
 6. **checks,** with facts up and telemetry served on demand;
 7. **artifacts, peers and backups.**
 
-The fake machine grows alongside, from the first step.
+The fakes, their conformance tier and the test budgets grow alongside,
+from the first step (4.3).
 
 ## 13. Open questions
 
@@ -682,5 +782,9 @@ The fake machine grows alongside, from the first step.
 - **Artifacts:** the second recipe (a build environment, sources and a
   command, run in a container of the environment's output, with its
   compile cache on a persistent volume), and how its outputs are stored.
-- **Peers:** HTTP by digest or btrfs send streams, and a cache per pool
-  or per site later (`factory.md`, section 14).
+- **Peers:** change sets over HTTP (4.6), and a cache per pool or per
+  site later (`factory.md`, section 14).
+- **The activator's interface:** exactly its operations, and how it
+  checks that a request names an output its builder's store holds.
+- **Budgets:** each tier's ceiling, and the local mirror: which
+  packages, pinned how, fetched by whom.
