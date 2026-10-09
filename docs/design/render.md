@@ -190,9 +190,9 @@ and step 4 reads other targets of the same environment.
   RFC 7386 (format.md, 4.1): task defaults, fleet, base, member,
   environment, base in the environment, its member.
 - **Presence** comes from the base, member and base-env layers alone
-  (format.md, 3.3), and the `hearth` task is added to every target
-  (format.md, 5.12); the composed settings are restricted to the present
-  tasks.
+  (format.md, 3.3), and the `hearth` task is added to every target but
+  a container (format.md, 5.12); the composed settings are restricted to
+  the present tasks.
 - **Every value keeps its provenance:** the layer, file, line and column
   that set it, so a later error names the right file.
 
@@ -224,7 +224,9 @@ and step 4 reads other targets of the same environment.
   section 8). Each target's exports are computed once per revision and
   shared by all their readers.
 - **Placements are read the same way:** `target.containers` holds the
-  environment's targets placed on this one (format.md, 3.5).
+  environment's targets placed on this one (format.md, 3.5). A
+  container's `on` must name a target of its environment that is not a
+  container; a build environment has none (format.md, 3.4).
 - **No cycle is possible:** exports depend only on their own task's
   settings and on `target` (format.md, 8.1).
 - **An error in another target's exports fails this render too,** naming
@@ -382,7 +384,12 @@ config
 
 - **The variant is a function of placement,** never a task (format.md,
   3.4): os chose it from a `container` task in render and from the
-  target's kind in deploy, which disagreed.
+  target's kind in deploy, which disagreed. A container's variant
+  changes its resolution key (5.1), so a host and its container never
+  share a packages layer.
+- **A container's packages part has no initramfs,** and render refuses
+  a task's module on it, as it refuses a boot parameter (format.md, 3.4;
+  7.2): with no kernel there is nothing to configure.
 - **The initramfs configuration is render's,** written as
   `tiny-initramfs.conf` from the part's two fields: `AUTO_MODULES=no`
   always, `INCLUDE_MODULES` from `modules`, and `MICROCODE=no` or
@@ -434,11 +441,13 @@ secrets
   files                map secret name → { path, mode, owner, group }
   passwords            map user → secret name
   identity             map item → { kind, algorithm?, path, public_path?, mode, owner, group }
-boot                   list of parameters, in order
+boot                   list of parameters, in order; empty for a container
 ```
 
 - **Slot parts never enter a layer key:** changing one makes a new slot of
   the same output (slots.md, section 5).
+- **A container's slot parts are its own,** placed by its host's
+  activator into the container's slot on the host [M5] (slots.md, 12.1).
 - **The secrets part holds names, never values.** Beside secret files it
   carries password secrets and identity items, the two other things the
   activator writes into a slot from the secret store (format.md,
@@ -523,7 +532,7 @@ resolution key = H("resolution", sources, request, variant, apt)
 
 ```
 mmdebstrap --verbose --simulate --mode=chrootless
-  --variant=apt
+  --variant=<variant>               the part's: apt for metal and vm; a container's (4.2)
   --architectures=amd64
   --include=<the request, sorted, comma-joined>
   --aptopt=Acquire::Check-Valid-Until "false"
@@ -750,11 +759,11 @@ error
 |---|---|
 | decode | not JSON, a duplicate key, a fraction, invalid UTF-8, a template's syntax, an unknown filter, a limit exceeded |
 | repository | a document out of place, an environment that does not exist, a submodule, a stray file in a task |
-| composition | two targets of one name, `null` for a task in a default, `placement` in a base |
+| composition | two targets of one name, `null` for a task in a default, `placement` in a base, a container's `on` that names a container or a target of another environment |
 | schema | an undeclared setting, a wrong type, a missing required setting, an undeclared read, a bad default |
 | evaluation | an undefined value used, a type error in an expression, an overflow, a `for_each` that is not a map or list |
 | guard | a false `requires`, with its message |
-| reserved | a command-line key, a path, a unit name, a drop-in that sorts after `zz-hearth-watchdog.conf`, a tmpfiles line, an initramfs setting or a preseed that hearth reserves; a secret or identity file `hearth` could read, or a secret readable by others (format.md, 5.11; build.md, 7.3, 7.4 and 9.2; slots.md, 5.5; machine.md, 6.2) |
+| reserved | a command-line key, a path, a unit name, a drop-in that sorts after `zz-hearth-watchdog.conf`, a tmpfiles line, an initramfs setting or a preseed that hearth reserves; a secret or identity file `hearth` could read, or a secret readable by others; [M5] an initramfs module, a boot parameter or the `hearth` task on a container, a host's preset that enables one of its containers' nspawn units (format.md, 3.4, 5.11 and 5.12; build.md, 7.3, 7.4 and 9.2; slots.md, 5.5; machine.md, 6.2) |
 | ids | an owner of a data path, a secret or an identity file without a fixed id; a download owned by anyone but `root` or a package user with a fixed id (3.3; format.md, 5.6 and 10.1) |
 | checks [M5] | a `blessing` check with `from`, a `from` no target has, a command's `user` that is `root`, or neither `nobody`, a sysusers user nor a declared package user (3.9) |
 | collision | one path from two tasks, two users that differ |

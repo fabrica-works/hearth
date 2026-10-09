@@ -56,8 +56,9 @@ render.md. Open questions are in section 13.
 - **Software is fetched by digest.** A download is `{url, sha256}`,
   placed as one file or unpacked from a tar archive at a declared path;
   an artifact is pinned by its key and placed as a tree [M6].
-- **hearth is a task too.** Every target has it: hearth's binary, its
-  activator's unit, its user and its subordinate range.
+- **hearth is a task too.** Every target but a container has it:
+  hearth's binary, its activator's unit, its user and its subordinate
+  range. No hearth runs in a container in M5; its host runs it.
 
 ## 2. The repository
 
@@ -218,9 +219,9 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   `fleet.json` hold the SSH port without putting an SSH server on every
   target.
 - **A target's tasks** are the keys left after merging its base, member
-  and base-env layers alone, and `hearth`, which every target has
-  (5.12). **Its settings** are the merge of every layer, restricted to
-  those tasks.
+  and base-env layers alone, and `hearth`, which every target but a
+  container has (5.12). **Its settings** are the merge of every layer,
+  restricted to those tasks.
 - **Every task named anywhere must exist** under `tasks/`, and its
   settings are validated even where no target has it, so a typo in a
   default fails.
@@ -240,7 +241,7 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 | `kind` | enum `metal`, `vm`, `container` | where the target runs |
 | `firmware` | enum `efi`, `bios` | how it boots (machine.md, sections 4 and 5); never for a container |
 | `hardware` | string | the profile tasks key hardware data by: `7th-gen`, `incus`, `ionos`, `serverhino`, `vultr`; never for a container |
-| `on` | target | for a container only: its host, a target of the same environment that is not a container |
+| `on` | target | for a container only: its host, a target of the same environment that is not a container; absent for a build environment, which no host runs (artifacts.md, 2.3) [M6] |
 
 - **Placement is data of the environment** (draft/brainstorm.md, 7.7). It
   may appear in `envs/<env>.json` and in a base-env layer or its members,
@@ -252,7 +253,10 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   file places in a container.
 - **What placement decides by itself:** the bootstrap variant
   (render.md, 4.2), and that a container has no kernel, so its initramfs
-  modules and boot parameters must be empty.
+  modules and boot parameters must be empty: its packages part has no
+  initramfs and its boot part is empty, and render refuses a module or a
+  parameter on it (render.md, 7.2). The `boot` task, which installs the
+  kernel, refuses a container by a guard of its own (5.4).
 - **Everything else that differs by placement is task data** that reads
   `target.placement`: the gettys masked in containers, the initramfs
   modules per hardware profile, EFI's tools (5.10).
@@ -277,9 +281,21 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   { "placement": { "kind": "container", "on": "rhi-prod" } }
   ```
 
+- **What a container's target holds** [M5]: tasks like any target's,
+  but no `hearth` task (5.12) and nothing that needs a kernel (3.4); the
+  gettys masked by the `core` task (5.10). Its `data` entries, identity
+  and secrets are its own target's, kept by its host's activator: its
+  persistent subvolumes sit on the host's top level, and its machine-id
+  is no longer its host's (slots.md, 12.1).
+- **Users are not mirrored** [M5]. The bash fleet declared
+  carbon-forge's `runner:600` on carbon too, with a home inside the
+  container's `/srv`. A container's persistent subvolumes are bound into
+  it alone and never mounted on its host (slots.md, 12.1), so its host
+  needs no such user; a host task that must know a container's user
+  reads it from the container's exports (section 8).
 - **How a host runs a container** (its slots, its user-namespace ids, its
   binds) is slots.md, section 12 [M5]; the fields it needs join
-  `placement` then.
+  `placement` then (section 13).
 
 ### 3.6 Clusters
 
@@ -620,7 +636,8 @@ nothing.
       }
     },
     "requires": {
-      "modules": { "if": "target.placement.hardware in settings.modules", "message": "no initramfs modules for this hardware" }
+      "kernel": { "if": "target.placement.kind != 'container'", "message": "a container has no kernel: its host runs it" },
+      "modules": { "if": "target.placement.kind == 'container' or target.placement.hardware in settings.modules", "message": "no initramfs modules for this hardware" }
     },
     "packages": {
       "{{ settings.kernel }}": {},
@@ -859,7 +876,8 @@ nothing.
   an error carrying its message and its line in `task.json`.
 - Most of os's guards are types now (`"type": {"enum": [...]}`).
   `requires` is for what spans settings or reads placement: the boot
-  task's module table must hold the target's hardware profile (5.4).
+  task refuses a container, and its module table must hold the target's
+  hardware profile (5.4).
 
 ### 5.10 From the fleet's code to task data
 
@@ -913,6 +931,7 @@ declares it (render.md, 7.2):
 | command-line keys `root`, `rootflags`, `rootfstype`, `rootwait`, `rootdelay`, `ro`, `rw`, `init`, `initrd`, `panic`, and every `hearth.*` key (the trial's token, slots.md, 6.3); a line past 2048 bytes with the activator's tokens | the activator's, or they change how tiny-initramfs finds and starts the root | machine.md, 6.2 |
 | task files at `/etc/fstab`, anything under `/.hearth/`; in `/etc/systemd/system.conf.d/`, a name beginning `zz-hearth` or sorting after `zz-hearth-watchdog.conf` | the activator writes them at prepare, and the watchdog's drop-in must sort last | slots.md, 5.5 |
 | units, links and presets named `hearth-trial*`; `hearth-check-*` | the dead-man's; checks' transient units | slots.md, 5.5; operating.md, 2.4 |
+| [M5] presets and links that enable `systemd-nspawn@<c>.service` for a container `c` placed on the target | the host's activator starts each container once its link and settings exist; one started before fails | slots.md, 12.2 |
 | task files at `/etc/passwd`, `/etc/group`, `/etc/shadow`, `/etc/gshadow`, `/etc/subuid`, `/etc/subgid`, `/etc/machine-id`, `/var/lib/dbus/machine-id` | users are declared (5.6); identity is written at prepare | build.md, 7.3 and 9.2 |
 | task files at `/etc/ssh/ssh_host_*_key` and their `.pub`, `/etc/dropbear/dropbear_*_host_key`, anything under `/etc/ssl/private/`, `/var/lib/systemd/random-seed`, `/var/lib/systemd/credential.secret` | identity and secrets: `identity` and `secrets` entries name these paths, files never do | build.md, 9.2 |
 | anything under `/var/lib/hearth/` | the mount points of hearth's state and store | machine.md, 3.4 |
@@ -925,12 +944,19 @@ declares it (render.md, 7.2):
 
 ### 5.12 The hearth task
 
-- **Every target has the `hearth` task,** without naming it: render adds
-  it to every target, and `"hearth": null` is an error. Every output
-  then carries hearth's binary, its activator's unit and its user, which
-  machine.md (8.3) and slots.md assume. Its files are in the repository
-  like any task's, `tasks/hearth/`, so the release a fleet runs is pinned
-  by a change.
+- **Every target has the `hearth` task,** but a container (below),
+  without naming it: render adds it, and `"hearth": null` is an error.
+  Every such output then carries hearth's binary, its activator's unit
+  and its user, which machine.md (8.3) and slots.md assume. Its files
+  are in the repository like any task's, `tasks/hearth/`, so the
+  release a fleet runs is pinned by a change.
+- **But a container's [M5]:** render adds no `hearth` task to a
+  container's target, and naming it there is an error. No hearth runs in
+  a container (slots.md, 12.5): its host's builder builds its output and
+  its host's activator prepares and starts it, so an activator enabled
+  inside would only fail, and the tools, the user and the range would
+  serve nothing. Should a container run a hearth of its own, this
+  exception goes.
 - `tasks/hearth/task.json`:
 
   ```json
@@ -999,6 +1025,9 @@ declares it (render.md, 7.2):
   the failed units that are not on it (slots.md, 7.1).
 - **A failed unit on the list is still reported** as a fact (operating.md,
   section 4); it only stops counting against a bless.
+- **A container's list holds as a host's [M5]:** its host reads the
+  container's failed units from outside during its trial (slots.md,
+  12.3).
 
 ## 6. The schema
 
@@ -1556,7 +1585,8 @@ PersistentKeepalive=25
 - **The machine-id is every target's,** never declared. The bash fleet
   fixed it in configuration so the journal had a stable path, and lab,
   production and a container shared one; here each target on each
-  machine has its own, kept across its slots (slots.md, 5.4).
+  machine has its own, kept across its slots (slots.md, 5.4); a
+  container's is kept by its host's activator (slots.md, 12.1) [M5].
 - **The kinds are a closed list** that grows with the activator's
   operations (activator.md, section 5).
 
@@ -1721,10 +1751,18 @@ artifacts.md (7.3) cite it.
   from facts.
 - **The bootstrap variant for containers:** os's `custom` with an
   essential list in a task, or mmdebstrap's `essential` variant; settled
-  with containers in M5 (slots.md, section 12).
-- **A host's container parameters** (user-namespace ids, binds,
-  capabilities) as `placement` fields, and a lab pool's containers, which
+  with containers in M5 (slots.md, section 12). It depends too on where
+  preseeds load: mmdebstrap runs no essential hook for `custom`, and
+  runs it for `essential` (build.md, 5.5).
+- **A host's container parameters** (the user-namespace base, binds,
+  capabilities, the network: the fleet's are host networking, a pool's
+  faults need veth pairs, operating.md, section 8) as `placement`
+  fields, and whether they enter the prepare key, since a new base
+  needs a new shift (slots.md, 12.1); and a lab pool's containers, which
   its engine places rather than a repository [M5].
+- **A build environment's placement** [M6]: a container with no `on`
+  (3.4), or a kind of its own; it depends on whether anything else
+  about it ever differs from a container's.
 - **The `incus` module list** for a lab VM booting from its own disk, to
   verify on the VM tier (machine.md, section 7; testing.md, section 7).
 - **Whether interpolation and `for_each` in declarations are enough,** or

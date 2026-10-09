@@ -50,7 +50,9 @@ section 15.
   ids, leaving out `/var`, the persistent subvolumes and other mounts.
   Drift is reported, never repaired: a fix is a new slot.
 - **Containers have slots on their host [M5]:** prepared the same way,
-  activated by a restart, tried until their unit is stably active.
+  activated by a restart, tried until their unit is stably active and
+  their boot has no failed unit, and blessed by the host's hearth, since
+  none runs inside.
 
 ## 2. Slots and targets
 
@@ -226,7 +228,7 @@ Inputs, from the place request (activator.md, 5.1): the slot, the
 output's key and tree digest, its kernel version and digests, the
 `data`, `secrets` and `boot` parts, the package users, the trial's
 window, the units allowed to fail, and the target's kind and firmware
-from `meta`.
+from `meta`, or a container's host and id base [M5] (12.1).
 
 - **Identity first:** before anything else the activator makes every
   identity item the request declares and the store lacks (activator.md,
@@ -534,6 +536,9 @@ RebootWatchdogSec=10min
 
 ### 6.1 Which kind
 
+A container's trial is always a restart, with no kernel to compare
+(12.2) [M5]. For a machine's own slots:
+
 **The kernel is unchanged,** and a soft reboot enough, when the new slot
 and the booted kernel (section 3) agree on all four of:
 
@@ -687,6 +692,9 @@ a soft reboot is to verify.
   trial, and the default never moved. No outside probe judges the slot:
   the bash fleet once lost a good boot to an SSH probe that never
   reconnected.
+- **A container is the exception [M5]:** no hearth runs in it, so its
+  host's builder asks its host's activator, which reads the container
+  from outside (12.3).
 
 ### 7.3 What it does
 
@@ -861,6 +869,13 @@ ids are facts; drift is never repaired in place.
   with operating's signals [M5] (operating.md, section 4).
 - **Drift is the activator's:** it wrote the record, and only root can
   read every file of a slot (README, section 4.2).
+- **A host's containers [M5]** are checked by the host's activator under
+  the same ids, reported for the container's target: the running slot's
+  root from the top level, against its record and manifest;
+  `slot.mounts` against the nspawn settings it wrote (12.1), not fstab;
+  no `slot.boot.*`; `machine.default` against the default it recorded.
+  `machine.subvolumes` counts the containers' subvolumes as the host's
+  layout.
 
 ## 11. Crashes and power cuts
 
@@ -892,6 +907,11 @@ default and `b` the slot in question:
   by GRUB, so no cut makes a trial sticky.
 - **Recovery is idempotent:** every start event's handling may itself be
   cut and done again.
+- **A container's slot [M5]** follows the same table for prepare. A cut
+  in its trial or bless leaves a link in `/run` and a marker: a power
+  cut drops the link, and the host's start links the recorded default
+  (12.3); an activator crash finds the link and the marker, and goes on
+  as 12.3 says.
 
 ## 12. Containers and pool hosts [M5]
 
@@ -901,27 +921,55 @@ default and `b` the slot in question:
   `@<container>.b`, `@<container>.b.var`, and its persistent
   subvolumes, where the container's name is its target's unless a pool
   runs several of one target.
-- **Prepared by the host's activator,** steps 5.1 to 5.5, with these
+- **Its `/var` is per slot,** as a host's. The bash fleet bound a
+  persistent `.var` into each container; what a container keeps across
+  slots is a `data` entry of its tasks, as on a host.
+- **Prepared by the host's activator,** section 5's steps, with these
   differences:
   - the shift writes ids from the container's own range, its
-    `PrivateUsers=` base, 64 Ki aligned, instead of from 0 (or from 0,
-    with idmapped mounts: 12.4);
-  - no fstab for `/` and no dead-man units: nspawn makes the root, and
-    the host judges the trial;
-  - the identity and secrets are the container's target's, so a
-    container no longer shares its host's machine-id.
+    `PrivateUsers=` base, 64 Ki aligned and clear of the builder's
+    range (store.md, 9.2), instead of from 0 (or from 0, with idmapped
+    mounts: 12.4); its persistent subvolumes are owned in the same ids,
+    their root the container's root;
+  - 5.1 takes nothing out of a firmware's fallbacks, and 5.3 makes no
+    mount point for hearth's state and store, which are never bound into
+    a container (store.md, 9.4);
+  - 5.5 writes its `/etc/fstab` with no line, and writes no dead-man
+    unit and no watchdog drop-in: nspawn makes its root and binds the
+    rest (machine.md, 3.3), and the host judges the trial (12.3);
+  - 5.6 writes the host's nspawn settings instead of boot files (below),
+    and 5.7 reads no boot file back;
+  - the identity and secrets are the container's target's, made and
+    kept by the host's activator, so a container no longer shares its
+    host's machine-id.
+- **Its slot record** (2.2) has no kernel, command line or boot; it
+  records the id base the slot was shifted to.
 - **The host's nspawn settings,** written by the host's activator from
   typed data into `/run/systemd/nspawn/<container>.nspawn`:
   `PrivateUsers=`, `ReadOnly=yes`, `Bind=` lines for the slot's `/var`
   and the persistent subvolumes, from `/run/hearth-activator/top`. The root is
   found at `/run/machines/<container>`, a link to the slot's root (that
-  nspawn's image search includes `/run/machines` is to verify).
+  nspawn's image search includes `/run/machines` is to verify). That
+  top-level mount is `nodev,nosuid,noexec` (machine.md, 3.2); whether
+  nspawn's bind of a root and of `/var` from it keeps those flags is to
+  verify (section 15).
 
 ### 12.2 Activation is a restart
 
-Repoint the link atomically (a new link renamed over the old) and run
-`systemctl restart systemd-nspawn@<container>.service`. There is no
-kernel, no soft reboot and no one-shot.
+Write the slot's settings and repoint the link, each by rename over the
+old, and run `systemctl restart systemd-nspawn@<container>.service`.
+There is no kernel, no soft reboot and no one-shot.
+
+- **The host's activator starts its containers.** At every start it
+  makes each container's settings and link that `/run` lacks, from the
+  default it recorded (12.6), then runs `systemctl start` on its unit,
+  which leaves one already active alone. So a host reboot starts every
+  container on its default, and an activator restart within a boot
+  leaves them as they are.
+- **No output enables them:** a host's output enables no
+  `systemd-nspawn@` unit of its containers, and render refuses one that
+  does (format.md, 5.11). Started at boot before its link exists, it
+  would fail.
 
 ### 12.3 Trial
 
@@ -929,14 +977,30 @@ kernel, no soft reboot and no one-shot.
   `systemctl is-active` answers of `active`, polled within 30 seconds;
   `failed` fails at once. This is the bash fleet's `vul-host-control
   switch-container`, its only working trial and fall back.
+- **Then the minimal criterion, read from the host:** the container's
+  boot reached its default target with no failed unit but those its
+  target's `bless.ignore_failed` lists (7.1; format.md, 5.13), through
+  `systemctl --machine=<container> is-system-running` and
+  `list-units --state=failed`, as operating.md (2.9) reads a container's
+  units. 7.1's second condition, a builder of the slot's own, has no
+  counterpart (12.5).
+- **The host's builder asks to bless** once the criterion holds, and the
+  container's blessing checks too (operating.md, section 3), or to fall
+  back on a failed unit that counts. The bless records the link's target
+  as the container's default in the host's state (12.6).
+- **The window is the host's activator's:** no dead-man runs in a
+  container, so the activator falls the container back itself when the
+  trial's window ends with no bless.
 - **On failure,** the host's activator points the link back and restarts
   the old slot.
-- **On success, bless** records the link's target as the container's
-  default in the host's state. Task checks of the container join it as
-  they do for hosts (operating.md, section 3).
+- **A container's first slot** is tried with no other slot running, the
+  one exception to `try`'s guard (section 4): a failed first trial
+  leaves the container stopped, its slot `fell back`.
 - **A host reboot mid-trial** falls back by itself: the links live in
-  `/run`, and the host's activator makes them again at start from the
-  defaults it recorded.
+  `/run`, the host's activator makes them again at start from the
+  defaults it recorded, and records `fell back` from the marker of an
+  older boot. An activator restart within the boot keeps the trial, its
+  window counted from the marker's `armed at` (6.4).
 
 ### 12.4 Pool hosts
 
@@ -963,6 +1027,31 @@ kernel, no soft reboot and no one-shot.
   and on whether a pool's containers need to report to the lab's engine
   directly.
 
+### 12.6 The three facts and the state machine
+
+A container's facts are its host's activator's, read from outside:
+
+| Fact | Read from |
+|---|---|
+| **running** | the subvolume of the container's root, by uuid, while its unit is active (through its leader's root, to verify how); `none` otherwise |
+| **default** | the slot the host's state records as the container's default (activator.md, 7.1), which its link names at every host start |
+| **trial** | the trial marker, `trial/<container>.<label>` (6.4) |
+
+- **Section 4's states, table and guards hold,** with a container's
+  events: `try` is 12.2's restart; the unit stably active on the slot is
+  `start here`, and on the other slot `start elsewhere`; a host start is
+  a new boot; `bless` comes from the host's builder (12.3), not from one
+  running in the slot; `first bless` never happens (12.3's first slot).
+- **The invariant reads:** the slot the host links at start, and the one
+  nspawn runs outside a trial, is blessed; a link to a slot on trial
+  lasts until its bless, its fall back or the host's next start.
+- **One mutating operation at a time** (activator.md, 4.2) holds across
+  the host and its containers, so a host prepares and tries one target
+  at a time (wire.md, 4.3).
+- **What does not apply:** boot files and entries (5.6), the dead-man
+  and the watchdog (5.5; the window is the activator's, 12.3), the
+  kernel's rule (6.1), and the BIOS boot counter (8.4).
+
 ## 13. Its world
 
 `hearth-domain-slots` runs in domain worlds on the fake machine
@@ -977,7 +1066,10 @@ with:
   fall back and roll back, at awkward moments and with stale conditions;
 - **faults from the seed** at every step: a crash of the activator, a
   power cut, a kernel that panics or hangs, a unit that fails, a hearth
-  that never blesses, a firmware quirk, a torn FAT or NVRAM write.
+  that never blesses, a firmware quirk, a torn FAT or NVRAM write;
+- **a host's containers [M5]** on the fake machine's nspawn (testing.md,
+  3.12): units that start or fail, failed units inside, a host reboot
+  or an activator crash mid-trial, checked against 12.6's invariant.
 
 The referee checks section 4's invariant after every event, every cell
 of the table is reached (transition coverage), and every request gets
@@ -1054,3 +1146,20 @@ section 7).
   to each container's range, or once with idmapped mounts; how a pool
   names several containers of one target; whether nspawn finds images in
   `/run/machines`. Depends on M5's pool design and operating.md's checks.
+- **A container's parameters and its prepare key [M5]:** where its id
+  base, binds and capabilities are declared (format.md, section 13), and
+  whether a change to them prepares a new slot, as a new base needs a
+  new shift; depends on that format.
+- **A container that fails to start on its host's trial [M5]:** its unit,
+  started by the host's activator (12.2), counts as a failed unit
+  against the host's own minimal bless unless the host lists it in
+  `bless.ignore_failed`; whether a container should fail its host's
+  trial depends on how often a host's change breaks its containers.
+- **nspawn's binds from the activator's top-level mount [M5]:** whether
+  a root and a `/var` bound from `/run/hearth-activator/top`, mounted
+  `nodev,nosuid,noexec`, keep those flags (to verify); if they do,
+  containers need a mount of the top level without them.
+- **Reading a container from its host [M5]:** whether
+  `systemctl --machine=` needs a system bus inside the container, and
+  how the running slot's subvolume is read through the container's
+  leader (to verify on the VM tier, testing.md, 7.3).

@@ -304,12 +304,18 @@ facts, naming the container's target.
 - **A unit:** `systemctl --machine=<container> show --property=…
   <unit>`, through the container's systemd.
 - **A command:** the same transient unit, started inside the container
-  with `systemd-run --machine=<container>`, under the same properties
-  (2.4).
+  with `systemd-run --machine=<container>` by the host's activator
+  (activator.md, 5.14), under the same properties (2.4), with the
+  container slot's secret and identity paths inaccessible.
 - **A probe** the container's target runs itself: from the host, to the
-  container's address.
+  container's address, which is the host's own under the fleet's host
+  networking.
+- **Its failed units** are read the same way, for its trial's minimal
+  criterion (slots.md, 12.3) and as its `units` fact (section 4).
 - **To verify:** that `--machine=` reaches a container that
-  `systemd-nspawn@.service` started, as machined registers it.
+  `systemd-nspawn@.service` started, as machined registers it, and
+  whether it needs a system bus inside the container (slots.md,
+  section 15).
 
 ## 3. Blessing with checks
 
@@ -358,6 +364,11 @@ This extends slots.md, section 7.
     `bless.ignore_failed` does not list (slots.md, 7.1). A desktop's
     routinely failing unit belongs on that list, so it never fails a
     trial.
+- **A container's trial** follows the same rule, with its own first
+  condition: its unit stably active and no failed unit that counts,
+  read from its host (slots.md, 12.3). Its window is computed the same
+  way and kept by its host's activator, which falls it back at the end,
+  since no dead-man runs in a container.
 - **After the bless, checks only report.** Every check runs at its
   interval, blessing and watching alike. A check that starts failing on
   a blessed slot is a fact and an event; hearth rolls nothing back. In
@@ -398,6 +409,10 @@ section 6.
   from M5 the whole list is a fact (`units`), ignored units included and
   marked, and each new one an event (`unit failed`). Which of
   systemctl's output forms is stable to parse is to verify.
+- **A host's containers:** their failed units are read from the host
+  (2.9) and reported under their own targets. They share the host's file
+  system, memory and pressure, so the host's alarms cover them, with the
+  host's thresholds.
 - **Drift:** the activator's (slots.md, section 10), checked at every
   start of the activator and on demand, and from M5 on a period (daily
   to start), reported by its stable ids.
@@ -426,6 +441,11 @@ person reads them through the engine.
   - The journal's directory is `/var/log/journal/<machine-id>`. The
     machine-id is identity, written into every slot at prepare (slots.md,
     5.4), so every slot of the target writes one journal.
+  - **A container's journal** is the same `core` entry of its own
+    target: a persistent subvolume on its host's top level, bound into
+    the container alone, under its own machine-id. The host's builder,
+    which serves journal reads, cannot reach it beneath the activator's
+    mount, so how a container's journal is read is open (section 10).
 - **hearth samples the machine's signals:** CPU (`/proc/stat`), memory
   (`/proc/meminfo`), pressure (`/proc/pressure/*`), load
   (`/proc/loadavg`), and disk use per mount (`df`), every 10 s.
@@ -463,6 +483,10 @@ defines their orders):
   cheap and conditional (temper's `factory.md`, section 9).
 - **hearth checks only mechanics:** the key, the condition, that the
   unit belongs to the slot. It never refuses on judgement.
+- **For a container's target,** a roll back is a trial of its other
+  blessed slot through its host (slots.md, 12.3); which unit a restart
+  names, one inside the container or the container's own, is open
+  (wire.md, section 11).
 - **In standalone mode,** `hearth rollback` is the client's (wire.md,
   3.1). A person on the machine restarts a unit with `systemctl` as
   root; hearth does not wrap it.
@@ -512,6 +536,9 @@ off-machine backup of service data at all, and snapper missed
 - **Crash-consistent only.** A service whose files are consistent only
   at rest needs more (a quiescing command before the snapshot); that is
   open.
+- **A container's data** sits on its host's top level (slots.md, 12.1),
+  so the host's activator snapshots and sends it as its own, under the
+  container's target, to the backup peer of the container's environment.
 
 ### 7.2 Sending
 
@@ -591,7 +618,9 @@ off-machine backup of service data at all, and snapper missed
 
   The services keep writing to the old subvolume until the reboot, and
   those writes are what a restore discards. A power cut between the two
-  renames is finished or undone at startup from the record.
+  renames is finished or undone at startup from the record. For a
+  container's data, step 5 is a restart of the container instead, which
+  binds the subvolume by name again (slots.md, 12.2).
 - **The old data is kept** as `@mail-prod.mail.before.<seq>` until an
   operator or the engine removes it. Both names, `.restoring` and
   `.before.<seq>`, are in machine.md, 3.1's layout from M6, so drift's
@@ -628,6 +657,10 @@ off-machine backup of service data at all, and snapper missed
   | a killed process | `systemctl --machine=<container> kill --signal=SIGKILL <unit>` |
   | a full disk | a qgroup limit on the container's data subvolume (`btrfs qgroup limit`), which needs quotas enabled on the file system |
 
+- **The network faults need a pool's containers on networks of their
+  own** (veth pairs and a bridge), where the fleet's containers share
+  their host's (`VirtualEthernet=no`); a container's network is one of
+  the parameters format.md (section 13) leaves open.
 - **Every fault has an end,** a duration in its order, after which the
   host's hearth removes it itself: a fault, like a trial, always ends,
   even if the engine is gone.
@@ -643,7 +676,9 @@ off-machine backup of service data at all, and snapper missed
   outcomes; fake services that probes reach, as step machines speaking
   TCP, HTTP, SMTP and DNS, which answer slowly, refuse, reset, present a
   certificate close to expiry or offer no `STARTTLS`; probers that lose
-  their route to the probed target. The seed draws them. Its invariants:
+  their route to the probed target; a host's containers, whose units
+  and commands are reached with `--machine=` (testing.md, 3.12). The
+  seed draws them. Its invariants:
   - a slot is blessed only once the minimal bless held and every
     blessing check reached `passing`, within the trial's window;
   - every trial ends: a bless or a fall back;
@@ -705,3 +740,8 @@ off-machine backup of service data at all, and snapper missed
   depends on the lab's pool hosts (machine.md).
 - **History across the fleet:** when a central store for metrics and
   logs is worth deploying, and which.
+- **A container's journal:** on its own persistent subvolume, read
+  by the host's activator for its builder, or kept on the host's with
+  nspawn's `LinkJournal=`, which the host's builder reads as its own; it
+  depends on how `hearth logs` and the wire's journal reads name a
+  container (wire.md, sections 3 and 7).

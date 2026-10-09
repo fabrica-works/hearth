@@ -70,6 +70,16 @@ recipe artifact [M6]                                         artifacts.md
   steps fixed by its recipe; the parts give the data.
 - **Slot parts never reach a recipe:** `data`, `secrets` and `boot` are
   the activator's at prepare (render.md, section 4; slots.md, section 5).
+- **A host builds its containers' outputs [M5]** with the rootfs recipe,
+  in its own store: no hearth runs in a container (slots.md, 12.5). A
+  container's output differs only by its parts: the containers' variant
+  (5.4), no initramfs configuration and no kernel, so its tree file's
+  `boot` is empty (store.md, 6.3); nothing unique or secret enters it
+  either (section 9), since its identity and secrets are written at
+  prepare as a host's are.
+- **The artifact recipe's sandbox is not a container target [M6]:** a
+  build environment's output is only a sandbox's root, never run by
+  nspawn nor placed in a slot (artifacts.md, 2.3).
 
 ## 3. The layers
 
@@ -317,7 +327,9 @@ mmdebstrap
   configured and before the rest,** so the target's own
   `debconf-set-selections` loads the preseeds before tzdata, locales or
   postfix ask. mmdebstrap runs no essential hook for the `custom`
-  variant (containers): where their preseeds load is open (section 15).
+  variant, os's for containers and one candidate for hearth's
+  (format.md, section 13): where a container's preseeds would load is
+  open (section 15).
 - **The initramfs configuration is the packages part's,** which render
   writes from its two fields, the modules and the microcode choice
   (render.md, 4.2; machine.md, 7.1). Nothing a task writes reaches it
@@ -1009,9 +1021,10 @@ with its tail.
 - **apt's reconcile for the packages layer:** when it is adopted;
   depends on the lab's comparison of patch and scratch (temper's
   `factory.md`, 6.4).
-- **Preseeds where no essential hook runs:** the `custom` variant
-  (containers), and preseeds for `Essential: yes` packages; depends on
-  whether the extract hook can load them with an unconfigured debconf.
+- **Preseeds where no essential hook runs:** the `custom` variant, if
+  containers take it (format.md, section 13), and preseeds for
+  `Essential: yes` packages; depends on whether the extract hook can
+  load them with an unconfigured debconf.
 - **`--mode=unshare` or `--mode=root`** inside the sandbox; depends on
   the conformance tier's comparison.
 - **The local repository's details:** whether apt asks a `file:` source

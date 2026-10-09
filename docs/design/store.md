@@ -784,8 +784,8 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
 | Pin | From | Lasts |
 |---|---|---|
 | the empty layer | the store | always |
-| the outputs of the machine's slots [M3] | the activator's facts over the link (activator.md, section 4) | while a slot holds it, or is prepared from it |
-| the desired revision's output [M3] | `hearth-domain-converge` (wire.md, section 4) | while it is desired |
+| the outputs of the machine's slots [M3], its containers' included [M5] | the activator's facts over the link (activator.md, section 4) | while a slot holds it, or is prepared from it |
+| the desired revision's outputs [M3]: the machine's target's, and its containers' [M5] | `hearth-domain-converge` (wire.md, section 4) | while it is desired |
 | builds in flight | the plan (build.md, section 4) | until the build ends |
 | a target's last N outputs | `targets/` (6.6); N is 3 by default | until N newer builds |
 | a peer's request [M6] | a lease per transfer (10.3) | until it ends or its deadline |
@@ -949,12 +949,18 @@ lives in `state/`, each file named by `H("state", name)`, each bounded:
   `useradd -r -F -K SUB_UID_MIN=<base>` (to verify).
 - **Base 262144 (0x40000) by default:** aligned, and below
   systemd-nspawn's automatic range (524288 to 1879048191, systemd's
-  `UIDS-GIDS.md`), which hearth's containers may use [M5]. machine.md
-  (section 8) sets it at bootstrap.
+  `UIDS-GIDS.md`), which hearth's containers may use [M5] only with
+  idmapped mounts: a shift into a container's own range needs its base
+  at prepare, before nspawn would pick one (slots.md, 12.1 and 12.4).
+  machine.md (section 8) sets it at bootstrap.
 - **The range is the builder's alone.** Whoever runs as its base owns
   every layer, so no other user, container or nspawn range may overlap
   it. hearth refuses a range missing, short, overlapping or in more
-  than one entry, and a store made with another (6.6).
+  than one entry, and a store made with another (6.6); a host's
+  activator refuses a container whose range overlaps it [M5]. The
+  fleet's containers clear it today: carbon-forge's base is 65536,
+  rhi-chat's 327680, the first id past the builder's range, and
+  vul-agent-control has no user namespace.
 - **Aligned where there is an activator.** Only the shift needs the
   alignment, so a machine with an activator refuses an unaligned range,
   while a builder alone (a developer's machine, a lab builder, the real

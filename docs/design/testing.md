@@ -633,6 +633,28 @@ protocol is their command line. hearth builds it first.
 - **skein's minimal fake machine stays minimal,** as skein's
   `testing.md`, section 4 says; the kit does not grow it.
 
+### 3.12 Containers [M5]
+
+A host's containers are part of the hearth half, on the host's fake
+kernel (slots.md, section 12):
+
+- **nspawn as a unit:** `systemd-nspawn@<c>.service` starts a container
+  only if `/run/machines/<c>` links to a directory and
+  `/run/systemd/nspawn/<c>.nspawn` exists; it reads `PrivateUsers=`,
+  `ReadOnly=` and `Bind=` from it, and fails otherwise, as one started
+  at boot before its link would.
+- **A container is a view and a PID 1:** the slot's root, read-only,
+  with its binds, seen through an id map of the container's range (3.4);
+  the fake PID 1 of 3.7 runs inside it, with its units, failed units and
+  `is-system-running`, and no kernel, firmware or initramfs of its own.
+- **Reached from the host** with `systemctl --machine=` and
+  `systemd-run --machine=`, which the fake answers from that PID 1;
+  whether the real ones need a bus inside is the VM tier's question
+  (7.3).
+- **A host reboot** empties `/run`, so no container starts until the
+  host's activator makes its link again; a power cut stops every
+  container with its host.
+
 ## 4. The fakes of tools
 
 ### 4.1 One face
@@ -677,7 +699,8 @@ out   bytes on stdout and stderr, in chunks over the world's time: progress;
 | the target's tools: `systemd-sysusers`, `systemd-tmpfiles`, `systemctl preset-all` with `SYSTEMD_OFFLINE=1`, `tar` | `hearth-protocol-builder`'s generic machine | users, files and preset links made in the layer, as its root, inside it | a tool missing from the target; a failure with a tail | M2 |
 | git | `hearth-protocol-git` | render.md 2.2's `rev-parse`, `ls-tree` and `cat-file --batch` on a repository, and the fetch of wire.md, section 4 | a remote unreachable; a revision missing; a branch rewritten; a stall | M1 |
 | efibootmgr | `hearth-protocol-efi` | writes only: creates at a fixed number, deletes, `--bootnext`, `--delete-bootnext`, `--bootorder`, on the variables of efivarfs | the variable store full; efivarfs not writable; a number already taken | M3 |
-| systemctl, at run time | `hearth-protocol-systemd` | `soft-reboot`, `reboot`, `reboot -ff`, `is-system-running`, `show`, `stop`; `restart` [M5] | a unit that fails; a job that times out | M3 |
+| systemctl, at run time | `hearth-protocol-systemd` | `soft-reboot`, `reboot`, `reboot -ff`, `is-system-running`, `show`, `stop`; `restart` [M5]; a container's nspawn unit and `--machine=` (3.12) [M5] | a unit that fails; a job that times out; a container that never comes up | M3 |
+| systemd-run | `hearth-protocol-systemd` | the hold's timer [M4]; a check's transient unit (operating.md, 2.4), and with `--machine=` in a container [M5] | the unit refused; a timeout; an out-of-memory kill | M4 |
 | ssh-keygen | `hearth-protocol-keygen` | activator.md 5.7's host key: a private and a `.pub` file, their bytes from the seed | a full disk | M3 |
 | the activator's others: mount, umount, cp, and bootstrap's disk tools | `hearth-protocol-activator` | their effects on the fake machine's mounts, files and disks (activator.md, section 8) | a failure with a tail | M3 |
 | wg | `hearth-protocol-activator` | a WireGuard key as identity | a failure with a tail | later: M3's identity is SSH host keys only |
@@ -1007,10 +1030,12 @@ Containers [M5], in a host VM:
 | Scenario | What happens | What must hold |
 |---|---|---|
 | a container's slot | a container target placed on the VM's host target: its slot prepared on the host, then its nspawn unit restarted on it (slots.md, 12.1 and 12.2) | the unit stably active, the slot blessed as the container's default in the host's state |
-| a container that fails | `test-unit-fails` inside the container | the trial fails at the first `failed`, and the host's activator restarts the container on its old slot (slots.md, 12.3) |
-| a host reboot during a container's trial | `incus stop --force` mid-trial | the links in `/run` are gone; the host's activator restarts the container on its default |
+| a container that fails | `test-unit-fails` inside the container | its unit stays active, but the host reads a failed unit through `systemctl --machine=`, asks to fall back, and the host's activator restarts the container on its old slot (slots.md, 12.3); with the unit on `bless.ignore_failed`, it is blessed |
+| a container that never comes up | a slot whose nspawn unit fails | the trial fails at the first `failed`; the container runs its old slot |
+| a host reboot during a container's trial | `incus stop --force` mid-trial | the links in `/run` are gone; the host's activator restarts the container on its default, and records the trial `fell back` |
+| reading a container from its host | the facts and the criterion of a running container | recorded: whether `systemctl --machine=` needs a bus inside (slots.md, section 15); running reads as the subvolume of the container's root |
 | a container's checks | a check of a unit and a probe, run by the host's hearth (operating.md, 2.9) | reported as the host's facts, naming the container's target |
-| a pool host | one output, several containers (slots.md, 12.4) | one build and one shift; a snapshot per container; each container's files owned as nspawn maps them |
+| a pool host | one output, several containers (slots.md, 12.4's lean) | one build and one shift; a snapshot per container; each container's files owned as nspawn maps them |
 | a host and its container in one revision | both specs change | the container's trial first, the host's last, since the host's may reboot the machine (wire.md, 4.7) |
 
 A hang that only the watchdog ends needs a kernel that stops; how to
@@ -1088,12 +1113,16 @@ section 10; operating.md, section 9; artifacts.md, section 8.
   would read), and checks that it names a
   slot whose record says blessed and whose tree equals that record.
   This holds from the first bless; what a cut during bootstrap leaves is
-  machine.md's (section 8).
+  machine.md's (section 8). **Its container form [M5]:** after every
+  host start, each container's link names a slot whose record says
+  blessed, or none before its first bless; a link to a slot on trial
+  never outlives its trial (slots.md, 12.6).
 - **The three facts stay consistent** (slots.md, section 3). At every
   settle, and with every fact hearth reports, the world compares them
   with the machine's ground truth: running is the subvolume the fake
   booted; default is what its firmware would boot; trial is the
-  activator's marker.
+  activator's marker. For a container [M5], running is the subvolume of
+  its root, and default the record its host keeps.
 - **No secret and no identity in an output.** Secrets, machine-ids and
   keys in worlds are drawn from the seed, and the world knows each. It
   searches every layer, record, fact, event, trace and build step's
@@ -1117,6 +1146,8 @@ section 10; operating.md, section 9; artifacts.md, section 8.
 - **Trials always end.** When a trial starts, the referee arms a
   deadline: the bless, or the fallback, by the trial's bound. A command
   line without `panic=` meets the fake's endless panic and fails here.
+  A container's trial ends by its host's activator alone, so a host's
+  builder that never asks still meets the deadline [M5].
 - **A soft reboot exactly when the kernel is unchanged.** The world
   computes slots.md 6.1's rule on its own, from the fake trees: the
   digests of the kernel image, of the modules subtree and of the
@@ -1241,8 +1272,8 @@ finding, as a failing check is.
 | M2 | domain (store, build, tree); system (builder and tree helper); machine (dpkg, tree); protocol (tree helper); real loop (tree helper, process groups) | btrfs and its ownership rule; ids, maps of several extents, namespaces, cgroups, sandboxes; `openat2`'s flags; attributes, inodes, ctimes; the full universe, `systemd-container` included; full disks; power cuts on files and subvolumes, and `syncfs` | mmdebstrap's bootstrap; `apt-helper`; dpkg-query; the target's systemd tools and `tar` | conformance: bootstrap in both modes, extras, fetch, query, the target's tools, the btrfs rules; real builds |
 | M3 | domain (converge, slots, boot, disk, activator); system (the pair joins); machine (link, efi, systemd, keygen, client); protocol (link, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; cues; an os machine to adopt | efibootmgr; systemctl at run time; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools | VM tier on OVMF; conformance: firmware, host keys |
 | M3b | machine (grub) | SeaBIOS; msdos and the post-MBR gap; GRUB on FAT, its environment pair, its boot counter, saves that fail, and the slots' fragments | grub-editenv; grub-install | VM tier on SeaBIOS; conformance: env file, GRUB |
-| M4 | protocol (the wire, on `skein-fake-channel`); machine (wire) | — | `hearth-fake-engine` (4.6) | — |
-| M5 | domain (checks); containers and pool hosts | units' states and signals; containers' roots on a host | systemctl restarting a unit | VM tier: bless with checks |
+| M4 | protocol (the wire, on `skein-fake-channel`); machine (wire) | — | `hearth-fake-engine` (4.6); systemd-run, for a held bless's timer | — |
+| M5 | domain (checks); containers and pool hosts | units' states and signals; containers on a host (3.12) | systemctl restarting a unit, a container's nspawn unit and `--machine=`; systemd-run's checks | VM tier: bless with checks; containers in a host VM (7.3) |
 | M6 | domain (artifacts, backups); protocol (bytes by digest, between builders) | send streams and a backup peer; faults as effects; virtual disks | — | real builds: artifacts |
 | later | identity beyond SSH host keys | — | wg, for WireGuard keys | — |
 

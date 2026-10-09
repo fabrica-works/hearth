@@ -100,9 +100,13 @@ text.
 ### 2.3 The environment
 
 - **A build environment is a target,** with tasks, packages and a pinned
-  Debian snapshot like any other. Its placement is a container: it has
-  no kernel and no bootloader, and it is never prepared into a slot. Its
-  output is used only as a sandbox's root.
+  Debian snapshot like any other. Its placement's kind is `container`
+  with no host (no `on`, format.md, 3.4): it has no kernel and no
+  bootloader, takes the containers' bootstrap variant, and is never
+  prepared into a slot. Its output is used only as a sandbox's root
+  (5.2), never run by nspawn as a host's containers are (slots.md,
+  section 12): no host's `target.containers` holds it, and no hearth
+  ever activates it.
 - **It is named by target,** in the recipe's repository at the recipe's
   commit by default: stoa's is `stoa-build-lab`, base `stoa-build` in
   environment `lab` (format.md, 3.1), which every plane builds. Another

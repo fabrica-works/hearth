@@ -39,8 +39,8 @@ open. Each part has a document of its own beside this one.
   is changed in place: a fix is a new slot.
 - **Slots try before they commit** (slots.md): prepare, trial, bless,
   fall back. A new slot runs once; the boot default moves only when the
-  slot's own hearth blesses it, and any failure during the trial ends in
-  a reboot into the old default.
+  slot's own hearth blesses it (a container's, its host's), and any
+  failure during the trial ends in a reboot into the old default.
 - **Nothing unique and nothing secret in an output,** so outputs can be
   shared between machines. Identity and secrets are written into a slot
   when it is prepared, from a root-only store on the machine.
@@ -108,7 +108,7 @@ every milestone, from the first (testing.md, section 10).
 | M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, and os is retired on it | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; wire.md's client and standalone mode; a minimal bless |
 | M3b | BIOS | BIOS machines, which most IaaS providers offer | machine.md's BIOS path; slots.md's trial through GRUB |
 | M4 | The wire | hearth as a system behind an engine | wire.md's wire, facts and events |
-| M5 | Operating | the machine's end of the run side | operating.md, but for backups; checks as task data; containers and pool hosts |
+| M5 | Operating | the machine's end of the run side | operating.md, but for backups; checks as task data; containers and pool hosts (slots.md, section 12) |
 | M6 | The rest | the full vision | artifacts.md; peers; backups; faults; disks as an effect |
 | later | Reproducible builds | a level of trust | reproducible.md |
 
@@ -273,7 +273,7 @@ hearth-<name>-world           the other worlds, under tests/
 | persistent subvolume | a target's data that outlives its slots, mounted at a path a task declares |
 | secret store | root-only, on the machine: the target's secrets and the machine's identity |
 | identity | what makes a machine itself: its machine-id, its host keys |
-| running, default, trial | the three facts: the slot running, the boot default, the slot on trial (slots.md, section 3) |
+| running, default, trial | the three facts: the slot running, the boot default, the slot on trial (slots.md, section 3); a container's, read by its host (slots.md, 12.6) |
 | prepare, trial, bless, fall back, roll back | a slot's transitions (slots.md, section 4) |
 | boot partition | the FAT partition the firmware or GRUB writes: the ESP on EFI, GRUB's env on BIOS (machine.md) |
 | builder, activator, link | the two processes, and the pipe pair that joins them (activator.md) |
@@ -374,8 +374,9 @@ that last:
   `apt-helper`, reaches the network, in a cgroup of its own (build.md,
   5.1).
 - **The builder's subordinate range starts at 262144,** 65536 ids long,
-  clear of systemd-nspawn's automatic range (store.md, 9.2). The `hearth`
-  user is declared by the hearth task, which every target has (format.md,
+  clear of systemd-nspawn's automatic range and of the fleet's
+  containers' ranges (store.md, 9.2). The `hearth` user is declared by
+  the hearth task, which every target but a container has (format.md,
   5.12).
 - **The kernel is unchanged** when the kernel image, the modules' tree,
   the initramfs's inputs (not its bytes, which are not reproducible) and
@@ -396,7 +397,8 @@ that last:
 - **Trials always end:** `panic=N` on a trial's command line, a hardware
   watchdog where there is one, and a dead-man timer in the trial slot
   that forces a reboot unless the slot's hearth blesses it first
-  (slots.md, section 6).
+  (slots.md, section 6); a container's, by its host's activator at its
+  window's end (slots.md, 12.3).
 - **A minimal bless until checks exist:** the boot reaches its target
   with no failed unit, and the slot's own hearth is up and talking to
   its activator (slots.md, section 7).
@@ -476,6 +478,19 @@ that last:
 - **Failed units a target expects** are listed as task data
   (`bless.ignore_failed`); the minimal bless counts only the others
   (format.md, section 5; slots.md, 7.1).
+- **A host runs its containers [M5]:** its builder builds their outputs,
+  its activator prepares their slots on its top level, starts each at
+  every start from the default it recorded, and tries a new slot by a
+  restart, judged from outside with the minimal bless read through
+  `systemctl --machine=`; the host's builder blesses it. No hearth runs
+  in a container, which has no `hearth` task, while whether one should
+  stays open (slots.md, section 12; format.md, 5.12).
+- **A container's `/var` is per slot,** as a host's: the bash fleet's
+  persistent `.var` becomes data entries, and a container's identity and
+  secrets are its own target's, kept by its host (slots.md, 12.1).
+- **A build environment is a container with no host** [M6]: its output
+  is only a sandbox's root, never an nspawn container (artifacts.md,
+  2.3; format.md, 3.4).
 
 ## 8. What hearth asks of others
 
@@ -535,6 +550,12 @@ Each document lists its own. The ones that reach across:
 - one generation for the whole secret store, so any import prepares
   every target's slot again, or one per target (activator.md);
 - whether a container runs a hearth of its own (slots.md, 12.5);
+- a container's parameters (its id range, binds, capabilities, network)
+  as placement fields, and whether a change to them prepares a new slot
+  (format.md; slots.md);
+- where a container's journal lives, and how its host reads it
+  (operating.md);
+- adopting an os host that runs containers (machine.md);
 - a blessed EFI default that later stops booting panic-loops, since the
   firmware falls through only when a load fails: keeping the previous
   slot first in `BootOrder` and arming `BootNext` at each healthy start

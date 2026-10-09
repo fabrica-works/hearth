@@ -107,6 +107,11 @@ Notes on the rows that research corrected or confirmed:
   second. It costs no reboot, since the initramfs is judged by its
   inputs (build.md, 5.8), but two builds of one key differ in it, so the
   gate and every comparison of outputs meet it.
+- **Containers [M5].** A container's output has no kernel and no
+  initramfs (format.md, 3.4), so row 4 never reaches it, nor does
+  section 4's initramfs judged by its inputs. Whatever its variant
+  (format.md, section 13), it installs exactly its closure (build.md,
+  5.7) and meets the other rows as a host's output does.
 - **Row 6.** mmdebstrap's `cleanup/reproducible` writes an empty
   `/etc/machine-id` if one exists and removes dbus's. An empty file
   means "not a first boot" (machine-id(5)): systemd then mounts a

@@ -132,6 +132,14 @@ a machine                             │
 - **There is no `bless` command.** The hearth in the new slot blesses
   it (slots.md, 7.2); only an engine releases a bless it held (5.4). A
   person never blesses by hand.
+- **A host's containers [M5]** are named with `--target <t>`:
+  `prepare`, `trial`, `rollback`, `shell`, `secrets import` and
+  `identity` act on the machine's own target by default, and on one of
+  its containers with it; `status` lists every target the machine runs.
+  A container's `trial` returns with its restart's outcome
+  (activator.md, 5.16), and its host blesses it later (slots.md, 12.3).
+  How `logs` reads a container's journal is open (operating.md,
+  section 10).
 - **The command set is os's, folded into one tool.** `render` and `diff`
   replace `manifest`; `build` replaces `deploy install`; `status`
   replaces `deploy info`, `ek info` and `provision drift`; `prepare`,
@@ -579,14 +587,28 @@ be made or run, so its prepare key is refused.
 - **The loop takes the containers first, one at a time, and the host's
   own target last,** since the host's trial may reboot the machine and
   interrupt the rest.
+- **One desired revision for the machine.** The host and its containers
+  converge to the same commit, with the same trial policy (4.1): a
+  container is a target of the host's revision, rendered, built and
+  placed by the host's builder, in the host's store (build.md,
+  section 2).
 - **A container's trial is a restart on its new root,** watched, with a
   fall back to the old root if it does not come up healthy, as the bash
   fleet's `switch-container` does (slots.md, 12.2 and 12.3). The host's
   hearth judges it from outside; no hearth runs in the container in M5
   (slots.md, 12.5).
+- **Its bless is in the same pass.** Where a host's pass ends at its
+  reboot, a container's goes on: once the restart has answered, the pass
+  waits for the minimal criterion and the container's blessing checks,
+  read from the host, and asks the host's activator to bless, or to fall
+  back on a failed unit that counts (slots.md, 12.3). A container's
+  fell-back prepare key is refused as a host's is (4.4).
 - **Each container's output key is compared on its own,** so a commit
   that changes only one container's target leaves the host and its
   other containers alone.
+- **A container's first slot** is prepared and tried by its host's pass
+  like any other, with nothing to fall back to (slots.md, 12.3); its
+  secrets are imported for its own target (3.6).
 
 ## 5. The wire [M4]
 
@@ -630,7 +652,7 @@ of the channel only with it.
 Hello
   machine       name; architecture; boot: efi | bios; soft reboot: yes | no; watchdog: yes | no
   release       hearth's version (the running slot's); the wire versions it speaks
-  targets       for each target the machine runs:
+  targets       for each target the machine runs, its containers' included [M5]:
     slots         per label: state; output key; prepare key; slot parts' digests;
                   the identity's and secret store's generations; slot tree digest,
                   secrets counted by H(name, generation) (slots.md, 2.2);
@@ -639,7 +661,7 @@ Hello
     last trial    slot; output key; blessed | held | fell back | rolled back; age
   orders        in flight: key, attempt, stage
                 answered, not yet acknowledged: key, attempt, outcome
-  identity      the public halves: SSH host keys, the machine-id
+  identity      per target, the public halves: SSH host keys, the machine-id
   costs         since the last acknowledged report (build.md, section 12)
   store         bytes used and free; outputs; layers
 ```
@@ -664,6 +686,10 @@ Hello
   | running `a`, default `a`, no trial; `b` fell back | `b` fell back; `a` runs |
   | running `a`, default `a`, no trial; `b` prepared, no record of its trial | the activation never began |
 
+- **A container's activation [M5] drops no channel:** its host stays
+  up, so its outcome reaches the engine as fact updates while the
+  channel is open, and the same table reads its facts in any later
+  hello.
 - **Bounded.** The hello's size follows from the limits: targets per
   machine, slots per target, orders kept, identity entries. Its largest
   body is in the terms.
@@ -784,6 +810,16 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
 - **Outcomes:** restarted, with the new invocation; failed, with the
   unit's `Result`; refused.
 
+**For a container's target [M5]:**
+
+- **Orders reach its host's hearth,** which builds, prepares and
+  activates the container (4.7): prepare, activate and roll back are
+  keyed and conditional as above, on the container's own facts, and an
+  activation is a restart (slots.md, 12.2), answered `begun` before it.
+- **A held bless and a restart of a unit** for a container are open
+  (section 11): a host's hold ends by a timer in its trial slot
+  (slots.md, 7.4), which a container has not.
+
 **For every order:**
 
 - **hearth keeps every order's key with its outcome** in the builder's
@@ -898,7 +934,7 @@ Application kinds of skein's channel; each belongs to one direction.
 | `trial` | fact | the last trial: slot; attempt; kind; phase reached; outcome; age | activator | M3 |
 | `data` | fact | persistent subvolumes: present, mounted, orphaned | activator | M3 |
 | `drift` | fact | per slot: clean, or the stable ids of what differs (slots.md, section 10) | activator | M3 |
-| `identity` | fact | public halves: SSH host keys (type, key), the machine-id | activator | M3 |
+| `identity` | fact | per target, public halves: SSH host keys (type, key), the machine-id | activator | M3 |
 | `secrets` | fact | the secret store's generation; declared secrets missing, by name | activator | M3 |
 | `desired` | fact | standalone: revision, trial policy, generation | builder | M3 |
 | `pass` | fact | standalone: stage; last outcome; refused keys with why; backoff left | builder | M3 |
@@ -906,7 +942,7 @@ Application kinds of skein's channel; each belongs to one direction.
 | `store` | fact | bytes used and free; outputs; layers; pins | builder | M3 |
 | `costs` | fact | per build: each step's time, bytes fetched, cache hits; totals (build.md, section 12) | builder | M3 |
 | `orders` | fact | in flight: key, attempt, stage; answered, not acknowledged | builder | M4 |
-| `units` | fact | the running slot's failed units, with their results | builder | M5 |
+| `units` | fact | per target, the running slot's failed units, with their results; a container's read from its host (operating.md, 2.9) | builder | M5 |
 | `check` | fact | per check: state, last result, reason, slot and output, run by (operating.md, section 2) | builder | M5 |
 | `alarm` | fact | disk, memory, pressure: level, value, threshold (operating.md, section 4) | builder | M5 |
 | `backup` | fact | per data subvolume: last snapshot's age, last sent, peer, bytes (operating.md, section 7) | activator | M6 |
@@ -1017,7 +1053,7 @@ wire, not in traits: another backend is another daemon speaking it.
 | a target, a revision | a base in an environment; a commit of the IaC repository (format.md) |
 | an output, by key | the config layer, on software and packages layers, on btrfs (store.md) |
 | parts, by name and digest | packages, software, config, data, secrets, boot: names the engine's policy may match ("caution follows what changed", temper's `factory.md`, 6.3), never interprets |
-| a slot, by label, and the three facts | `@<target>.<label>` and its `/var`; `BootNext`, `BootOrder`, GRUB's env (machine.md) |
+| a slot, by label, and the three facts | `@<target>.<label>` and its `/var`; `BootNext`, `BootOrder`, GRUB's env (machine.md); for a container, its link and the default its host records [M5] (slots.md, 12.6) |
 | an activation: soft reboot, reboot, restart | `systemctl soft-reboot` into `/run/nextroot`; `systemctl reboot` with `SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT=1` (slots.md, section 6); a container's restart |
 | a unit, by name | a systemd unit of the running slot |
 | a check, by id, with its result | a unit, a command or a probe (operating.md) |
@@ -1047,8 +1083,11 @@ wire, not in traits: another backend is another daemon speaking it.
   The seed draws: commits that change nothing, change config, or break
   render; build steps that fail; power cuts at every stage of a pass,
   of a prepare and of a trial; trials that hang, panic or fail the
-  minimal bless; imports of secrets; holds and releases. Its invariants:
-  - the machine always boots a blessed slot or a trial that ends;
+  minimal bless; imports of secrets; holds and releases; [M5] a host's
+  containers, their trials failing or cut by a host reboot. Its
+  invariants:
+  - the machine always boots a blessed slot or a trial that ends, and
+    each container starts on one [M5];
   - a refused prepare key is never tried by the loop, and a refusal
     never covers the running slot;
   - a slot that runs but is not the default is blessed again before
@@ -1109,3 +1148,15 @@ wire, not in traits: another backend is another daemon speaking it.
   window (a time of day), when a machine needs one.
 - **Changing a machine's mode** between standalone and an engine without
   a new bootstrap; it depends on how identity is issued (5.3).
+- **A container that leaves its host's spec [M5],** removed from the
+  repository or placed on another host: whether the host stops it, and
+  what becomes of its slots and of its data, which only a person deletes
+  (machine.md, 3.4); it depends on how a container moves between hosts.
+- **Holding a container's bless [M5]:** a host's hold ends by a timer
+  in its trial slot (slots.md, 7.4); a container's would be its host
+  activator's deadline, as its window is (slots.md, 12.3); it depends on
+  whether an engine bakes canaries in containers.
+- **Restarting a unit of a container [M5]:** a unit inside it, through
+  `systemctl --machine=`, or the container's own nspawn unit, or both as
+  two forms of the order; it depends on what the run side's policies
+  restart.

@@ -12,9 +12,9 @@ open is in section 10.
 ## 1. In one page
 
 - **The activator is root, small and closed.** It owns the machine's
-  slots, boot state, identity and secrets, and carries out a closed list
-  of operations on typed requests. It runs no IaC code, renders no
-  template and parses no IaC.
+  slots, boot state, identity and secrets, and on a host its containers'
+  too [M5], and carries out a closed list of operations on typed
+  requests. It runs no IaC code, renders no template and parses no IaC.
 - **It starts the builder and listens to nothing else.** systemd starts
   `hearth activator` as root; it spawns `hearth builder` as the user
   `hearth` and talks to it over a pipe pair. It has no socket and no
@@ -77,7 +77,8 @@ open is in section 10.
 |---|---|
 | output key | a digest; a layer and a record of that name exist in the store (6.1) |
 | label | `a` or `b` |
-| target | the machine record's target |
+| target | the machine record's target; or [M5] a container whose placement's `on` is that target, by the request's `meta` |
+| a container's id base [M5], when its slot is shifted to one | 64 Ki aligned; its range clear of the builder's (store.md, 9.2) and of the host's other containers' (slots.md, 12.1) |
 | `data` entries | machine.md, 3.4 |
 | secret and identity paths | absolute and normal; not beneath a `data` path, `/var/lib/hearth`, `/.hearth`, `/proc`, `/sys`, `/dev`, `/run` or `/tmp`; not a path the activator writes itself (`/etc/fstab`, `/etc/machine-id`, `/etc/shadow`) |
 | secret modes | at most `0777`: no setuid, setgid or sticky bit; nothing for others to read |
@@ -116,7 +117,11 @@ changes nothing.
 ### 2.4 Where it writes
 
 - **The top level:** this target's slot subvolumes, and its persistent
-  subvolumes when they are missing. Nothing else there.
+  subvolumes when they are missing; on a host, its containers' too
+  [M5]. Nothing else there.
+- **For containers [M5]:** their nspawn settings in
+  `/run/systemd/nspawn/` and their links in `/run/machines/`
+  (slots.md, 12.1).
 - **Inside a slot being prepared,** beneath its root, never following a
   link out of it.
 - **The boot partition:** this target's ESP files; on BIOS, the
@@ -165,8 +170,9 @@ digest.
 
 ### 3.1 Started by systemd
 
-Every output carries hearth's binary and its unit, from the `hearth`
-task (format.md, 5.12):
+Every output but a container's carries hearth's binary and its unit,
+from the `hearth` task (format.md, 5.12); a container's activator is its
+host's [M5]:
 
 ```
 # /usr/lib/systemd/system/hearth-activator.service
@@ -305,13 +311,14 @@ one higher than the last:
 - **the machine:** target, firmware, `SecureBoot`, the booted kernel,
   the boot id, soft reboots, firmware quirks seen;
 - **the three facts:** running, default, trial (slot, attempt, kind,
-  phase) (slots.md, section 3);
-- **each slot:** state, output, prepare key, reported tree digest
-  (slots.md, 5.7; never the full one, which covers secrets' digests),
-  kernel digests (slots.md, 6.1), part digests, generations, last trial
-  and its outcome;
+  phase) (slots.md, section 3), per target: the machine's own, and on a
+  host each container's [M5] (slots.md, 12.6);
+- **each slot,** its containers' included: state, output, prepare key,
+  reported tree digest (slots.md, 5.7; never the full one, which covers
+  secrets' digests), kernel digests (slots.md, 6.1), part digests,
+  generations, last trial and its outcome;
 - **persistent subvolumes:** present, mounted, orphaned;
-- **identity:** its generation and public halves;
+- **identity:** per target, its generation and public halves;
 - **secrets:** the names the spec declares, each present or missing,
   and the store's generation; never values or digests;
 - **the operation in flight** and its step; drift's results by check id
@@ -358,6 +365,7 @@ builder collects nothing until the first `Welcome` has told it these.
 | hold, and release, a bless | the builder of the slot on trial, for an engine | conditional | M4 |
 | run a check | the builder, for operating's checks | idempotent: a reading | M5 |
 | restart a unit | the builder, for an engine | keyed by the order's key; conditional on the unit's `InvocationID` | M5 |
+| place, trial, bless, fall back and roll back of a container's slot (5.16) | the host's builder | as the machine's own: place keyed by the prepare key, the rest conditional | M5 |
 | partition and format | bootstrap in-process; the lab as an effect | conditional | M3; M6 as an effect |
 | back up: snapshot, send, receive | the builder, on the data's period, or for a peer | keyed: the sequence; send idempotent | M6 |
 | restore | the builder, for an engine | keyed by the order's key; conditional on the data's UUID | M6 |
@@ -384,6 +392,10 @@ Place {
   expect      { running, default, slot state }
 }
 ```
+
+For a container's slot [M5], `meta` is `{ kind: container, target, on,
+id base }`, `on` checked against the machine record (2.2); `kernel` is
+absent and `boot` empty (5.16).
 
 - **Effects:** slots.md, section 5, steps 5.1 to 5.7: identity first,
   then the prepare key, which covers the window and the units allowed
@@ -533,6 +545,9 @@ RestartUnit { unit, invocation }
   `hearth-trial*`, `hearth-check-*`); that the unit is one the running
   slot's spec ships or enables is the builder's check (operating.md,
   section 6).
+- **For a container's target [M5],** whether the unit is one inside the
+  container (`systemctl --machine=`) or the container's own nspawn unit
+  is open (wire.md, section 11).
 
 ### 5.10 Partition and format
 
@@ -622,6 +637,9 @@ RunCheck { task, name, user, capabilities, network, timeout, argv }
   them even as a user their owners would allow.
 - **The program is the running slot's,** a system the machine already
   runs, never a program of a slot being prepared or of the store.
+- **In a container [M5],** the same unit is started inside it with
+  `systemd-run --machine=<container>`, its `InaccessiblePaths=` the
+  container slot's secret and identity paths (operating.md, 2.9).
 - **Done:** `pass` (exit 0), `fail` (another status, or the timeout) or
   `error` (the unit could not start), with the unit's `Result`, and
   nothing else: no output reaches the builder, which could otherwise
@@ -647,6 +665,29 @@ Fault { experiment, kind, targets, parameters, until }        Unfault { experime
 - **Every fault ends at `until`,** which the activator keeps and
   enforces itself, after a restart too, so a fault ends even when the
   engine is gone.
+
+### 5.16 A container's slots [M5]
+
+Place, trial, bless, fall back and roll back (5.1 to 5.5) on a
+container's slot, asked by the host's builder with the container's
+target (2.2). The effects are slots.md, section 12's; none touches the
+boot partition or NVRAM.
+
+| Operation | Effects | Recovery class |
+|---|---|---|
+| place | section 5's steps with a container's differences (slots.md, 12.1) | keyed: the prepare key |
+| trial | the marker; the slot's nspawn settings and link, each by rename; `systemctl restart systemd-nspawn@<container>.service`; the poll (slots.md, 12.2 and 12.3) | conditional on the container's running slot, default and the slot's prepare key; a repeat by attempt gets the first answer |
+| bless | the criterion, read from the host; the record `blessed`; the marker removed; the default recorded (7.1) | conditional |
+| fall back | the default's settings and link back, a restart, the record `fell back` | conditional |
+| roll back | a trial of the other blessed slot | conditional |
+
+- **A trial is answered after its restart,** not before a reboot: done
+  once the unit is stably active, the slot `on trial`; failed once it is
+  not, the container back on its default.
+- **The window is the activator's own deadline,** kept in the marker:
+  at its end with no bless, the activator falls the container back
+  itself, after its own restart too, since no dead-man runs in a
+  container.
 
 ## 6. Verification
 
@@ -719,7 +760,9 @@ What the activator checks before a place request becomes a slot.
   `zz-hearth-watchdog.conf` (slots.md, 5.5);
 - a kernel version without its `boot/vmlinuz-`, `boot/initrd.img-` or
   `usr/lib/modules/` entry;
-- a target or a firmware that is not the machine record's.
+- a target or a firmware that is not the machine record's; [M5] a
+  container whose `on` is not the machine record's target, or whose id
+  range overlaps the builder's or another container's (2.2).
 
 ## 7. Its state
 
@@ -742,11 +785,18 @@ What the activator checks before a place request becomes a slot.
 │                                           the dead-man is armed from /run and the command line instead
 ├── identity/
 │   └── x1-prod/                            generation, machine-id, SSH host keys, the backup key [M6], public halves
-└── secrets/
-    └── x1-prod/
-        ├── index                           the store's generation; each name's value file, digest, size
-        └── <name>@<generation>             one value per file, 0600
+├── secrets/
+│   └── x1-prod/
+│       ├── index                           the store's generation; each name's value file, digest, size
+│       └── <name>@<generation>             one value per file, 0600
+└── containers/ [M5]
+    └── chat-prod                           on rhi-prod: the container's default slot, and its id base
 ```
+
+- **A host keeps its containers' records beside its own [M5],** each by
+  the container's target: `slots/chat-prod.a`, `trial/chat-prod.b`,
+  `identity/chat-prod/`, `secrets/chat-prod/`. The default has a record
+  of its own, since no firmware holds it (slots.md, 12.6).
 
 ### 7.2 Records
 
@@ -785,6 +835,7 @@ reboot), and cleared when the operation ends.
 | hold a bless [M4] | the marker `held` and its transient timer: nothing to redo |
 | run a check [M5] | the transient unit, collected by systemd: run it again |
 | restart a unit [M5] | read the invocation id: changed means done |
+| a container's trial, bless or fall back [M5] | by the marker and the facts, with the link and settings in `/run` (slots.md, 12.3) |
 | partition and format [M6] | look for the identifiers: found means done |
 | back up [M6] | look for the snapshot, or the received one: found means done; a send not confirmed is sent again |
 | restore [M6] | the recorded swap: finish it, or undo it, then reboot |
@@ -811,7 +862,10 @@ At every start, after a boot, a soft reboot or a crash:
    pruned, made again; the dead-man of a running slot that is blessed,
    stopped; on BIOS, `tries` reset when the running default meets the
    criterion (slots.md, 8.4);
-8. **spawn the builder;** its `Welcome` carries the facts.
+8. **start the containers** [M5]: each container's settings and link
+   that `/run` lacks, from its recorded default, then `systemctl start`
+   on its unit (slots.md, 12.2);
+9. **spawn the builder;** its `Welcome` carries the facts.
 
 Every step is idempotent, so a crash during the start repeats it.
 
@@ -828,7 +882,7 @@ domain sees only typed values.
 | `hearth-protocol-link` | the link's records (4.1) | both |
 | `hearth-protocol-state` (new) | the records of `@hearth.state` (7.1), the trial marker, the slot record inside the root (slots.md, 2.2) | both |
 | `hearth-protocol-accounts` (new) | `/etc/passwd`, `/etc/group`, `/etc/shadow` lines | read; `/etc/shadow` written |
-| `hearth-protocol-units` (new) | fstab (machine.md, 3.3), the trial's units and the watchdog's drop-in (slots.md, 5.5) | written |
+| `hearth-protocol-units` (new) | fstab (machine.md, 3.3), the trial's units and the watchdog's drop-in (slots.md, 5.5); a container's nspawn settings [M5] (slots.md, 12.1) | written |
 | `hearth-protocol-xattr` (new) | `security.capability` v2 and v3, POSIX ACL values (slots.md, 5.2) | both |
 | `hearth-protocol-tree` | the store's layer records and tree files, read; the slot manifest, a tree file (store.md, 6.2 and 6.3) | both |
 | `hearth-protocol-efi` | efivarfs variables and `EFI_LOAD_OPTION` (machine.md, 4.5); efibootmgr's argument vectors | both |
@@ -851,8 +905,8 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 | `/usr/bin/grub-editenv` [M3b] | `set` and `unset` in `env.0`, then `env.1` | `hearth-protocol-grub` | success, or exit and tail |
 | `/usr/sbin/grub-install` [M3b] | bootstrap, once | `hearth-protocol-grub` | success, or exit and tail |
 | `/usr/bin/mount`, `/usr/bin/umount` | the top level, the boot partition, `/run/nextroot` | `hearth-protocol-activator` | success, or exit and tail |
-| `/usr/bin/systemctl` | `soft-reboot`, `reboot`, `is-system-running`, `list-units --state=failed`, `show`, `stop`; `restart` [M5]; `--machine=<container> kill` [M6] | `hearth-protocol-systemd` | a state, a count, an id, a list of units |
-| `/usr/bin/systemd-run` | the hold's timer [M4]; checks as transient units [M5] | `hearth-protocol-systemd` | the unit's exit status and `Result`, nothing of its output |
+| `/usr/bin/systemctl` | `soft-reboot`, `reboot`, `is-system-running`, `list-units --state=failed`, `show`, `stop`; `restart` [M5]; for a container [M5], `start`, `restart` and `is-active` of `systemd-nspawn@<container>.service`, and `is-system-running` and `list-units` with `--machine=<container>`; `--machine=<container> kill` [M6] | `hearth-protocol-systemd` | a state, a count, an id, a list of units |
+| `/usr/bin/systemd-run` | the hold's timer [M4]; checks as transient units, `--machine=<container>` for a container's [M5] | `hearth-protocol-systemd` | the unit's exit status and `Result`, nothing of its output |
 | `/usr/bin/ssh-keygen` | identity's host keys | `hearth-protocol-keygen` | success; the keys as files |
 | `/usr/sbin/wipefs`, `/usr/sbin/parted`, `/usr/sbin/partprobe`, `/usr/bin/udevadm`, `/usr/sbin/mkfs.vfat`, `/usr/sbin/mkfs.btrfs`, `/usr/sbin/useradd`, `/usr/sbin/usermod` | bootstrap; disks as an effect [M6] | `hearth-protocol-activator` | success, or exit and tail |
 | `/usr/bin/btrfs` `send`, `receive`, `qgroup limit` [M6] | backups and restores; a full-disk fault | `hearth-protocol-activator` | a stream, and success |
@@ -913,8 +967,9 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
   (testing.md, section 7).
 - **Later operations join with their milestones:** a held bless that
   ends at its deadline [M4]; checks whose transient units fail, time out
-  or never start [M5]; a restore cut between its renames, and faults
-  that outlive their engine [M6].
+  or never start, and a host's containers prepared, tried, blessed and
+  fallen back across crashes and host reboots [M5]; a restore cut
+  between its renames, and faults that outlive their engine [M6].
 
 ## 10. What is open
 

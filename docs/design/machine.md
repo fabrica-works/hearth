@@ -17,9 +17,10 @@ in section 12.
   top level.
 - **The top level holds only subvolumes, named by target:** two slots,
   each a root and a `/var`; a persistent subvolume per `data` entry; the
-  builder's store; the activator's state; backups [M6]. Slots and
-  persistent subvolumes are siblings, never nested, and only the
-  activator mounts the top level.
+  builder's store; the activator's state; backups [M6]. A host's
+  containers have their slots and persistent subvolumes there too, under
+  their own targets' names [M5]. Slots and persistent subvolumes are
+  siblings, never nested, and only the activator mounts the top level.
 - **The root is read-only twice over:** its subvolume is sealed
   read-only when prepare ends, and it is mounted `ro`. `/var`, the
   persistent subvolumes, the store and the state are writable mounts
@@ -63,7 +64,7 @@ in section 12.
 | Incus VM with its own disk | OVMF | a virtio disk; ESP | soft reboot, or `BootNext` | iTCO on q35 | the VM tier's machines (testing.md, section 7) | M3 |
 | IaaS VM on BIOS | the provider's BIOS | a virtio disk; FAT environment partition | soft reboot, or `next_entry` | none known | `rhi-prod`, `ion-prod`, `mail-prod` | M3b |
 | IaaS VM on EFI, NVRAM unreliable | the provider's UEFI | a virtio disk; ESP | open (9.4) | none known | vul | later |
-| container | none: the host's kernel | slots on the host's top level | restart | the host's | `mail-lab` in a lab pool | M5 |
+| container | none: the host's kernel | slots on the host's top level | restart | the host's | `chat-prod` on `rhi-prod`; `mail-lab` in a lab pool | M5 |
 | VM with a virtiofs root | Incus direct kernel boot | slots on the pool host's top level | stop, repoint, start | the host's | the bash fleet's lab | later |
 
 ### 2.1 Bare metal on EFI
@@ -115,9 +116,13 @@ reliable there; 9.4 gives the lean.
 
 ### 2.5 Containers [M5]
 
-No kernel, no boot partition, no entries: a container's slots are
-subvolumes on its host's top level, prepared by the host's activator,
-and activating one restarts its nspawn unit (slots.md, section 12).
+No kernel, no boot partition, no entries: a container's slots and
+persistent subvolumes are subvolumes on its host's top level, prepared
+by the host's activator, and activating one restarts its nspawn unit
+(slots.md, section 12). Sections 4 to 7 and 9 do not apply to it; no
+fstab mounts anything of it (3.3), and it is never bootstrapped (8.4).
+The fleet runs three today, `carbon-forge`, `rhi-chat` and
+`vul-agent-control`, on carbon, rhi and vul.
 
 ### 2.6 VMs with a virtiofs root [later]
 
@@ -146,7 +151,8 @@ Placement is data of the environment (format.md, 3.4), in the spec's
   device under `/sys/class/watchdog/` when it prepares a slot, on the
   machine the slot will run on (slots.md, 5.5).
 - **The trial window** is a place input, 10 minutes in M3, sealed into
-  the slot's units (activator.md, 5.1).
+  the slot's units (activator.md, 5.1); a container's is kept by its
+  host's activator instead (slots.md, 12.3) [M5].
 
 ## 3. The btrfs top level
 
@@ -176,6 +182,12 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 | `@<target>.<name>.restoring` [M6] | a writable snapshot of a backup | a restore (operating.md, 7.4) | renamed to `@<target>.<name>` by the restore's swap |
 | `@<target>.<name>.before.<seq>` [M6] | the data a restore replaced | the restore's swap | an operator or the engine |
 
+- **A host's containers [M5]** add the same names under their own
+  targets: on `rhi-prod`, `@chat-prod.a`, `@chat-prod.a.var`,
+  `@chat-prod.b`, `@chat-prod.b.var` and `@chat-prod.journal`, beside
+  the host's own (slots.md, 12.1). The table above holds for them, the
+  host's activator acting for the container; os's `@<target>.machines`
+  under `/var/lib/machines` has no successor.
 - **Slots exist once prepared:** os made empty placeholders at format
   time; hearth makes a slot by snapshot, so `@x1-prod.b` is absent until
   the first prepare into `b`. No build happens at the top level: os's
@@ -242,6 +254,12 @@ UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /srv/data              btrfs  subvol=
 - **Every mount point already exists** in the sealed root or in the
   slot's `/var`, because a read-only root cannot get one later, and
   systemd would otherwise try to create it (slots.md, 5.3 and 5.5).
+- **A container is in no fstab [M5].** Its host's fstab holds the
+  host's own lines only; nspawn makes the container's root and binds its
+  `/var` and persistent subvolumes from the activator's mount of the top
+  level, as the host's nspawn settings say (slots.md, 12.1). The
+  container's own `/etc/fstab` is written with no line, so its systemd
+  mounts nothing.
 
 ### 3.4 Names and data entries
 
@@ -260,7 +278,8 @@ UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /srv/data              btrfs  subvol=
   with a root of `0:0 0755`, seeded with what the output holds at its
   path, so packages' files there are not hidden by an empty mount
   (slots.md, 5.3); the slot's own `tmpfiles.d` lines set owners and
-  modes at boot, by name.
+  modes at boot, by name. A container's `0:0` is its own root, in the
+  ids its slots are shifted to (slots.md, 12.1) [M5].
 - **A data entry that disappears keeps its subvolume,** unmounted and
   reported as orphaned; deleting persistent data is a person's decision
   (section 12).
@@ -859,6 +878,14 @@ The firmware or GRUB boots `a`. Its activator finds `a` running and
 default, no trial marker and no journal; its builder finds the desired
 revision built and placed, and converges from there.
 
+**A host's containers are not bootstrapped [M5].** Bootstrap places the
+host's own target only. From its first boot, the host's hearth builds
+and prepares each container's first slot as any change (wire.md, 4.7),
+and tries it with nothing to fall back to (slots.md, 12.3). A
+container's secrets are imported for its own target (wire.md, 3.6),
+before or after: a missing secret only makes its prepare wait (wire.md,
+4.4).
+
 ### 8.5 Disks as an effect [M6]
 
 The lab's throwaway machines need disks made on order, not by a person
@@ -909,6 +936,11 @@ bootstrap, so a first slot that fails falls back to os:
    slot until hearth prepares into it. A trial that fails lands in os,
    where no hearth runs: the operator sees os, and running bootstrap
    again resumes from what the first run made, by its keys.
+
+**A host that runs containers [M5]** (carbon, rhi, vul) keeps them
+under `/var/lib/machines`, os's `@<target>.machines`: each container's
+link to its active root slot, and its `.var` and `.srv`. M3 adopts
+`x1-prod`, which has none; adopting such a host is open (section 12).
 
 **Importing data without os.** `--data <name>=<directory>`, on any
 bootstrap, copies a directory tree (an old disk mounted on the live
@@ -1078,3 +1110,9 @@ slots.md, section 4's, judged by booting the firmware and GRUB models:
 - **Adopting os's data:** owners whose ids differ between os's output
   and hearth's, and where os kept `x1-prod`'s homes; depends on a dry
   run of `--adopt-os` on a copy of the disk (8.6).
+- **Adopting a host that runs containers [M5]:** which of a container's
+  `.var` and `.srv` under os's `@<target>.machines` become its target's
+  `data` entries, whose ids they are owned by (each container's
+  `PrivateUsers=` base), and whether a container's first hearth slot
+  can fall back to its os root rather than to nothing (8.6; slots.md,
+  12.3); depends on a dry run on carbon or rhi.
