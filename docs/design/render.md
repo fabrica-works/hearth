@@ -127,7 +127,8 @@ Exceeding a limit is an error of the revision, with the path at fault.
   ```
 
   A desired commit must then be reachable from `refs/hearth/<branch>`;
-  render resolves it there.
+  render resolves it there, or a commit imported from a bundle from its
+  own `refs/hearth-dev/<commit>` (wire.md, 4.1; development.md, 6.2).
 - **Its environment is 2.2's,** given whole, plus the credential's one
   variable. The URL never carries a credential.
 - **The read credential is the builder's own,** never a secret of the
@@ -454,7 +455,8 @@ secrets
   passwords            map user → secret name
   identity             map item → { kind, algorithm?, path, public_path?, mode, owner, group }
 boot                   list of parameters, in order; for a container [M5], its parameters instead:
-                         { ids, binds: map path → { source, read_only }, capabilities, network, bridge? }
+                         { ids, binds: map path → { source, read_only }, capabilities, network, bridge? };
+                         and mutable, from placement (development.md, section 4)
 ```
 
 - **Slot parts never enter a layer key:** changing one makes a new slot of

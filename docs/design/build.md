@@ -14,9 +14,10 @@ layer is walked and published is store.md. What is open is in section
   then walked, frozen and published (store.md, 4.2).
 - **The plan starts from the highest layer whose key is published.** A
   config change is a snapshot of the software layer and the config
-  steps: seconds. The packages layer is always built from scratch in
-  M2; apt's reconcile waits for the lab's comparison of patch and
-  scratch.
+  steps: seconds. The packages layer is reconciled from the target's
+  previous one by apt, and built from scratch instead only when there is
+  no base, when a reconcile fails, and now and then to bound history
+  (4.2).
 - **Packages are fetched by digest, then installed offline.** A fetch
   step runs `apt-helper` for every `.deb` the resolution names by
   SHA-256, into the store's cache, where resolution kept the indices apt
@@ -118,23 +119,44 @@ plan(spec)
   walks, records) and to the protocol layer (tools).
 - **A plan pins its chain** while it runs (store.md, 7.1).
 
-### 4.2 The packages layer from scratch
+### 4.2 The packages layer: reconcile, and scratch now and then
 
-- **In M2 the packages layer is always built on the empty layer,**
-  never by apt's reconcile on an older packages layer.
+- **By default, a reconcile from a base.** The base is the target's
+  previous packages layer, or else the published packages layer of the
+  same suite, architecture and variant whose closure shares the most
+  packages with the new one. The step snapshots the base and, in the
+  sandbox, offline from the local repository (5.3), with the seeds and
+  preseeds of the new part applied first (5.5):
+  `apt-get install --allow-downgrades <name>=<version>…` for the whole
+  closure, then `apt-get purge` of every name the closure no longer
+  holds, never `autoremove`, then `dpkg --configure -a`. The installed
+  set is then checked against the closure, and the cleanups and the
+  scan run, exactly as after a scratch build (5.6, 5.7, 9.3).
+- **The same key either way.** The key names the inputs (store.md,
+  3.3); the record says how the layer was made: `how` scratch or
+  reconcile, its `base`, and its `depth`, the reconciles since the last
+  scratch build in its line (store.md, 6.2).
+- **From scratch instead, never in addition,** when there is no base;
+  when the suite, the architecture or the variant changes; when a
+  reconcile fails, which a scratch build then retries at once; and when
+  the line's depth reaches a bound (8 by default) or its last scratch
+  build is older than a period (30 days by default), both settings of
+  the hearth task.
+- **Why reconcile is the default:** a snapshot bump changes tens of a
+  thousand packages, and only those are unpacked and configured, with
+  triggers (the initramfs, `ldconfig`, man-db) run once; the walk hashes
+  only the files that changed (store.md, 4.3); the layer shares its
+  unchanged extents with its base; and a peer's change set [M6] is a
+  few megabytes, not a system.
+- **What a reconciled layer may carry:** a purged package's leftovers,
+  old conffiles, debconf answers and maintainer scripts' state, which a
+  scratch build would not hold (temper's `factory.md`, 6.4). The
+  periodic scratch build bounds that history. Comparing a reconciled
+  layer with a scratch build of the same key is the lab's experiment,
+  run in the background, never a step of a build.
 - **Above packages, a patch and a scratch build agree by construction:**
   a config layer is always built on the same software layer, from that
   layer's tree, never on an older config layer.
-- **A reconcile would not:** a purged package's leftovers, conffiles,
-  debconf answers and maintainer scripts' state carry over (temper's
-  `factory.md`, 6.4; os has no test that its reconcile matches a
-  scratch build).
-- **It is a later optimisation:** reconcile from the closest packages
-  layer of the same suite, architecture and variant, adopted once the
-  lab's comparison of patch and scratch holds it to the scratch build,
-  which stays the proof.
-- **The price:** a snapshot bump rebuilds packages in full, minutes
-  (section 12).
 
 ### 4.3 Steps and failure
 
@@ -956,6 +978,10 @@ with its tail.
   | a config change, end to end | seconds | an estimate |
   | deleting a layer without the mount option | about 15 µs a path | measured |
 
+- **The builder's own memory,** idle and at its peak during a build, is
+  a cost fact too: the heavy work runs in child processes that exit, so
+  an idle builder should stay small, and a builder that grows is a
+  finding.
 - **A regression is a finding:** the lab benchmarks hearth as it does
   any product, and the real tier's second run builds nothing, which its
   costs show (testing.md, section 9).
@@ -991,8 +1017,10 @@ with its tail.
 - **Layers by key, shared between targets,** replace `@T`, `@T.var` and
   the pristine `@T.install` snapshots named by target; `/var` stays in
   the layer until prepare.
-- **No reconcile:** M2 builds packages from scratch, where os ran apt
-  install and purge on its pristine snapshot.
+- **Reconcile kept, by key:** as os ran apt install and purge on its
+  pristine snapshot, hearth reconciles from the target's previous
+  packages layer, but bounds the history with periodic scratch builds
+  and leaves the comparison of the two to the lab (4.2).
 - **Offline, from a local repository,** where os fetched through
   apt-cacher-ng with the proxy as an `--aptopt` left in the output.
 - **mmdebstrap's cleanup kept,** where os passed `--skip=cleanup`.
@@ -1017,9 +1045,10 @@ with its tail.
 
 ## 15. What is open
 
-- **apt's reconcile for the packages layer:** when it is adopted;
-  depends on the lab's comparison of patch and scratch (temper's
-  `factory.md`, 6.4).
+- **The bounds on a reconciled line:** a depth of 8 and a period of 30
+  days are guesses; they depend on what the lab's comparison of
+  reconcile and scratch finds (temper's `factory.md`, 6.4), and on how
+  often snapshots are bumped.
 - **Preseeds where no essential hook runs:** the `custom` variant, if
   containers take it (format.md, section 13), and preseeds for
   `Essential: yes` packages; depends on whether the extract hook can

@@ -28,7 +28,8 @@ in section 12.
   atomic across its services.
 - **The root is read-only twice over:** its subvolume is sealed
   read-only when prepare ends, and it is mounted `ro`. `/var`, the
-  classes, the store and the state are writable mounts beside it.
+  classes, the store and the state are writable mounts beside it. A
+  mutable development machine is the one exception (2.8).
 - **fstab is the activator's, written from typed data** at prepare: the
   filesystem by UUID, the slot's own subvolumes, the classes at
   `/srv/<class>`, and a bind per entry at the path its task declares.
@@ -152,6 +153,7 @@ Placement is data of the environment (format.md, 3.4), in the spec's
 | `firmware` | `efi`, `bios` | sections 4 and 5; checked against the machine record |
 | `hardware` | `7th-gen`, `incus`, `ionos`, `serverhino`, `vultr` | nothing directly: the `boot` task keys its modules and parameters, consoles among them, by it (format.md, 5.4) |
 | `on` | the host's target [M5] | slots.md, section 12 |
+| `mutable` | `true`, `false` | 3.3's `/` line `rw` and no seal at prepare, on a machine that accepts it (2.8; development.md, section 4) |
 
 - **The watchdog is the machine's own fact:** the activator looks for a
   device under `/sys/class/watchdog/` when it prepares a slot, on the
@@ -159,6 +161,22 @@ Placement is data of the environment (format.md, 3.4), in the spec's
 - **The trial window** is a place input, 10 minutes in M3, sealed into
   the slot's units (activator.md, 5.1); a container's is kept by its
   host's activator instead (slots.md, 12.3) [M5].
+
+### 2.8 Development machines [M3b]
+
+- **An Incus VM cloned from a base image** (development.md, section 3):
+  2.2's kind of machine, with its own disk, ESP and OVMF variables,
+  made by `incus copy` of a VM bootstrapped once from a small target,
+  then given its own target by `hearth retarget`, which places and blesses
+  its first slot as bootstrap does (8.2).
+- **It may be mutable:** bootstrapped with `--accept-mutable` (8.1), it
+  takes targets whose placement says `mutable`, whose slots are not
+  sealed and whose root is mounted `rw` (3.3). Every other rule of this
+  document holds: the same top level, boot entries, trials and fall
+  backs. A machine that does not accept is never mutable.
+- **Every clone shares the base's filesystem UUID** and partition
+  identifiers; no machine sees two disks of one image, so nothing
+  confuses them.
 
 ## 3. The btrfs top level
 
@@ -819,11 +837,13 @@ wire.md, 3.8):
 | repository | the IaC repository's URL (wire.md, 4.1) | the same |
 | desired revision | a commit, or a branch to follow with its interval, and `trial: auto` or `manual` (wire.md, 4.1) | none: the engine orders revisions (wire.md, 5.4) |
 | operators | the uids that may run every socket command (wire.md, 3.4) | the same |
+| mutable | `refuse`, or `accept` with `--accept-mutable`: whether the activator places mutable targets (development.md, 4.3); in its machine record | `refuse`: the run side never deploys one |
 | engine | none | its address, what to trust it by, and the machine's credential if the identity chosen is one (wire.md, 5.1 and 5.3) |
 
-The target goes into the activator's machine record too; the rest is
-the builder's, kept in its state (store.md, 8.3), from which the client
-changes only the desired revision and its trial mode (wire.md, 4.1).
+The target and `mutable` go into the activator's machine record; the
+rest is the builder's, kept in its state (store.md, 8.3), from which the
+client changes only the desired revision and its trial mode
+(wire.md, 4.1).
 
 **Before it touches the disk,** bootstrap renders the target: it makes
 the `hearth` user (8.3) and spawns `/proc/self/exe render` as that user,

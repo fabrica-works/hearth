@@ -249,6 +249,7 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 | `capabilities` | set of names | for a container on a host [M5]: capabilities added to nspawn's default set, such as `CAP_NET_ADMIN`; none by default |
 | `network` | enum `host`, `veth` | for a container on a host [M5]: `host` by default, the host's own network; `veth`, a veth pair whose host end joins `bridge` [M6] |
 | `bridge` | string | for `network: veth` only: the host's bridge [M6] |
+| `mutable` | bool | `false` by default; `true` leaves the target's slots unsealed and their root read-write, for changes by hand on a development machine (development.md, section 4); a container's too [M5]; never a build environment's |
 
 - **Placement is data of the environment** (draft/brainstorm.md, 7.7). It
   may appear in `envs/<env>.json` and in a base-env layer or its members,
@@ -265,6 +266,13 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   command line (3.5), and render refuses a module or a parameter on it
   (render.md, 7.2). The `boot` task, which installs the kernel, refuses a
   container by a guard of its own (5.4).
+- **`mutable` is a slot's, never an output's.** Render puts it in the
+  `boot` part (render.md, 4.3), so it enters the prepare key and no
+  layer key: a mutable target builds the output its sealed twin would.
+  Render accepts it anywhere placement may be; whether a machine takes
+  it is the machine's configuration (machine.md, 8.1), and the run
+  side's engine never orders one [M4] (development.md, 4.3). An
+  environment such as `dev` sets it for all its targets.
 - **Everything else that differs by placement is task data** that reads
   `target.placement`: the gettys masked in containers, the initramfs
   modules per hardware profile, EFI's tools (5.10).

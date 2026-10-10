@@ -660,7 +660,7 @@ scan         digest                 the scan's rules it passed (build.md, 9.3)
 placed       list [ digest ]        software only: each download's SHA-256 it placed, and each artifact's tree digest [M6]
 tools        list                   [ name, version ]: mmdebstrap, apt, dpkg, the target's tools it ran
 costs        map                    per step: wall and CPU time, peak memory, bytes fetched, written, hashed
-made         map                    { at: wall time in ns, by: built | received [M6], from [M6] }
+made         map                    { at: wall time in ns, by: built | received [M6], from [M6]; packages only: how: scratch | reconcile, base: key | none, depth: uint }
 ```
 
 The key recomputes from `kind`, `parent` and `inputs`, and the startup

@@ -38,7 +38,8 @@ open. Each part has a document of its own beside this one.
   declare are writable: a directory per entry in one of the target's
   three class subvolumes, `core`, `data` and `cache`, bound at the
   entry's path and snapshotted by class. Nothing on a running machine
-  is changed in place: a fix is a new slot.
+  is changed in place: a fix is a new slot. A development machine may
+  be mutable instead (development.md, section 4).
 - **Slots try before they commit** (slots.md): prepare, trial, bless,
   fall back. A new slot runs once; the boot default moves only when the
   slot's own hearth blesses it (a container's, its host's), and any
@@ -66,6 +67,10 @@ open. Each part has a document of its own beside this one.
   fake for every tool, a conformance tier that holds the fakes to the
   real tools, real builds as a regular user, and VMs for what needs root
   until the lab exists.
+- **Agents develop on throwaway machines** (development.md): Incus VMs
+  cloned in seconds, roots they may change by hand, a capture of what
+  they changed, and their working tree applied as a revision. Builds
+  from scratch stay the lab's.
 - **Built in milestones** (section 3): render, then builds, then slots
   on one EFI machine in standalone mode (the MVP), then BIOS, the wire,
   operating, and the rest of the vision.
@@ -96,9 +101,11 @@ open. Each part has a document of its own beside this one.
     operational effects, snapshots and backups.
 11. **testing.md:** how `testing-strategy.md` applies to hearth: the fake
     machine, the fakes of tools, the tiers and their budgets.
-12. **artifacts.md:** the second recipe: an artifact from a build
+12. **development.md:** how an agent develops a machine: development
+    machines on Incus, mutable roots, capture, applying a working tree.
+13. **artifacts.md:** the second recipe: an artifact from a build
     environment, sources and a command.
-13. **reproducible.md:** reproducible builds, deferred: what is kept from
+14. **reproducible.md:** reproducible builds, deferred: what is kept from
     day one and how they are retrofitted.
 
 `draft/brainstorm.md` is the record of the first discussion. These
@@ -115,11 +122,11 @@ every milestone, from the first (testing.md, section 10).
 |---|---|---|---|
 | M1 | Render | specs with digests; the rendered diff of any change | format.md, but for checks and artifacts; render.md; the client's render and diff |
 | M2 | Build | outputs keyed by digest, built unprivileged, layer by layer | store.md, but for peers; build.md; the tree helper |
-| M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, installed from scratch | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; wire.md's client and standalone mode; a minimal bless |
-| M3b | BIOS | BIOS machines, which most IaaS providers offer | machine.md's BIOS path; slots.md's trial through GRUB |
+| M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, installed from scratch | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; wire.md's client and standalone mode; a minimal bless; development.md's mutable machines, capture and working trees |
+| M3b | BIOS; development machines | BIOS machines, which most IaaS providers offer; development machines on Incus | machine.md's BIOS path; slots.md's trial through GRUB; development.md's Incus driver |
 | M4 | The wire | hearth as a system behind an engine | wire.md's wire, facts and events |
-| M5 | Operating | the machine's end of the run side | operating.md, but for backups; checks as task data; local snapshots of each class, and restores from them (operating.md, section 7); containers and pool hosts (slots.md, section 12) |
-| M6 | The rest | the full vision | artifacts.md; peers; backups; faults; disks as an effect |
+| M5 | Operating | the machine's end of the run side | operating.md, but for backups; checks as task data; local snapshots of each class, and restores from them (operating.md, section 7); containers and pool hosts (slots.md, section 12); clusters and containers in development (development.md) |
+| M6 | The rest | the full vision | artifacts.md; peers; backups; faults; disks as an effect; development VMs from the host's store (development.md, section 9) |
 | later | Reproducible builds | a level of trust | reproducible.md |
 
 **The MVP needs no parity with os.** M3 leaves out on purpose: BIOS,
@@ -186,6 +193,7 @@ hearth-domain-builder         the builder's root: routes between its children; o
 ├── hearth-domain-converge    the desired revision, orders, a slot's decisions (wire.md)  M3
 ├── hearth-domain-checks      checks, signals, windows (operating.md)                     M5
 └── hearth-domain-artifacts   the second recipe (artifacts.md)                            M6
+hearth-domain-dev             the client's development loop; the Incus driver from M3b (development.md)  M3
 hearth-domain-activator       the activator's root (activator.md)                         M3
 ├── hearth-domain-slots       slot state, prepare, trial, bless, fall back, drift         M3
 ├── hearth-domain-boot        boot entries and files: EFI, then GRUB (machine.md)         M3
@@ -213,6 +221,7 @@ hearth-protocol-proc          /proc/<pid>/mountinfo and cgroup: mounts, overlays
 hearth-protocol-keygen        ssh-keygen and the other identity tools                     M3
 hearth-protocol-client        the client's records                                        M3
 hearth-protocol-grub          grub-editenv, GRUB's configuration and env                  M3b
+hearth-protocol-incus         incus's argument vectors and JSON output (development.md, 8.3)  M3b
 hearth-protocol-wire          the wire to an engine, over skein's channel                 M4
 hearth-protocol-probe         probes of a service as its users see it (operating.md, 2.5) M5
 hearth-protocol-http          bytes by digest                                             M6
@@ -262,6 +271,8 @@ hearth-<name>-world           the other worlds, under tests/
 | target | a base in an environment, such as `mail-prod`: what is rendered and built |
 | placement | where a target runs: bare metal, a VM, a container on a named target; data of its environment |
 | machine | where a target runs: a disk with slots, or a container's root on a host |
+| development machine | a throwaway standalone machine an agent changes and applies its working tree to: an Incus VM cloned from a base image [M3b], which may be mutable (development.md) |
+| mutable | a placement whose slots are not sealed and whose root is mounted read-write, for changes by hand; taken only by a machine bootstrapped to accept it, never by the run side (development.md, section 4) |
 | task | everything about one concern: settings, files, packages, software, data, secrets, checks, exports |
 | setting, schema | a value a task reads; the task's declaration of its settings: names, types, defaults, a line each |
 | export | a fact a task publishes to the other targets of its environment |
@@ -372,6 +383,19 @@ that last:
   survive a soft reboot. The live bless arms the new slot's trial
   (`BootNext`, or `next_entry`) rather than moving the default, so every
   slot still boots natively on trial before it becomes the default.
+- **The development loop** (development.md): up, explore, capture,
+  encode in IaC, apply from the working tree, land. A development
+  machine is an Incus VM cloned from a base image and driven by `hearth
+  dev`, a client outside the daemon [M3b]. An environment may mark its
+  placement `mutable`: slots not sealed, roots read-write, taken only by
+  a machine bootstrapped with `--accept-mutable` and never by the run
+  side. `hearth diff --running` captures what was done by hand and
+  drafts task fragments; a working tree becomes a machine's desired
+  revision as a commit on no branch, shipped as a git bundle. Builds
+  from scratch stay out of the loop: every apply prepares a fresh slot
+  from the IaC, so what was not captured is gone at once, and a first
+  boot, the upgrade from production and a sealed root are the lab's, at
+  QA or at the landing gate (development.md, section 7).
 - **Boot follows os, and adds the trial.**
   - EFI: the ESP holds each slot's kernel and initramfs, booted by a
     direct EFI-stub entry per slot. A trial is a `BootNext`; a bless
@@ -515,6 +539,10 @@ that last:
 - **Package indices come from the resolution:** apt's verified,
   decompressed `Packages` files are kept by digest and served from the
   local repository; the fetch gets only packages (build.md, section 5).
+- **The packages layer is reconciled by apt** from the target's previous
+  one, and built from scratch instead, never in addition, when there is
+  no base, when a reconcile fails, and now and then to bound the history
+  a line carries; comparing the two is the lab's (build.md, 4.2).
 - **Failed units a target expects** are listed as task data
   (`bless.ignore_failed`); the minimal bless counts only the others
   (format.md, section 5; slots.md, 7.1).

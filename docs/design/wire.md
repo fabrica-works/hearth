@@ -94,10 +94,12 @@ a machine                             │
 |---|---|---|---|---|
 | `hearth render <target> [--at <rev>] [--repo <path>]` | renders the target at a revision; prints the spec's parts with their digests (render.md, section 4) | the builder, from its own clone; in-process with `--repo` or a local path (3.5) | anyone | yes |
 | `hearth diff <from> <to> [--target <t>] [--repo <path>]` | the rendered diff: per target and part, what changed (render.md, section 6) | as `render` | anyone | yes |
+| `hearth diff --running [--target <t>] [--suggest]` | the running slot against its record: packages, files (with contents on a mutable machine), units, users; `--suggest` drafts task fragments (development.md, section 5) | the builder, from the activator's capture; the drafts in-process | operators | yes |
 | `hearth build <target> [--at <rev>]` | builds the output; prints each layer's key, whether it was found or built, and its costs | the builder, or in-process with a store of one's own | operators; anyone with their own store | yes |
 | `hearth status [--check]` | each target's slots, the four facts, the last trial, drift, how a prepared slot would be activated and why not live, the desired revision, the pass and the hold | the builder, which reads the activator's facts afresh | anyone | yes |
 | `hearth revision` | shows the desired revision | the builder | anyone | shows the engine's last order |
-| `hearth revision set <commit>` | sets the desired revision to a commit | the builder | operators | refused |
+| `hearth revision set <commit> [--bundle <file>]` | sets the desired revision to a commit; with `--bundle`, imports it first from a git bundle into the builder's clone (4.1; development.md, 6.2) | the builder | operators | refused |
+| `hearth revision bundle <file> [--repo <path>] [--since <commit>]` | commits a working tree to an object on no branch and writes it as a git bundle; prints the commit (development.md, 6.1) | in-process | anyone | yes |
 | `hearth revision follow <branch> [--every <d>] [--trial auto\|manual]` | follows a branch, polled every `d` | the builder | operators | refused |
 | `hearth prepare [--at <rev>]` | prepares the inactive slot; keyed by target and revision | the builder, then the activator | operators | refused |
 | `hearth trial [--how auto\|live\|full]` | tries the prepared slot: live when eligible, else by a soft or a one-shot reboot (slots.md, 6.1); conditional on the facts read | the builder, then the activator | operators | refused |
@@ -107,6 +109,7 @@ a machine                             │
 | `hearth retry <target>` | clears the target's refusals, so the pass may try those slots again (4.4) | the builder | operators | refused |
 | `hearth credential <file>` | replaces the builder's read credential for the repository (3.8) | the builder | operators | yes |
 | `hearth bootstrap …` | partitions, formats and makes the first slot from a live system (machine.md, section 8); its arguments are 3.8's | in-process, as root | root | yes, before the daemon exists |
+| `hearth retarget <target> --revision <commit> [--bundle <file>] [--secrets <dir>]` [M3b] | a development machine cloned from a base image takes its target: its first slot built, placed and blessed as bootstrap's are (development.md, 3.2) | in-process, as root | root | refused |
 | `hearth secrets import <path>…` | imports secrets into the secret store (activator.md, 5.8), then asks the builder to read its facts afresh | in-process, as root | root | refused but at bootstrap |
 | `hearth identity` | the public halves of the machine's identity, to record as data (format.md, section 8) | the builder, from the activator's facts | anyone | yes |
 | `hearth logs [--unit <u>] [--since <d>] [-n <lines>]` | a bounded window of the journal, read locally (section 7); M3 | the builder, in `systemd-journal` | operators | yes |
@@ -114,6 +117,10 @@ a machine                             │
 | `hearth snapshots [--target <t>]` [M5] | each class's snapshots: sequence, age, the buckets that keep it, and from M6 whether the peer holds it (operating.md, 7.1) | the builder, from the activator's facts | anyone | yes |
 | `hearth restore <entry> \| --class <class> --from <seq> [--target <t>]` [M5] | restores one entry's directory, or a whole class, from a snapshot, then reboots (operating.md, 7.4); conditional on the facts read | the builder, then the activator | operators | refused |
 | `hearth artifact <repository> <recipe> [--at <commit>] [--build]` [M6] | resolves a recipe at a commit to its key and prints the pin; with `--build`, builds it (artifacts.md, 5.7 and 7.1) | the builder, or in-process | anyone; operators to build on the daemon | yes |
+| `hearth dev up <target>… [--count <n>] [--at <rev>] [--repo <path>] [--secrets <dir>]` [M3b] | development machines cloned from the base image, each retargeted to its target (development.md, section 3) | in-process, on the development host, driving `incus` | a user who may use Incus | — |
+| `hearth dev apply <machine>… [--repo <path>] [--how auto\|live\|full]` [M3b] | the working tree as each machine's desired revision, followed until it converges or falls back (development.md, 6.3) | as `dev up` | as `dev up` | — |
+| `hearth dev shell <machine>`, `hearth dev diff <machine> [--suggest [--out <dir>]]` [M3b] | a root shell in the machine; its capture, the drafts written on the host (development.md, 4.4 and section 5) | as `dev up` | as `dev up` | — |
+| `hearth dev list`, `hearth dev down <machine>…`, `hearth dev image` [M3b] | the development machines; deleting them; making the base image (development.md, section 3) | as `dev up` | as `dev up` | — |
 
 - **"With an engine"** is the machine's mode, set at bootstrap (3.8)
   and kept in the builder's state (4.1). A machine follows its engine or
@@ -142,6 +149,10 @@ a machine                             │
   the class subvolume's UUID from the facts, asks the activator with it
   as the condition, and returns once the activator has swapped the
   names, just before the reboot (operating.md, 7.4).
+- **`hearth dev` runs on a development host, not on a machine:** a
+  client that drives `incus` and reaches each development machine's
+  hearth through `incus exec` (development.md, section 8). Nothing in
+  the daemon serves it.
 - **There is no `bless` command.** The hearth in the new slot blesses
   it (slots.md, 7.2); only an engine releases a bless it held (5.4). A
   person never blesses by hand.
@@ -229,8 +240,9 @@ a machine                             │
   README.md, 8.1) and never trusts a uid a record names.
   - root, and the uids listed as operators in the builder's
     configuration, may run every command the socket serves;
-  - any other uid may run `render`, `diff`, `status`, `revision` (to
-    read) and `identity`;
+  - any other uid may run `render`, `diff` (but `--running`, which
+    reads the slot's files), `status`, `revision` (to read) and
+    `identity`;
   - membership of a group as the test of an operator needs the peer's
     supplementary groups (`SO_PEERGROUPS`), which is open (section 11).
 - **Bounded.** The builder admits at most `clients` connections (8 to
@@ -262,14 +274,18 @@ a machine                             │
 
 ### 3.6 Root-only commands
 
-- **`bootstrap`, `secrets import` and `shell` run in-process as root,**
-  and `shell` drops root at once (3.7). The client checks its effective
-  uid first and exits 77 otherwise.
+- **`bootstrap`, `retarget`, `secrets import` and `shell` run in-process
+  as root,** and `shell` drops root at once (3.7). The client checks its
+  effective uid first and exits 77 otherwise.
   None of them asks the daemon to act: the activator listens only to its
   builder, and a secret must never pass through the builder.
 - **`bootstrap`** runs the activator's code in the client's process,
   which spawns a builder over a link as the daemon's activator would
   (machine.md, 8.2). The privilege split holds from the first slot.
+- **`retarget`** [M3b] is bootstrap's place and first bless on a
+  development machine's own top level, with the daemon stopped, refused
+  unless the machine accepts mutable targets (development.md, 3.2 and
+  4.3).
 - **`secrets import`** writes the secret store in `@hearth.state` with
   the activator's own code (activator.md, 5.8): each new value by
   rename, then the index, with the store's generation bumped once for
@@ -345,6 +361,7 @@ hearth bootstrap --disk <device> [--wipe]
                  --revision <commit | branch> [--every <d>] [--trial auto|manual]
                  [--secrets <directory>]
                  [--operator <uid>]…
+                 [--accept-mutable]
                  [--engine <address> --trust <file> [--credential <file>]]     [M4]
 ```
 
@@ -356,6 +373,10 @@ hearth bootstrap --disk <device> [--wipe]
   branch is polled every `--every` (10 minutes by default); `--trial`
   is `auto` by default, and `x1-prod` is bootstrapped with `--trial
   manual` (4.1).
+- **`--accept-mutable`:** the machine takes targets whose placement is
+  `mutable`, with unsealed, read-write roots: a development machine
+  (development.md, 4.3). Without it the activator refuses them. It is
+  kept in the activator's machine record, and no other command sets it.
 - **`--repo-credential`:** the builder's own read credential for the
   repository, if the forge needs one. It is kept in the store's
   `credentials/` and given to git by render (render.md, 2.2); it is
@@ -380,7 +401,7 @@ hearth bootstrap --disk <device> [--wipe]
   desired
     target       x1-prod                      the activator's machine record, in its facts
     repository   the IaC repository's URL     written at bootstrap (3.8)
-    revision     commit 3f1c2ab0…  |  branch main, every 10 min
+    revision     commit 3f1c2ab0…  |  branch main, every 10 min  |  commit c07a11e9…, from a bundle
     trial        auto | manual
     set by       uid 1000, 2 days ago
     generation   7                            bumped at every change
@@ -389,6 +410,13 @@ hearth bootstrap --disk <device> [--wipe]
 - **Set by the client:** `hearth revision set <commit>`, or `hearth
   revision follow <branch> --every <d>`. The interval is at least a
   minute, so a fleet of followers does not hammer the forge.
+- **A commit from a bundle** (development.md, 6.2): `hearth revision
+  set <commit> --bundle <file>` fetches a git bundle into the builder's
+  clone as `refs/hearth-dev/<commit>`, then sets the commit. The pass
+  finds it in the clone and never fetches it from the repository's URL;
+  render resolves it from that ref. The builder keeps the last 16 such
+  refs, never the desired one's. This is how a working tree, committed
+  on no branch, becomes a machine's desired revision.
 - **`trial: manual`** stops each pass at a prepared slot and waits for
   `hearth trial`, live changes included. A workstation such as
   `x1-prod`, the MVP's machine, reboots, or changes under its user's

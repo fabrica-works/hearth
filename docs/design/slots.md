@@ -15,7 +15,8 @@ is activator.md's. What is open is in section 15.
 - **A slot is a read-only root and its own `/var`,** two subvolumes
   labelled `a` or `b`, holding one output prepared for this machine:
   shifted to real ids, with this machine's identity and secrets, fstab
-  and units written in, then sealed.
+  and units written in, then sealed; a mutable target's slot is left
+  unsealed and read-write, for changes by hand (development.md).
 - **Four facts, kept apart:** the slot running (the root subvolume's
   identity, never `/proc/cmdline`), the default (what the firmware or
   GRUB boots), the slot on trial (the activator's marker), and the live
@@ -80,6 +81,10 @@ is activator.md's. What is open is in section 15.
   read-only flag, and mounted `ro`; only its `/var` and the target's
   class subvolumes are written while it runs. Nothing is changed in
   place: a fix, a new secret or a new command line is a new prepare.
+- **But a mutable slot,** whose `boot` part says `mutable`, on a machine
+  that accepts it: its root is not sealed and is mounted `rw`
+  (development.md, 4.2). What is changed in it by hand is never
+  carried into another slot: the next prepare starts from the output.
 - **One machine runs one target,** so its slots are `@<target>.a` and
   `@<target>.b`. A host's containers have slots of their own on the
   host's top level [M5] (section 12).
@@ -596,7 +601,9 @@ RebootWatchdogSec=10min
 ### 5.7 Verifying
 
 1. **Seal the root:** `BTRFS_IOC_SUBVOL_SETFLAGS` with
-   `BTRFS_SUBVOL_RDONLY`.
+   `BTRFS_SUBVOL_RDONLY`; left out for a mutable slot, whose fstab
+   mounts `/` `rw` (development.md, 4.2). Its manifest is written all
+   the same: capture compares against it (development.md, section 5).
 2. **Check the package users:** every user a task declares as made by a
    package (format.md, 5.6), such as `postfix`, must be in the slot's
    `/etc/passwd`, read through the same bounded parser as 5.4's; a
@@ -859,6 +866,7 @@ why (wire.md, section 6).
 | 9 | **No file dpkg owns** under `usr/` or `opt/` changed by the software layer, by the packages layer's dpkg database; conffiles in `etc/` are fine | a download over a packaged file is a packages change in disguise | builder |
 | 10 | **The machine fits:** Linux 6.8 or later (`MOVE_MOUNT_BENEATH` since 6.5, overlayfs's `lowerdir+` since 6.8; trixie runs 6.12); `etc`, `usr` and `opt` are directories in the base; no mount on or beneath them but hearth's; running = default = blessed; no trial; at most one live state, whose base is the running slot; [M5] the new slot's window no longer than the base's | the swap's mechanisms; a base proven by a native boot; the base's dead-man ends the trial | activator |
 | 11 | **Sandboxes beneath the hierarchies:** units whose mount namespace has a mount beneath `/etc`, `/usr` or `/opt` join the restarts, and if one is never-live the change is not eligible | the overlay, propagated into the unit's namespace, shadows that mount until the unit restarts | activator, as root, from `/proc/<pid>/mountinfo` of every process and its cgroup |
+| 12 | **An unexplored base, on a mutable machine:** a metadata walk of the base's `etc/`, `usr/` and `opt/` matches its manifest (development.md, 4.4) | what was changed by hand beneath the overlay would stay visible and fail L2; a soft reboot discards it instead | activator |
 
 - **What the builder sends:** `try live`, with the digest of the change
   from the base's output to the new one, which the delta will hold, and
@@ -868,7 +876,7 @@ why (wire.md, section 6).
 - **What the activator recomputes:** the change between the two slots'
   manifests, leaving out each slot's own files (5.4, 5.5), whose digest
   (in store.md, 3.5's form) must equal the builder's; then rules 1 to 5,
-  8 for the plan's units, 10 and 11. The delta is built from its own
+  8 for the plan's units, 10, 11 and 12. The delta is built from its own
   diff, never from paths the builder sent. A difference refuses the
   trial, naming the rule.
 - **A later live change** is planned against what runs, the live
@@ -1328,6 +1336,11 @@ ids are facts; drift is never repaired in place.
 | `machine.data.<name>` | the entry's directory exists in its class's subvolume, and its path shows it: bound from `/srv/<class>/<name>`, or that path itself |
 | `machine.data.orphaned` | no directory in a class subvolume but the entries' and a restore's (machine.md, 3.4); each orphan is listed, and reported, never removed |
 
+- **On a mutable slot** (development.md, 5.3) the same checks are the
+  experiment's diff: what `slot.root.tree` finds was changed by hand, is
+  reported as `explored` rather than as a fault, and is what `hearth
+  diff --running` presents with contents (development.md, section 5);
+  `slot.root.subvolume` expects the read-only flag clear.
 - **Left out:** the contents of `/var` and of the class subvolumes,
   which are meant to change, and anything mounted beneath `/`. The root's
   walk goes through the top level, so it stays on the root's subvolume

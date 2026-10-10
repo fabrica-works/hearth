@@ -94,6 +94,7 @@ open is in section 10.
 | owners and groups | names found in the slot's own `/etc/passwd` and `/etc/group`; for a secret or identity file, never `hearth` nor a group `hearth` belongs to |
 | secret names, identity kinds | format.md, section 9; kinds from the closed list of 5.7 |
 | `boot` tokens | machine.md, 6.2 |
+| `mutable`, in the `boot` part | only where the machine record accepts mutable targets (development.md, 4.3); the slot is then left unsealed and its `/` mounted `rw` |
 | unit names [M5] | systemd's unit name syntax, at most 256 bytes; never hearth's own |
 | a live plan's units (5.17) | systemd's unit name syntax, at most 256 bytes; at most 256 in all; never hearth's own nor a never-live one (format.md, 5.14) |
 | a check [M5] | a user of the running slot, never `root`; capabilities from a closed list; an absolute program path and at most 64 arguments of at most 4 KiB in all (operating.md, 2.4) |
@@ -511,6 +512,10 @@ Facts { drift: none | metadata | contents }
 - **Done:** the facts (4.3), after running drift's checks at the depth
   asked (slots.md, section 10). Read only: it changes nothing but the
   results it reports.
+- **The capture** (development.md, section 5) is the same walk, asked by
+  `hearth diff --running`: what differs, by kind, with the contents of
+  changed files under `/etc`, `/usr/local` and `/opt` on a mutable slot
+  only, and never a secret's or an identity file's.
 
 ### 5.7 Generate identity
 
@@ -931,7 +936,8 @@ and L2):
 ```
 /var/lib/hearth/state                       @hearth.state: root, 0700
 ├── machine                                 target, firmware, fs uuid, boot partition's volume id,
-│                                           the ESP's GPT GUID, entry numbers, layout version
+│                                           the ESP's GPT GUID, entry numbers, layout version; mutable:
+│                                           accept or refuse; [M3b] a retired target (development.md, 3.2)
 ├── boot                                    the booted kernel: boot id, its digests (slots.md, 6.1)
 ├── journal                                 the operation in flight, and its step (7.3)
 ├── facts                                   quirks seen, drift's last results, last costs
@@ -1042,7 +1048,9 @@ At every start, after a boot, a soft reboot or a crash:
    pruned, made again; the dead-man of a running slot that is blessed,
    stopped; on BIOS, `tries` reset when the running default meets the
    criterion (slots.md, 8.4); each delta subvolume that neither the live
-   record nor the marker names, deleted;
+   record nor the marker names, deleted; after an adoption [M3b], the
+   retired target's slots, entries, ESP files and records, deleted
+   (development.md, 3.2);
 8. **start the containers** [M5]: each container's settings and link
    that `/run` lacks, from its recorded default, then `systemctl start`
    on its unit (slots.md, 12.2); and set each class's snapshot deadline
@@ -1073,6 +1081,7 @@ domain sees only typed values.
 | `hearth-protocol-systemd` | systemctl's and systemd-run's lines: states, counts, ids, failed units, `Result`; a job's outcome, and `ActiveState`, `InvocationID`, `NRestarts` and `MainPID` per unit (slots.md, 6.8) | read |
 | `hearth-protocol-proc` (new) | `/proc/<pid>/mountinfo` lines: mount ids, parents, mount points, propagation, fstype, source and options, an overlay's layers included; `/proc/<pid>/cgroup`, a process's unit | read |
 | `hearth-protocol-keygen` | ssh-keygen's argument vector and public line | both |
+| `hearth-protocol-dpkg` | dpkg's status, for capturing a mutable machine's packages (development.md, section 5) | read |
 
 `hearth-protocol-activator` is the protocol layer: it routes these
 machines, and holds only the argument vectors of tools whose answer is

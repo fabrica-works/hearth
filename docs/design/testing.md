@@ -1018,6 +1018,11 @@ real costs of each step.
 - **A packages layer of its own** only where a test is about packages:
   the extras on the base; and `test-boot`'s, whose `/var/lib/machines`
   must be a directory, not a nested subvolume (8.5).
+- **Both ways of making a packages layer** (build.md, 4.2): a closure
+  that adds an extras package and drops another is reconciled from the
+  base, and built from scratch when the test forces it. Each must pass
+  the installed-set check, and the test records how the two trees
+  differ, as the recordings the lab's comparison starts from.
 
 Every test asserts its own cost facts: which steps ran, which layers
 were reused, what was fetched.
@@ -1165,6 +1170,27 @@ cause one in a VM is open (section 11).
 - **Until the lab exists.** The lab's throwaway machines then run the
   same scenarios (temper's `factory.md`).
 
+### 7.6 The development loop
+
+development.md's loop runs here too, on the VM tier's machines and, from
+M3b, on a development host with the Incus driver. Its worlds live with
+the others: capture and the bundle in the slots', activator's and
+standalone worlds [M3], and `hearth-dev-world` under `tests/dev`, with
+`hearth-fake-incus` under `testing/`, for the driver [M3b]
+(development.md, section 10).
+
+| Scenario | What happens | What must hold |
+|---|---|---|
+| a mutable slot [M3] | a VM bootstrapped with `--accept-mutable`, its target placed `mutable`; and one bootstrapped without | the root writable, its read-only flag clear; the second refuses the place, naming the field |
+| capture [M3] | by hand: `apt install`, an edit in `/etc`, a program in `/opt`, `systemctl enable`, `useradd` | `hearth diff --running` lists each once, packages without their files; recorded: what systemd writes in `/etc` at a mutable root's first boot |
+| the round trip [M3] | the suggestions, unchanged, committed and applied | a soft reboot; the next capture empty |
+| a working tree [M3] | `hearth revision bundle`, then `hearth revision set --bundle` on the VM | the commit under `refs/hearth-dev/`; converged; the same tree again changes nothing |
+| explored, then a config change [M3] | an edit by hand, then a change with a `reload` entry | not live (slots.md, 6.7, rule 12): a soft reboot, the edit gone |
+| up [M3b] | `hearth dev up` from the base image, timed | a copy in seconds; slot `a` of the target blessed, its identity not the seed's; whether the copy kept `qemu.nvram` recorded |
+| several [M3b] | `hearth dev up --count 3` | one build; three identities |
+| a cluster [M5] | three members of one base on one bridge | each resolves the others by `<instance>.incus` and reads their exports |
+| a container in development [M5] | a host target with a mutable container placed on it | the container explored with `machinectl shell`, captured through its host |
+
 ## 8. Worlds and their invariants
 
 ### 8.1 The worlds
@@ -1183,11 +1209,13 @@ cause one in a VM is open (section 11).
 | `hearth-checks-world` | checks, on units and signals | M5 |
 | `hearth-backups-world` | class snapshots, their retention and restores; from M6, send streams and a backup peer | M5 |
 | `hearth-artifacts-world` | the second recipe | M6 |
+| `hearth-dev-world` | the development driver's domain, on `hearth-fake-incus` (development.md, section 10) | M3b |
 
 Each document's own world section names its scenarios:
 render.md, section 9; store.md, section 11; build.md, section 13;
 machine.md, section 10; slots.md, section 13; activator.md, section 9;
-wire.md, section 10; operating.md, section 9; artifacts.md, section 8.
+wire.md, section 10; operating.md, section 9; artifacts.md, section 8;
+development.md, section 10.
 
 ### 8.2 Scenarios, cues and the referee
 
@@ -1398,11 +1426,11 @@ finding, as a failing check is.
 |---|---|---|---|---|
 | M1 | step; domain (render, builder); machine (config, template, git, mmdebstrap); protocol (builder and tools); simulated (builder); real loop (render, real git); end to end (render, diff) | files with owners and modes; processes; the universe's index at snapshot timestamps | git; mmdebstrap `--simulate` | conformance: resolve, git; the mirror's indexes |
 | M2 | domain (store, build, tree); system (builder and tree helper); machine (dpkg, tree); protocol (tree helper); real loop (tree helper, process groups) | btrfs and its ownership rule; ids, maps of several extents, namespaces, cgroups, sandboxes; `openat2`'s flags; attributes, inodes, ctimes; the full universe, `systemd-container` included; full disks; power cuts on files and subvolumes, and `syncfs` | mmdebstrap's bootstrap; `apt-helper`; dpkg-query; the target's systemd tools and `tar` | conformance: bootstrap in both modes, extras, fetch, query, the target's tools, the btrfs rules; real builds |
-| M3 | domain (converge, slots, boot, disk, activator); system (the pair joins); machine (link, efi, systemd, keygen, client, proc); protocol (link, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode and its jobs; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; mount namespaces, the new mount API and overlayfs (3.13); cues | efibootmgr; systemctl at run time, its unit verbs included; systemd-tmpfiles; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools | VM tier on OVMF, live changes included; conformance: firmware, host keys, overlays in a user namespace |
-| M3b | machine (grub) | SeaBIOS; msdos and the post-MBR gap; GRUB on FAT, its environment pair, its boot counter, saves that fail, and the slots' fragments | grub-editenv; grub-install | VM tier on SeaBIOS; conformance: env file, GRUB |
+| M3 | domain (converge, slots, boot, disk, activator); system (the pair joins); machine (link, efi, systemd, keygen, client, proc); protocol (link, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client); capture and the bundle (development.md, section 10) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode and its jobs; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; mount namespaces, the new mount API and overlayfs (3.13); cues; a mutable root changed by hand, apt and dpkg on a running slot | efibootmgr; systemctl at run time, its unit verbs included; systemd-tmpfiles; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools; git's bundles | VM tier on OVMF, live changes included, and mutable slots, capture and working trees (7.6); conformance: firmware, host keys, overlays in a user namespace |
+| M3b | machine (grub, incus); domain (dev) | SeaBIOS; msdos and the post-MBR gap; GRUB on FAT, its environment pair, its boot counter, saves that fail, and the slots' fragments; Incus's instances and pool | grub-editenv; grub-install; incus | VM tier on SeaBIOS, and the development loop on a development host (7.6); conformance: env file, GRUB, incus |
 | M4 | protocol (the wire, on `skein-fake-channel`); machine (wire) | — | `hearth-fake-engine` (4.6); systemd-run, for a held bless's timer | — |
-| M5 | domain (checks, backups); containers and pool hosts | units' states and signals; containers on a host (3.12); `setns` into a container's mount namespace; read-only snapshots of class subvolumes and their pruning | systemctl restarting a unit, a container's nspawn unit and `--machine=`; systemd-run's checks | VM tier: bless with checks; containers in a host VM, live changes included (7.3) |
-| M6 | domain (artifacts; backups' sends); protocol (bytes by digest, between builders) | send streams and a backup peer; faults as effects; virtual disks | — | real builds: artifacts |
+| M5 | domain (checks, backups); containers and pool hosts | units' states and signals; containers on a host (3.12); `setns` into a container's mount namespace; read-only snapshots of class subvolumes and their pruning | systemctl restarting a unit, a container's nspawn unit and `--machine=`; systemd-run's checks | VM tier: bless with checks; containers in a host VM, live changes included (7.3); clusters and containers in development (7.6) |
+| M6 | domain (artifacts; backups' sends); protocol (bytes by digest, between builders) | send streams and a backup peer; faults as effects; virtual disks | — | real builds: artifacts; development VMs from the host's store (development.md, section 9) |
 | later | identity beyond SSH host keys | — | wg, for WireGuard keys | — |
 
 M1 sets the pattern: every tier up to end to end exists for render
