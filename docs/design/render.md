@@ -50,9 +50,10 @@ section 10.
     `--repo` or a path: the client renders it in its own process, with
     its own user's access, and never hands the path to a daemon
     (wire.md, section 3);
-  - **the builder's own clone,** `@hearth.store/repo/`, which the daemon
-    fetches and renders, and the only repository it renders
-    (wire.md, section 4).
+  - **the builder's own clone,** `@hearth.store/repo/`, which the
+    daemon's builder fetches and renders in jobs its steward gives it,
+    and the only repository the daemon renders (wire.md, section 4;
+    steward.md, 3.3).
 - **A revision:** a commit id, or a ref name that render resolves to a
   commit id once, first. Everything after names the commit.
 - **Targets:** one, several, or every target of the revision.
@@ -117,9 +118,10 @@ Exceeding a limit is an error of the revision, with the path at fault.
   shape that store.md's scan knows (store.md, section 2). It is made once,
   `git init --bare --quiet <store>/repo`, and read with 2.2's commands.
 - **The fetch** is the one git command that reaches the network, as
-  `apt-helper` is build's (build.md, 10.2). Its argument vector, with the
-  repository's URL from the builder's configuration and the branch it
-  follows (wire.md, section 4):
+  `apt-helper` is build's (build.md, 10.2). The builder runs it in a
+  `fetch` job from its steward (steward.md, 3.3). Its argument vector,
+  with the repository's URL and the branch the machine follows, which
+  the job carries from the steward's desired revision (wire.md, 4.1):
 
   ```
   git --git-dir=<store>/repo fetch --quiet --no-tags --no-recurse-submodules --prune
@@ -141,9 +143,9 @@ Exceeding a limit is an error of the revision, with the path at fault.
   - over SSH, `GIT_SSH_COMMAND=ssh -F /dev/null -i <store>/credentials/deploy_key
     -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes
     -o UserKnownHostsFile=<store>/credentials/known_hosts`.
-- **Bounded:** a deadline the converging domain sets, and the store's
-  free space; git's progress is not parsed, only its exit and the tail of
-  its errors.
+- **Bounded:** the deadline the steward sets on the `fetch` job
+  (steward.md, 5.2), and the store's free space; git's progress is not
+  parsed, only its exit and the tail of its errors.
 
 ## 3. The pipeline
 
@@ -293,11 +295,12 @@ overwrote silently, in alphabetical order of task.
   task's `live` entries (format.md, 5.14): the eligibility input that
   only a spec holds. Render decides nothing about a change: the builder
   pairs two specs' live parts with two outputs' tree files when it plans
-  a trial (slots.md, 6.7).
+  a trial, in a `plan live` job (slots.md, 6.7; steward.md, 3.3).
 - **The output is the spec.** Every file it names is in the store's
   cache by digest, static files from step 1 and rendered ones from
   step 6, where a build finds them. Specs are never stored: a builder
-  renders again when it needs one.
+  renders again when it needs one, as a new builder does for a `build`
+  job whose render an earlier one answered (steward.md, 3.3).
 
 ### 3.9 Checks and probes [M5]
 
@@ -848,8 +851,10 @@ hearth-protocol-builder          the builder's protocol layer: routes its machin
   and `hearth-protocol-builder` passes each through
   `hearth-protocol-template` before translating the whole declaration
   into render's types.
-- **The client runs the same domain in-process** when no builder runs
-  (README, 4.1).
+- **The client runs the same domain in-process** when no daemon
+  answers, or for a local repository (README, 4.1; wire.md, 3.5); in
+  the daemon, the builder's root takes the steward's jobs through
+  `hearth-protocol-jobs` (steward.md, section 3).
 
 ### 8.2 What crosses
 
@@ -1036,8 +1041,10 @@ Over generated repositories, valid by construction and then mutated:
   depends on store.md, section 6.
 - **Classifying mmdebstrap's failures by pattern,** which recordings of
   real failures will confirm or correct.
-- **Keeping decoded documents across revisions** in a long-running
-  builder: memory against time, bounded by a limit to set.
+- **Keeping decoded documents across revisions** within one builder's
+  life, a pass and its linger (steward.md, 4.1): what a pass's later
+  renders, a diff's two revisions or the bless's render, would save,
+  against the builder's memory, bounded by a limit to set.
 - **Fetching a single commit** rather than a branch, which needs the
   forge to allow fetching an object by id; it depends on the forges the
   fleet uses.

@@ -164,7 +164,7 @@ fstab, so the line is the sealed twin's and the kernel's rule holds
 - **The activator enforces it:** the setting is in its machine record,
   and it refuses a place whose `boot` part is mutable on a machine that
   refuses, naming the field (activator.md, 2.2); it would be the one to
-  leave a root unsealed. The builder refuses first, from the facts, as a
+  leave a root unsealed. The steward refuses first, from the facts, as a
   configuration error that waits for another commit (wire.md, 4.4).
 
 ### 4.4 Exploring
@@ -193,9 +193,11 @@ fstab, so the line is the sealed twin's and the kernel's rule holds
 ### 5.1 What it compares
 
 `hearth diff --running [--target <t>] [--suggest] [--json]` runs on the
-machine, for operators. The builder asks its activator, since drift is
+machine, for operators. The steward asks its activator, since drift is
 the activator's (slots.md, section 10): capture is drift's walk with
-contents, presented as a diff.
+contents, presented as a diff, and reaches the client as the link's
+typed records, so the steward reads no file of the slot itself
+(steward.md, 2.2).
 
 | Kind | Compared | Read from | Shown as |
 |---|---|---|---|
@@ -275,13 +277,14 @@ whole history.
 ### 6.2 Into the machine
 
 - **Pushed** with `incus file push --uid 59999 --gid 59999 --mode 0600`
-  to `/run/hearth/<commit>.bundle`, which only the builder reads.
+  to `/run/hearth/<commit>.bundle`, which only the builder reads, in a
+  fetch job (steward.md, 3.3).
 - **`hearth revision set <commit> --bundle <file>`** (wire.md, 4.1): the
-  builder fetches the bundle into its clone (render.md, 2.4) as
-  `refs/hearth-dev/<commit>`, deletes the file and sets the desired
-  revision; a missing prerequisite is refused, and the driver sends the
-  whole history. The pass never fetches the commit, which the clone
-  holds (wire.md, 4.2). Any standalone machine accepts it from an
+  steward has a builder fetch the bundle into its clone (render.md, 2.4)
+  as `refs/hearth-dev/<commit>` and delete the file, then sets the
+  desired revision; a missing prerequisite is refused, and the driver
+  sends the whole history. The pass never fetches the commit, which the
+  clone holds (wire.md, 4.2). Any standalone machine accepts it from an
   operator, as `revision set` accepts any commit (wire.md, 3.1).
 
 ### 6.3 What the machine does
@@ -435,7 +438,8 @@ backoff), a timeout, a full pool.
   back instead of costing a VM; it depends on how often first builds
   fail, and on guards that span two targets.
 - **How the builder's fetch proxy is set,** by a bootstrap argument or a
-  file of the builder's configuration; it depends on build.md's fetch.
+  file of hearth's configuration, which the steward passes to its
+  builders; it depends on build.md's fetch.
 - **Noise in capture,** to verify on the VM tier: whether systemd's
   update services (`ConditionNeedsUpdate=/etc`) write `/etc` at a
   mutable root's first boot, marking every root explored, and whether

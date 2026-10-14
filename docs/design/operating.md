@@ -43,7 +43,7 @@ section 10.
   read-only snapshots of each class of a target's data, `core` and
   `data`, on the period the `hearth` task sets, kept and pruned on the
   machine [M5], and sent incrementally with `btrfs send` to a backup
-  peer, encrypted for the peer before any byte reaches the builder
+  peer, encrypted for the peer before any byte reaches the steward
   [M6]. A snapshot is atomic across every service in its class.
   Restoring one entry or a whole class is an effect; drills are
   experiments on the run side's own throwaway machines.
@@ -150,7 +150,7 @@ The postfix task, its checks and the user its command check runs as:
 
 ### 2.3 A unit active
 
-- **Run by the builder,** which needs no privilege for it:
+- **Run by the steward,** which needs no privilege for it:
   `systemctl show --property=LoadState,ActiveState,SubState,Result
   <unit>`, parsed by `hearth-protocol-systemd`.
 - **`pass`:** `ActiveState=active`. **`fail`:** `failed`, `inactive`,
@@ -199,7 +199,7 @@ The postfix task, its checks and the user its command check runs as:
   `fail` (any other status, or the timeout) or `error` (the transient
   unit could not start: the user missing, systemd refusing), with the
   unit's `Result` (`exit-code`, `timeout`, `oom-kill`, `signal`). The
-  command's output never reaches the builder or the engine: it stays in
+  command's output never reaches the steward or the engine: it stays in
   the journal, under the transient unit's name, for a person or a
   journal read (section 5) to find.
 - **To verify against trixie's systemd (257):** the exit status
@@ -209,7 +209,7 @@ The postfix task, its checks and the user its command check runs as:
 
 ### 2.5 A probe of the service, as its users see it
 
-- **Run by the builder of the target that runs it** (2.6), through
+- **Run by the steward of the target that runs it** (2.6), through
   skein's io: a TCP connection, skein's TLS client where asked, skein's
   HTTP client for `http`, and two small protocol machines of hearth's
   for `smtp` and `dns` (`hearth-protocol-probe`, M5). Probes speak; they
@@ -328,8 +328,9 @@ This extends slots.md, section 7.
 
 - **M3's minimal criterion stays the first condition** (slots.md, 7.1):
   the boot reached its default target with no failed unit but those the
-  target's `bless.ignore_failed` lists (format.md), and the slot's own
-  builder is up and has answered its activator.
+  target's `bless.ignore_failed` lists (format.md), the slot's own
+  steward is up and has answered its activator, and a builder it spawned
+  has rendered the slot's own revision (steward.md, section 6).
 - **Then every blessing check of the slot's target must reach
   `passing`.** While the slot is on trial its blessing checks run back
   to back, a `trial_interval` apart (5 s to start), not at their watching
@@ -342,13 +343,13 @@ This extends slots.md, section 7.
 - **`error` blocks the bless; `skip` does not.** A check that cannot be
   judged cannot prove health. A check that errors everywhere is a bug the
   lab finds first, since it runs the same checks.
-- **The trial's window grows with the checks.** The dead-man's window
-  is 10 minutes in M3 (slots.md, 6.4). From M5 the builder computes it
-  from the blessing checks before prepare and passes it as an input of
-  the place request (activator.md, 5.1). It is part of the prepare key
-  (slots.md, 2.2) and sealed into the slot's trial units, so a slot
-  carries the window it was prepared with, and a change to the checks'
-  windows is a new slot:
+- **The trial's window grows with the checks.** The dead-man's window is
+  10 minutes in M3 (slots.md, 6.4). From M5 the steward computes it
+  before prepare, from the blessing checks its builder's render answered
+  (steward.md, 3.3), and passes it as an input of the place request
+  (activator.md, 5.1). It is part of the prepare key (slots.md, 2.2) and
+  sealed into the slot's trial units, so a slot carries the window it
+  was prepared with, and a change to the checks' windows is a new slot:
 
   ```
   window = M3's 10 minutes, for the boot and the minimal criterion
@@ -358,7 +359,7 @@ This extends slots.md, section 7.
   ```
 
 - **How a trial ends:**
-  - every blessing check passing: the slot's builder asks its activator
+  - every blessing check passing: the slot's steward asks its activator
     to bless, or to hold the bless under an engine that holds it
     (slots.md, 7.4; wire.md, 5.4);
   - the window passes first: the dead-man reboots into the default, and
@@ -381,7 +382,7 @@ This extends slots.md, section 7.
   is the base's, whose dead-man ends it, so a change whose new window
   would be longer than the base's is not live (slots.md, 6.7, rule 10).
   A failing check is waited for until a margin before that window ends;
-  then the builder asks the live fall back (slots.md, 8.5), which needs
+  then the steward asks the live fall back (slots.md, 8.5), which needs
   no reboot, and the dead-man stays the backstop.
 - **A live bless is not the last word:** the slot's native boot is a
   trial of its own (slots.md, 6.8, L9), and its blessing checks run
@@ -434,8 +435,9 @@ wire.md, section 6.
   start of the activator and on demand, and from M5 on a period (daily
   to start), reported by its stable ids.
 - **Costs:** hearth's own, per build step: time, bytes fetched, cache
-  hits (build.md, section 12). The lab benchmarks hearth with them, and a
-  regression in its efficiency is a finding.
+  hits; and the steward's memory, idle and at its peak, and the
+  builder's (build.md, section 12; steward.md, 5.3). The lab benchmarks
+  hearth with them, and a regression in its efficiency is a finding.
 - **Liveness is redialling** (wire.md, 5.5). A machine that stops
   redialling is down; there is no heartbeat fact.
 
@@ -470,7 +472,7 @@ person reads them through the engine.
     its host's activator (slots.md, 5.4 and 12.1), so every slot of the
     container writes one journal. nspawn refuses to link a journal whose
     id is its host's, which a container's never is.
-  - The host's builder reads it as it reads its own, being in
+  - The host's steward reads it as it reads its own, being in
     `systemd-journal`, with `journalctl
     --directory=/var/log/journal/<machine-id>`, whether the container
     runs or not. That journald inside a container with its own id range
@@ -480,17 +482,18 @@ person reads them through the engine.
 - **hearth samples the machine's signals:** CPU (`/proc/stat`), memory
   (`/proc/meminfo`), pressure (`/proc/pressure/*`), load
   (`/proc/loadavg`), and disk use per mount (`df`), every 10 s.
-  - They are kept in a ring of fixed size in the builder's state
-    (store.md, 8.3), at three resolutions: 10 s for 6 hours, 1
-    minute for 3 days, 15 minutes for 60 days. The sizes are computed at
-    startup and bounded.
+  - They are kept in a ring of fixed size in the steward's records, in
+    the store's `state/` (store.md, 8.3; steward.md, 2.2), at three
+    resolutions: 10 s for 6 hours, 1 minute for 3 days, 15 minutes for
+    60 days. The sizes are computed at startup and bounded.
   - The ring is on disk, so a reboot keeps what led up to it.
 - **Each check's history:** its last 1,024 results, a ring per check in
-  the builder's state, beside the signals.
+  the steward's records, beside the signals.
 - **Served on demand,** by bounded reads of a window
-  (wire.md, section 7). Nothing is pushed. The builder reads the journal
+  (wire.md, section 7). Nothing is pushed. The steward reads the journal
   itself, as `hearth` in the group `systemd-journal` (activator.md, 3.2;
-  format.md, 5.12).
+  format.md, 5.12); its builder, spawned with no supplementary group,
+  cannot (steward.md, 2.3).
 - **No central store for metrics or logs to start.** If history across
   the fleet is needed later, it is a service the factory deploys from
   its own IaC, behind an observability connector of its own (temper's
@@ -527,9 +530,9 @@ renewal, snapshots and backups). The operational effects start with three
 
 ## 7. Snapshots [M5] and backups [M6]
 
-A target's data belongs to its services, not to the builder, so
-snapshotting it and backing it up is the activator's work, and it may
-use `btrfs send`, which needs root. Data is kept by class
+A target's data belongs to its services, not to hearth's unprivileged
+side, so snapshotting it and backing it up is the activator's work, and
+it may use `btrfs send`, which needs root. Data is kept by class
 (format.md, 5.7): `core`, `data` and `cache`, one subvolume each, with a
 policy per class, as os's and the bash fleet's layout intended. The bash
 fleet relied on snapper, which missed `/srv/data` and was off on rhi for
@@ -557,9 +560,9 @@ lack of disk, and had no off-machine backup of service data at all.
   only grows, and keys the snapshot: one of that sequence means done.
   The activator's record of the class names each snapshot's sequence,
   time, which policies keep it, and its backup state [M6].
-- **No builder is needed:** the activator keeps each class's deadline
+- **No steward is needed:** the activator keeps each class's deadline
   itself, from its records, after its restarts too, so snapshots go on
-  while the builder is down or the machine is on trial.
+  while the steward is down or the machine is on trial.
 - **On the machine, for a person:** `hearth snapshots` lists them, and
   `hearth shell --snapshot <class>@<seq>` shows one read-only, as any
   slot is shown (wire.md, 3.1 and 3.7), so a file can be copied out by
@@ -591,14 +594,14 @@ lack of disk, and had no off-machine backup of service data at all.
   Render gives each target its peer through that task's exports, and
   the peer the targets it receives from, so a peer accepts streams only
   from the targets its own spec names.
-- **Encrypted for the peer before any byte reaches the builder.**
+- **Encrypted for the peer before any byte reaches the steward.**
   Persistent data holds private material, such as ACME account and
-  certificate keys, so no builder ever sees a stream in plaintext. The
-  activator pipes `btrfs send` into `age`, encrypting to the peer's
-  backup key:
+  certificate keys, so no steward or builder ever sees a stream in
+  plaintext. The activator pipes `btrfs send` into `age`, encrypting to
+  the peer's backup key:
 
   ```
-  btrfs send -p <parent> <seq>  |  age --encrypt --recipient <the peer's age1… key>  →  a pipe to the builder
+  btrfs send -p <parent> <seq>  |  age --encrypt --recipient <the peer's age1… key>  →  a pipe to the steward
   ```
 
   - **The peer's backup key** is an identity item of the peer's target,
@@ -608,11 +611,11 @@ lack of disk, and had no off-machine backup of service data at all.
   - **The recipient reaches the activator at prepare,** in the class's
     policy in the sending slot's `data` part, rendered from that export,
     and is kept in the slot record: a send request names a class and a
-    sequence, never a recipient, so the builder cannot redirect a stream
+    sequence, never a recipient, so the steward cannot redirect a stream
     to a key of its own.
 - **The path of the ciphertext:** over a pipe made for the transfer
-  (not the link) to the builder, which sends it to the peer's builder
-  over HTTP (`hearth-protocol-http`); the peer's builder hands it to its
+  (not the link) to the steward, which sends it to the peer's steward
+  over HTTP (`hearth-protocol-http`); the peer's steward hands it to its
   activator, which runs `age --decrypt --identity <its backup key>`
   into `btrfs receive <top>/@hearth.backups/mail-prod.data/` and
   confirms. Only the two activators see plaintext.
@@ -758,7 +761,7 @@ lack of disk, and had no off-machine backup of service data at all.
   - every result names its check, slot and output, or its probed target
     and prober;
   - no command check runs as `root`, reaches a path `InaccessiblePaths=`
-    hides, or sends a byte of its output to the builder;
+    hides, or sends a byte of its output to the steward;
   - alarms follow their hysteresis; the signals' and history's rings
     stay within their sizes; every telemetry read is bounded.
 - **The backups' world** [M5] runs `hearth-domain-backups` on the fake
@@ -774,7 +777,7 @@ lack of disk, and had no off-machine backup of service data at all.
     sending needs;
   - a restore is finished or undone after any power cut, an entry's
     touching no other entry of its class;
-  - no byte of a stream reaches a builder before `age` has encrypted
+  - no byte of a stream reaches a steward before `age` has encrypted
     it, and every stream's recipient is the one its slot record names
     [M6];
   - the snapshot the peer last confirmed is never deleted locally, and
@@ -806,7 +809,7 @@ lack of disk, and had no off-machine backup of service data at all.
   full sends, rather than receiving plaintext subvolumes (7.3); it
   depends on how far a backup peer is trusted within its plane.
 - **The activator sending to the peer itself,** the alternative to
-  encrypting for the peer (7.2): no builder would carry the stream at
+  encrypting for the peer (7.2): no steward would carry the stream at
   all, but the activator would dial out and need an HTTP and TLS client
   of its own; it depends on how small the activator must stay
   (activator.md, section 2).

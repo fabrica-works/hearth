@@ -841,7 +841,7 @@ wire.md, 3.8):
 | engine | none | its address, what to trust it by, and the machine's credential if the identity chosen is one (wire.md, 5.1 and 5.3) |
 
 The target and `mutable` go into the activator's machine record; the
-rest is the builder's, kept in its state (store.md, 8.3), from which the
+rest is the steward's, kept in its state (store.md, 8.3), from which the
 client changes only the desired revision and its trial mode
 (wire.md, 4.1).
 
@@ -896,7 +896,7 @@ failure finds what the first run made, up to the disk's wipe.
    `@hearth.state` (`0:0 0700`) and `@hearth.store` (`hearth`, `0700`);
    write the machine record (target, firmware, filesystem UUID, boot
    partition's volume id, entry numbers) into the state, and the
-   machine's configuration (8.1) into the builder's state, owned by
+   machine's configuration (8.1) into the steward's state, owned by
    `hearth`, with the repository's read credential under the store's
    `credentials/` (render.md, 2.2), never in the secret store.
 5. **Import the secrets** from `--secrets` (activator.md, 5.8). A
@@ -905,14 +905,16 @@ failure finds what the first run made, up to the disk's wipe.
    it.
 6. **Build:** bootstrap enters a transient scope with `Delegate=yes`
    (`systemd-run --scope --property=Delegate=yes`) and lays out its
-   cgroups as the daemon does (activator.md, 3.1); its activator's
-   domain spawns the builder from `/proc/self/exe` (the live system has
-   no `/usr/bin/hearth`) over a link, as on a running machine
-   (activator.md, 3.2), with the store mounted at
-   `/var/lib/hearth/store`. The builder renders the
-   target at its desired revision, builds its output and asks to place
-   it, as converge does on any machine (wire.md, section 4); under an
-   engine [M4], the revision given builds this first slot only.
+   cgroups as the daemon does (activator.md, 3.1; steward.md,
+   section 7); its activator's domain spawns the steward from
+   `/proc/self/exe` (the live system has no `/usr/bin/hearth`) over a
+   link, as on a running machine (activator.md, 3.2), with the store
+   mounted at `/var/lib/hearth/store`. The steward spawns a builder for
+   its jobs (steward.md, section 3), which renders the target at its
+   desired revision and builds its output; the steward then asks to
+   place it, as converge does on any machine (wire.md, section 4);
+   under an engine [M4], the revision given builds this first slot
+   only.
 7. **Place into slot `a`:** prepare, from snapshot to verify
    (slots.md, section 5), including the boot files and both entries
    (EFI) or the slot's fragment (BIOS). Prepare first makes every
@@ -933,7 +935,8 @@ failure finds what the first run made, up to the disk's wipe.
    transition that needs no running slot (slots.md, section 4).
 10. **Report and stop:** print the machine-id and each identity item's
     public half for the repository's exports (format.md, section 8);
-    stop the builder; unmount everything. The operator reboots.
+    stop the steward, which stops its builder; unmount everything. The
+    operator reboots.
 
 The import comes before the build and the identity is made by the
 place, though the task listed both last: prepare writes them into the
@@ -941,10 +944,10 @@ slot, so they must exist when it runs.
 
 ### 8.3 The build on a live system
 
-- **The builder runs as `hearth`, unprivileged, even here.** A live
-  system has no `hearth` user, so bootstrap makes one, with the fixed
-  uid, gid and subordinate range that every output also declares
-  (format.md, 5.12; store.md, 9.2):
+- **The steward and its builder run as `hearth`, unprivileged, even
+  here.** A live system has no `hearth` user, so bootstrap makes one,
+  with the fixed uid, gid and subordinate range that every output also
+  declares (format.md, 5.12; store.md, 9.2):
 
   ```
   useradd --system --uid 59999 --user-group --home-dir /nonexistent --shell /usr/sbin/nologin hearth
@@ -964,7 +967,7 @@ slot, so they must exist when it runs.
 ### 8.4 The first boot
 
 The firmware or GRUB boots `a`. Its activator finds `a` running and
-default, no trial marker and no journal; its builder finds the desired
+default, no trial marker and no journal; its steward finds the desired
 revision built and placed, and converges from there.
 
 **A host's containers are not bootstrapped [M5].** Bootstrap places the

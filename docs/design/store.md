@@ -2,11 +2,11 @@
 
 Provisional, 2026-10-09. The builder's store on btrfs: its layout, the
 canonical encoding every digest uses, layer keys and tree digests, a
-layer's life, the tree helper, records, pins and collection, how the
-builder reads its state back, what the machine must provide, and how
-peers exchange layers. M2 builds it, but for peers (section 10, M6).
-How a layer's contents are made is build.md. What is open is in section
-12.
+layer's life, the tree helper, records, pins and collection, how each
+builder reads the store back, the steward's records beside it, what the
+machine must provide, and how peers exchange layers. M2 builds it, but
+for peers (section 10, M6). How a layer's contents are made is build.md.
+What is open is in section 12.
 
 ## 1. In one page
 
@@ -42,9 +42,9 @@ How a layer's contents are made is build.md. What is open is in section
   rest:** unrecord, clear the read-only flag, empty inside the
   namespace, `rmdir`. Builders and test filesystems may delete whole
   with `user_subvol_rm_allowed`.
-- **The filesystem is hearth's only state.** At startup three
-  unprivileged btrfs ioctls and the records rebuild what the builder
-  holds in memory. No kv store.
+- **The filesystem is hearth's only state.** At each builder's start
+  three unprivileged btrfs ioctls and the records rebuild what it holds
+  in memory. No kv store.
 - **Peers exchange change sets [M6]** by layer key over HTTP, applied to
   a snapshot of a parent the receiver holds and checked by tree digest,
   within one plane.
@@ -67,7 +67,7 @@ How a layer's contents are made is build.md. What is open is in section
 ├── cache/<sha256>                 bytes by content: downloads, kept indices, render's blobs; 0644, never modified (2.2)
 ├── cache/<sha256>.record          where they came from (6.5)
 ├── targets/<H("target", name)>.record   a target's last builds (6.6)
-├── state/                         the builder's other records and rings (8.3)
+├── state/                         the steward's records and rings (8.3)
 ├── artifacts/                     [M6] artifacts, as layers/ holds layers: <key>, .record, .tree, .staging, .trash
 ├── sources/, caches/              [M6] artifacts' sources and compile caches, as subvolumes (artifacts.md, 3.2, 6.1)
 ├── repo/                          the builder's clone of the IaC repository (render.md, 2.2)
@@ -83,6 +83,9 @@ How a layer's contents are made is build.md. What is open is in section
 - **Directories are 0700, records and tree files 0600,** all the
   builder's: user `hearth` on a machine, the developer on a developer's
   machine.
+- **Two writers, apart:** on a machine the steward writes only
+  `state/`, and the builder writes the rest and never `state/`
+  (steward.md, 2.2). Both run as `hearth`.
 - **Artifacts [M6]** are read-only subvolumes named by key, with records
   and tree files beside them, built, published and deleted as layers are
   (artifacts.md, section 4); they live in `artifacts/` so that their
@@ -418,9 +421,10 @@ An interrupted build is built again when next asked for.
   by the scan, which reads no file: the activator's verification of what
   it places (activator.md, section 6), a scrub, a peer's walk (10.2).
   It is never a lasting refusal of the key. The builder hashes the layer
-  again (5.4); if the tree differs from its record, it deletes the layer
-  and every layer built on it (7.3) and builds them again; if it does
-  not, the mismatch is the activator's to report.
+  again (5.4), in a `verify` job (steward.md, 3.3); if the tree differs
+  from its record, it deletes the layer and every layer built on it
+  (7.3) and builds them again; if it does not, the mismatch is the
+  activator's to report.
 
 ### 4.5 Lineage through `parent_uuid`
 
@@ -439,7 +443,10 @@ An interrupted build is built again when next asked for.
 - **A key is built once at a time.** A request for a key in progress
   waits for it; one for a published key finds it.
 - **Different keys build at once** within the builder's limits
-  (build.md, 8.7); a chain is built bottom-up.
+  (build.md, 8.7); a chain is built bottom-up. On a machine the steward
+  gives its builder the pass's jobs one at a time, so one of its own
+  outputs builds there at a time, with others' work beside it from M6
+  (steward.md, 3.4).
 
 ## 5. The tree helper
 
@@ -747,7 +754,7 @@ depends on who names it (7.5).
 - **`targets/<H("target", name)>.record`:** the name and the last N
   builds (7.1), newest first, each `[revision, output key, at]`,
   rewritten when a build for the target completes.
-- **`state/`:** the builder's other records and rings (8.3).
+- **`state/`:** the steward's records and rings (8.3).
 
 ### 6.7 An artifact's record [M6]
 
@@ -768,7 +775,8 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
 - **Versioned per kind, across releases** (activator.md, 7.2's rule): a
   release reads its own version of each kind and the previous one, and
   writes only versions the previous release can read. After a fall back,
-  the blessed slot's older builder reads what the newer one wrote.
+  the blessed slot's older builder and steward read what the newer ones
+  wrote.
 - **An unknown version never stops the builder.** A layer, tree file,
   resolution, download or target record of a version it cannot read is
   treated as absent: the layer deleted (7.3), the rest made again, which
@@ -784,8 +792,8 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
 | Pin | From | Lasts |
 |---|---|---|
 | the empty layer | the store | always |
-| the outputs of the machine's slots [M3], its containers' included [M5] | the activator's facts over the link (activator.md, section 4) | while a slot holds it, or is prepared from it |
-| the desired revision's outputs [M3]: the machine's target's, and its containers' [M5] | `hearth-domain-converge` (wire.md, section 4) | while it is desired |
+| the outputs of the machine's slots [M3], its containers' included [M5] | the activator's facts over the link (activator.md, 4.3), passed on by the steward in the jobs' `Welcome` and `Pins` (steward.md, 3.2) | while a slot holds it, or is prepared from it |
+| the desired revision's outputs [M3]: the machine's target's, and its containers' [M5] | the steward's `hearth-domain-converge` (wire.md, section 4), in the same records | while it is desired |
 | builds in flight | the plan (build.md, section 4) | until the build ends |
 | a target's last N outputs | `targets/` (6.6); N is 3 by default | until N newer builds |
 | a peer's request [M6] | a lease per transfer (10.3) | until it ends or its deadline |
@@ -795,14 +803,18 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   parent's subvolume (snapshots share extents, not existence), but the
   target's next build starts from it and a peer's change set is against
   it. An ancestor costs only what its descendants changed or deleted.
-- **Nothing is collected before every source has spoken** since
-  startup: the activator's slots and the desired revision's output.
+- **A builder collects nothing before it has the steward's pins,** in
+  its `Welcome` (steward.md, 3.2): the activator's slots and the desired
+  revision's outputs. The steward spawns no builder that may collect
+  before its activator's `Welcome` has given it the slots' outputs.
 
 ### 7.2 Collection
 
-- **What no pin holds is collected:** after each publish, at startup
-  once the pins are known, and when the store's filesystem falls below
-  its free-space floor (`statfs`).
+- **What no pin holds is collected:** after each publish, at a
+  builder's start once the pins are known, and when the store's
+  filesystem falls below its free-space floor (`statfs`), which the
+  steward watches between builders and answers with a `collect` job
+  (steward.md, 3.3).
 - **Oldest first, bounded per run.** What a deletion frees is not known
   in advance: without quotas, which need root, btrfs does not say what a
   subvolume holds alone.
@@ -861,10 +873,11 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
 ### 8.1 The filesystem is the only truth
 
 - **Subvolumes and the records beside them are the builder's state,**
-  read back at startup: no kv store, no index file to disagree with the
-  disk.
-- **Only in memory:** builds in flight (their staging is deleted),
-  leases, the queue. A build asked for again finds or redoes its layers.
+  read back at each builder's start: no kv store, no index file to
+  disagree with the disk.
+- **Only in memory:** builds in flight (their staging is deleted) and
+  leases. The queue of jobs is the steward's (steward.md, 3.4). A build
+  asked for again finds or redoes its layers.
 - **The in-memory index** holds one entry per published layer (key,
   kind, parent, tree digest, uuid, counts, when), bounded by the store's
   layer limit (4,096 by default), and the resolutions and cache files by
@@ -872,34 +885,46 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
 
 ### 8.2 The startup scan
 
-1. **The store's record** (6.6): version and range.
-2. **Every subvolume under the store,** with
+It runs at every builder's start, and the steward spawns a builder for
+work (steward.md, 4.2), so what a crash, a kill or a power cut left is
+settled before the first job of every pass.
+
+1. **The lock:** an exclusive `flock` on the store's root directory,
+   held until the builder exits. A second builder over the same store,
+   a daemon's or a client's in-process on a developer's store, waits for
+   it (steward.md, 3.4). The root, not `store.record`, which 6.8 may
+   write again by rename onto another inode.
+2. **The store's record** (6.6): version and range.
+3. **Every subvolume under the store,** with
    `BTRFS_IOC_GET_SUBVOL_ROOTREF` on its root: the child subvolumes'
    tree ids and the directories holding them, 255 a call, continued from
    the last tree id. `btrfs subvolume list` needs root; this does not.
-3. **Each one's path,** with `BTRFS_IOC_INO_LOOKUP_USER`, which checks
+4. **Each one's path,** with `BTRFS_IOC_INO_LOOKUP_USER`, which checks
    read and search permission on each component: all the builder's.
-4. **Each one's identity,** with `BTRFS_IOC_GET_SUBVOL_INFO`: uuid,
+5. **Each one's identity,** with `BTRFS_IOC_GET_SUBVOL_INFO`: uuid,
    parent uuid, read-only flag, generation.
-5. **Matched against the records:** 4.4's cases, 4.5's uuids, each key
+6. **Matched against the records:** 4.4's cases, 4.5's uuids, each key
    recomputed. A subvolume inside a layer (`GET_SUBVOL_ROOTREF` on the
    layer) is refused, and the layer deleted.
-6. **Settled:** deletions done (7.3), strays (any name 2.1 does not
-   list) reported, the index built, and `state/` read (8.3).
+7. **Settled:** deletions done (7.3), strays (any name 2.1 does not
+   list) reported, and the index built. `state/` is the steward's, read
+   at its own start (8.3).
 
 The three ioctls have been unprivileged since Linux 4.18, and the
 builder makes them itself (5.8).
 
-### 8.3 The builder's other records
+### 8.3 The steward's records
 
-The rest of what the builder must keep across restarts and reboots
-lives in `state/`, each file named by `H("state", name)`, each bounded:
+What the steward must keep across restarts and reboots lives in
+`state/`, which only the steward writes and no builder opens
+(steward.md, 2.2), each file named by `H("state", name)`, each bounded:
 
 | Record | Holds | Bound | Written | Of a version it cannot read | Defined in |
 |---|---|---|---|---|---|
 | desired | target, repository, a commit or a branch with its interval, `trial: auto \| manual`, who set it and when, a generation | one | by rename, when the client changes it | reported; the running slot stays until the client sets a revision again | wire.md, 4.1 |
 | refused | output keys refused, each with why and when | the last 16 | by rename | discarded, reported; a fall back is refused again as the activator reports it | wire.md, 4.4 |
 | hold | who held (a peer's uid), when, the reason; or none | one | by rename | held, reported, until `hearth release` | wire.md, 4.5 |
+| pass | the last pass: its generation, commit, stage, output and prepare keys, and its outcome | one | by rename, at each stage | discarded; the bless's render then takes the desired revision, its commit or the branch's head in the clone | wire.md, 4.2; steward.md, section 6 |
 | orders [M4] | each order's key, attempt and stage, then its outcome, until the engine acknowledges it; a restart's unit `InvocationID` | 64 outcomes waiting (to start) | by rename, before the effect is asked | discarded; the engine sends again what it has not seen answered, and orders are keyed or conditional | wire.md, 5.4 and 5.5 |
 | signals [M5] | CPU, memory, pressure, load, disk use per mount | three rings: 10 s for 6 hours, 1 minute for 3 days, 15 minutes for 60 days | in place, slot by slot | discarded, started afresh | operating.md, section 5 |
 | check history [M5] | each check's results | 1,024 per check, a ring each | in place, slot by slot | discarded, started afresh | operating.md, section 5 |
@@ -916,7 +941,7 @@ lives in `state/`, each file named by `H("state", name)`, each bounded:
 - **Nothing here can be made again,** unlike the rest of the store, so
   6.8's rule matters most here: a newer release writes these in versions
   the previous one reads, and an unreadable one is settled as the table
-  says, never by stopping. The fall back that brings an older builder
+  says, never by stopping. The fall back that brings an older steward
   back is when convergence matters most.
 
 ## 9. Prerequisites
@@ -938,10 +963,10 @@ lives in `state/`, each file named by `H("state", name)`, each bounded:
 
 ### 9.2 The builder's user and its subordinate range
 
-- **User `hearth`,** a system user, with one subordinate uid range and
-  one gid range of 65536 ids, at a base aligned to 64 Ki: the
-  activator's shift is then a mask (slots.md, 5.2), as systemd's shifter
-  assumes.
+- **User `hearth`,** a system user, the steward's and the builder's,
+  with one subordinate uid range and one gid range of 65536 ids, at a
+  base aligned to 64 Ki: the activator's shift is then a mask
+  (slots.md, 5.2), as systemd's shifter assumes.
 - **Made explicitly.** `useradd -r` gives a system user no range unless
   `-F` (`--add-subids-for-system`), and then from `SUB_UID_MIN`, 100000,
   which is not aligned. So: `usermod --add-subuids <base>-<base+65535>
@@ -976,23 +1001,25 @@ lives in `state/`, each file named by `H("state", name)`, each bounded:
   `security.idmap.size` above 65536.
 - **`newuidmap` and `newgidmap`** (Debian's `uidmap`), setuid root.
 - **A cgroup v2 subtree the builder can write,** for its sandboxes'
-  limits: on a machine, `builder/`, which the activator makes under its
-  own delegated cgroup (`Delegate=yes`) and gives to `hearth`
-  (activator.md, section 3); on a developer's machine, the client's own
-  scope, run with `systemd-run --user --scope -p Delegate=yes`. What
-  build does with it is build.md, 8.7.
+  limits: on a machine, `steward/builder/`, which the steward makes in
+  the subtree the activator gives it, `steward/`, under its own
+  delegated cgroup (`Delegate=yes`; steward.md, section 7); on a
+  developer's machine, the client's own scope, run with `systemd-run
+  --user --scope -p Delegate=yes`. What build does with it is build.md,
+  8.7.
 - **The build's tools** (build.md, section 10): mmdebstrap, apt, dpkg.
   On a machine, hearth's own task installs them in every target that
   builds.
 
 ### 9.4 Where the store lives
 
-- **Reachable by the builder alone.** A layer holds setuid files owned
-  by the range: `su` is 4755, owned by the base. Whoever could reach and
-  run one would run as the base, which owns every layer, and could
-  rewrite an output before it becomes a slot. Guix met this
-  (CVE-2024-52867: setuid outputs reachable before they were fixed up),
-  and systemd warns of its foreign range the same way.
+- **Reachable by `hearth` alone,** and of its processes only the
+  builder and its helpers open a layer (steward.md, 2.2). A layer holds
+  setuid files owned by the range: `su` is 4755, owned by the base.
+  Whoever could reach and run one would run as the base, which owns
+  every layer, and could rewrite an output before it becomes a slot.
+  Guix met this (CVE-2024-52867: setuid outputs reachable before they
+  were fixed up), and systemd warns of its foreign range the same way.
 - **So it is mounted in one place only,** `/var/lib/hearth/store` in
   every slot, from the fstab the activator writes (machine.md, 3.3),
   with `nodev,nosuid,noatime`; its root is 0700 and owned by `hearth`,
@@ -1044,9 +1071,11 @@ lives in `state/`, each file named by `H("state", name)`, each bounded:
 
 ### 10.3 Serving
 
-- **A builder serves the layers it holds,** and its cache by digest.
-  The tree helper streams the change set from the tree file and the
-  layer, since only it can read every file.
+- **A machine serves the layers it holds,** and its cache by digest:
+  the steward holds the HTTP listener, and the bytes come from a
+  builder's job (steward.md, 2.1 and 3.3). The tree helper streams the
+  change set from the tree file and the layer, since only it can read
+  every file.
 - **A request leases the layer and its parent** until it ends or its
   deadline passes (7.1), within a bound on transfers at once and per
   peer.
@@ -1071,13 +1100,15 @@ lives in `state/`, each file named by `H("state", name)`, each bounded:
   machine's files as the namespace sees them.
 - **Faults from the seed:** a power cut at every step of 4.2 and 7.3; a
   full disk mid-walk or mid-apply; the helper killed mid-request; a
-  subvolume swapped behind its record; the activator's facts late.
+  subvolume swapped behind its record; the steward's pins late; a
+  second builder over the same store.
 - **Invariants** (testing.md, section 8):
   - every published layer's key recomputes from its record, its uuids
     match its subvolume, and its tree digest is the one the world gets
     walking the fake tree on its own;
-  - after any crash and a startup, no staging, trash or temporary file
-    remains, and every record has its layer;
+  - after any crash and a builder's start, no staging, trash or
+    temporary file remains, and every record has its layer;
+  - no two builders hold the store's lock at once;
   - collection never deletes a pinned layer or an ancestor of one, nor
     runs before the pins are known;
   - no layer holds a nested subvolume, an owner outside the range, or

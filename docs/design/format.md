@@ -1058,7 +1058,7 @@ declares it (render.md, 7.2):
 | a task file at `/etc/tiny-initramfs/tiny-initramfs.conf`, so `AUTO_MODULES=yes` and `MICROCODE=yes` cannot reach an output | the packages part's, written before the kernel installs | build.md, 5.5; machine.md, 7.1 |
 | tmpfiles `v`, `q`, `Q`; `w`, `w+`, `f+`, `L+` outside `/var`, `/run` and `/tmp` | a nested subvolume breaks a layer; a write on the read-only root fails at boot | build.md, 7.4 |
 | preseeds of type `password` | they leave the password in `/var/cache/debconf/passwords.dat` | build.md, 9.2 |
-| a secret or identity file owned by user `hearth`, or by a group `hearth` belongs to (`systemd-journal`); a secret's mode readable by others | the builder must never read a secret | activator.md, section 2; 9.1 |
+| a secret or identity file owned by user `hearth`, or by a group `hearth` belongs to (`systemd-journal`); a secret's mode readable by others | neither the steward nor its builder may ever read a secret | activator.md, section 2; 9.1 |
 | an owner of a data path, a secret or an identity file without a fixed id; a download's owner other than `root` or a package user with a fixed id | ids that move between builds; no sysusers user exists when software is placed | 5.6; 10.1 |
 | `live` entries that name a never-live unit or path (5.14); a `unit` with `none`, or none with another action; a path outside `/etc`, `/usr` and `/opt` | a never-live unit must not be acted on live, and a change elsewhere is never live | 5.14; slots.md, 6.7 |
 | presets and links that enable `systemd-sysext.service` or `systemd-confext.service`; anything under `/etc/extensions`, `/usr/lib/confexts`, `/usr/local/lib/confexts`, `/var/lib/extensions` or `/var/lib/confexts` | nothing may merge extensions over hearth's live overlays, at boot or after a soft reboot, a container's included, which has no `hearth` task to disable them | 5.12; slots.md, 6.6 |
@@ -1068,9 +1068,10 @@ declares it (render.md, 7.2):
 - **Every target has the `hearth` task,** but a container (below),
   without naming it: render adds it, and `"hearth": null` is an error.
   Every such output then carries hearth's binary, its activator's unit
-  and its user, which machine.md (8.3) and slots.md assume. Its files
-  are in the repository like any task's, `tasks/hearth/`, so the
-  release a fleet runs is pinned by a change.
+  (which starts the steward, which starts builders) and its user, which
+  machine.md (8.3) and slots.md assume. Its files are in the repository
+  like any task's, `tasks/hearth/`, so the release a fleet runs is
+  pinned by a change.
 - **But a container's [M5]:** render adds no `hearth` task to a
   container's target, and naming it there is an error. No hearth runs in
   a container (slots.md, 12.5): its host's builder builds its output and
@@ -1146,8 +1147,9 @@ declares it (render.md, 7.2):
   The uid 59999, with its own group of the same id, sits at the top of
   the ids adduser hands to people from 1000 up, and away from the system
   ids packages take below 1000 (to verify against the fleet's packages).
-- **`systemd-journal`** lets the builder read the journal for telemetry
-  (wire.md, section 7).
+- **`systemd-journal`** lets the steward read the journal for telemetry
+  (wire.md, section 7); its builder runs with no supplementary group
+  (steward.md, 2.3).
 - **Snapshots and backups are declared once, by class** (5.7), normally
   in `fleet.json` or an environment file:
 
@@ -1774,7 +1776,7 @@ PersistentKeepalive=25
 ### 8.7 Example: the backup peer [M6]
 
 - **Backups are encrypted to the peer's key** with `age` before any byte
-  reaches a builder (operating.md, section 7). The peer's `backup_peer`
+  reaches a steward (operating.md, section 7). The peer's `backup_peer`
   task holds that key as identity and exports its public half, recorded
   as data like any other (8.4):
 
@@ -1826,10 +1828,10 @@ PersistentKeepalive=25
   or identity gives, nor lie under a data path; a collision is an error
   (render.md, 3.7). A path beneath `/var` is allowed, and is written into
   the slot's own `/var` subvolume (slots.md, 5.4).
-- **Never the builder's to read:** a secret's mode gives others nothing
-  (at most `0770`, no setuid, setgid or sticky bit), and its owner is
-  neither user `hearth` nor a group `hearth` belongs to, such as
-  `systemd-journal` (5.11).
+- **Never `hearth`'s to read,** the steward's nor its builder's: a
+  secret's mode gives others nothing (at most `0770`, no setuid, setgid
+  or sticky bit), and its owner is neither user `hearth` nor a group
+  `hearth` belongs to, such as `systemd-journal` (5.11).
 - **Rotating a secret changes no part.** The activator prepares a new
   slot of the same output (README, section 7).
 - **TLS keys are secrets.** Build removes the snakeoil pair that

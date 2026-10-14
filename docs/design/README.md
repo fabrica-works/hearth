@@ -28,11 +28,14 @@ open. Each part has a document of its own beside this one.
   then config, each a read-only btrfs subvolume named by its cumulative
   key. A change rebuilds from the lowest layer whose key it changed, on
   a snapshot of the layer beneath.
-- **Two processes, split by privilege** (activator.md). The builder,
-  unprivileged, renders, builds and decides. The activator, root and
-  small, owns the machine's slots, boot state and secrets, and does a
-  closed list of operations. The activator starts the builder and
-  listens to nothing else.
+- **Three processes: two split by privilege, two by failure**
+  (activator.md, steward.md). The activator, root and small, owns the
+  machine's slots, boot state and secrets, and does a closed list of
+  operations. It starts the steward and listens to nothing else. The
+  steward, unprivileged and persistent, decides and faces: converge,
+  the client, the engine, checks. It spawns the builder, unprivileged
+  too, for work: render, builds, the store. A builder that crashes ends
+  a job, never the process that reports it.
 - **Immutable roots.** A slot's root (`/usr`, `/etc` and the rest) is
   mounted read-only. Only the slot's own `/var` and the data its tasks
   declare are writable: a directory per entry in one of the target's
@@ -61,8 +64,8 @@ open. Each part has a document of its own beside this one.
   is the MVP's.
 - **Built on skein,** following `programming-model.md`: one loop, sans-io
   step functions, a domain complete enough to run whole on a fake
-  machine. The heavy work runs in child processes: git, mmdebstrap,
-  efibootmgr, and hearth's own tree helper.
+  machine. The heavy work runs in child processes: the builder, git,
+  mmdebstrap, efibootmgr, and hearth's own tree helper.
 - **Tested from day 0** (testing.md): on a fake machine, with a realistic
   fake for every tool, a conformance tier that holds the fakes to the
   real tools, real builds as a regular user, and VMs for what needs root
@@ -93,19 +96,21 @@ open. Each part has a document of its own beside this one.
    bootstrap.
 7. **slots.md:** a slot's life: the four facts, prepare, trial (live
    changes included), bless, fall back, roll back, drift, containers.
-8. **activator.md:** the privilege boundary: the process pair, the link,
-   the activator's operations and what it verifies.
-9. **wire.md:** hearth's faces: the command-line client, standalone
-   mode, the wire to an engine, bytes by digest.
-10. **operating.md:** after a rollout: checks, facts, telemetry,
+8. **activator.md:** the privilege boundary: the activator and its
+   steward, the link, the activator's operations and what it verifies.
+9. **steward.md:** the unprivileged side: the steward and the builder it
+   spawns for work, the jobs between them, failures, the bless's render.
+10. **wire.md:** hearth's faces: the command-line client, standalone
+    mode, the wire to an engine, bytes by digest.
+11. **operating.md:** after a rollout: checks, facts, telemetry,
     operational effects, snapshots and backups.
-11. **testing.md:** how `testing-strategy.md` applies to hearth: the fake
+12. **testing.md:** how `testing-strategy.md` applies to hearth: the fake
     machine, the fakes of tools, the tiers and their budgets.
-12. **development.md:** how an agent develops a machine: development
+13. **development.md:** how an agent develops a machine: development
     machines on Incus, mutable roots, capture, applying a working tree.
-13. **artifacts.md:** the second recipe: an artifact from a build
+14. **artifacts.md:** the second recipe: an artifact from a build
     environment, sources and a command.
-14. **reproducible.md:** reproducible builds, deferred: what is kept from
+15. **reproducible.md:** reproducible builds, deferred: what is kept from
     day one and how they are retrofitted.
 
 `draft/brainstorm.md` is the record of the first discussion. These
@@ -122,7 +127,7 @@ every milestone, from the first (testing.md, section 10).
 |---|---|---|---|
 | M1 | Render | specs with digests; the rendered diff of any change | format.md, but for checks and artifacts; render.md; the client's render and diff |
 | M2 | Build | outputs keyed by digest, built unprivileged, layer by layer | store.md, but for peers; build.md; the tree helper |
-| M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, installed from scratch | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; wire.md's client and standalone mode; a minimal bless; development.md's mutable machines, capture and working trees |
+| M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, installed from scratch | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; steward.md, but for peers and artifacts; wire.md's client and standalone mode; a minimal bless; development.md's mutable machines, capture and working trees |
 | M3b | BIOS; development machines | BIOS machines, which most IaaS providers offer; development machines on Incus | machine.md's BIOS path; slots.md's trial through GRUB; development.md's Incus driver |
 | M4 | The wire | hearth as a system behind an engine | wire.md's wire, facts and events |
 | M5 | Operating | the machine's end of the run side | operating.md, but for backups; checks as task data; local snapshots of each class, and restores from them (operating.md, section 7); containers and pool hosts (slots.md, section 12); clusters and containers in development (development.md) |
@@ -143,7 +148,8 @@ slots.md, section 7), peers, artifacts and backups.
 - the slots' four facts and their state machine (slots.md);
 - every effect keyed or conditional, even while the client is the only
   one to ask (wire.md);
-- the privilege split, from the first slot (activator.md).
+- the privilege split, from the first slot (activator.md), and the
+  steward apart from its builder (steward.md).
 
 ## 4. Structure
 
@@ -152,27 +158,36 @@ slots.md, section 7), peers, artifacts and backups.
 ```
 a machine
 ├── hearth activator          root, started by systemd: the machine's slots, boot state, secrets
-│   └── hearth builder        user hearth, with a subordinate id range; started by the activator
-│       ├── tools             git, apt-helper, mmdebstrap, dpkg-query: each build step in a sandbox of its own
-│       └── tree helper       in the builder's user namespace: snapshots, freezes, walks, hashes, applies, empties
-└── hearth (the client)       any user: talks to the builder over a local socket, or runs in-process
+│   └── hearth steward        user hearth; persistent; started by the activator: converge, the faces, checks
+│       └── hearth builder    user hearth, with a subordinate id range; started by the steward for work
+│           ├── tools         git, apt-helper, mmdebstrap, dpkg-query: each build step in a sandbox of its own
+│           └── tree helper   in the builder's user namespace: snapshots, freezes, walks, hashes, applies, empties
+└── hearth (the client)       any user: talks to the steward over a local socket, or runs in-process
 ```
 
-- **The link** joins the activator and its builder: a pipe pair made
-  when the activator spawns the builder, so the activator hears no one
+- **The link** joins the activator and its steward: a pipe pair made
+  when the activator spawns the steward, so the activator hears no one
   else (activator.md, section 3).
+- **The jobs** join the steward and its builder: the builder's standard
+  input and output. The steward spawns a builder when it has work and
+  lets it exit once idle, so a crash in render or a build loses a job,
+  not the machine's face (steward.md).
+- **The steward never reads the repository, runs a build tool or opens
+  a layer;** whatever IaC steers runs in the builder or beneath it
+  (steward.md, 2.2).
 - **cgroups are delegated:** the activator's unit has `Delegate=yes`; the
-  activator moves itself into a leaf and gives the builder a subtree of
-  its own, for its sandboxes (activator.md, section 3).
+  activator moves itself into a leaf and gives the steward a subtree of
+  its own, in which the builder gets one with its own memory ceiling,
+  for its sandboxes (steward.md, section 7).
 - **A builder alone** serves tests, the lab's builders and a developer's
-  machine: rendering, diffing and building need neither an activator nor
-  root.
+  machine: rendering, diffing and building need neither a steward, an
+  activator nor root.
 - **The client runs the builder's domain in-process** when no daemon
   runs, on a developer's machine (M1, M2), and whenever it renders a
   local repository: the daemon renders only its own clone
   (wire.md, section 3).
 - **Bootstrap runs the activator's code in-process,** as root from a
-  live system, and it spawns a builder over a link as the daemon does
+  live system, and it spawns a steward over a link as the daemon does
   (machine.md, section 8).
 
 ### 4.2 Crates
@@ -186,13 +201,14 @@ lib                           no_std, skein-lib only
 hearth-lib                    the canonical encoding and H (store.md, 3.1 and 3.2)        M1
 
 domain                        no_std, skein-lib, hearth-lib and their own children only
-hearth-domain-builder         the builder's root: routes between its children; orders and facts
+hearth-domain-builder         the builder's root: routes between its children; jobs (steward.md)
 ├── hearth-domain-render      configuration to spec (format.md, render.md)                M1
 ├── hearth-domain-store       layers, keys, records, pins, collection (store.md)          M2
 ├── hearth-domain-build       plans and steps (build.md)                                  M2
-├── hearth-domain-converge    the desired revision, orders, a slot's decisions (wire.md)  M3
-├── hearth-domain-checks      checks, signals, windows (operating.md)                     M5
 └── hearth-domain-artifacts   the second recipe (artifacts.md)                            M6
+hearth-domain-steward         the steward's root: routes between its children; orders, facts, jobs  M3
+├── hearth-domain-converge    the desired revision, orders, a slot's decisions (wire.md)  M3
+└── hearth-domain-checks      checks, signals, windows (operating.md)                     M5
 hearth-domain-dev             the client's development loop; the Incus driver from M3b (development.md)  M3
 hearth-domain-activator       the activator's root (activator.md)                         M3
 ├── hearth-domain-slots       slot state, prepare, trial, bless, fall back, drift         M3
@@ -212,7 +228,8 @@ hearth-protocol-tree          the tree helper's records; the store's records and
 hearth-protocol-accounts      passwd, group and shadow lines                              M2
 hearth-protocol-tail          a tool's output tail, kept for a failure                    M2
 hearth-protocol-xattr         file capabilities and POSIX ACLs                            M2
-hearth-protocol-link          the builder–activator records, both ways                    M3
+hearth-protocol-link          the steward–activator records, both ways                    M3
+hearth-protocol-jobs          the steward–builder records, both ways (steward.md, 3.2)   M3
 hearth-protocol-state         the activator's records, the trial marker, the slot record  M3
 hearth-protocol-units         fstab, the trial's units, the watchdog's drop-in           M3
 hearth-protocol-efi           EFI variables from efivarfs; efibootmgr's argument vectors  M3
@@ -226,10 +243,12 @@ hearth-protocol-wire          the wire to an engine, over skein's channel       
 hearth-protocol-probe         probes of a service as its users see it (operating.md, 2.5) M5
 hearth-protocol-http          bytes by digest                                             M6
 hearth-protocol-builder       the builder's protocol layer: routes its machines           M1
+hearth-protocol-steward       the steward's protocol layer: routes its machines           M3
 hearth-protocol-activator     the activator's protocol layer: routes its machines         M3
 
 service and shell
 hearth-service-builder        the builder's iterate                                       M1
+hearth-service-steward        the steward's iterate                                       M3
 hearth-service-activator      the activator's iterate                                     M3
 hearth-service-tree           the tree helper's iterate                                   M2
 hearth                        the binary: each process, and the client
@@ -238,7 +257,7 @@ testing
 hearth-fake-machine           the fake machine (testing.md, section 3)                    M1
 hearth-fake-<tool>            one fake per tool, acting on the fake machine               M1
 hearth-fake-engine            an engine at the wire's far end (testing.md)                M4
-hearth-system-world           the builder's and the tree helper's domains; the activator's from M3     M2
+hearth-system-world           the builder's and the tree helper's domains; the steward's and the activator's from M3     M2
 hearth-<name>-world           the other worlds, under tests/
 ```
 
@@ -246,14 +265,18 @@ hearth-<name>-world           the other worlds, under tests/
   encoding and `H` are needed by domains in three processes, which may
   depend only on lib and their own children (`programming-model.md`,
   4.5). It moves into skein's lib if another service needs it.
-- **The builder's children** are siblings that share no types; the root
-  translates between them (`programming-model.md`, 4.5).
+- **The builder's children,** and the steward's, are siblings that
+  share no types; each root translates between them
+  (`programming-model.md`, 4.5).
 - **Every format is its own machine crate,** lib-only and fuzzed alone;
   a process's protocol layer only routes between its machines
   (`programming-model.md`, section 4; activator.md, 8.1).
-- **The activator's domain never depends on the builder's.** The link's
-  records are the only vocabulary they share, through
-  `hearth-protocol-link`.
+- **The activator's domain never depends on the steward's, nor the
+  steward's on the builder's.** The link's records are the only
+  vocabulary the first two share, through `hearth-protocol-link`; the
+  jobs' are the only one the last two share, through
+  `hearth-protocol-jobs`. The client hosts the builder's domain
+  in-process (wire.md, 3.5), and needs no steward for it.
 - **Drift is the activator's** (slots.md, section 10): it wrote the slot
   record and alone can read every file of a slot.
 - **`hearth-domain-tree` has two parents in two processes:** the tree
@@ -301,7 +324,8 @@ hearth-<name>-world           the other worlds, under tests/
 | live change, delta, live bless | a trial with no reboot: a delta of the new slot (`@<target>.live.<n>`) mounted over the running slot's `/etc`, `/usr` and `/opt`, the declared units acted on; its bless arms the new slot's native trial (slots.md, 6.6 and 7.6) |
 | prepare, trial, bless, fall back, roll back | a slot's transitions (slots.md, section 4) |
 | boot partition | the FAT partition the firmware or GRUB writes: the ESP on EFI, GRUB's env on BIOS (machine.md) |
-| builder, activator, link | the two processes, and the pipe pair that joins them (activator.md) |
+| activator, steward, builder | the three processes: root and closed; persistent, deciding and facing; spawned for work (activator.md, steward.md) |
+| link, jobs | the pipe pairs between the activator and its steward, and between the steward and its builder |
 | client | the command-line face (wire.md, section 3) |
 | engine | what orders a machine: the run side's or the lab's (temper's `factory.md`) |
 | plane | the lab or the run side: outputs and credentials never cross between them |
@@ -405,6 +429,17 @@ that last:
     GRUB's files and its env, which GRUB cannot write on btrfs, so that
     `next_entry` is a one-shot; two env files, so a torn write never
     loses the default (machine.md, sections 4 and 5).
+- **The steward and its builder** (2026-10-14; steward.md). The
+  unprivileged side is two processes, by failure rather than privilege:
+  the steward, persistent, holds converge, the client's socket, the
+  wire, checks and telemetry, and never reads the repository, runs a
+  build tool or opens a layer; the builder, spawned by the steward for
+  work and gone once idle, does git, render, builds and the store. A
+  builder that crashes loses a job, which a second loss fails as
+  `crashed`, so a revision that trips a hearth bug is reported by a
+  machine that stays in view. The bless asks for one render more, of
+  the slot's own revision, so a release that cannot render what built
+  it never becomes the default.
 
 **Others:**
 
@@ -452,7 +487,7 @@ that last:
 - **A host keeps no list of its containers:** a container's placement
   names its host (format.md, 3.5). This replaces the brainstorm's list in
   the host's configuration (its 7.7).
-- **The activator starts the builder** and talks to it over a pipe pair;
+- **The activator starts the steward** and talks to it over a pipe pair;
   it listens to nothing else (activator.md, section 3).
 - **Which slot runs** is read from the root subvolume's identity
   (`BTRFS_IOC_GET_SUBVOL_INFO` on `/`), cross-checked with the slot
@@ -465,8 +500,9 @@ that last:
   window's end (slots.md, 12.3); a live trial's, by the running slot's
   own dead-man, started from `/run` (slots.md, 6.8).
 - **A minimal bless until checks exist:** the boot reaches its target
-  with no failed unit, and the slot's own hearth is up and talking to
-  its activator (slots.md, section 7).
+  with no failed unit, the slot's own steward is up and talking to its
+  activator, and a builder it spawned has rendered the slot's own
+  revision (slots.md, section 7; steward.md, section 6).
 - **Secure Boot off** for now: a Debian kernel cannot boot from a direct
   stub entry under it (machine.md, section 9).
 - **tiny-initramfs is the initramfs,** Debian's package, configured
@@ -495,9 +531,10 @@ that last:
   waits for another commit; an operational failure (git, the
   resolution, a fetch) is retried with backoff; an output that failed
   to build, verify or hold is refused (wire.md, 4.4; render.md, 7.1).
-- **The builder reads the journal itself:** it runs with `hearth`'s
+- **The steward reads the journal itself:** it runs with `hearth`'s
   supplementary groups, `systemd-journal` among them, and no
-  capabilities (activator.md, 3.2).
+  capabilities; its builder runs with none (activator.md, 3.2;
+  steward.md, 2.3).
 - **Users a package makes** (`postfix`) are declared by the task that
   installs it, so render knows them and the activator checks they exist
   at prepare (format.md, 5.6; slots.md, 5.7).
@@ -514,7 +551,7 @@ that last:
   the command line, never from a mount; each EFI slot has a normal and a
   trial entry (slots.md, section 6; machine.md, section 4).
 - **A bless marks the slot blessed before it moves the default,** so a
-  cut leaves a blessed slot that is not the default, and the builder
+  cut leaves a blessed slot that is not the default, and the steward
   blesses it again (slots.md, section 7; wire.md, 4.2).
 - **Refusals are keyed by the prepare key** (the output, the slot parts
   and the generations), never by the output alone; a corrupt layer is
@@ -525,9 +562,9 @@ that last:
   of the wrong shape is refused (slots.md, section 5;
   activator.md, section 6).
 - **The boundary, stated honestly:** the activator keeps secrets from
-  the builder and confines it to closed operations, but a compromised
-  builder is root at the next trial, since it can place an output whose
-  activator is root. The defence against a bad output is review and the
+  the steward and its builder and confines them to closed operations,
+  but a compromised builder or steward is root at the next trial, since
+  it can place an output whose activator is root. The defence against a bad output is review and the
   lab (activator.md, section 2).
 - **Identity in M3 is SSH host keys,** made with `ssh-keygen`; WireGuard
   keys wait for in-process generation (format.md, 9.3).
@@ -546,12 +583,12 @@ that last:
 - **Failed units a target expects** are listed as task data
   (`bless.ignore_failed`); the minimal bless counts only the others
   (format.md, section 5; slots.md, 7.1).
-- **A host runs its containers [M5]:** its builder builds their outputs,
+- **A host runs its containers [M5]:** its builders build their outputs,
   its activator prepares their slots on its top level, starts each at
   every start from the default it recorded, and tries a new slot live
   when the change is eligible, inside the container's mount namespace
   (slots.md, 12.8), or else by a restart, judged from outside with the
-  minimal bless read through `systemctl --machine=`; the host's builder
+  minimal bless read through `systemctl --machine=`; the host's steward
   blesses it. No hearth runs in a container, which has no `hearth`
   task, while whether one should stays open (slots.md, section 12;
   format.md, 5.12).
@@ -566,7 +603,7 @@ that last:
   criterion leaves out its containers' nspawn units; each container's
   slot has its own trial and facts (slots.md, 7.1).
 - **A container's journal is in its host's [M5]:** `LinkJournal=try-host`,
-  under the container's own machine-id, read by the host's builder as
+  under the container's own machine-id, read by the host's steward as
   its own (operating.md, section 5).
 - **A container removed from its host's spec [M5]** is stopped and its
   slots deleted; its data stays, orphaned, until a person deletes it
@@ -592,7 +629,7 @@ user (`testing-strategy.md`, section 9). From the earliest:
 | JSON: skipping a value; refusing duplicate keys | strict configuration | M1 |
 | a full stat by name, without following links; readlink; extended attributes | the tree helper's walk | M2 |
 | writing a tree's metadata: symlink, link, chmod, chown, utimes, mkdir, truncate | change sets; the shift | M2 |
-| spawning as another user, with supplementary groups; signalling a process group | the builder under the activator; stopping a tool | M2 |
+| spawning as another user, with supplementary groups; signalling a process group | the steward under the activator, the builder under the steward; stopping a tool | M2 |
 | contained process trees (skein's draft `process.md`), with id maps through `newuidmap`, a composed root and `pivot_root`, network and uts namespaces, fresh `/proc`, `/sys` and `/dev`, `no_new_privs` and limits (build.md, 8.8) | sandboxes | M2 |
 | a closed list of synchronous ioctls in the ring adapter: `GET_SUBVOL_INFO`, `GET_SUBVOL_ROOTREF`, `INO_LOOKUP_USER`, `SUBVOL_CREATE_V2`, `SNAP_CREATE_V2`, `SNAP_DESTROY_V2`, `SUBVOL_SETFLAGS` (store.md, 5.8) | the store and the slots, unprivileged where they can be | M2 |
 | a digest of a world's state, for replay (testing.md, 8.4) | replay checks in hearth's worlds | M1 |
@@ -603,7 +640,7 @@ user (`testing-strategy.md`, section 9). From the earliest:
 | the new mount API: `fsopen`, `fsconfig`, `fsmount`, `move_mount` with `MOVE_MOUNT_BENEATH`, `open_tree`, `mount_setattr`; `umount2` with `MNT_DETACH`; walking a detached mount through its descriptor | live changes: overlays built aside, verified, swapped beneath and back (slots.md, 6.8) | M3 |
 | `mknodat` of a 0/0 character device | a live delta's whiteouts | M3 |
 | `setns` into another process's mount namespace, from a child | a container's live swap (slots.md, 12.8) | M5 |
-| cgroup v2: making, delegating and moving into subtrees, and spawning into one | sandboxes' limits; the builder's subtree | M2 |
+| cgroup v2: making, delegating and moving into subtrees, and spawning into one; `cgroup.kill` | sandboxes' limits; the steward's and the builder's subtrees | M2 |
 | generating Ed25519 and X25519 keys in-process | identity without tools from a slot | later |
 | HTTP ranges and file-backed bodies | bytes by digest | M6 |
 

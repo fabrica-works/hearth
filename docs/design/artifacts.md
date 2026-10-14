@@ -303,9 +303,10 @@ in, since two builds of one key differ for now.
 ### 4.4 Pins and collection
 
 - **The store's pins apply** (store.md, section 7). An artifact is
-  pinned while a spec the builder keeps names it (its desired revision's,
-  or an order's), while a layer is being built from it, and for a window
-  after its last use. Then it is collected like a layer.
+  pinned while a spec in the pins the steward gives its builder names it
+  (its desired revision's, or an order's; steward.md, 3.2), while a
+  layer is being built from it, and for a window after its last use.
+  Then it is collected like a layer.
 - **A software layer holds its own copy** (7.3), so collecting an
   artifact never breaks an output. Sources' subvolumes and the memo of
   listings (3.2, 6.3) follow the same rules.
@@ -339,13 +340,15 @@ any state ─→ failed (typed, 5.5)          any state ─→ cancelled (the or
   renders the environment for its identity, finds S (the memo, or an
   export) and computes the key, which must equal the pin's (7.1).
 - **Two orders for one key join one build** (a keyed effect, jig's
-  `connectors.md`, 4.3). **Preparing** builds the environment's output
-  if it is missing (build.md, section 4) and patches the sources for the
-  cache (6.3).
-- **After a restart,** a build that had not written its record never
-  happened: its `/out` and sandbox are removed, its cache is emptied
-  (6.4), and an order still standing starts it again. The filesystem is
-  the only state (store.md, section 8).
+  `connectors.md`, 4.3): the steward holds the orders, and gives its
+  builder one job per key (steward.md, 3.3). **Preparing** builds the
+  environment's output if it is missing (build.md, section 4) and
+  patches the sources for the cache (6.3).
+- **After a restart,** a builder's loss included (steward.md, 5.1), a
+  build that had not written its record never happened: its `/out` and
+  sandbox are removed, its cache is emptied (6.4), and an order still
+  standing starts it again. The filesystem is the only state (store.md,
+  section 8).
 
 `hearth-domain-artifacts` steps this machine: a child of
 `hearth-domain-builder` sharing no types with its siblings, whose
@@ -408,7 +411,7 @@ for an artifact:
 | `/tmp` | tmpfs `size=` | writes fail with ENOSPC |
 | outputs | the declared outputs' size, at collection | failed: `output too large` |
 | the store's disk | the store's free-space floor (store.md, 7.2), checked with `statfs` while the command runs | stopped: `disk` |
-| concurrent builds | a bounded slab of builds in the domain | the order waits, or is refused when the queue is full |
+| concurrent builds | the steward's lane for others' work, as many as the builder's limits allow (steward.md, 3.4; build.md, 4.4) | the order waits, or is refused when the queue is full |
 
 - **Limits are the recipe's,** within the builder's ceilings, in place
   of a step's defaults (build.md, 8.7); a recipe that asks for more is
@@ -417,7 +420,8 @@ for an artifact:
   (to verify for unprivileged use), so `/out` and `/cache` share the
   store's space, bounded by the floor and the caches' caps (6.4). **No
   progress deadline,** unlike a build step's (build.md, 8.7): a link
-  step may be silent for minutes.
+  step may be silent for minutes. The steward's deadline for the job
+  (steward.md, 5.2) is the recipe's time and a margin.
 
 ### 5.5 Failures
 
@@ -426,7 +430,8 @@ exited non-zero (its status, and the last 64 KiB of its output as opaque
 bytes); stopped by a limit (which); a declared output missing, or not a
 file, a directory or a link; an input's digest wrong; the pin's key not
 its recipe's (7.1, both keys); the environment's build failed
-(build.md's failure, nested); the sources not fetched or exported.
+(build.md's failure, nested); the sources not fetched or exported; the
+builder lost twice, `crashed` (steward.md, 5.1).
 
 - **A failure is not a verdict:** a new order builds again.
 - **The command's output** goes to a file beside the record, capped (the
@@ -452,7 +457,8 @@ Every build records, and reports as facts (wire.md, section 6):
   order "build this artifact", keyed by its key, or by repository,
   commit and recipe; and a fact "key → tree digest, or failed" (wire.md,
   sections 5.4 and 6): the one effect and the one fact the lab's
-  connector needs (temper's `factory.md`, section 7).
+  connector needs (temper's `factory.md`, section 7). The steward takes
+  the order and runs it as its builder's job (steward.md, 3.3).
 - **The client:** resolve a recipe at a commit to its key and pin
   (7.1), and build it locally (wire.md, section 3).
 

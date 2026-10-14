@@ -49,10 +49,11 @@ is activator.md's. What is open is in section 15.
   target, or a dead-man timer the old activator wrote into the slot. The
   dead-man is armed by a kernel command-line token or a marker in `/run`,
   so no failed mount and no emergency mode can disarm it.
-- **The new slot blesses itself:** its own builder asks its own
-  activator, once the boot has reached its target with no failed unit.
-  A broken hearth release cannot bless itself, so it cannot strand a
-  machine.
+- **The new slot blesses itself:** its own steward asks its own
+  activator, once the boot has reached its target with no failed unit
+  and a builder has rendered the slot's own revision (steward.md,
+  section 6). A broken hearth release cannot bless itself, so it cannot
+  strand a machine.
 - **Fall back is recorded, not decided:** the default slot's activator
   finds the marker naming a slot that is not running, and records that
   it fell back.
@@ -141,12 +142,12 @@ slot record    slots/<target>.<label>
   nor on trial.** On a machine at rest, running and default are the
   same slot, so the other one is free. When they differ (the firmware
   fell through to the other slot, or a bless was cut), prepare is refused
-  until the facts agree again: the running slot's builder blesses it
+  until the facts agree again: the running slot's steward blesses it
   again, which moves the default to the slot that runs (7.5).
 - **A `live-blessed` slot is neither running nor the default,** so a
   later change prepares over it while its delta, a subvolume of its own,
   keeps serving (6.9).
-- **The builder chooses nothing:** it asks to place an output, and the
+- **The steward chooses nothing:** it asks to place an output, and the
   activator answers with the slot it used. converge decides whether a
   new prepare is needed by comparing the desired output and parts with
   the slots' records in the facts (wire.md, section 4).
@@ -209,7 +210,7 @@ live record    live/<target>
   each boot id, since a full boot always runs the kernel of the slot it
   boots.
 - **Facts are read afresh** at every start of the activator and after
-  every operation, and reported to the builder when they change
+  every operation, and reported to the steward when they change
   (activator.md, section 4) and to an engine [M4] (wire.md, section 6).
   An event such as `fell back` is a hint; the facts are the truth.
 
@@ -243,8 +244,8 @@ Events:
 | `start here` | the activator starts (after a boot, a soft reboot or its own restart) and this slot runs |
 | `start elsewhere, same boot` | the activator starts, another slot runs, and the boot id and soft reboot count equal the trial marker's |
 | `start elsewhere, new boot` | the activator starts, another slot runs (or none), and they differ; with the marker's boot id and a higher soft reboot count, while a live state was recorded, it is a person's soft reboot (6.8) |
-| `bless` | a bless request from the builder running in this slot |
-| `bless live` | a live bless request from the builder running over this slot's live state (7.6) |
+| `bless` | a bless request from the steward running in this slot |
+| `bless live` | a live bless request from the steward running over this slot's live state (7.6) |
 | `fall back` | a request to end this slot's trial now; for a live one, the live fall back (8.5) |
 | `first bless` | bootstrap's bless: no slot is blessed and none runs |
 
@@ -263,7 +264,7 @@ activator's own order of steps excludes the cell.
 | `on trial` | refuse: running | impossible | impossible | refuse | refuse | `on trial`: the activator restarted within the trial | fault: a person switched roots by hand | `fell back` | criterion holds: `blessed`; else refuse, saying which part failed | refuse: not a live trial | reboot into the default (8.1); the next start decides | refuse |
 | `on live trial` | refuse: on trial | impossible: no prepare runs | impossible: no prepare runs | refuse: busy | same attempt: done; else refuse: busy | fault: booted natively with no trial, by hand; it was never armed | phase `arming`: `prepared`, disarmed, the delta deleted; later phases: `reboot -ff`, and the next start decides (section 11) | a person's soft reboot: `reboot -ff`; else phase `arming`: `prepared`; else `fell back`; the delta deleted | refuse: a live trial is blessed live | phase `running`, settled, criterion holds: `live-blessed` (7.6); else refuse, saying which part failed | the live fall back (8.5): `fell back`; a step that fails: `reboot -ff` | refuse |
 | `live-blessed` | neither running nor default: `preparing`, its one-shot and marker cleared and old subvolumes deleted first; the delta keeps serving (6.9) | impossible | impossible | `trying`: an ordinary trial of it now, soft or one-shot (6.1) | refuse: already live | the one-shot booted it: `on trial`, marker set `running` (6.8, L9) | the live fact agrees with the live record: ignore; else `reboot -ff`, into its trial | a person's soft reboot: `reboot -ff`; the one-shot never set, or still set: `prepared`, one-shot cleared, reported; else `fell back`, never reached hearth | refuse: not running | same attempt: done; else refuse | the live fall back (8.5), one-shot cleared first: `fell back` | refuse |
-| `blessed` | running or default: refuse; else `preparing`, old subvolumes deleted first | impossible | impossible | not the default: `trying` (a roll back); else refuse | refuse: a roll back is an ordinary trial | ignore; not the default: reported, and the builder blesses it again (7.5) | ignore | ignore | running and not the default, criterion holds: the default moves here (7.5); same attempt: done; else refuse | refuse | refuse | refuse |
+| `blessed` | running or default: refuse; else `preparing`, old subvolumes deleted first | impossible | impossible | not the default: `trying` (a roll back); else refuse | refuse: a roll back is an ordinary trial | ignore; not the default: reported, and the steward blesses it again (7.5) | ignore | ignore | running and not the default, criterion holds: the default moves here (7.5); same attempt: done; else refuse | refuse | refuse | refuse |
 | `fell back` | `preparing`, old subvolumes deleted first | impossible | impossible | refuse: prepare again | refuse: prepare again | fault: booted with no trial; reported | ignore | ignore | refuse | refuse | refuse | refuse |
 
 Guards across both slots, checked before a cell is taken:
@@ -276,10 +277,10 @@ Guards across both slots, checked before a cell is taken:
   default and is blessed, with no trial; a live state, if one exists,
   has the running slot as its base; and the change is eligible (6.7).
 - **`bless`** names the running slot, which is on trial, or blessed but
-  not the default; it can only come from the builder of the running
+  not the default; it can only come from the steward of the running
   slot, the only one on the link.
 - **`bless live`** names the slot on live trial; it comes from the
-  builder on the link, the base's, spawned anew after the swap (6.8,
+  steward on the link, the base's, spawned anew after the swap (6.8,
   L6).
 - **`first bless`** only while running is `none` and neither slot is
   blessed: bootstrap (machine.md, 8.2).
@@ -468,9 +469,10 @@ entry joins the `/var` manifest.
   `/etc/passwd` and `/etc/group` after the shift, through bounded parsers
   (activator.md, 2.3); an unknown name, or a missing secret, fails the
   prepare and names them all.
-- **Never readable by the builder:** a secret or identity file owned by
-  `hearth`, or by a group `hearth` belongs to, and a secret whose mode
-  lets others read it, are refused (format.md, 5.11 refuses them first).
+- **Never readable by the steward or its builder:** a secret or
+  identity file owned by `hearth`, or by a group `hearth` belongs to,
+  and a secret whose mode lets others read it, are refused (format.md,
+  5.11 refuses them first).
 - **Password hashes,** secrets too, for the users the `secrets` part
   names: the activator replaces the second field of those users' lines
   in the slot's `/etc/shadow`, keeping the file's owner, group and mode.
@@ -616,7 +618,7 @@ RebootWatchdogSec=10min
 4. **Compute the reported tree digest,** the same formula with each
    secret and identity file's content digest replaced by
    `H("secret", name, generation)`: the slot's digest the facts carry to
-   the builder and to an engine, which says when a secret changed but
+   the steward and to an engine, which says when a secret changed but
    not what it holds.
 5. **On EFI, read the boot files back** from the ESP and check their
    digests against the kernel's, and **read both entries back** and
@@ -665,17 +667,17 @@ and the booted kernel (section 3) agree on all four of:
   own, and systemd in the new root reads its `systemd.*` options.
 - **A one-shot reboot** otherwise: `BootNext` (EFI), or `next_entry`
   (BIOS) [M3b].
-- **The builder may ask for a full reboot** (`how: full`), to try the
+- **The steward may ask for a full reboot** (`how: full`), to try the
   firmware's path as well; it may not ask for a soft reboot the rule
   forbids.
 - **`how: auto`** takes the first kind that applies; **`how: live`**
   asks for live only, and is refused, with the rules that fail, when the
   change is not eligible; **`how: full`** a one-shot reboot
   (wire.md, 5.4).
-- **The builder asks for live,** with `try live`, since half of 6.7's
-  rules read the specs and the store, which are its own; the activator
-  checks the rest and refuses otherwise, and the builder then asks an
-  ordinary `try`.
+- **The steward asks for live,** with `try live`, since half of 6.7's
+  rules read the specs and the store, which a builder checks for it in
+  its `plan live` job (steward.md, 3.3); the activator checks the rest
+  and refuses otherwise, and the steward then asks an ordinary `try`.
 - **The activator chooses between soft and one-shot,** since that rule
   reads only the records and facts it owns, and it answers with the
   kind it chose.
@@ -736,7 +738,7 @@ gone (EFI), or `next_entry` is empty in both files (BIOS); a
 
 ```
 /var/lib/hearth/state/trial/<target>.<label>
-  slot, attempt          what is tried, and the builder's attempt id
+  slot, attempt          what is tried, and the steward's attempt id
   kind                   soft | one-shot | live
   phase                  arming | armed | running | held [M4]
                          live: arming | armed | swapped | running | live-blessed | held [M4]
@@ -766,14 +768,14 @@ gone (EFI), or `next_entry` is empty in both files (BIOS); a
 
 | What happens in the trial | What ends it | Where it lands |
 |---|---|---|
-| the minimal criterion holds, and the slot's builder asks | bless (section 7) | the new slot, now the default |
+| the minimal criterion holds, and the slot's steward asks | bless (section 7) | the new slot, now the default |
 | the trial's kernel fails to load | the firmware moves on to `BootOrder`; GRUB's `fallback` | the default, in the same boot |
 | the kernel or the initramfs panics (a missing root after 180 s) | `panic=10` | the default: the one-shot was consumed |
 | the kernel or PID 1 hangs | the hardware watchdog (`RuntimeWatchdogSec=`), where the machine has one | the default |
 | userspace never finishes booting | `JobTimeoutAction=reboot-force` on `hearth-trial.target` | the default |
 | a mount fails and systemd isolates `emergency.target` | the dead-man's timer, kept by `IgnoreOnIsolate=yes`, armed without any mount | the default |
 | it boots, but no bless comes: a failed unit, a broken hearth | the dead-man: `systemctl reboot -ff` after the window | the default |
-| the slot's builder finds a definite failure (`degraded`) | it asks `fall back` (section 8) | the default |
+| the slot's steward finds a definite failure: a failed unit that counts (`degraded`), or its builder cannot render the slot's revision (steward.md, section 6) | it asks `fall back` (section 8) | the default |
 | the power is cut | the next power-on | the default |
 | live: a unit action fails, a touched unit dies in the settle, the criterion fails | the live fall back (8.5) | the base's files, with no reboot |
 | live: the live fall back itself fails or hangs | `reboot -ff`, or the base's dead-man | the default |
@@ -846,10 +848,11 @@ merges extensions behind hearth's back.
 
 ### 6.7 What may be live
 
-An allowlist. The builder decides it when it plans the trial, from the
-two outputs' tree files (a sorted diff, store.md, 6.3) and the specs'
-`live` parts (render.md, 4.4); the activator checks again what its own
-records and the machine show. A change that fails any rule takes an
+An allowlist. A builder decides it when the steward has it plan the
+trial (`plan live`, steward.md, 3.3), from the two outputs' tree files
+(a sorted diff, store.md, 6.3) and the specs' `live` parts
+(render.md, 4.4); the activator checks again what its own records and
+the machine show. A change that fails any rule takes an
 ordinary trial (6.1). Not being live is never an error: the facts say
 why (wire.md, section 6).
 
@@ -868,16 +871,17 @@ why (wire.md, section 6).
 | 11 | **Sandboxes beneath the hierarchies:** units whose mount namespace has a mount beneath `/etc`, `/usr` or `/opt` join the restarts, and if one is never-live the change is not eligible | the overlay, propagated into the unit's namespace, shadows that mount until the unit restarts | activator, as root, from `/proc/<pid>/mountinfo` of every process and its cgroup |
 | 12 | **An unexplored base, on a mutable machine:** a metadata walk of the base's `etc/`, `usr/` and `opt/` matches its manifest (development.md, 4.4) | what was changed by hand beneath the overlay would stay visible and fail L2; a soft reboot discards it instead | activator |
 
-- **What the builder sends:** `try live`, with the digest of the change
+- **What the steward sends:** `try live`, with the digest of the change
   from the base's output to the new one, which the delta will hold, and
   the unit plan (activator.md, 5.17): the units to stop before the swap,
   to reload, restart or start after it, and whether `daemon-reload`,
-  tmpfiles, D-Bus or the accounts need acting on.
+  tmpfiles, D-Bus or the accounts need acting on: all as its builder's
+  plan answered them.
 - **What the activator recomputes:** the change between the two slots'
   manifests, leaving out each slot's own files (5.4, 5.5), whose digest
-  (in store.md, 3.5's form) must equal the builder's; then rules 1 to 5,
+  (in store.md, 3.5's form) must equal the plan's; then rules 1 to 5,
   8 for the plan's units, 10, 11 and 12. The delta is built from its own
-  diff, never from paths the builder sent. A difference refuses the
+  diff, never from paths the steward sent. A difference refuses the
   trial, naming the rule.
 - **A later live change** is planned against what runs, the live
   state's files, and its delta built against the base (6.9).
@@ -895,10 +899,10 @@ Every step that leaves the state starts by writing the journal
 | **L3. Arm** | write the marker: kind `live`, phase `arming`, base `a`, the delta, the previous one, the boot id and soft reboot count. Write `/run/hearth-trial/x1-prod.a`, then `systemctl start hearth-trial.timer`: `a`'s own dead-man (5.5), whose condition the file meets and whose `OnActiveSec=` counts from now; check it is active | `armed`; `b` is `on live trial` |
 | **L4. Stop** | `systemctl stop`, one call: the units being removed or disabled, and each `restart` unit with a changed path under `usr/` or `opt/`; every job's result checked | `armed` |
 | **L5. Swap** | for `/etc`, then `/usr`, then `/opt`: the overlay built and moved beneath the current top (below); the mount table read back; the live record written | `swapped` |
-| **L6. Act** | `systemctl daemon-reload` if a unit file, drop-in or `.wants` link changed; `systemd-tmpfiles --create /usr/lib/tmpfiles.d/hearth.conf` if it changed; `systemctl reload dbus` if D-Bus policy changed; `nscd --invalidate` for `passwd` and `group` if nscd runs and the accounts changed. Then the declared reloads, restarts and starts as one batch (below), every job checked. Then answer the request and spawn the builder anew (activator.md, 3.3), so the live bless comes from a builder started in the new files | `running` |
+| **L6. Act** | `systemctl daemon-reload` if a unit file, drop-in or `.wants` link changed; `systemd-tmpfiles --create /usr/lib/tmpfiles.d/hearth.conf` if it changed; `systemctl reload dbus` if D-Bus policy changed; `nscd --invalidate` for `passwd` and `group` if nscd runs and the accounts changed. Then the declared reloads, restarts and starts as one batch (below), every job checked. Then answer the request and spawn the steward anew (activator.md, 3.3), so the live bless comes from a steward started in the new files, whose builder renders the slot's revision (steward.md, section 6) | `running` |
 | **L7. Settle** | 60 seconds to start, within the base's window: every unit L4 to L6 touched stays `active` with the `InvocationID` and `NRestarts` L6 read; the minimal criterion holds (7.1); from M5, the blessing checks pass (operating.md, section 3) | `running` |
-| **L8. Live bless** | asked by the builder: 7.6. The default does not move | `live-blessed`; `b` is `live-blessed` |
-| **L9. The native boot** | the next boot consumes the one-shot and boots `b`'s trial entry: `b` runs on trial (6.3), its dead-man armed by `hearth.trial=`; its activator sets the marker `running`; its builder blesses it (7.3), the default moves to `b`, and the delta is deleted | the marker removed by the bless |
+| **L8. Live bless** | asked by the steward: 7.6. The default does not move | `live-blessed`; `b` is `live-blessed` |
+| **L9. The native boot** | the next boot consumes the one-shot and boots `b`'s trial entry: `b` runs on trial (6.3), its dead-man armed by `hearth.trial=`; its activator sets the marker `running`; its steward blesses it (7.3), the default moves to `b`, and the delta is deleted | the marker removed by the bless |
 
 **L1, the delta.** `BTRFS_IOC_SUBVOL_CREATE_V2` makes it, with `etc`,
 `usr` and `opt` carrying `b`'s metadata. The change is walked in tree
@@ -1044,12 +1048,17 @@ While `b` is `live-blessed` (or a live state outlives its slot, below):
   parsed by `hearth-protocol-systemd`) on the target's
   `bless.ignore_failed` list (format.md, 5.13), which the place request
   carries. `starting` means not yet; a failed unit that counts means the
-  builder asks to fall back rather than wait out the window. A desktop
+  steward asks to fall back rather than wait out the window. A desktop
   such as `x1-prod` often carries a routinely failed unit; comparing
   against a baseline of the previous slot is later, once measured there.
-- **The slot's own builder is up and has answered its activator:** the
-  bless request arrives over the link from the builder the slot's
-  activator spawned, after its hello, and that is the answer.
+- **The slot's own steward is up and has answered its activator, and
+  a builder it spawned has answered the bless's render** of the slot's
+  own revision (steward.md, section 6): the bless request arrives over
+  the link from the steward the slot's activator spawned, after its
+  hello and after that render. The activator checks the rest of the
+  criterion itself (7.3); the render it cannot see, and takes the
+  request as its proof. A render that fails makes the steward ask to
+  fall back instead (steward.md, 5.1).
 - **A host's containers never count [M5]:** the failed units counted
   leave out the nspawn unit, `systemd-nspawn@<container>.service`, of
   every container the host's activator keeps records for
@@ -1060,20 +1069,24 @@ While `b` is `live-blessed` (or a live state outlives its slot, below):
 
 ### 7.2 Who asks
 
-- **The new slot's hearth blesses itself:** its builder's converge asks
+- **The new slot's hearth blesses itself:** its steward's converge asks
   its own activator, once the link is up and the criterion holds. The
   old slot's hearth never blesses the new one: it is not running.
-- **A broken hearth release cannot bless itself.** If the new builder
+- **A broken hearth release cannot bless itself.** If the new steward
   never starts, never connects or never asks, the dead-man ends the
-  trial, and the default never moved. No outside probe judges the slot:
-  the bash fleet once lost a good boot to an SSH probe that never
-  reconnected.
+  trial, and the default never moved. If its builder cannot render the
+  slot's own revision, an error or a second loss, the steward asks to
+  fall back at once (steward.md, 5.1's table). No outside probe judges
+  the slot: the bash fleet once lost a good boot to an SSH probe that
+  never reconnected.
 - **A container is the exception [M5]:** no hearth runs in it, so its
-  host's builder asks its host's activator, which reads the container
-  from outside (12.3).
-- **A live trial is blessed by the base's builder,** spawned anew after
-  the swap so that it starts in the new files (7.6); the new slot
-  blesses itself only at its native boot (6.8, L9).
+  host's steward asks its host's activator, which reads the container
+  from outside (12.3), with no bless's render: the host's hearth did not
+  change (steward.md, section 6).
+- **A live trial is blessed by the base's steward,** spawned anew after
+  the swap so that it starts in the new files, and whose builder runs
+  the bless's render (7.6); the new slot blesses itself only at its
+  native boot (6.8, L9).
 
 ### 7.3 What it does
 
@@ -1105,7 +1118,7 @@ While `b` is `live-blessed` (or a live state outlives its slot, below):
 An engine may hold a bless while a canary bakes (wire.md, 5.4: an
 `activate` with `bless: held for at most d`):
 
-- **The slot's builder asks to hold** once the minimal criterion holds
+- **The slot's steward asks to hold** once the minimal criterion holds
   (operating.md's checks too, from M5). The activator moves the marker to
   phase `held`, with the hold's end, and replaces the dead-man's timer by
   a transient one ending at the hold's end, `systemd-run
@@ -1135,9 +1148,11 @@ An engine may hold a bless while a canary bakes (wire.md, 5.4: an
 - **The running slot is blessed but not the default** after a bless cut
   before it moved the default, after a firmware fell through to it, or
   after GRUB's counter booted it (8.4). The facts say so.
-- **Its builder asks to bless it again,** a stage of converge's pass
-  (wire.md, section 4). The activator checks the criterion as for a
-  trial, but needs no marker: the slot is already blessed, and it runs.
+- **Its steward asks to bless it again,** a stage of converge's pass
+  (wire.md, section 4), with no bless's render: the slot's hearth was
+  proven when it was first blessed (steward.md, section 6). The
+  activator checks the criterion as for a trial, but needs no marker:
+  the slot is already blessed, and it runs.
   Then it moves the default to it (7.3, step 5), and writes nothing else.
 - **Until then, prepare is refused** (2.3), so no slot is written while
   the firmware would boot another.
@@ -1148,8 +1163,9 @@ An engine may hold a bless while a canary bakes (wire.md, 5.4: an
 
 ### 7.6 The live bless
 
-The bless of a live trial (6.8, L8), asked by the builder on the link,
-the base's, spawned after the swap:
+The bless of a live trial (6.8, L8), asked by the steward on the link,
+the base's, spawned after the swap, once its builder has answered the
+bless's render (steward.md, section 6):
 
 1. **Check:** the marker names this slot and attempt, in phase
    `running`; the live fact agrees with the live record; every unit L4
@@ -1199,11 +1215,11 @@ the base's, spawned after the swap:
 - **In the trial slot `/run/nextroot` is not a mount point,** since the
   switch consumed it. The trap matters in the old slot, while a soft
   reboot is armed, which is why aborting one unmounts it first.
-- **Asked for in two cases:** the trial slot's builder finds a definite
-  failure; or the old slot's builder, before the reboot, gives up on a
-  trial it armed. In the second case nothing reboots: the one-shot is
-  cleared, `/run/nextroot` unmounted, `/run/hearth-trial/` emptied, and
-  the slot is `prepared` again.
+- **Asked for in two cases:** the trial slot's steward finds a
+  definite failure (7.1); or the old slot's steward, before the reboot,
+  gives up on a trial it armed. In the second case nothing reboots: the
+  one-shot is cleared, `/run/nextroot` unmounted, `/run/hearth-trial/`
+  emptied, and the slot is `prepared` again.
 
 ### 8.2 Recording it
 
@@ -1242,7 +1258,7 @@ fails to load, and GRUB's `fallback` is the default itself.
   default, and `tries=3`. GRUB counts `tries` down at each boot of the
   default; at 0 it boots `previous` instead. The activator resets
   `tries` at every start that meets the minimal criterion. The previous
-  slot, booted so, is blessed and not the default: its builder blesses it
+  slot, booted so, is blessed and not the default: its steward blesses it
   again (7.5), and the slot that stopped booting is recorded `fell back`.
   Prepare clears `previous` before it writes over that slot (5.1).
 - **EFI (M3): no such fallback.** A blessed default that panics at every
@@ -1256,7 +1272,7 @@ fails to load, and GRUB's `fallback` is the default itself.
 ### 8.5 The live fall back
 
 How a live trial falls back with no reboot (6.8). The activator runs it
-itself when an action of L6 fails; the builder asks for it when a
+itself when an action of L6 fails; the steward asks for it when a
 touched unit dies or the criterion fails during the settle, or, a margin
 before the base's window ends (60 seconds to start), when the bless has
 not come, so the dead-man stays the backstop; and a `fall back` or a
@@ -1371,7 +1387,7 @@ running and default and `b` the slot in question:
 
 | Step | Activator crash | Power cut |
 |---|---|---|
-| prepare, any step from 5.1 to 5.7 | `b` `preparing`: deleted at start, nested subvolumes first; the builder asks again | the same after the reboot into `a`; ESP files of `b` may be torn, behind entries outside `BootOrder` that nothing boots but a person's choice (a fault cell, section 4) |
+| prepare, any step from 5.1 to 5.7 | `b` `preparing`: deleted at start, nested subvolumes first; the steward asks again | the same after the reboot into `a`; ESP files of `b` may be torn, behind entries outside `BootOrder` that nothing boots but a person's choice (a fault cell, section 4) |
 | prepare, record written, journal not cleared | `b` `prepared`; the journal is cleared | the same |
 | trial, marker `arming` | `b` `trying`, same boot: `prepared`, one-shot cleared | new boot into `a`: `prepared`, one-shot cleared |
 | trial, one-shot set, marker `armed`, before the reboot | same boot: `prepared`, one-shot cleared, `/run/nextroot` unmounted | power-on consumes `BootNext` or `next_entry`: `b` boots, `start here`: `on trial`. Soft kind: `a` boots, `fell back` (never reached hearth) |
@@ -1529,9 +1545,9 @@ and no one-shot. A change to the container's parameters is never live
   target's `bless.ignore_failed` lists (7.1; format.md, 5.13), through
   `systemctl --machine=<container> is-system-running` and
   `list-units --state=failed`, as operating.md (2.9) reads a container's
-  units. 7.1's second condition, a builder of the slot's own, has no
-  counterpart (12.5).
-- **The host's builder asks to bless** once the criterion holds, and the
+  units. 7.1's second condition, a steward of the slot's own and its
+  bless's render, has no counterpart (12.5; steward.md, section 6).
+- **The host's steward asks to bless** once the criterion holds, and the
   container's blessing checks too (operating.md, section 3), or to fall
   back on a failed unit that counts. The bless records the link's target
   as the container's default in the host's state (12.6).
@@ -1596,7 +1612,7 @@ A container's facts are its host's activator's, read from outside:
   events: `try` is 12.2's restart; `try live` and `bless live` are
   12.8's; the unit stably active on the slot is `start here`, and on
   the other slot `start elsewhere`; a host start, or a restart of the
-  container, is a new boot; `bless` comes from the host's builder
+  container, is a new boot; `bless` comes from the host's steward
   (12.3), not from one running in the slot; `first bless` never happens
   (12.3's first slot). A `live-blessed` slot's one-shot is the host's
   record that the container's next start is its trial (12.8).
@@ -1613,7 +1629,7 @@ A container's facts are its host's activator's, read from outside:
 ### 12.7 A container removed from its host's spec
 
 A container leaves its host's spec when its target is deleted from the
-repository or placed on another host. The host's builder then finds,
+repository or placed on another host. The host's steward then finds,
 in the activator's facts, a container whose target its spec no longer
 names (`target.containers`, format.md, 3.5), and asks its activator to
 remove it (activator.md, 5.16):
@@ -1658,9 +1674,10 @@ by its host's activator from outside, since no hearth runs inside:
 - **The units' actions** go through `systemctl --machine=<container>`
   (`stop`, `daemon-reload`, `reload`, `restart`, `reload-or-restart`,
   `start`, `show`), and tmpfiles through `systemd-run
-  --machine=<container> --wait`; there is no builder inside to spawn
-  anew. The host's builder plans, waits out the settle and asks the
-  live bless (12.3).
+  --machine=<container> --wait`; there is no steward inside to spawn
+  anew. The host's steward has a builder plan the change
+  (steward.md, 3.3), waits out the settle and asks the live bless
+  (12.3).
 - **The dead-man is the host's:** the window is the activator's deadline
   in the marker, as for any container trial (12.3). At its end, or when
   a step of the live fall back fails, the activator restarts the
@@ -1693,7 +1710,7 @@ with:
   systemd: a boot reaches its target or not, units fail,
   `is-system-running` answers, a soft reboot switches roots and keeps
   the boot id;
-- **a scripted builder** on the link, which asks to place, try, bless,
+- **a scripted steward** on the link, which asks to place, try, bless,
   fall back and roll back, at awkward moments and with stale conditions;
 - **data by class:** entries added, removed and moved between classes
   across prepares, so classes are made once, each entry seeded once and
@@ -1760,9 +1777,9 @@ soft reboot and its fall back, and every live scenario
 ## 15. What is open
 
 - **The trial window:** 10 minutes in M3, a place input sealed into the
-  units; from M5 the builder computes it from the blessing checks
-  (operating.md, section 3). Its right length depends on measuring the
-  slowest target.
+  units; from M5 the steward computes it from the blessing checks its
+  builder's render answered (operating.md, section 3). Its right length
+  depends on measuring the slowest target.
 - **A blessed EFI default that stops booting:** keeping the previous
   slot first in `BootOrder` and arming `BootNext` to the default at each
   healthy start (8.4); depends on what one NVRAM write per boot costs,
@@ -1850,7 +1867,7 @@ soft reboot and its fall back, and every live scenario
   - the unit actions end to end: stop, swap, start for a changed binary;
     a reload for a configuration change; newly wanted units started; a
     unit stopped whose file and binary the delta removes; every job's
-    result reaching the builder;
+    result reaching the steward;
   - the fall backs: 8.5 end to end, including a unit that fails only
     after the settle; an activator killed in each phase; the power
     pulled in each phase; a person's soft reboot;

@@ -174,6 +174,10 @@ plan(spec)
 - **One build per key** (store.md, 4.6), different keys at once within
   the builder's limits: one packages step at a time, a configured
   number of other steps, one fetcher per source host.
+- **On a machine, its own builds one at a time:** the steward gives its
+  builder the pass's jobs one by one; from M6, artifacts and peers'
+  change sets run beside them within the limits above
+  (steward.md, 3.4).
 
 ## 5. The packages layer
 
@@ -759,15 +763,20 @@ the packages step: a tool root                    every other step: the layer as
 | disk | the store's free-space floor (store.md, 7.2) | `statfs` while the step runs |
 
 - **Deadlines are the domain's;** the protocol layer runs the timers.
-- **The builder's cgroups.** On a machine the activator's unit has
-  `Delegate=yes`; the activator moves itself into a leaf, `activator/`,
-  and makes `builder/`, owned by `hearth`, with `memory` and `pids`
-  enabled, for the builder and everything it starts
-  (activator.md, section 3). On a developer's machine the client runs
-  under `systemd-run --user --scope -p Delegate=yes`. cgroup v2 lets no
-  cgroup with controllers enabled for its children hold processes itself
-  (the no-internal-processes rule), so the builder moves itself into a
-  leaf, `builder/self/`, enables both controllers in `builder/`'s
+  The steward bounds the whole job besides, and stops a builder that
+  outlives it (steward.md, 5.2).
+- **The builder's cgroups** (steward.md, section 7). On a machine the
+  activator's unit has `Delegate=yes`; the activator moves itself into a
+  leaf, `activator/`, and makes `steward/`, owned by `hearth`. The
+  steward moves itself into `steward/self/` and spawns each builder into
+  `steward/builder/`, with `memory` and `pids` enabled and a memory
+  ceiling of its own (6 GiB to start), so a build the kernel must kill
+  for memory is killed within the builder's subtree, never the
+  steward. On a developer's machine the client runs under `systemd-run
+  --user --scope -p Delegate=yes`. cgroup v2 lets no cgroup with
+  controllers enabled for its children hold processes itself (the
+  no-internal-processes rule), so the builder moves itself into a leaf,
+  `builder/self/`, enables both controllers in `builder/`'s
   `cgroup.subtree_control`, and gives each sandbox, fetch and tree
   helper a leaf of its own beside it, named by a token and removed once
   empty. The limits above are written to those leaves.
@@ -978,10 +987,12 @@ with its tail.
   | a config change, end to end | seconds | an estimate |
   | deleting a layer without the mount option | about 15 µs a path | measured |
 
-- **The builder's own memory,** idle and at its peak during a build, is
-  a cost fact too: the heavy work runs in child processes that exit, so
-  an idle builder should stay small, and a builder that grows is a
-  finding.
+- **hearth's own memory is a cost fact too:** the steward's, idle,
+  since it always runs, and a steward that grows is a finding; the
+  builder's at its peak, and its start, the store's scan (store.md,
+  8.2), which every pass pays. The heavy work runs in child processes
+  that exit, and an idle machine runs no builder at all
+  (steward.md, 4.1).
 - **A regression is a finding:** the lab benchmarks hearth as it does
   any product, and the real tier's second run builds nothing, which its
   costs show (testing.md, section 9).

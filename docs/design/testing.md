@@ -59,10 +59,10 @@ io worlds are skein's: hearth does not retest io.
 |---|---|---|---|---|---|
 | step tests | one step function, or one protocol machine's step | its events, by hand | yes | focused | M1 |
 | domain worlds | one domain: a child with the world as its parent, or a root with its children | the machine and the tools at their domain faces; the other process, scripted | yes | focused; sweeps fuzzy | M1 |
-| system worlds | the builder's, the tree helper's and the activator's domains together | the machine and the tools at their domain faces; the world carries the link's and the tree helper's records | yes | focused; sweeps fuzzy | M2 |
+| system worlds | the builder's, the tree helper's, the steward's and the activator's domains together | the machine and the tools at their domain faces; the world carries the link's, the jobs' and the tree helper's records | yes | focused; sweeps fuzzy | M2 |
 | machine worlds | one protocol machine | the stream below; the user above; the tool's bytes: recordings, generated, mutated | yes | focused; fuzz targets | M1 |
 | protocol worlds | the protocol layers, their machines and the domains above, at both ends | the tools' fakes at their io face; the bytes between two hearth processes | yes, in plaintext | focused | M1 |
-| simulated worlds | every process's `iterate`: builder, tree helper, activator, client | the kernel, by skein's simulator; the machine and the tools behind it | yes, in plaintext | focused, a few; fuzzy | M1 |
+| simulated worlds | every process's `iterate`: steward, builder, tree helper, activator, client | the kernel, by skein's simulator; the machine and the tools behind it | yes, in plaintext | focused, a few; fuzzy | M1 |
 | real loop | hearth as it ships, in one loop over one ring; real git | nothing: it runs only what needs no prerequisite | no | focused | M1 |
 | end to end | the `hearth` binary, as processes | as the real loop | no | focused, one per path through `main` | M1 |
 | conformance | each real tool as a regular user; real btrfs; OVMF and SeaBIOS in a VM | nothing: the same scenario also runs on the fake | no | `conformance` profile | M1 |
@@ -80,7 +80,7 @@ demand, one refusal.
 ### 2.2 Domain worlds
 
 Most of hearth's tests. Each child domain has a world with the world as
-its parent; each root (`hearth-domain-builder`,
+its parent; each root (`hearth-domain-builder`, `hearth-domain-steward`,
 `hearth-domain-activator`) has one with its children beneath it.
 
 - **The machine and the tools sit at their domain faces** (3.1, 4.1):
@@ -88,8 +88,10 @@ its parent; each root (`hearth-domain-builder`,
   their outcomes into the domain's events, as the protocol layer would.
   The domain never sees a tool's text here or anywhere.
 - **The other process is scripted:** the builder's world plays the tree
-  helper and the activator; the activator's world plays the builder,
-  including a builder that lies (8.3).
+  helper and the steward; the steward's world plays the builder and the
+  activator, including builders that die, hang or answer for a stale
+  generation (steward.md, section 8); the activator's world plays the
+  steward, including one whose store lies (8.3).
 - **A restart is cold.** A reboot or a power cut ends every domain; the
   world builds each again from what the fake machine holds, as its
   startup reads it back (store.md, section 8; activator.md, section 7).
@@ -98,19 +100,22 @@ its parent; each root (`hearth-domain-builder`,
 
 `hearth-system-world`, under `tests/system`, is the crate of hearth's
 system worlds. It begins at M2 with the builder and the tree helper; the
-activator joins it at M3. Its two worlds are each joined on one fake
-machine:
+steward and the activator join it at M3. Its two worlds are each joined
+on one fake machine:
 
 - **The builder and its tree helper** [M2]: the layers the helper
   snapshotted, froze and emptied are the ones the builder named; the
   change set it computed is the one the builder records.
-- **The process pair and the tree helper** [M3]: the activator, the
-  builder it starts, and the helper, across reboots and power cuts. The
-  output the activator placed is the one the builder built; the slot the
-  builder asked to bless is the one running.
+- **The daemon and the tree helper** [M3]: the activator, the steward
+  it starts, the builders the steward spawns, and the helper, across
+  reboots, power cuts and builders lost at any job. The output the
+  activator placed is the one a builder built; the slot the steward
+  asked to bless is the one running, after the bless's render
+  (steward.md, section 6).
 
-The world carries the link's and the tree helper's records between the
-domains, as their protocol layers would (testing-strategy.md, 2.3).
+The world carries the link's, the jobs' and the tree helper's records
+between the domains, as their protocol layers would
+(testing-strategy.md, 2.3).
 
 ### 2.4 Machine worlds
 
@@ -127,9 +132,10 @@ alone.
 
 Both ends of each connection, joined by streams cut at random: the
 builder and the tools' fakes at their io face (3.1) [M1]; the builder
-and its tree helper [M2]; the builder and the activator over the link,
-and the client and the builder [M3]; the builder and the engine's fake
-over skein's channel [M4]; two builders, bytes by digest [M6]. They run
+and its tree helper [M2]; the steward and the activator over the link,
+the steward and its builder over the jobs, and the client and the
+steward [M3]; the steward and the engine's fake over skein's channel
+[M4]; two machines, bytes by digest [M6]. They run
 the system worlds' scenarios through bytes: the argument vectors hearth
 makes, a tool's output cut mid-line, a pipe that fills, a tool killed
 mid-write.
@@ -139,7 +145,8 @@ mid-write.
 Each process's `iterate` on skein's simulator, the fake machine behind
 its machine seam (skein's `simulator.md`, section 3). A spawn starts a
 tool's fake, or one of hearth's own processes in the same world: the
-activator spawning the builder, the builder its tree helper. A reboot
+activator spawning the steward, the steward its builder, the builder
+its tree helper. A reboot
 ends every process; the fake firmware boots a slot; its PID 1 starts the
 activator, which reads its records from the fake's files.
 
@@ -157,9 +164,9 @@ no subordinate ids, no mirror, no root.
   cgroup's kill needs a delegated subtree and is the real tier's [M2];
   the client on a Unix socket [M3].
 - **End to end:** `hearth` as processes, one test per path through
-  `main`: the client's render and diff in-process [M1]; the builder as a
-  daemon and the client talking to it [M3]. The activator's `main`
-  needs root, so the VM tier runs it.
+  `main`: the client's render and diff in-process [M1]; the steward as a
+  daemon, the builders it spawns, and the client talking to it [M3]. The
+  activator's `main` needs root, so the VM tier runs it.
 
 ### 2.8 Outside the gate
 
@@ -251,6 +258,9 @@ hearth-fake-machine
   view), what it changed and what it refused, in a bounded queue the
   referee drains; and counts a world reads at settle: bytes read and
   written per process, inodes changed, subvolumes made, programs run.
+  The steward's rule is read from it (steward.md, 2.2): no open beneath
+  the store's `layers/` or `repo/`, and no build tool spawned, by the
+  steward's process.
 
 ### 3.2 Files
 
@@ -607,6 +617,10 @@ The machine then powers on, and the firmware boots what it would (3.7).
   firmware that forgets, a disk missing at boot, a GRUB save that fails,
   a mount that fails at boot, and a published layer whose contents were
   lost (a file torn as an unsynced write would leave it).
+- **Out of memory:** a cgroup past its `memory.max` loses a process of
+  its own subtree, killed: a step's in its leaf (build.md, 8.7), or,
+  drawn by the seed, the builder itself when `steward/builder/` reaches
+  its ceiling, never a process outside it (steward.md, 5.3).
 
 ### 3.11 Shared with temper
 
@@ -1077,12 +1091,19 @@ were reused, what was fetched.
 | fallback after a panic | the revision adds the `test-panic` task (8.2) | the trial panics; `panic=N` reboots into a, which records that b fell back |
 | fallback after a hang | `test-hang` blocks the trial's target | `JobTimeoutAction=` or the dead-man unit reboots with `-ff`; fell back |
 | a mount fails during a trial | `test-mount-fails` adds a mount that fails, and the trial lands in emergency mode | the dead-man, armed from `/run` or `hearth.trial=` and kept by `IgnoreOnIsolate=yes`, still reboots with `-ff`; fell back |
-| a failed unit | `test-unit-fails` fails a unit | the boot is `degraded`, and the slot's builder asks to fall back at once (slots.md, section 8), with no dead-man; fell back |
+| a failed unit | `test-unit-fails` fails a unit | the boot is `degraded`, and the slot's steward asks to fall back at once (slots.md, section 8), with no dead-man; fell back |
 | a failed unit, allowed | the same unit, named in `bless.ignore_failed` (slots.md, 7.1) | the minimal bless passes; b blessed |
 | a power cut during prepare | a kill at a drawn moment of prepare | a boots; the half-prepared slot is redone or discarded (slots.md, section 11) |
 | a power cut in trial and bless | kills just after `BootNext` is set, and between the steps of the bless: journal, `blessed`, marker removed, default moved, dead-man stopped | the default boots a blessed slot |
 | BIOS [M3b] | the bootstrap, a one-shot trial, a fallback after a panic, and a cut while the activator writes the environment pair, on SeaBIOS | `next_entry` consumed in both files before the kernel; the default boots a blessed slot |
 | BIOS, a blessed default that panics [M3b] | after a bless, the harness arms `test-panic` through a flag in a data entry, so the default panics at every boot | GRUB's boot counter answers (machine.md, section 5), and the machine reaches the other blessed slot without a person |
+
+The steward and its builder, on the same VMs (steward.md, section 5):
+
+| Scenario | What happens | What must hold |
+|---|---|---|
+| a builder killed for memory | during a packages step, the harness, root in the VM, writes a `memory.max` on `steward/builder/` below the step's peak | the kernel kills within `steward/builder/` only; a step killed fails as that step, the builder killed loses its job, tried once more by a new builder (steward.md, 5.1 and 5.3); `hearth status` answers throughout, and the loss is a fact |
+| a builder killed mid-pass | `kill -9` of the builder during a build | the job lost and tried again by a new builder, whose startup scan settles the staging layer (store.md, 4.4); converged; the steward never restarted |
 
 Data by class, on the same VMs (format.md, 5.7; machine.md, section 3;
 operating.md, section 7):
@@ -1141,7 +1162,7 @@ Containers [M5], in a host VM:
 | a host and its container in one revision | both specs change | the container's trial first, the host's last, since the host's may reboot the machine (wire.md, 4.7) |
 | a container's parameters change | a bind added to its placement | a new slot of the same output, its settings with the bind, tried by a restart (slots.md, 12.1) |
 | a container that fails on its host's trial | the host's trial boots and the container's unit fails | the host is blessed all the same; the container's facts report it (slots.md, 7.1) |
-| a container's journal | entries written inside the container, read by the host's builder while it runs and after it stops | read from `/var/log/journal/<its machine-id>` in the host's journal entry, in its `core` class; recorded: whether journald inside writes there under its id range (operating.md, section 5) |
+| a container's journal | entries written inside the container, read by the host's steward while it runs and after it stops | read from `/var/log/journal/<its machine-id>` in the host's journal entry, in its `core` class; recorded: whether journald inside writes there under its id range (operating.md, section 5) |
 | a container removed | the revision drops the container's target | its unit stopped, its slots deleted and their outputs unpinned; its class subvolumes reported orphaned (slots.md, 12.7) |
 | a container's change applied live | a config change with a `reload` entry, in a container target | the overlays in the container's mount namespace, none in the host's; the unit reloaded through `systemctl --machine=`; the host's state records the container's next start as `b`'s trial (slots.md, 12.8) |
 | a container's live fall back | the container's reload fails, then a step of the fall back is made to fail | the files back and the units acted on again; then a restart of the container on its default |
@@ -1198,14 +1219,15 @@ standalone worlds [M3], and `hearth-dev-world` under `tests/dev`, with
 | World | Real | From |
 |---|---|---|
 | `hearth-render-world` | render, on fake git and the universe's index | M1 |
-| `hearth-builder-world` | the builder's root and its children; tree helper and activator scripted | M1 |
+| `hearth-builder-world` | the builder's root and its children; tree helper and steward scripted | M1 |
 | `hearth-store-world` | the store, on fake btrfs | M2 |
 | `hearth-build-world` | plans and steps, on the fakes of `apt-helper`, mmdebstrap, dpkg-query and the target's tools, in sandboxes | M2 |
 | `hearth-tree-world` | the tree helper's domain, on files with namespace ids | M2 |
 | `hearth-system-world` | the system worlds (2.3) | M2 |
+| `hearth-steward-world` | the steward's root and its children; builder and activator scripted (steward.md, section 8) | M3 |
 | `hearth-converge-world` | the desired revision and the orders | M3 |
 | `hearth-slots-world`, `hearth-boot-world`, `hearth-disk-world` | the activator's children, on firmware, btrfs and disks | M3 |
-| `hearth-activator-world` | the activator's root and its children; the builder scripted | M3 |
+| `hearth-activator-world` | the activator's root and its children; the steward scripted | M3 |
 | `hearth-checks-world` | checks, on units and signals | M5 |
 | `hearth-backups-world` | class snapshots, their retention and restores; from M6, send streams and a backup peer | M5 |
 | `hearth-artifacts-world` | the second recipe | M6 |
@@ -1214,7 +1236,7 @@ standalone worlds [M3], and `hearth-dev-world` under `tests/dev`, with
 Each document's own world section names its scenarios:
 render.md, section 9; store.md, section 11; build.md, section 13;
 machine.md, section 10; slots.md, section 13; activator.md, section 9;
-wire.md, section 10; operating.md, section 9; artifacts.md, section 8;
+steward.md, section 8; wire.md, section 10; operating.md, section 9; artifacts.md, section 8;
 development.md, section 10.
 
 ### 8.2 Scenarios, cues and the referee
@@ -1237,9 +1259,9 @@ development.md, section 10.
   content.
 - **The referee** (testing-strategy.md, section 7) watches the machine's
   ledger and hearth's facts, events and answers, never hearth's state.
-  Its stimuli: a power cut, a reboot, the builder killed, the client
-  gone, the engine's channel dropping [M4]. Its deadlines are simulated
-  time, so a trial's window costs nothing.
+  Its stimuli: a power cut, a reboot, a builder killed at any job, the
+  steward killed, the client gone, the engine's channel dropping [M4].
+  Its deadlines are simulated time, so a trial's window costs nothing.
 
 ### 8.3 hearth's invariants
 
@@ -1280,12 +1302,14 @@ development.md, section 10.
 - **Every order gets exactly one answer:** from the client [M3] and from
   the engine [M4], across restarts of either side, with keyed orders
   answered once by key (wire.md, 5.4). The same holds for each
-  operation the builder asks of its activator over the link.
+  operation the steward asks of its activator over the link, and each
+  job it gives its builder ends in one answer or one loss
+  (steward.md, 3.2).
 - **Trials always end.** When a trial starts, the referee arms a
   deadline: the bless, or the fallback, by the trial's bound. A command
   line without `panic=` meets the fake's endless panic and fails here.
   A container's trial ends by its host's activator alone, so a host's
-  builder that never asks still meets the deadline [M5].
+  steward that never asks still meets the deadline [M5].
 - **A soft reboot exactly when the kernel is unchanged.** The world
   computes slots.md 6.1's rule on its own, from the fake trees: the
   digests of the kernel image, of the modules subtree and of the
@@ -1301,6 +1325,18 @@ development.md, section 10.
   exactly when they hold; the merged view after every swap equals the
   live record's manifest, which equals the new slot's files under the
   three trees.
+- **The steward stays in view** (steward.md, section 5). Whatever its
+  builder does, dying at any job, hanging, or killed for memory, the
+  steward keeps answering the client and, from M4, its channel; a job
+  lost twice fails as `crashed`, and the pass follows steward.md, 5.1's
+  table; nothing outside `steward/builder/` is killed for the builder's
+  memory; and the ledger shows the steward opening nothing beneath
+  `layers/` or `repo/` and spawning no build tool (3.1; steward.md,
+  2.2).
+- **No native bless before the bless's render.** No slot is blessed by
+  its own steward before a builder of that steward has rendered the
+  slot's revision; a render that fails ends the trial in a fall back
+  (steward.md, section 6).
 - **A live state never moves the default.** No live bless writes
   `BootOrder` or `default`; after every reboot or power cut no overlay
   remains, and the firmware boots a blessed slot or the trial entry a
@@ -1336,8 +1372,8 @@ same repository (7.3).
 | Scenario | World | What happens | What must hold |
 |---|---|---|---|
 | a mount fails during a trial | slots, system | `test-mount-fails`: the trial's boot isolates `emergency.target` | the trial's units, armed from the `/run` marker or `hearth.trial=` and kept by `IgnoreOnIsolate=yes`, still end the trial; fell back |
-| a failed unit | slots, system | `test-unit-fails`: the trial boots `degraded` | the slot's builder asks to fall back at once; the dead-man plays no part. With the unit on `bless.ignore_failed`, the bless passes |
-| a cut in the bless | activator, system | a crash of the activator, and a power cut, between each step of the bless (slots.md, section 7): journal, `blessed`, marker removed, default moved, dead-man stopped | a power cut boots the default, a blessed slot; after a crash the running slot is blessed but not the default, and the builder blesses it again, which finishes the order |
+| a failed unit | slots, system | `test-unit-fails`: the trial boots `degraded` | the slot's steward asks to fall back at once; the dead-man plays no part. With the unit on `bless.ignore_failed`, the bless passes |
+| a cut in the bless | activator, system | a crash of the activator, and a power cut, between each step of the bless (slots.md, section 7): journal, `blessed`, marker removed, default moved, dead-man stopped | a power cut boots the default, a blessed slot; after a crash the running slot is blessed but not the default, and the steward blesses it again, which finishes the order |
 | both GRUB saves fail [M3b] | boot, system | GRUB cannot save `env.0` nor `env.1`, so `next_entry` stays set | the activator in the trial's slot clears it and reports it (machine.md, 5.6); a trial that panics meanwhile is bounded by the boot counter; the default stays a blessed slot |
 | a blessed default that panics [M3b] | boot, system | the default panics at every boot | the boot counter moves GRUB to the other blessed slot (machine.md, section 5) |
 | hostile tree shapes | activator, slots | an output whose `/var`, `/etc` or kernel is a symbolic link, or with a FIFO where `/etc/passwd` should be | prepare refuses each, since every slot path is resolved with `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS` and `RESOLVE_NO_XDEV` (3.2); nothing outside the slot is read or written |
@@ -1352,6 +1388,12 @@ same repository (7.3).
 | a cut while seeding | slots, system | a power cut while an entry's `<name>.new` is filled | the next prepare deletes the `.new` and seeds again; no half-seeded entry is ever bound |
 | a snapshot across two services [M5] | backups, system | two writers in one class, snapshots and prunes cut at every step | each snapshot is both writers' state at one instant; retention keeps each bucket's newest |
 | restoring one entry [M5] | backups, system | a restore of `mail` from a snapshot, cut between its renames | finished or undone at start; `postfix`, in the same class, untouched |
+| a revision that crashes the builder | steward, system | every builder dies rendering one revision: scripted in the steward's world, killed by the referee at that job in the system world | the job lost, tried by a new builder, lost again: `crashed`; the pass waits for another commit, the crash a fact and an event naming the revision; the client's `status` answered throughout; the next commit converges (steward.md, 5.1) |
+| a builder killed for memory | steward, system | `steward/builder/` reaches its ceiling in a packages step (3.10): the step's leaf killed in one seed, the builder's own in another | the step killed: that step's failure (build.md, 4.3); the builder killed: a lost job, tried once more; nothing outside `steward/builder/` killed; the steward answers throughout |
+| a builder that hangs | steward | the scripted builder never answers a build | at the job's deadline the steward stops the builder's cgroup; the job lost and tried again (steward.md, 5.2) |
+| the bless's render fails | steward, system | in the new slot, the render of the slot's revision fails: a configuration error in one seed, the builder lost twice in another | the steward asks to fall back, never to bless; the default never moved; `a` boots, and `b`'s prepare key is refused (steward.md, section 6) |
+| a release that renders another output | steward, system | the new slot's builder renders the slot's revision to another output key | the bless is asked and given; a `render changed` fact; the next pass builds that output and tries it |
+| a steward that dies with a builder running | activator, system | the steward killed in the middle of a build | the activator empties `steward/` with `cgroup.kill` before it spawns a new steward, so no builder outlives its steward; the next builder's startup scan settles the staging layer; the pass goes on (steward.md, 5.4) |
 
 ## 9. Budgets and costs
 
@@ -1426,11 +1468,11 @@ finding, as a failing check is.
 |---|---|---|---|---|
 | M1 | step; domain (render, builder); machine (config, template, git, mmdebstrap); protocol (builder and tools); simulated (builder); real loop (render, real git); end to end (render, diff) | files with owners and modes; processes; the universe's index at snapshot timestamps | git; mmdebstrap `--simulate` | conformance: resolve, git; the mirror's indexes |
 | M2 | domain (store, build, tree); system (builder and tree helper); machine (dpkg, tree); protocol (tree helper); real loop (tree helper, process groups) | btrfs and its ownership rule; ids, maps of several extents, namespaces, cgroups, sandboxes; `openat2`'s flags; attributes, inodes, ctimes; the full universe, `systemd-container` included; full disks; power cuts on files and subvolumes, and `syncfs` | mmdebstrap's bootstrap; `apt-helper`; dpkg-query; the target's systemd tools and `tar` | conformance: bootstrap in both modes, extras, fetch, query, the target's tools, the btrfs rules; real builds |
-| M3 | domain (converge, slots, boot, disk, activator); system (the pair joins); machine (link, efi, systemd, keygen, client, proc); protocol (link, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client); capture and the bundle (development.md, section 10) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode and its jobs; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; mount namespaces, the new mount API and overlayfs (3.13); cues; a mutable root changed by hand, apt and dpkg on a running slot | efibootmgr; systemctl at run time, its unit verbs included; systemd-tmpfiles; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools; git's bundles | VM tier on OVMF, live changes included, and mutable slots, capture and working trees (7.6); conformance: firmware, host keys, overlays in a user namespace |
+| M3 | domain (steward, converge, slots, boot, disk, activator); system (the steward and the activator join); machine (link, jobs, efi, systemd, keygen, client, proc), each fuzzed; protocol (link, jobs, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client); builders lost at every job, and the bless's render (steward.md, section 8); capture and the bundle (development.md, section 10) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode and its jobs; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; mount namespaces, the new mount API and overlayfs (3.13); out-of-memory kills within a cgroup (3.10); cues; a mutable root changed by hand, apt and dpkg on a running slot | efibootmgr; systemctl at run time, its unit verbs included; systemd-tmpfiles; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools; git's bundles | VM tier on OVMF, live changes included, builders killed for memory and mid-pass, and mutable slots, capture and working trees (7.6); conformance: firmware, host keys, overlays in a user namespace |
 | M3b | machine (grub, incus); domain (dev) | SeaBIOS; msdos and the post-MBR gap; GRUB on FAT, its environment pair, its boot counter, saves that fail, and the slots' fragments; Incus's instances and pool | grub-editenv; grub-install; incus | VM tier on SeaBIOS, and the development loop on a development host (7.6); conformance: env file, GRUB, incus |
 | M4 | protocol (the wire, on `skein-fake-channel`); machine (wire) | — | `hearth-fake-engine` (4.6); systemd-run, for a held bless's timer | — |
 | M5 | domain (checks, backups); containers and pool hosts | units' states and signals; containers on a host (3.12); `setns` into a container's mount namespace; read-only snapshots of class subvolumes and their pruning | systemctl restarting a unit, a container's nspawn unit and `--machine=`; systemd-run's checks | VM tier: bless with checks; containers in a host VM, live changes included (7.3); clusters and containers in development (7.6) |
-| M6 | domain (artifacts; backups' sends); protocol (bytes by digest, between builders) | send streams and a backup peer; faults as effects; virtual disks | — | real builds: artifacts; development VMs from the host's store (development.md, section 9) |
+| M6 | domain (artifacts; backups' sends); protocol (bytes by digest, between two machines) | send streams and a backup peer; faults as effects; virtual disks | — | real builds: artifacts; development VMs from the host's store (development.md, section 9) |
 | later | identity beyond SSH host keys | — | wg, for WireGuard keys | — |
 
 M1 sets the pattern: every tier up to end to end exists for render

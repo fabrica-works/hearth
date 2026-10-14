@@ -11,11 +11,13 @@ milestone first reports each fact and event. What is open is in section
 
 ## 1. In one page
 
-- **Three faces, one domain.** The daemon (the activator and its
-  builder) serves a local client and, from M4, an engine. The client is
-  the same binary, run by any user: it talks to the builder over a local
-  Unix socket, or runs the builder's domain in its own process when no
-  daemon runs. Root-only commands run in-process as root.
+- **Three faces, one domain.** The daemon (the activator, its steward,
+  and the builder the steward spawns for work; steward.md) serves a
+  local client and, from M4, an engine. The steward is the face. The
+  client is the same binary, run by any user: it talks to the steward
+  over a local Unix socket, or runs the builder's domain in its own
+  process when no daemon runs. Root-only commands run in-process as
+  root.
 - **The client prints typed records and ends with an exit code.** Every
   answer is a record of `hearth-protocol-client`, printed as a table for
   people or as JSON lines for scripts. The exit code says which of a few
@@ -26,16 +28,19 @@ milestone first reports each fact and event. What is open is in section
   those facts have moved (3.1, 5.4).
 - **Standalone mode converges to a desired revision set locally**
   (section 4): a commit, or a branch polled on an interval, kept in the
-  builder's state. A pass fetches, renders, compares, builds, prepares
-  and tries, one target at a time, and the new slot's hearth blesses it.
-  A slot that fell back is never tried again on its own. A local hold
-  stops new passes.
+  steward's state. A pass fetches, renders, compares, builds, prepares
+  and tries, one target at a time, the fetch, the render and the build
+  as a builder's jobs. The new slot's hearth blesses it once a builder
+  of its own has rendered the slot's revision. A slot that fell back is
+  never tried again on its own, and a revision that crashes a builder
+  twice is reported and waited out, never retried in a loop. A local
+  hold stops new passes.
 - **The wire is skein's channel, dialled out by hearth** (section 5).
   The hello comes first and carries the facts: slots, the four facts,
   versions, costs, and the answers the engine has yet to acknowledge. A
   reboot is a redial, and the hello after it is how the engine learns
   whether an activation held or fell back; a live activation respawns
-  the builder, which redials too.
+  the steward, which redials too.
 - **Orders follow jig's recovery classes** (5.4). prepare is keyed;
   activate, bless and roll back are conditional on the facts decided
   from; restart a unit is keyed by the order's key, which hearth keeps.
@@ -58,18 +63,21 @@ milestone first reports each fact and event. What is open is in section
                                    engine [M4]: the run side's or the lab's
                                       ▲ skein's channel over TLS, dialled out
 a machine                             │
-├── hearth activator   root  ◄─link─► hearth builder   user hearth
-│                                       ▲ skein's channel over /run/hearth/client.sock
+├── hearth activator   root  ◄─link─► hearth steward   user hearth, persistent
+│                                       ▲      └─jobs─► hearth builder   user hearth, spawned for work
+│                                       │ skein's channel over /run/hearth/client.sock
 ├── hearth (the client) any user ───────┘
 │                       with no daemon: the builder's domain, in-process
 └── hearth (as root)    root-only commands: the activator's code, in-process
 ```
 
-- **The daemon** is the process pair of activator.md, section 3: the
-  activator, started by systemd, and the builder it starts. The builder
-  is the face. It serves the client's socket and, from M4, dials the
-  engine. `hearth-domain-converge` holds the desired revision and the
-  orders, whichever face they came from.
+- **The daemon** is activator.md's activator, started by systemd, and
+  steward.md's two processes: the steward it starts, and the builder
+  the steward spawns for work. The steward is the face. It serves the
+  client's socket and, from M4, dials the engine;
+  `hearth-domain-converge`, its child, holds the desired revision and
+  the orders, whichever face they came from. Whatever reads the
+  repository or builds is a builder's job (steward.md, 3.3).
 - **The client** is the `hearth` binary's command-line face. It holds
   no state. It sends one request, prints the records that answer it,
   and exits.
@@ -77,7 +85,7 @@ a machine                             │
   builder's, on a developer's machine, in CI, wherever no daemon runs,
   and for any local repository (3.5); and the activator's code, as
   root, for the root-only commands (3.6).
-- **The activator has no face.** It hears only its builder, over the
+- **The activator has no face.** It hears only its steward, over the
   link (activator.md, section 3). The client never reaches it. A
   root-only command runs the activator's own code in its own process.
 - **One vocabulary behind every face.** A command from the client and an
@@ -92,38 +100,38 @@ a machine                             │
 
 | Command | What it does | Served by | Who may | With an engine |
 |---|---|---|---|---|
-| `hearth render <target> [--at <rev>] [--repo <path>]` | renders the target at a revision; prints the spec's parts with their digests (render.md, section 4) | the builder, from its own clone; in-process with `--repo` or a local path (3.5) | anyone | yes |
+| `hearth render <target> [--at <rev>] [--repo <path>]` | renders the target at a revision; prints the spec's parts with their digests (render.md, section 4) | the steward, by a builder's job on the builder's clone (steward.md, 3.3); in-process with `--repo` or a local path (3.5) | anyone | yes |
 | `hearth diff <from> <to> [--target <t>] [--repo <path>]` | the rendered diff: per target and part, what changed (render.md, section 6) | as `render` | anyone | yes |
-| `hearth diff --running [--target <t>] [--suggest]` | the running slot against its record: packages, files (with contents on a mutable machine), units, users; `--suggest` drafts task fragments (development.md, section 5) | the builder, from the activator's capture; the drafts in-process | operators | yes |
-| `hearth build <target> [--at <rev>]` | builds the output; prints each layer's key, whether it was found or built, and its costs | the builder, or in-process with a store of one's own | operators; anyone with their own store | yes |
-| `hearth status [--check]` | each target's slots, the four facts, the last trial, drift, how a prepared slot would be activated and why not live, the desired revision, the pass and the hold | the builder, which reads the activator's facts afresh | anyone | yes |
-| `hearth revision` | shows the desired revision | the builder | anyone | shows the engine's last order |
-| `hearth revision set <commit> [--bundle <file>]` | sets the desired revision to a commit; with `--bundle`, imports it first from a git bundle into the builder's clone (4.1; development.md, 6.2) | the builder | operators | refused |
+| `hearth diff --running [--target <t>] [--suggest]` | the running slot against its record: packages, files (with contents on a mutable machine), units, users; `--suggest` drafts task fragments (development.md, section 5) | the steward, from the activator's capture; the drafts in-process | operators | yes |
+| `hearth build <target> [--at <rev>]` | builds the output; prints each layer's key, whether it was found or built, and its costs | the steward, by a builder's job; or in-process with a store of one's own | operators; anyone with their own store | yes |
+| `hearth status [--check]` | each target's slots, the four facts, the last trial, drift, how a prepared slot would be activated and why not live, the desired revision, the pass and the hold | the steward, which reads the activator's facts afresh | anyone | yes |
+| `hearth revision` | shows the desired revision | the steward | anyone | shows the engine's last order |
+| `hearth revision set <commit> [--bundle <file>]` | sets the desired revision to a commit; with `--bundle`, imports it first from a git bundle into the builder's clone (4.1; development.md, 6.2) | the steward; the bundle by a builder's fetch job | operators | refused |
 | `hearth revision bundle <file> [--repo <path>] [--since <commit>]` | commits a working tree to an object on no branch and writes it as a git bundle; prints the commit (development.md, 6.1) | in-process | anyone | yes |
-| `hearth revision follow <branch> [--every <d>] [--trial auto\|manual]` | follows a branch, polled every `d` | the builder | operators | refused |
-| `hearth prepare [--at <rev>]` | prepares the inactive slot; keyed by target and revision | the builder, then the activator | operators | refused |
-| `hearth trial [--how auto\|live\|full]` | tries the prepared slot: live when eligible, else by a soft or a one-shot reboot (slots.md, 6.1); conditional on the facts read | the builder, then the activator | operators | refused |
-| `hearth rollback` | rolls back to the other slot (slots.md, section 9); conditional on the facts read | the builder, then the activator | operators | refused |
-| `hearth hold [--reason <text>]` | holds convergence (4.5) | the builder | operators | refused |
-| `hearth release` | releases the hold | the builder | operators | refused |
-| `hearth retry <target>` | clears the target's refusals, so the pass may try those slots again (4.4) | the builder | operators | refused |
-| `hearth credential <file>` | replaces the builder's read credential for the repository (3.8) | the builder | operators | yes |
+| `hearth revision follow <branch> [--every <d>] [--trial auto\|manual]` | follows a branch, polled every `d` | the steward | operators | refused |
+| `hearth prepare [--at <rev>]` | prepares the inactive slot; keyed by target and revision | the steward, then the activator | operators | refused |
+| `hearth trial [--how auto\|live\|full]` | tries the prepared slot: live when eligible, else by a soft or a one-shot reboot (slots.md, 6.1); conditional on the facts read | the steward, then the activator | operators | refused |
+| `hearth rollback` | rolls back to the other slot (slots.md, section 9); conditional on the facts read | the steward, then the activator | operators | refused |
+| `hearth hold [--reason <text>]` | holds convergence (4.5) | the steward | operators | refused |
+| `hearth release` | releases the hold | the steward | operators | refused |
+| `hearth retry <target>` | clears the target's refusals, so the pass may try those slots again (4.4) | the steward | operators | refused |
+| `hearth credential <file>` | replaces the builder's read credential for the repository (3.8) | the steward; a builder's job writes it | operators | yes |
 | `hearth bootstrap …` | partitions, formats and makes the first slot from a live system (machine.md, section 8); its arguments are 3.8's | in-process, as root | root | yes, before the daemon exists |
 | `hearth retarget <target> --revision <commit> [--bundle <file>] [--secrets <dir>]` [M3b] | a development machine cloned from a base image takes its target: its first slot built, placed and blessed as bootstrap's are (development.md, 3.2) | in-process, as root | root | refused |
-| `hearth secrets import <path>…` | imports secrets into the secret store (activator.md, 5.8), then asks the builder to read its facts afresh | in-process, as root | root | refused but at bootstrap |
-| `hearth identity` | the public halves of the machine's identity, to record as data (format.md, section 8) | the builder, from the activator's facts | anyone | yes |
-| `hearth logs [--unit <u>] [--since <d>] [-n <lines>]` | a bounded window of the journal, read locally (section 7); M3 | the builder, in `systemd-journal` | operators | yes |
+| `hearth secrets import <path>…` | imports secrets into the secret store (activator.md, 5.8), then asks the steward to read its facts afresh | in-process, as root | root | refused but at bootstrap |
+| `hearth identity` | the public halves of the machine's identity, to record as data (format.md, section 8) | the steward, from the activator's facts | anyone | yes |
+| `hearth logs [--unit <u>] [--since <d>] [-n <lines>]` | a bounded window of the journal, read locally (section 7); M3 | the steward, in `systemd-journal` | operators | yes |
 | `hearth shell [a\|b \| --snapshot <class>@<seq>] [-- <argv>]` | a read-only view of a slot, or of a class's snapshot [M5] (3.7) | in-process, started as root | root | yes, locally |
-| `hearth snapshots [--target <t>]` [M5] | each class's snapshots: sequence, age, the buckets that keep it, and from M6 whether the peer holds it (operating.md, 7.1) | the builder, from the activator's facts | anyone | yes |
-| `hearth restore <entry> \| --class <class> --from <seq> [--target <t>]` [M5] | restores one entry's directory, or a whole class, from a snapshot, then reboots (operating.md, 7.4); conditional on the facts read | the builder, then the activator | operators | refused |
-| `hearth artifact <repository> <recipe> [--at <commit>] [--build]` [M6] | resolves a recipe at a commit to its key and prints the pin; with `--build`, builds it (artifacts.md, 5.7 and 7.1) | the builder, or in-process | anyone; operators to build on the daemon | yes |
+| `hearth snapshots [--target <t>]` [M5] | each class's snapshots: sequence, age, the buckets that keep it, and from M6 whether the peer holds it (operating.md, 7.1) | the steward, from the activator's facts | anyone | yes |
+| `hearth restore <entry> \| --class <class> --from <seq> [--target <t>]` [M5] | restores one entry's directory, or a whole class, from a snapshot, then reboots (operating.md, 7.4); conditional on the facts read | the steward, then the activator | operators | refused |
+| `hearth artifact <repository> <recipe> [--at <commit>] [--build]` [M6] | resolves a recipe at a commit to its key and prints the pin; with `--build`, builds it (artifacts.md, 5.7 and 7.1) | the steward, by a builder's job; or in-process | anyone; operators to build on the daemon | yes |
 | `hearth dev up <target>… [--count <n>] [--at <rev>] [--repo <path>] [--secrets <dir>]` [M3b] | development machines cloned from the base image, each retargeted to its target (development.md, section 3) | in-process, on the development host, driving `incus` | a user who may use Incus | — |
 | `hearth dev apply <machine>… [--repo <path>] [--how auto\|live\|full]` [M3b] | the working tree as each machine's desired revision, followed until it converges or falls back (development.md, 6.3) | as `dev up` | as `dev up` | — |
 | `hearth dev shell <machine>`, `hearth dev diff <machine> [--suggest [--out <dir>]]` [M3b] | a root shell in the machine; its capture, the drafts written on the host (development.md, 4.4 and section 5) | as `dev up` | as `dev up` | — |
 | `hearth dev list`, `hearth dev down <machine>…`, `hearth dev image` [M3b] | the development machines; deleting them; making the base image (development.md, section 3) | as `dev up` | as `dev up` | — |
 
 - **"With an engine"** is the machine's mode, set at bootstrap (3.8)
-  and kept in the builder's state (4.1). A machine follows its engine or
+  and kept in the steward's state (4.1). A machine follows its engine or
   converges on its own, never both. Under an engine the commands that
   change slots or the desired revision exit 69 (3.3): the engine
   decides.
@@ -139,7 +147,7 @@ a machine                             │
   before the machine reboots or soft reboots into the slot. The outcome
   is read after the reboot with `hearth status`: blessed, or fell back.
   The client cannot outlive the reboot it asked for. A live trial
-  returns once the units are acted on, before the builder is spawned
+  returns once the units are acted on, before the steward is spawned
   anew; `status` then shows it on live trial, live-blessed, or fell back
   (live). `--how live` asks for live only and exits 1, with the rules
   that fail, when the change is not eligible.
@@ -175,10 +183,11 @@ a machine                             │
 
 ### 3.2 Output
 
-- **Records, not text.** The builder answers with typed records of
-  `hearth-protocol-client`: a spec's parts, a diff's entries, a build's
-  layers, slot rows, identity rows, journal entries. The domain never
-  formats. The client's protocol layer prints them.
+- **Records, not text.** The steward answers with typed records of
+  `hearth-protocol-client`, its builder's results among them: a spec's
+  parts, a diff's entries, a build's layers, slot rows, identity rows,
+  journal entries. The domain never formats. The client's protocol
+  layer prints them.
 - **Tables for people.** One table per record type, aligned columns,
   keys and digests cut to 12 hex digits, ages as durations:
 
@@ -208,7 +217,7 @@ a machine                             │
 | 1 | a negative answer | `diff` found differences; a conditional order refused because the facts moved; `status --check` found a fall back, drift, a refusal or a hold |
 | 2 | failed | a configuration error in the revision (render.md, 7.1); a build step that failed its key (build.md, 4.3); a prepare the activator refused on verification |
 | 64 | usage | an unknown command, target or option; a malformed revision |
-| 69 | unavailable | no daemon answers and the command does not run in-process; the machine follows an engine |
+| 69 | unavailable | no daemon answers and the command does not run in-process; the machine follows an engine; the command's job crashed its builder twice (steward.md, 5.1) |
 | 75 | try again | another order holds the target's slots; an operational failure that may pass: git, the resolution's mmdebstrap, a fetch, a timeout (render.md, 7.1) |
 | 77 | not permitted | the peer's credentials do not allow it; a root-only command run by another user |
 
@@ -226,26 +235,26 @@ a machine                             │
 ### 3.4 The socket and peer credentials
 
 - **`/run/hearth/client.sock`,** a Unix stream socket bound by the
-  builder. The activator makes `/run/hearth/` (owner `hearth`, mode
-  0755) before it spawns the builder (activator.md, 3.2). The
+  steward. The activator makes `/run/hearth/` (owner `hearth`, mode
+  0755) before it spawns the steward (activator.md, 3.2). The
   socket's mode is 0666: who may do what is decided by peer
   credentials, never by the file's mode.
 - **skein's channel over it,** with the magic `hrtc`, the client as
   initiator and an empty credential (skein's `channel.md`, section 5).
-  The client and the builder come from the same release, so the version
+  The client and the steward come from the same release, so the version
   range is one version wide; the opening still refuses a stale client
   cleanly.
-- **Peer credentials decide.** The builder reads the peer's uid with
+- **Peer credentials decide.** The steward reads the peer's uid with
   `SO_PEERCRED` when it accepts the connection (an ask of skein,
   README.md, 8.1) and never trusts a uid a record names.
-  - root, and the uids listed as operators in the builder's
+  - root, and the uids listed as operators in the steward's
     configuration, may run every command the socket serves;
   - any other uid may run `render`, `diff` (but `--running`, which
     reads the slot's files), `status`, `revision` (to read) and
     `identity`;
   - membership of a group as the test of an operator needs the peer's
     supplementary groups (`SO_PEERGROUPS`), which is open (section 11).
-- **Bounded.** The builder admits at most `clients` connections (8 to
+- **Bounded.** The steward admits at most `clients` connections (8 to
   start) and one request in flight on each. A connection beyond the
   bound is refused at the entrance, and the client exits 75.
 
@@ -278,10 +287,12 @@ a machine                             │
   as root,** and `shell` drops root at once (3.7). The client checks its
   effective uid first and exits 77 otherwise.
   None of them asks the daemon to act: the activator listens only to its
-  builder, and a secret must never pass through the builder.
+  steward, and a secret must never pass through the steward or its
+  builder.
 - **`bootstrap`** runs the activator's code in the client's process,
-  which spawns a builder over a link as the daemon's activator would
-  (machine.md, 8.2). The privilege split holds from the first slot.
+  which spawns a steward over a link as the daemon's activator would,
+  and the steward its builders (machine.md, 8.2). The privilege split
+  holds from the first slot.
 - **`retarget`** [M3b] is bootstrap's place and first bless on a
   development machine's own top level, with the daemon stopped, refused
   unless the machine accepts mutable targets (development.md, 3.2 and
@@ -294,7 +305,7 @@ a machine                             │
   line, or a directory of them, by secret name. It imports no identity,
   which the activator makes (activator.md, 5.7). It prints the
   target's declared secrets with present or missing, never a value.
-  Then, if a daemon answers, it asks the builder over the socket to
+  Then, if a daemon answers, it asks the steward over the socket to
   read its facts afresh; that request carries nothing but itself.
 - **Under an engine,** secrets come from the plane's store (5.3), and
   `secrets import` is refused except as part of `bootstrap`.
@@ -394,7 +405,7 @@ hearth bootstrap --disk <device> [--wipe]
 ### 4.1 The desired revision
 
 - **What a machine converges to, set locally.** Either a commit, or a
-  branch to follow, polled every interval. It lives in the builder's
+  branch to follow, polled every interval. It lives in the steward's
   state (store.md, 8.3) and survives restarts and reboots:
 
   ```
@@ -410,33 +421,39 @@ hearth bootstrap --disk <device> [--wipe]
 - **Set by the client:** `hearth revision set <commit>`, or `hearth
   revision follow <branch> --every <d>`. The interval is at least a
   minute, so a fleet of followers does not hammer the forge.
-- **A commit from a bundle** (development.md, 6.2): `hearth revision
-  set <commit> --bundle <file>` fetches a git bundle into the builder's
-  clone as `refs/hearth-dev/<commit>`, then sets the commit. The pass
-  finds it in the clone and never fetches it from the repository's URL;
-  render resolves it from that ref. The builder keeps the last 16 such
-  refs, never the desired one's. This is how a working tree, committed
-  on no branch, becomes a machine's desired revision.
+- **A commit from a bundle** (development.md, 6.2): `hearth revision set
+  <commit> --bundle <file>` has a builder fetch a git bundle into its
+  clone as `refs/hearth-dev/<commit>`, a fetch job (steward.md, 3.3),
+  then sets the commit. The pass finds it in the clone and never fetches
+  it from the repository's URL; render resolves it from that ref. The
+  builder keeps the last 16 such refs, never the desired one's. This is
+  how a working tree, committed on no branch, becomes a machine's
+  desired revision.
 - **`trial: manual`** stops each pass at a prepared slot and waits for
   `hearth trial`, live changes included. A workstation such as
   `x1-prod`, the MVP's machine, reboots, or changes under its user's
   feet, when its user chooses, not when a commit lands. `auto` tries at
   once, live when eligible, and suits servers.
 - **The target is the activator's,** in its machine record
-  (activator.md, 7.1), and the repository the builder's; both are
-  written at bootstrap (3.8). The client changes the revision, never
-  which target the machine is.
-- **The builder's state for its faces,** a record each in `state/`,
-  read back at startup (store.md, 8.3):
+  (activator.md, 7.1), and the repository the steward's, whose
+  builders keep its clone; both are written at bootstrap (3.8). The
+  client changes the revision, never which target the machine is.
+- **The steward's state,** a record each in the store's `state/`,
+  which only the steward writes, read back at startup (store.md, 8.3;
+  steward.md, 2.2):
   - the desired revision, above;
   - the mode, the operators' uids and, under an engine, its address,
     its trust and the machine's credential [M4] (3.8);
-  - the repository's read credential, if any, in the store's
-    `credentials/` beside `state/` (3.8; render.md, 2.2);
-  - the hold (4.5), the refused prepare keys (4.4) and the last pass;
+  - the hold (4.5) and the refused prepare keys (4.4);
+  - the last pass: its generation, commit, stage and outcome, and the
+    output and prepare keys it made; the bless's render reads its
+    commit (steward.md, section 6);
   - orders with their outcomes, until acknowledged [M4] (5.5);
   - the rings of signals and check history [M5]
     (operating.md, section 5).
+
+  The repository's read credential, if any, is the builder's, in the
+  store's `credentials/` beside `state/` (3.8; render.md, 2.2).
 - **Every pass names the generation it serves.** A pass whose
   generation is no longer the desired one stops at its next stage, and a
   new pass starts.
@@ -446,18 +463,25 @@ hearth bootstrap --disk <device> [--wipe]
 The convergence loop is a procedure of `hearth-domain-converge`:
 level-triggered, bounded, and stepped by events (jig's `connectors.md`,
 section 6, is the model). It compares what the desired revision makes
-with what runs, and does the next thing that closes the gap.
+with what runs, and does the next thing that closes the gap. Its
+stages that read the repository or build, `fetching`, `rendering` and
+`building`, and the live plan in `trying`, are a builder's jobs
+(steward.md, 3.3); the steward compares, asks the activator, and
+blesses.
 
 ```
 stage        on                                          to           does
-waiting      the interval elapsed (a branch), the        fetching     git fetch the branch, or the
+waiting      the interval elapsed (a branch), the        fetching     a fetch job: the branch, or the
              desired revision changed, the backoff                    commit if the clone lacks it
              elapsed, startup
-fetching     the commit C                                rendering    render the target at C (render.md)
-             git failed                                  waiting      back off, or wait (4.4)
+fetching     the commit C                                rendering    a render job: the target at C
+                                                                      (render.md)
+             git failed, or the job crashed (steward.md, waiting      back off, or wait (4.4)
+             5.1)
 rendering    the spec S                                  comparing    the output key: resolution reused
                                                                       by its key, or resolved
-             a configuration error (render.md, 7.1)      waiting      wait for another commit
+             a configuration error (render.md, 7.1), or  waiting      wait for another commit
+             the job crashed
              an operational failure (render.md, 7.1)     waiting      back off
 comparing    the running slot is blessed but is not      re-blessing  ask the activator to bless it again
              the default: a cut bless, or the firmware                (slots.md, 2.3 and section 7)
@@ -467,17 +491,17 @@ comparing    the running slot is blessed but is not      re-blessing  ask the ac
              (slots.md, section 3)
              S's prepare key is refused (4.4)            waiting      reported; wait for another key
              S equals the prepared, untried slot         trying
-             otherwise                                   building
+             otherwise                                   building     a build job: K, from S
 re-blessing  blessed: the default is the running slot    comparing
              refused                                     waiting      back off
 building     the output, keyed K                         preparing    ask the activator to place K with S's
                                                                       slot parts and trial window
-             a failure                                   waiting      back off, refuse, or wait (4.4)
+             a failure, the job crashed included         waiting      back off, refuse, or wait (4.4)
 preparing    prepared                                    trying       or waiting, if trials are manual
              refused or failed                           waiting      back off, refuse, wait or rebuild (4.4)
-trying       eligible (slots.md, 6.7), how auto or live  (respawn)    ask the activator to try live with the
-                                                                      plan: delta, swap, units (slots.md, 6.8);
-                                                                      a new builder is spawned over them
+trying       a plan live job: eligible (slots.md, 6.7),  (respawn)    ask the activator to try live with the
+             how auto or live                                         plan: delta, swap, units (slots.md, 6.8);
+                                                                      a new steward is spawned over them
              not eligible, or live refused or failed     trying       ask an ordinary trial, the plan's
              before the swap                                          reasons kept as a fact
              the activator took the trial                (reboot)     a reboot or a soft reboot into the
@@ -485,15 +509,20 @@ trying       eligible (slots.md, 6.7), how auto or live  (respawn)    ask the ac
 
 over the live state, after the respawn
 blessing     settled, the minimal bless holds            waiting      ask the activator to bless live: the
-             (slots.md, 6.8, L7)                                      one-shot set to the slot's trial entry
+             (slots.md, 6.8, L7), the bless's render                  one-shot set to the slot's trial entry
+             answered (steward.md, section 6)
              a touched unit failed, the criterion        waiting      ask the live fall back (slots.md, 8.5);
-             failed, or the window nearly over                        refuse b's prepare key
+             failed, the bless's render failed or                     refuse b's prepare key
+             crashed, or the window nearly over
              the activator fell back live at L6          waiting      refuse b's prepare key
 
 in the new slot, after the reboot
-blessing     the minimal bless holds (slots.md, 7.1)     waiting      ask the activator to bless
+blessing     the minimal bless holds (slots.md, 7.1),    waiting      ask the activator to bless
+             the bless's render answered (steward.md,
+             section 6)
              a unit failed that the target's             (reboot)     ask the activator to fall back
              `bless.ignore_failed` does not list
+             the bless's render failed, or crashed       (reboot)     ask the activator to fall back
              neither, within the trial's window          (reboot)     the dead-man reboots into the default
 
 in the old slot, after a fall back
@@ -524,22 +553,25 @@ waiting      the activator reports "fell back" from b    waiting      refuse b's
 - **A prepared slot is reused.** When the inactive slot already holds
   S, untried (a manual trial, or a pass interrupted by a restart), the
   pass goes straight to trying.
-- **The pass ends at the reboot.** The trial slot's own builder starts
+- **The pass ends at the reboot.** The trial slot's own steward starts
   afresh, reads its state and the activator's facts, and its pass begins
-  in `blessing`. A broken hearth release in the new slot cannot bless
-  itself, so it cannot strand the machine.
+  in `blessing`, with a render job of the slot's own revision, offline
+  (steward.md, section 6). A broken hearth release in the new slot
+  cannot bless itself, whether its steward never asks or its builder
+  cannot render the revision that built the slot, so it cannot strand
+  the machine.
 - **A failed unit the target expects does not fail a trial.** A
   desktop often carries one that fails routinely; the target lists it
   in `bless.ignore_failed`, and the minimal bless counts only the
   others (format.md; slots.md, 7.1).
 - **Activation is the cheapest that covers the change.** Live first,
-  when slots.md, 6.7's rules hold: the builder plans it from the two
-  outputs' tree files and the live parts of the running and the new
-  spec (render.md, 4.4), and the activator checks again. Otherwise the
-  activator chooses a soft reboot or a one-shot reboot by
-  slots.md, 6.1's rule (the kernel's digests and its command line).
-  `status` shows which a prepared slot needs, and why it is not live. A
-  reboot is a clean `systemctl reboot` with
+  when slots.md, 6.7's rules hold: a builder plans it, as a job, from
+  the two outputs' tree files and the live parts of the running and the
+  new spec (render.md, 4.4; steward.md, 3.3), and the activator checks
+  again. Otherwise the activator chooses a soft reboot or a one-shot
+  reboot by slots.md, 6.1's rule (the kernel's digests and its command
+  line). `status` shows which a prepared slot needs, and why it is not
+  live. A reboot is a clean `systemctl reboot` with
   `SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT=1` (slots.md, 6.3); only the dead-man
   and a failed live fall back use `systemctl reboot -ff`.
 - **A live bless ends the pass converged** with the base still the
@@ -562,6 +594,9 @@ waiting      the activator reports "fell back" from b    waiting      refuse b's
   `preparing` or `trying` is refused as busy** (exit 75). One that comes
   while the pass fetches, renders or builds stops the pass at its next
   stage, and the command goes first.
+- **A client's `render`, `diff` or `build` is a job too:** it waits in
+  the steward's queue, in the machine's own lane, behind the job in
+  flight there (steward.md, 3.4).
 
 ### 4.4 Failures and backoff
 
@@ -581,7 +616,8 @@ be made or run, so its prepare key is refused.
 | a build step failed: a maintainer script, `customize.sh`, a limit, the scan (build.md, 4.3) | refused | refuse the prepare key |
 | out of space | operational | an alarm; collection (store.md, 7.2); back off |
 | a secret the spec declares is missing at prepare (slots.md, 5.4) | configuration | wait for the secret store's generation to change: an import |
-| the activator found a layer that does not match its record (activator.md, section 6) | none: the store is corrupt | never a refusal: the builder hashes the layer again and, if it is corrupt, deletes it and its descendants and builds again (store.md, 4.4) |
+| the activator found a layer that does not match its record (activator.md, section 6) | none: the store is corrupt | never a refusal: a builder's verify job hashes the layer again and, if it is corrupt, deletes it and its descendants, and the pass builds again (store.md, 4.4; steward.md, 3.3) |
+| a job lost twice alone: its builder died or hung under it (steward.md, 5.1) | `crashed`, classed by its job: a fetch's, a verify's or a collection's operational; a render's configuration; a build's refused | back off; wait for another commit; refuse the prepare key. Reported with the job, its stage and the exit status or signal |
 | the trial fell back: no bless within the window, or a failed unit `bless.ignore_failed` does not list; or a live trial fell back (slots.md, 8.5) | refused | refuse the prepare key |
 | a change not eligible for live, or a live trial whose delta failed to build or verify (slots.md, 6.7 and 6.8) | none: not an error | an ordinary trial; why it was not live is a fact |
 
@@ -592,7 +628,7 @@ be made or run, so its prepare key is refused.
   both allow it. Render's own overall deadline for a resolution (10
   minutes, render.md, 5.5) bounds one attempt.
 - **A refused prepare key is never tried again on its own.** Refusals
-  are kept in the builder's state, bounded (the last 16), each with why
+  are kept in the steward's state, bounded (the last 16), each with why
   and how long ago. A new commit that makes the same prepare key stays
   refused; one that makes another, by its output, its slot parts or a
   generation, is tried. This is what stops a boot loop.
@@ -605,6 +641,10 @@ be made or run, so its prepare key is refused.
   `hearth prepare --at` act on a refused key when asked, and clear it if
   the trial is blessed. A failed unit that fails every boot belongs in
   `bless.ignore_failed`, not in a retry.
+- **A hearth bug is not a crash loop.** A revision that crashes a
+  builder ends, after one retry, in a wait or a refusal like any
+  failure of its class, while the steward stays up, keeps its faces and
+  reports the crash with the revision that caused it (steward.md, 5.1).
 - **A failed pass is a fact and an event** (section 6), with its stage
   and its typed reason. `status --check` exits 1 while one stands.
 
@@ -617,7 +657,7 @@ be made or run, so its prepare key is refused.
   falls back whatever the hold says: a hold cannot keep a machine on an
   unblessed slot.
 - **It stays until `hearth release`,** across restarts and reboots, in
-  the builder's state, with who held it (the peer's uid), when, and the
+  the steward's state, with who held it (the peer's uid), when, and the
   reason given.
 - **It does not stop the operator.** `prepare`, `trial` and `rollback`
   still work while held. A manual change that convergence should not
@@ -633,7 +673,7 @@ be made or run, so its prepare key is refused.
 
 - **Rotating a secret is a new slot of the same output** (README.md,
   section 7). `hearth secrets import` bumps the secret store's
-  generation, which the activator reports to its builder as a fact.
+  generation, which the activator reports to its steward as a fact.
 - **The next pass sees the running slot's generation behind,** which
   changes the prepare key (slots.md, 2.2 and 5.4), and prepares a new
   slot from the output it already holds: no build, a snapshot and a
@@ -656,9 +696,9 @@ be made or run, so its prepare key is refused.
   interrupt the rest.
 - **One desired revision for the machine.** The host and its containers
   converge to the same commit, with the same trial policy (4.1): a
-  container is a target of the host's revision, rendered, built and
-  placed by the host's builder, in the host's store
-  (build.md, section 2).
+  container is a target of the host's revision, rendered and built by
+  the host's builders, in the host's store (build.md, section 2), and
+  placed by the host's activator at its steward's request.
 - **A container's trial is live when eligible** (slots.md, 12.8), the
   host's activator swapping the overlays inside the container's mount
   namespace and acting on its units through `systemctl --machine=`.
@@ -681,7 +721,7 @@ be made or run, so its prepare key is refused.
   like any other, with nothing to fall back to (slots.md, 12.3); its
   secrets are imported for its own target (3.6).
 - **A container the spec no longer places on the host** is removed in
-  the same pass, before the host's own target: the builder asks its
+  the same pass, before the host's own target: the steward asks its
   activator to stop it and delete its slots, which unpins their outputs,
   and its data stays, reported as orphaned (slots.md, 12.7).
 
@@ -699,7 +739,7 @@ be made or run, so its prepare key is refused.
 - **The stack, hearth's end:**
 
   ```
-  hearth-domain-builder    routes orders to hearth-domain-converge, facts from every child
+  hearth-domain-steward    routes orders to hearth-domain-converge, facts from every child
   hearth-protocol-wire     the connection, its timers, the translation, calls and their answers
   skein-channel            magic "hrth", versions, terms; hearth is the initiator
   TLS client               skein's; the engine terminates TLS
@@ -714,8 +754,9 @@ be made or run, so its prepare key is refused.
   written at bootstrap (3.8). io connects to addresses; the shell resolves a
   name at startup, so a moved engine needs a restart until skein's io
   resolves names (section 11).
-- **The builder speaks the wire, never the activator.** Orders reach
-  the activator over the link, as the client's do.
+- **The steward speaks the wire, never the activator nor the
+  builder.** Orders reach the activator over the link, as the client's
+  do, and what an order needs built is a builder's job.
 
 ### 5.2 The hello
 
@@ -731,7 +772,7 @@ Hello
     slots         per label: state; output key; prepare key; slot parts' digests;
                   the identity's and secret store's generations; slot tree digest,
                   secrets counted by H(name, generation) (slots.md, 2.2);
-                  the revision, from the builder's records; drift; age
+                  the revision, from the steward's records; drift; age
     boot          running, default, trial: a label or none; live: the delta's slot and prepare key,
                   or none (slots.md, section 3)
     last trial    slot; output key; kind; blessed | held | live-blessed | fell back | rolled back; age
@@ -743,7 +784,7 @@ Hello
   store         bytes used and free; outputs; layers
 ```
 
-- **Facts, read afresh.** The builder asks its activator for the slots
+- **Facts, read afresh.** The steward asks its activator for the slots
   and the four facts when it composes the hello, never from a cache.
   The hello is a fresh read the engine's connector can decide on (jig's
   `connectors.md`, 5.1).
@@ -770,8 +811,8 @@ Hello
   up, so its outcome reaches the engine as fact updates while the
   channel is open, and the same table reads its facts in any later
   hello.
-- **A host's live activation drops the channel once,** when the builder
-  is spawned anew after the swap (slots.md, 6.8, L6); the new builder's
+- **A host's live activation drops the channel once,** when the steward
+  is spawned anew after the swap (slots.md, 6.8, L6); the new steward's
   hello carries the live fact, and the rest arrives as fact updates.
 - **Bounded.** The hello's size follows from the limits: targets per
   machine, slots per target, orders kept, identity entries. Its largest
@@ -794,7 +835,7 @@ store, is open (README.md, section 9). What is fixed:
   probed.
 - **The candidates:**
   - **a credential issued at bootstrap:** a name and a secret, entered
-    with `hearth bootstrap` and kept in the builder's state. It works
+    with `hearth bootstrap` and kept in the steward's state. It works
     with skein's channel today. It is a bearer secret: whoever reads it
     is the machine.
   - **a client certificate:** a key made on the machine at bootstrap
@@ -808,8 +849,9 @@ store, is open (README.md, section 9). What is fixed:
 - **Secrets under an engine** are fetched from the plane's store under
   the same identity. The lean: the store seals each secret to a key of
   the activator's (generated with the machine's identity, its public
-  half a fact), and the builder fetches and relays the sealed bytes to
-  the activator, so no secret value ever passes through the builder.
+  half a fact), and the steward fetches and relays the sealed bytes to
+  the activator, so no secret value ever passes through the steward or
+  its builder.
 
 ### 5.4 Orders
 
@@ -830,12 +872,13 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
 
 **prepare.**
 
-- **Keyed by target and revision.** The builder keeps each prepare's
-  target, revision and outcome (4.1; store.md, 8.3), and renders the
-  revision to an output and slot parts. The activator keys the place by
-  its prepare key (slots.md, 2.2; activator.md, 4.4): a prepare whose
-  output, parts and generations a slot already holds, prepared or
-  running, answers with that slot and does nothing.
+- **Keyed by target and revision.** The steward keeps each prepare's
+  target, revision and outcome (4.1; store.md, 8.3), and has a builder
+  render the revision to an output and slot parts (steward.md, 3.3).
+  The activator keys the place by its prepare key (slots.md, 2.2;
+  activator.md, 4.4): a prepare whose output, parts and generations a
+  slot already holds, prepared or running, answers with that slot and
+  does nothing.
 - **The expected output key** is what the engine rendered for the
   target (any hearth renders any target). A prepare that makes another
   key is refused as `mismatch`, which is a bug worth a finding: two
@@ -856,7 +899,7 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
   engine decided from. The activator checks them as it applies the
   trial (activator.md, 4.4 and 5.2). A late or repeated copy finds the
   facts moved and is refused, with the facts as they are.
-- **Its answer is `begun`,** recorded in the builder's state before the
+- **Its answer is `begun`,** recorded in the steward's state before the
   activator sets `BootNext` or `/run/nextroot`, and sent before the
   reboot when the channel allows, else in the next hello. The trial's
   outcome is told by the facts (5.2), never by an answer.
@@ -869,7 +912,7 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
   that fail when the change is not eligible, so an engine can keep
   reboots for a window of its own; `full` is a one-shot reboot.
 - **A live activation's `begun`** is recorded before the swap and sent
-  before the builder is spawned anew. A held live bless releases into
+  before the steward is spawned anew. A held live bless releases into
   the live bless; `roll back` while live is the live fall back
   (slots.md, 8.5). The live bless leaves the default where it was: the
   slot becomes the default only at its native boot's bless, which the
@@ -896,7 +939,7 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
 - **Keyed by the order's key, which hearth keeps.** systemd keeps no
   operation id for a restart, so without hearth's record the effect
   would be unrecoverable (jig's `examples.md`, 3.2).
-- **Before acting,** the builder records the key with the unit's
+- **Before acting,** the steward records the key with the unit's
   `InvocationID` (`systemctl show --property=InvocationID --value
   <unit>`), and the activator restarts it only if the invocation is
   still that one (activator.md, 5.9). After a crash, a repeated order
@@ -934,7 +977,7 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
 
 **For every order:**
 
-- **hearth keeps every order's key with its outcome** in the builder's
+- **hearth keeps every order's key with its outcome** in the steward's
   state, so a repeat by key always gets the first outcome, whatever its
   class. The condition protects an order whose first copy hearth never
   recorded.
@@ -986,7 +1029,7 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
   - The engine drops an answer for an attempt it has finished with.
   - So a stale attempt can never act over a newer one.
 - **Answers are kept until acknowledged.** Each outcome stays in the
-  builder's state until the engine acknowledges its key, which it does
+  steward's state until the engine acknowledges its key, which it does
   once it has committed it, and is resent in every hello. At most
   `orders` outcomes wait (64 to start); past that, new orders are
   refused `busy` until the engine catches up.
@@ -995,7 +1038,7 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
   the next hello carries. Events are hints: while the channel is down
   they are dropped and counted.
 - **A reboot is a redial.** An activation's reboot drops the channel;
-  the new slot's builder dials; its hello carries the facts. There is no
+  the new slot's steward dials; its hello carries the facts. There is no
   other path for a machine coming back.
 - **Liveness is the dial.** A machine that stops redialling is down; the
   engine judges it after its silence. hearth sends no heartbeat beyond
@@ -1040,30 +1083,30 @@ Application kinds of skein's channel; each belongs to one direction.
 | Name | Kind | What it carries | Known by | From |
 |---|---|---|---|---|
 | `machine` | fact | target; architecture; firmware; `SecureBoot`; the booted kernel; boot id; soft reboots; watchdog; firmware quirks seen (activator.md, 4.3) | activator | M3 |
-| `release` | fact | hearth's version; the wire versions spoken | builder | M3 |
-| `slot` | fact | target; label; state; output key; prepare key; slot parts' digests; the identity's and secret store's generations; the trial window [M5]; the slot's tree digest, in which each secret's contents count as `H(name, generation)`, never the value; age (slots.md, 2.2); the revision, from the builder's records | activator | M3 |
+| `release` | fact | hearth's version; the wire versions spoken | steward | M3 |
+| `slot` | fact | target; label; state; output key; prepare key; slot parts' digests; the identity's and secret store's generations; the trial window [M5]; the slot's tree digest, in which each secret's contents count as `H(name, generation)`, never the value; age (slots.md, 2.2); the revision, from the steward's records | activator | M3 |
 | `boot` | fact | per target: running, default, trial, live (slots.md, section 3) | activator | M3 |
 | `live` | fact | per target, the live state: base; delta; the slot and prepare key it carries, or none; hierarchies overlaid; whether the mount table agrees with the live record (slots.md, 2.4) | activator | M3 |
 | `trial` | fact | the last trial: slot; attempt; kind (live, soft reboot, reboot, restart); phase reached; outcome; for a live one, the step that failed and the units acted on; age | activator | M3 |
-| `activation` | fact | per target, how its prepared slot would be activated: live with its unit plan, or a soft reboot, a reboot or a restart, and when not live, why: the rules of slots.md, 6.7 that fail, with their first paths or units, bounded | builder | M3 |
+| `activation` | fact | per target, how its prepared slot would be activated: live with its unit plan, or a soft reboot, a reboot or a restart, and when not live, why: the rules of slots.md, 6.7 that fail, with their first paths or units, bounded | steward, from a builder's plan | M3 |
 | `data` | fact | per target, each class subvolume present and mounted, and its UUID; each entry's directory present and bound; orphans, by name (machine.md, 3.4) | activator | M3 |
 | `snapshots` | fact | per class: its snapshots, each with its sequence and age; the newest's and oldest's age; the next due; the bytes the class's mount holds (operating.md, 7.1) | activator | M5 |
 | `drift` | fact | per slot: clean, or the stable ids of what differs (slots.md, section 10) | activator | M3 |
 | `identity` | fact | per target, public halves: SSH host keys (type, key), the machine-id | activator | M3 |
 | `secrets` | fact | the secret store's generation; declared secrets missing, by name | activator | M3 |
-| `desired` | fact | standalone: revision, trial policy, generation | builder | M3 |
-| `pass` | fact | standalone: stage; last outcome; refused keys with why; backoff left | builder | M3 |
-| `hold` | fact | standalone: who, reason, age | builder | M3 |
+| `desired` | fact | standalone: revision, trial policy, generation | steward | M3 |
+| `pass` | fact | standalone: stage; the job in flight; last outcome; refused keys with why; backoff left | steward | M3 |
+| `hold` | fact | standalone: who, reason, age | steward | M3 |
 | `store` | fact | bytes used and free; outputs; layers; pins | builder | M3 |
 | `costs` | fact | per build: each step's time, bytes fetched, cache hits; totals (build.md, section 12) | builder | M3 |
-| `orders` | fact | in flight: key, attempt, stage; answered, not acknowledged | builder | M4 |
-| `units` | fact | per target, the running slot's failed units, with their results; a container's read from its host (operating.md, 2.9) | builder | M5 |
-| `check` | fact | per check: state, last result, reason, slot and output, run by (operating.md, section 2) | builder | M5 |
-| `alarm` | fact | disk, memory, pressure: level, value, threshold (operating.md, section 4) | builder | M5 |
+| `orders` | fact | in flight: key, attempt, stage; answered, not acknowledged | steward | M4 |
+| `units` | fact | per target, the running slot's failed units, with their results; a container's read from its host (operating.md, 2.9) | steward | M5 |
+| `check` | fact | per check: state, last result, reason, slot and output, run by (operating.md, section 2) | steward | M5 |
+| `alarm` | fact | disk, memory, pressure: level, value, threshold (operating.md, section 4) | steward | M5 |
 | `backup` | fact | per class: the last sent and the last confirmed, their ages, the peer, the bytes sent (operating.md, 7.2) | activator | M6 |
 | `fault` | fact | a pool host's active faults, each with its end (operating.md, section 8) | activator | M6 |
 | `artifact` | fact | an artifact's key: its tree digest, or failed; its costs (artifacts.md, 5.6 and 5.7) | builder | M6 |
-| `prepared` | event | slot; output key | builder | M3 |
+| `prepared` | event | slot; output key | steward | M3 |
 | `trial begun` | event | slot; soft reboot or reboot; why it was not live | activator | M3 |
 | `live trial begun` | event | slot; base; delta; the units stopped, reloaded, restarted and started | activator | M3 |
 | `live-blessed` | event | slot; the one-shot set to its trial entry; the default unmoved | activator | M3 |
@@ -1073,23 +1116,30 @@ Application kinds of skein's channel; each belongs to one direction.
 | `fell back` | event | from slot; to slot | activator | M3 |
 | `rolled back` | event | from slot; to slot | activator | M3 |
 | `drifted` | event | slot | activator | M3 |
-| `pass failed` | event | standalone: stage; typed reason | builder | M3 |
-| `unit failed` | event | unit; result | builder | M5 |
-| `check changed` | event | check; from state; to state | builder | M5 |
-| `alarm raised`, `alarm cleared` | event | alarm; value | builder | M5 |
+| `pass failed` | event | standalone: stage; typed reason | steward | M3 |
+| `builder lost` | event | the job; its last stage; the exit status or signal; whether it is tried again (steward.md, 5.1) | steward | M3 |
+| `job crashed` | event | the job, lost twice; its target and revision; the class the pass gave it (steward.md, 5.1) | steward | M3 |
+| `render changed` | event | slot; its output key; the output key the running release renders the slot's revision to (steward.md, section 6) | steward | M3 |
+| `unit failed` | event | unit; result | steward | M5 |
+| `check changed` | event | check; from state; to state | steward | M5 |
+| `alarm raised`, `alarm cleared` | event | alarm; value | steward | M5 |
 | `snapshot failed` | event | class; reason, such as a full disk | activator | M5 |
 | `restored` | event | class; entry, if one; the snapshot's sequence | activator | M5 |
 | `backup sent`, `backup failed` | event | class; reason | activator | M6 |
 | `fault began`, `fault ended` | event | fault; target | activator | M6 |
 
 - **"Known by"** is the process that owns the fact. The activator's
-  reach the builder over the link (activator.md, 4.3), and the builder
-  relays them. Drift is the activator's (README.md, 4.2).
+  reach the steward over the link (activator.md, 4.3), and the
+  steward relays them. A builder's come in its jobs' answers
+  (steward.md, 3.2), and the steward keeps their latest values, since
+  no builder runs between jobs. Drift is the activator's
+  (README.md, 4.2).
 - **The slots' outputs are pins.** The output keys in the activator's
-  `slot` facts pin those outputs in the builder's store, with their
-  ancestors, for as long as a slot holds them or is prepared from them
-  (store.md, 7.1); collection waits until the activator has reported
-  them since startup.
+  `slot` facts pin those outputs in the store, with their ancestors,
+  for as long as a slot holds them or is prepared from them
+  (store.md, 7.1). The steward gives them to every builder with its
+  `Welcome`, and a builder collects nothing before it has them
+  (steward.md, 3.2).
 - **Events after a reboot** are not replayed. `blessed` and `fell back`
   happen in a boot whose channel may not be open yet; the hello's facts
   say the same.
@@ -1103,22 +1153,23 @@ Application kinds of skein's channel; each belongs to one direction.
 
   | Read | Window | From |
   |---|---|---|
-  | `journal` | target; units; since and until, as durations ago; priority; at most N entries; after a cursor | `journalctl --output=json --no-pager --after-cursor=… --lines=…`, run by the builder, parsed by `hearth-protocol-systemd`; a container's [M5] with `--directory=/var/log/journal/<its machine-id>` (operating.md, section 5) |
+  | `journal` | target; units; since and until, as durations ago; priority; at most N entries; after a cursor | `journalctl --output=json --no-pager --after-cursor=… --lines=…`, run by the steward, parsed by `hearth-protocol-systemd`; a container's [M5] with `--directory=/var/log/journal/<its machine-id>` (operating.md, section 5) |
   | `signals` | names; since; resolution | hearth's own ring of samples (operating.md, section 5) |
   | `checks` | check ids; since | each check's history (operating.md, section 5) |
   | `facts` | names | afresh, as the hello's |
 
 - **Journal entries carry their wall-clock times as data.** No deadline
   crosses the wire; a log's time is what it says, not a deadline.
-- **The builder reads the journal itself.** The activator spawns it
+- **The steward reads the journal itself.** The activator spawns it
   with `hearth`'s supplementary groups (activator.md, 3.2), and the
   hearth task puts `hearth` in `systemd-journal` (format.md, 5.12), the
   group of `/var/log/journal` (format.md, 5.7). No root is involved in
-  a read.
+  a read, and no builder: it runs with no supplementary group
+  (steward.md, 2.3).
 - **Agents read through the engine,** for triage, with the engine's
   authority deciding who may read what.
 - **Locally from M3.** The client's `hearth logs` reads the same journal
-  window through the builder on the machine itself (3.1); only reads
+  window through the steward on the machine itself (3.1); only reads
   over the wire wait for M5, as do the signals and the checks' history.
 - **Bounded at both ends.** One read in flight per kind, the page's
   bytes, the entries' count and the window's span are limits; a read
@@ -1141,9 +1192,12 @@ Application kinds of skein's channel; each belongs to one direction.
 
   Ranges resume an interrupted transfer; a file-backed body serves it
   without reading it into memory (both asks of skein, README.md, 8.1).
-- **Who serves:** every builder of a plane, for the layers it holds, and
-  a pool's cache (temper's `factory.md`, 6.5). `hearth-protocol-http`
-  holds the routing, on skein's HTTP client and server.
+- **Who serves:** every hearth of a plane, for the layers its store
+  holds, and a pool's cache (temper's `factory.md`, 6.5). The steward
+  holds the HTTP listener; a change set's bytes come from a builder's
+  job, streamed through the steward (steward.md, 2.1 and 3.3).
+  `hearth-protocol-http` holds the routing, on skein's HTTP client and
+  server.
 - **Where from.** A prepare order names its sources (5.4): peers and
   caches of the machine's plane, in order of preference, from what the
   engine knows of where outputs live. A machine with no sources builds.
@@ -1152,8 +1206,8 @@ Application kinds of skein's channel; each belongs to one direction.
   - A change set is applied to a snapshot of a parent the receiver
     holds, and the result's tree digest checked against the one its own
     engine gave for the key, in the order (store.md, 10.2 and 10.4).
-    The engine had it from the builder that made the layer, over that
-    builder's authenticated wire.
+    The engine had it from the hearth whose builder made the layer,
+    over that machine's authenticated wire.
   - A machine fetches only from its own plane's peers and caches, and
     takes tree digests only from its own engine, so a lab output never
     reaches production (`draft/brainstorm.md`, 11.2; store.md, 10.4).
@@ -1191,25 +1245,27 @@ wire, not in traits: another backend is another daemon speaking it.
 ## 10. Its world
 
 - **The client's world** runs the client's protocol layer against the
-  builder's domain on the fake machine: every command, from scripted
-  peers with given uids, through records without bytes; then through the
-  socket's bytes in a protocol world. It checks:
+  steward's domain on the fake machine, with the builder's behind its
+  jobs: every command, from scripted peers with given uids, through
+  records without bytes; then through the socket's bytes in a protocol
+  world. It checks:
   - each command's records and exit code, against the table of 3.3;
   - peer credentials: a reader never changes state;
   - conditional commands refused when a scripted second client moved the
     facts in between;
   - in-process and over the socket give the same records.
-- **The standalone world** runs `hearth-domain-builder` and
-  `hearth-domain-activator` on the fake machine, with a fake forge (a
-  git remote, from skein's fake checkout) whose branch moves under it.
-  The seed draws: commits that change nothing, change config, or break
-  render; build steps that fail; power cuts at every stage of a pass,
-  of a prepare and of a trial; trials that hang, panic or fail the
-  minimal bless; imports of secrets; holds and releases; changes
-  eligible for live and not, live trials whose reload fails, cut at
-  every phase, and later changes while live; [M5] a host's containers,
-  their trials failing or cut by a host reboot, live or not. Its
-  invariants:
+- **The standalone world** runs `hearth-domain-steward`,
+  `hearth-domain-builder` and `hearth-domain-activator` on the fake
+  machine, with a fake forge (a git remote, from skein's fake checkout)
+  whose branch moves under it. The seed draws: commits that change
+  nothing, change config, or break render; build steps that fail;
+  builders that crash or hang on a revision, at every job; power cuts at
+  every stage of a pass, of a prepare and of a trial; trials that hang,
+  panic or fail the minimal bless; imports of secrets; holds and
+  releases; changes eligible for live and not, live trials whose reload
+  fails, cut at every phase, and later changes while live; [M5] a host's
+  containers, their trials failing or cut by a host reboot, live or not.
+  Its invariants:
   - the machine always boots a blessed slot or a trial that ends, and
     each container starts on one [M5];
   - a refused prepare key is never tried by the loop, and a refusal
@@ -1221,7 +1277,10 @@ wire, not in traits: another backend is another daemon speaking it.
     never moves the default;
   - at most one prepare and one trial per machine at a time;
   - backoff and polling stay within their bounds; a pass for an old
-    generation never acts.
+    generation never acts;
+  - a revision that crashes a builder ends in a wait or a refusal,
+    never a loop, and the steward answers the client throughout;
+  - no bless is asked before the bless's render has answered.
 - **The wire's world** puts a fake engine on the other side: a step
   machine speaking the wire's domain records (and, in a protocol world,
   its bytes through skein's channel). It accepts or refuses dials,
@@ -1249,11 +1308,12 @@ wire, not in traits: another backend is another daemon speaking it.
   certificate (5.3); it depends on skein's TLS client certificates and
   on how the plane registers machines.
 - **Secrets under an engine:** sealed to the activator's key and relayed
-  by the builder, or fetched by the activator itself; it depends on the
+  by the steward, or fetched by the activator itself; it depends on the
   plane's secret store, which the factory owns (README.md, 8.3).
-- **Where the wire's credential lives:** in the builder's state, or held
-  by the activator and lent to the builder; it depends on the identity
-  chosen and on how much the builder is trusted.
+- **Where the wire's credential lives:** in the steward's state, or held
+  by the activator and lent to the steward; it depends on the identity
+  chosen and on how much the steward is trusted, which is no more than
+  its builder (steward.md, 2.3).
 - **Operators by group:** admitting a group of operators needs the
   peer's supplementary groups (`SO_PEERGROUPS`, to verify in skein's
   Unix sockets); until then, operators are uids.

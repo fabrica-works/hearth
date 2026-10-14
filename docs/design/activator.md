@@ -2,7 +2,7 @@
 
 Provisional, 2026-10-09. The privilege boundary of a machine: what the
 activator trusts and what it never does, the process pair it forms with
-its builder, the link between them, its closed list of operations, how
+its steward, the link between them, its closed list of operations, how
 it verifies what it is asked to place, its state, and the tools it
 drives. M3 builds it, with the operations a slot needs, live changes
 included; restarting a unit, snapshots and restores of data, and a
@@ -17,13 +17,13 @@ open is in section 10.
   slots, boot state, identity and secrets, and on a host its containers'
   too [M5], and carries out a closed list of operations on typed
   requests. It runs no IaC code, renders no template and parses no IaC.
-- **It starts the builder and listens to nothing else.** systemd starts
-  `hearth activator` as root; it spawns `hearth builder` as the user
+- **It starts the steward and listens to nothing else.** systemd starts
+  `hearth activator` as root; it spawns `hearth steward` as the user
   `hearth` and talks to it over a pipe pair. It has no socket and no
-  port.
+  port. The steward spawns the builder itself, for work (steward.md).
 - **The link carries sized records:** requests, each with exactly one
   answer, and facts, pushed whenever they change. Every mutating request
-  is keyed or conditional on the facts it was decided from, so a builder
+  is keyed or conditional on the facts it was decided from, so a steward
   that restarts and asks again finds what its first request made.
 - **What it places, it verifies.** The output must be a read-only layer
   of the store, owned by the builder's range, with a record. The
@@ -33,11 +33,12 @@ open is in section 10.
 - **It carries live changes itself** (5.17 to 5.19): it builds a
   verified delta of a prepared slot, mounts it over the running slot's
   `/etc`, `/usr` and `/opt` with the new mount API, acts on the units
-  the builder's plan names, and falls back without a reboot, or with
+  the steward's plan names, and falls back without a reboot, or with
   `reboot -ff` when a step of the fall back fails.
 - **Secrets never cross the link.** They enter the secret store from a
   root process (an import run in-process by the client) and leave it
-  only into a slot. The builder sees names and the store's generation.
+  only into a slot. The steward sees names and the store's generation;
+  its builder, the names render gives.
 - **Its state is files in `@hearth.state`:** the machine record, slot
   records and manifests, the trial marker, identity, the secret store,
   and a journal of the operation in flight, so a crash or a power cut at
@@ -47,12 +48,12 @@ open is in section 10.
   bootstrap parted and the mkfs tools. It never runs a program from a
   slot it prepares or from the store, and it resolves every path in a
   slot from the slot's own descriptor, following no link.
-- **What it does not protect:** a compromised builder is root at the
-  next trial, since it can place any output it built, and that output's
-  activator is root. The defence against a bad output is review and the
-  lab; the activator guarantees that only the closed operations happen,
-  on inputs that are what they claim, and that secrets never reach the
-  builder.
+- **What it does not protect:** a compromised builder or steward is
+  root at the next trial, since it can place any output the builder
+  built, and that output's activator is root. The defence against a bad
+  output is review and the lab; the activator guarantees that only the
+  closed operations happen, on inputs that are what they claim, and
+  that secrets never reach the steward or its builder.
 
 ## 2. The trust boundary
 
@@ -141,7 +142,7 @@ changes nothing.
   environment pair, and GRUB once at bootstrap.
 - **NVRAM:** this target's four entries, `BootNext` and `BootOrder`.
 - **`@hearth.state`, `/run/hearth-activator` and `/run/nextroot`;**
-  and it makes `/run/hearth/` for the builder (3.2).
+  and it makes `/run/hearth/` for the steward (3.2).
 - **From M6:** on a backup peer, `@hearth.backups` (5.11), and on a lab
   pool host its faults' rules (5.15).
 - **The running slot:** nothing, since it is sealed; it changes systemd's
@@ -149,33 +150,35 @@ changes nothing.
   overlays over its `/etc`, `/usr` and `/opt` (slots.md, 6.8), which
   write nothing either.
 
-### 2.5 What the builder never gets
+### 2.5 What the steward and its builder never get
 
 Secret values; identity's private halves; root; the top level; the
-state. The builder's uid cannot open `@hearth.state` or `/run/hearth-activator`
-(both `0700`, root), and no link record carries a secret's value or
-digest.
+state. Their uid, `hearth`'s, cannot open `@hearth.state` or
+`/run/hearth-activator` (both `0700`, root), and no link record carries
+a secret's value or digest.
 
 ### 2.6 What the boundary does not give
 
-- **A compromised builder is root at the next trial.** It can place any
-  output it built, and the activator verifies only that the output is
-  intact and the builder's, not that it is good; that output's own
-  activator is root once tried, and its hearth can bless it.
+- **A compromised builder or steward is root at the next trial.** They
+  share a uid, so either is both (steward.md, 2.3). The steward can
+  place any output the builder built, and the activator verifies only
+  that the output is intact and the builder's, not that it is good;
+  that output's own activator is root once tried, and its hearth can
+  bless it.
 - **Slot parts are unchecked in M3.** The `data`, `secrets` and `boot`
-  parts arrive from the builder as typed values the activator validates
+  parts arrive from the steward as typed values the activator validates
   (2.2), but nothing tells it they are what the repository says. Under
   an engine [M4], the prepare order carries the slot parts' expected
   digests, which the activator recomputes from the typed values it
   received (render.md, 4.5) and checks: that catches a builder whose
-  render went wrong, not one that forges the order, which would need
-  orders signed for the activator.
+  render went wrong, not a steward that forges the order, which would
+  need orders signed for the activator.
 - **What the boundary does protect:** the machine's secrets and identity
-  from the builder (no value on the link; no secret file a `hearth`
-  group can read, 2.2), root from the IaC's code, and the machine from
-  operations outside the closed list. Bad outputs are kept out upstream:
-  by review, by the lab, and by outputs never crossing planes (temper's
-  `factory.md`).
+  from the steward and its builder (no value on the link; no secret file
+  a `hearth` group can read, 2.2), root from the IaC's code, and the
+  machine from operations outside the closed list. Bad outputs are kept
+  out upstream: by review, by the lab, and by outputs never crossing
+  planes (temper's `factory.md`).
 - **Open (section 10):** how far the activator trusts the builder's
   records (6.3; README, section 9), and whether it should place only a
   hearth binary whose digest it already holds.
@@ -208,57 +211,69 @@ WantedBy=multi-user.target
 
 - **One process, one loop,** on skein. It panics to abort, and systemd
   restarts it.
-- **At start** it recovers (7.4), then spawns the builder.
+- **At start** it recovers (7.4), then spawns the steward.
 - **Its cgroups are delegated** (`Delegate=yes`). At start the activator
-  moves itself into a leaf, `activator/`, makes `builder/` owned by
-  `hearth` for the builder, its tools, its tree helper and its
-  sandboxes (build.md, 8.7), and enables the controllers they need in
-  the unit's own cgroup. Bootstrap does the same in a transient scope
+  moves itself into a leaf, `activator/`, makes `steward/` owned by
+  `hearth` for the steward, its builder, the builder's tools, its tree
+  helper and its sandboxes (steward.md, section 7; build.md, 8.7), and
+  enables the controllers they need, `memory` and `pids`, in the unit's
+  own cgroup. Bootstrap does the same in a transient scope
   (machine.md, 8.2).
 - **`KillMode=control-group`:** stopping the activator stops everything
-  in both, so no builder outlives the activator that spawned it.
+  in both, so no steward and no builder outlives the activator that
+  spawned it.
 - **No sandboxing,** no `PrivateMounts=` and no `Protect*=`: the
   activator must run in the host's mount namespace, or its live
   overlays would land in a namespace of its own (slots.md, 6.8).
 
-### 3.2 Spawning the builder
+### 3.2 Spawning the steward
 
 | | |
 |---|---|
-| program | `/proc/self/exe`, argument `builder`: the activator's own binary, wherever it lives (on a live system, not in `/usr/bin`) |
-| cgroup | `builder/` (3.1), through skein's contained process trees (README, 8.1) |
-| user | `hearth`'s fixed uid and gid (format.md, 5.12; store.md, 9.2), and its supplementary groups as the running slot's `/etc/group` lists them, in practice `systemd-journal`, so the builder reads the journal for telemetry (wire.md, section 7); no capabilities. An ask of skein: spawning as another user (README, 8.1) |
+| program | `/proc/self/exe`, argument `steward`: the activator's own binary, wherever it lives (on a live system, not in `/usr/bin`) |
+| cgroup | `steward/` (3.1), through skein's contained process trees (README, 8.1) |
+| user | `hearth`'s fixed uid and gid (format.md, 5.12; store.md, 9.2), and its supplementary groups as the running slot's `/etc/group` lists them, in practice `systemd-journal`, so the steward reads the journal for telemetry (wire.md, section 7); no capabilities. An ask of skein: spawning as another user (README, 8.1) |
 | environment | given whole: `LANG=C.UTF-8`, and the store's path |
 | descriptors | the link: fd 3 reads what the activator writes, fd 4 writes what it reads; stdin `/dev/null` |
 | working directory | `/var/lib/hearth/store` |
 | process group | its own, so the activator can signal it and its children: an ask of skein (README, 8.1) |
 
 Before the spawn, the activator makes `/run/hearth/`, owner `hearth`,
-mode 0755, where the builder binds the client's socket (wire.md, 3.4);
+mode 0755, where the steward binds the client's socket (wire.md, 3.4);
 its own mounts live apart, under `/run/hearth-activator/` (0700, root),
-where the builder cannot replace a directory under them. The same pair
-runs at bootstrap, where the client process is the activator
-(machine.md, 8.2).
+where neither the steward nor its builder can replace a directory under
+them. The same pair runs at bootstrap, where the client process is the
+activator (machine.md, 8.2).
+
+The steward spawns its builder itself, for work, into `steward/builder/`,
+with no supplementary group, its jobs on the builder's standard input
+and output (steward.md, section 3). The activator never talks to a
+builder.
 
 ### 3.3 Restarts with backoff
 
-- **The builder exits** (a panic, a framing error on the link, an exit):
-  its pending requests die with its link; an operation already under way
-  runs to its end, and its outcome is in the facts. The activator waits,
-  then spawns a new builder on new pipes. The wait starts at 1 second,
-  doubles up to 60, and returns to 1 after the builder has run 10
-  minutes.
+- **The steward exits** (a panic, a framing error on the link, an
+  exit): its pending requests die with its link; an operation already
+  under way runs to its end, and its outcome is in the facts. The
+  activator waits, empties `steward/` with `cgroup.kill`, so no builder
+  outlives its steward, then spawns a new steward on new pipes. The
+  wait starts at 1 second, doubles up to 60, and returns to 1 after the
+  steward has run 10 minutes.
+- **A builder that exits is not the activator's:** its steward loses a
+  job and goes on (steward.md, section 5).
 - **The activator exits:** systemd restarts it after 1 second, its
-  cgroup's builder having been stopped; the new activator recovers
-  (7.4), then spawns a new builder.
-- **During a trial,** the slot's builder must come up to bless. One that
-  keeps crashing never blesses, and the dead-man ends the trial
-  (slots.md, 6.5).
+  cgroup's steward and builder having been stopped; the new activator
+  recovers (7.4), then spawns a new steward.
+- **During a trial,** the slot's steward must come up to bless, once a
+  builder it spawned has rendered the slot's own revision
+  (steward.md, section 6). One that keeps crashing never blesses, and
+  the dead-man ends the trial (slots.md, 6.5); one whose builder cannot
+  render asks to fall back.
 - **Once on purpose, in a live trial:** after the units are acted on
   (slots.md, 6.8, L6) the activator answers, closes the link and spawns
-  a new builder with no wait, so the live bless comes from a builder
-  started in the new files. A build in flight ends with it, and the
-  next pass starts it again.
+  a new steward with no wait, so the live bless comes from a steward
+  started in the new files. A build in flight ends with its builder,
+  and the next pass starts it again.
 
 ### 3.4 Shutdown
 
@@ -269,9 +284,11 @@ A termination signal arrives as skein's `Shutdown` event:
    prepare leaves its slot `preparing`, deleted at the next start; a
    trial whose reboot was asked for is that reboot, and its marker stays
    `armed`; a bless or a fall back finishes its last steps;
-3. **the link is closed** and the builder's process group is sent
-   `Terminate`, then `Kill` after 30 seconds;
-4. **it waits for the builder's exit,** then exits.
+3. **the link is closed** and the steward's process group is sent
+   `Terminate`, then `Kill` after 30 seconds; the steward stops its
+   builder within them (steward.md, 4.3);
+4. **it waits for `steward/` to be empty,** killing what is left with
+   `cgroup.kill`, then exits.
 
 `TimeoutStopSec=60s` leaves room for all of it.
 
@@ -289,12 +306,12 @@ body     the kind's fields, each of fixed size or length-prefixed
 
 | Record | Way | Holds | Limit |
 |---|---|---|---|
-| `Hello` | builder to activator | version | 64 B |
-| `Welcome` | activator to builder | version, epoch, facts | 64 KiB |
-| `Request` | builder to activator | request id (u64), an operation (section 5) | 64 KiB |
-| `Progress` | activator to builder | request id, step, done and total | 64 B |
-| `Answer` | activator to builder | request id, outcome: done with its result, refused with its reason, or failed with its error | 64 KiB |
-| `Facts` | activator to builder | generation, facts | 64 KiB |
+| `Hello` | steward to activator | version | 64 B |
+| `Welcome` | activator to steward | version, epoch, facts | 64 KiB |
+| `Request` | steward to activator | request id (u64), an operation (section 5) | 64 KiB |
+| `Progress` | activator to steward | request id, step, done and total | 64 B |
+| `Answer` | activator to steward | request id, outcome: done with its result, refused with its reason, or failed with its error | 64 KiB |
+| `Facts` | activator to steward | generation, facts | 64 KiB |
 | `Bye` | either | reason | 64 B |
 
 - **`hearth-protocol-link`** encodes and decodes them. It is the only
@@ -302,7 +319,7 @@ body     the kind's fields, each of fixed size or length-prefixed
 - **Versions match by construction:** both ends are the same binary of
   the same slot. A mismatch closes the link.
 - **A framing error closes the link,** and the activator respawns the
-  builder after its backoff. An unknown kind with a valid length is
+  steward after its backoff. An unknown kind with a valid length is
   answered as refused and its body skipped.
 
 ### 4.2 Requests and answers
@@ -310,7 +327,7 @@ body     the kind's fields, each of fixed size or length-prefixed
 - **Each request gets exactly one answer.** In the activator's domain a
   request arrives as a call with a `ReplyTo`, and the domain answers it
   once (`programming-model.md`, 4.4); request ids stay in the protocol
-  layer. In the builder's domain each request ends in its answer, or in
+  layer. In the steward's domain each request ends in its answer, or in
   `link lost` if the link closes first.
 - **Three outcomes:**
   - *done,* with the operation's result;
@@ -320,7 +337,7 @@ body     the kind's fields, each of fixed size or length-prefixed
   - *failed,* with a typed error: the operation ran and failed, and the
     facts describe what it left.
 - **One mutating operation at a time.** A second is refused as busy. The
-  builder keeps at most one mutating request and one facts request in
+  steward keeps at most one mutating request and one facts request in
   flight.
 - **`Progress`** reports prepare's steps, for the client's display.
 - **A trial is answered before its reboot,** which then ends the link.
@@ -350,18 +367,20 @@ one higher than the last:
 - **the operation in flight** and its step; drift's results by check id
   (slots.md, section 10); the last operation's costs, per step.
 
-The builder passes them on: to the client, and to an engine [M4]
+The steward passes them on: to the client, and to an engine [M4]
 (wire.md, section 6).
 
 **The slots' outputs are the builder's pins** (store.md, 7.1): each
 slot's output key, and the output of a prepare in flight, so collection
 never deletes a layer a slot holds or is being prepared from. The
-builder collects nothing until the first `Welcome` has told it these.
+steward passes them to its builder, in the jobs' `Welcome` and in `Pins`
+whenever they change (steward.md, 3.2); no builder collects anything
+before the steward's first `Welcome` has told it these.
 
 ### 4.4 Fencing and idempotency
 
-- **One link per builder process.** A new builder gets new pipes and a
-  new epoch in its `Welcome`; nothing an old builder wrote can reach the
+- **One link per steward process.** A new steward gets new pipes and a
+  new epoch in its `Welcome`; nothing an old steward wrote can reach the
   activator.
 - **Conditional:** each mutating request carries what it was decided
   from (running, default, the slot's state and prepare key or record,
@@ -370,9 +389,9 @@ builder collects nothing until the first `Welcome` has told it these.
   4.3), with the activator as the system.
 - **Keyed:** a place is keyed by its prepare key, which the activator
   computes (slots.md, 2.2); asking again finds what the first made. A
-  trial, a bless, a fall back and a roll back carry the builder's attempt
+  trial, a bless, a fall back and a roll back carry the steward's attempt
   id, and asking again with it gets the first answer.
-- **So a builder that restarts mid-operation** reads the facts in its
+- **So a steward that restarts mid-operation** reads the facts in its
   `Welcome` and asks only for what is still missing. An engine's orders
   get the same treatment one layer up [M4] (wire.md, 5.4).
 
@@ -380,26 +399,26 @@ builder collects nothing until the first `Welcome` has told it these.
 
 | Operation | Asked by | Recovery class | Milestone |
 |---|---|---|---|
-| place (prepare) | the builder | keyed: the prepare key | M3 |
-| trial | the builder | conditional | M3; through GRUB M3b |
-| bless, and re-bless | the builder of the slot on trial, or of a blessed slot that is not the default | conditional | M3 |
-| fall back | the builder | conditional | M3 |
-| roll back | the builder, for a person or an engine | conditional | M3 |
-| try live (5.17) | the builder | conditional, on the slot's prepare key, the running slot, the default and the live state; a repeat by attempt gets the first answer | M3; a container's M5 |
-| bless live (5.18) | the builder running over the live state | conditional | M3 |
-| the live fall back (5.19) | the builder; the activator itself when an action fails | conditional | M3 |
-| report facts, and drift | the builder | read only | M3 |
-| generate identity | the builder; prepare; bootstrap | idempotent | M3 |
+| place (prepare) | the steward | keyed: the prepare key | M3 |
+| trial | the steward | conditional | M3; through GRUB M3b |
+| bless, and re-bless | the steward of the slot on trial, or of a blessed slot that is not the default | conditional | M3 |
+| fall back | the steward | conditional | M3 |
+| roll back | the steward, for a person or an engine | conditional | M3 |
+| try live (5.17) | the steward | conditional, on the slot's prepare key, the running slot, the default and the live state; a repeat by attempt gets the first answer | M3; a container's M5 |
+| bless live (5.18) | the steward running over the live state | conditional | M3 |
+| the live fall back (5.19) | the steward; the activator itself when an action fails | conditional | M3 |
+| report facts, and drift | the steward | read only | M3 |
+| generate identity | the steward; prepare; bootstrap | idempotent | M3 |
 | import secrets | the client as root, in-process | idempotent | M3 |
-| hold, and release, a bless | the builder of the slot on trial, for an engine | conditional | M4 |
-| run a check | the builder, for operating's checks | idempotent: a reading | M5 |
-| restart a unit | the builder, for an engine | keyed by the order's key; conditional on the unit's `InvocationID` | M5 |
-| place, trial, bless, hold, fall back and roll back of a container's slot, and removing a container (5.16) | the host's builder | as the machine's own: place keyed by the prepare key, the rest conditional; remove idempotent | M5 |
+| hold, and release, a bless | the steward of the slot on trial, for an engine | conditional | M4 |
+| run a check | the steward, for operating's checks | idempotent: a reading | M5 |
+| restart a unit | the steward, for an engine | keyed by the order's key; conditional on the unit's `InvocationID` | M5 |
+| place, trial, bless, hold, fall back and roll back of a container's slot, and removing a container (5.16) | the host's steward | as the machine's own: place keyed by the prepare key, the rest conditional; remove idempotent | M5 |
 | partition and format | bootstrap in-process; the lab as an effect | conditional | M3; M6 as an effect |
 | snapshot and prune a class (5.11) | the activator itself, on the class's period | keyed: the sequence; a prune is idempotent | M5 |
-| send, receive (5.11) | the builder, on the backup's period, or for a peer | send idempotent; receive keyed by the snapshot | M6 |
-| restore an entry or a class (5.12) | the builder, for a person or an engine | keyed by the order's key; conditional on the class subvolume's UUID | M5; from the peer M6 |
-| apply, and remove, a fault | the builder of a lab pool host, for the lab's engine | apply keyed by the experiment; remove idempotent | M6 |
+| send, receive (5.11) | the steward, on the backup's period, or for a peer | send idempotent; receive keyed by the snapshot | M6 |
+| restore an entry or a class (5.12) | the steward, for a person or an engine | keyed by the order's key; conditional on the class subvolume's UUID | M5; from the peer M6 |
+| apply, and remove, a fault | the steward of a lab pool host, for the lab's engine | apply keyed by the experiment; remove idempotent | M6 |
 
 ### 5.1 Place
 
@@ -435,11 +454,11 @@ parameters instead of tokens:
 - **Effects:** slots.md, section 5, steps 5.1 to 5.7: identity first,
   then the prepare key, which covers the window and the units allowed
   to fail.
-- **`window`** is 10 minutes in M3; from M5 the builder computes it from
+- **`window`** is 10 minutes in M3; from M5 the steward computes it from
   the blessing checks (operating.md, section 3). It rides here, not in
   `Try`, because prepare seals it into the slot's units.
 - **The part digests are the spec's,** not recomputed in M3: they name
-  what the builder meant, for the prepare key and the facts; the
+  what the builder's render meant, for the prepare key and the facts; the
   shift's digest is the check (6.3). Under an engine [M4], an order's
   expected digests are checked against the typed values (2.6).
 - **Done:** the slot, its prepare key, its reported tree digest
@@ -455,7 +474,7 @@ parameters instead of tokens:
   disk is full; a tool failed (which, its exit, its tail). No error
   carries a file's content.
 - **A crash** leaves the slot `preparing`; the next start deletes it,
-  and the builder asks again.
+  and the steward asks again.
 
 ### 5.2 Trial
 
@@ -480,7 +499,7 @@ Bless { slot, attempt }
   a blessed slot that runs but is not the default, the re-bless of
   slots.md, 7.5: the criterion, then the default moves.
 - **Refused** while the criterion does not hold, saying which part; the
-  builder asks again, or asks to fall back.
+  steward asks again, or asks to fall back.
 - **Moving the default where it already is writes nothing,** so a bless
   cut anywhere is finished by asking again.
 
@@ -535,7 +554,7 @@ Identity { target, items: [ { item, kind, algorithm } ] }
   | `wireguard-key` [later] | in-process, from the kernel's random source and X25519, an ask of skein: no running slot need carry `wg` | the base64 public key |
   | `backup-key` [M6] | `age-keygen -o <.new>/<item>`: an X25519 key, kept in the identity store and written into no slot (format.md, 9.3 and 8.7) | the `age1…` recipient, reported as a fact |
 
-- **Done:** the generation and the public halves, which the builder
+- **Done:** the generation and the public halves, which the steward
   reports so that people and agents can record them as data in the
   repository (format.md, section 8).
 - **A crash** leaves a `.new` directory, removed at the next start.
@@ -547,7 +566,7 @@ Identity { target, items: [ { item, kind, algorithm } ] }
 
 Run by the client as root, in its own process, with the activator's
 domain (wire.md, section 3), never over the link: no value ever passes
-through the builder.
+through the steward or its builder.
 
 - **Input:** files named on the command line, or a directory of them,
   whose relative paths are secret names (format.md, section 9), each
@@ -567,7 +586,7 @@ through the builder.
 - **Readers read the index, then the files it names,** so they always
   see one consistent generation. The running activator reads the index
   before every prepare and every facts report; the client then asks the
-  builder to refresh its facts (wire.md, section 3).
+  steward to refresh its facts (wire.md, section 3).
 - **A crash** leaves value files no index names, removed by the next
   import.
 
@@ -577,7 +596,7 @@ through the builder.
 RestartUnit { unit, invocation }
 ```
 
-- **Keyed by the order's key,** which the builder keeps with the unit's
+- **Keyed by the order's key,** which the steward keeps with the unit's
   `InvocationID` before it asks (wire.md, 5.4), and **conditional on
   that invocation** at the activator: `systemctl show
   --property=InvocationID --value <unit>` must still equal it, then
@@ -585,7 +604,7 @@ RestartUnit { unit, invocation }
   an uncertain restart is resolved by reading it again.
 - **Never hearth's own units** (`hearth-activator.service`,
   `hearth-trial*`, `hearth-check-*`); that the unit is one the running
-  slot's spec ships or enables is the builder's check
+  slot's spec ships or enables is the steward's check
   (operating.md, section 6).
 - **For a container's target [M5],** the same operation with the
   container's target named, `RestartUnit { target, unit, invocation }`:
@@ -626,17 +645,17 @@ Send { target, class, seq, parent }      Receive { from, class, seq }      [M6]
 - **Prune,** after every snapshot: each snapshot that no bucket keeps
   and the backup does not need (operating.md, 7.3) is deleted with
   `SNAP_DESTROY_V2`, then dropped from the record. Idempotent: a
-  snapshot already gone is done. No request can prune: the builder
+  snapshot already gone is done. No request can prune: the steward
   never decides what a machine's history loses.
 - **Send** [M6]: `btrfs send -p <parent> <seq>`, or without `-p` the
   first time, piped into `age --encrypt --recipient <recipient>` before
-  any byte reaches the builder, then handed to it over a pipe made for
+  any byte reaches the steward, then handed to it over a pipe made for
   the transfer, never the link. The recipient is the peer's backup key,
   from the class's policy in the sending slot's record (slots.md, 2.2),
-  never from the request, so the builder cannot redirect a stream to a
+  never from the request, so the steward cannot redirect a stream to a
   key of its own. Idempotent: a send the peer has not confirmed is sent
   again. The semantics are operating.md, 7.2's.
-- **Receive** [M6], on the backup peer: the ciphertext from its builder,
+- **Receive** [M6], on the backup peer: the ciphertext from its steward,
   piped into `age --decrypt -i <its backup key>` and then `btrfs
   receive` into `@hearth.backups/<from>.<class>/`, accepted only from a
   target the peer's spec names; what the peer keeps at rest is
@@ -705,7 +724,7 @@ RunCheck { task, name, user, capabilities, network, timeout, argv }
   container slot's secret and identity paths (operating.md, 2.9).
 - **Done:** `pass` (exit 0), `fail` (another status, or the timeout) or
   `error` (the unit could not start), with the unit's `Result`, and
-  nothing else: no output reaches the builder, which could otherwise
+  nothing else: no output reaches the steward, which could otherwise
   read a file through a check.
 - **Idempotent:** checks only read until operating.md, 2.8 says
   otherwise, so an uncertain run is run again.
@@ -733,7 +752,7 @@ Fault { experiment, kind, targets, parameters, until }        Unfault { experime
 
 Place, trial, bless, hold, fall back and roll back (5.1 to 5.5, 5.13) on
 a container's slot, and removing a container, asked by the host's
-builder with the container's target (2.2). The effects are
+steward with the container's target (2.2). The effects are
 slots.md, section 12's; none touches the boot partition or NVRAM.
 
 | Operation | Effects | Recovery class |
@@ -755,8 +774,8 @@ slots.md, section 12's; none touches the boot partition or NVRAM.
   itself, after its own restart too, since no dead-man runs in a
   container. A held bless's ceiling is kept and enforced the same way.
 - **Remove names a container the host's spec no longer places on it;**
-  the builder checks that against its render, as it checks a unit
-  against the spec (5.9), and the activator refuses the host's own
+  the steward checks that against its builder's render, as it checks a
+  unit against the spec (5.9), and the activator refuses the host's own
   target.
 
 ### 5.17 Try live
@@ -779,11 +798,14 @@ TryLive {
   checked (6.5), the delta built and verified, the base's dead-man
   armed, the units stopped, the hierarchies swapped, the units acted on.
   The rule-11 units are added to the restarts.
+- **The plan is a builder's,** computed in a `plan live` job the steward
+  asked (steward.md, 3.3); the steward sends it, and the activator
+  checks again what it can read (6.5).
 - **Done,** after L6: the plan as acted on and each job's result; then
-  the activator spawns a new builder (3.3), whose `Welcome` shows the
+  the activator spawns a new steward (3.3), whose `Welcome` shows the
   slot `on live trial`.
 - **Refused:** invalid, stale, busy; not eligible, naming the rules of
-  slots.md, 6.7 that fail, and the builder then asks `Try`.
+  slots.md, 6.7 that fail, and the steward then asks `Try`.
 - **Failed:** at L1 or L2, the delta deleted and nothing on the machine
   changed; at L3 to L5, the stopped units started again and the trial
   disarmed, the slot `prepared`; at L6, a job failed and the live fall
@@ -803,7 +825,7 @@ BlessLive { slot, attempt }
   one-shot to the slot's trial entry, the marker's phase, the base's
   dead-man stopped. The default does not move.
 - **Refused** while the settle, a unit or the criterion does not hold,
-  saying which part; the builder asks again, or asks to fall back.
+  saying which part; the steward asks again, or asks to fall back.
 - **Asking again** with the attempt finds it done; a cut is finished at
   start from the journal.
 
@@ -819,7 +841,7 @@ FallBack { slot, attempt }        on a slot on live trial, or live-blessed
   `live-blessed` slot, its one-shot is cleared and the base's dead-man
   armed again first.
 - **Run by the activator itself** inside `TryLive` when an action of L6
-  fails, and asked by the builder otherwise; a roll back while live is
+  fails, and asked by the steward otherwise; a roll back while live is
   this (5.5).
 - **Any failed step is `reboot -ff`,** and the next start records the
   outcome. Done once the files that ran before run again and every job
@@ -908,14 +930,14 @@ and L2):
 - **The change is its own.** It diffs the two slots' manifests itself,
   leaving out each slot's own files (slots.md, 5.4 and 5.5), and the
   digest must equal the request's. The delta is built from its own
-  diff, never from paths the builder sent.
+  diff, never from paths the steward sent.
 - **The rules it can read:** slots.md, 6.7's rules 1 to 5 from the
   layer records, the slot records and the two slots' account files,
   through the parsers of 2.3; rule 8 for the plan's units; rule 10 from
   the kernel's release and the mount table; rule 11 from
   `/proc/<pid>/mountinfo` and `/proc/<pid>/cgroup` of every process.
   Rules 6, 7 and 9 read the specs and the store, and stay the
-  builder's.
+  builder's, in the steward's `plan live` job (steward.md, 3.3).
 - **The delta is built through descriptors:** `b`'s paths resolved
   beneath `b`'s root with `openat2` and `RESOLVE_BENEATH`,
   `RESOLVE_NO_SYMLINKS` and `RESOLVE_NO_XDEV`, the delta's beneath the
@@ -1056,7 +1078,7 @@ At every start, after a boot, a soft reboot or a crash:
    on its unit (slots.md, 12.2); and set each class's snapshot deadline
    from its record and the running slot's policies, a snapshot missed
    while the machine was down taken at once (operating.md, 7.1) [M5];
-9. **spawn the builder;** its `Welcome` carries the facts.
+9. **spawn the steward;** its `Welcome` carries the facts.
 
 Every step is idempotent, so a crash during the start repeats it.
 
@@ -1132,8 +1154,8 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 - **The root's world:** `hearth-domain-activator` with its children
   (`hearth-domain-slots`, `hearth-domain-boot`, `hearth-domain-disk`;
   `hearth-domain-backups` from M5) on the fake machine and the fakes of
-  section 8, with a scripted builder on the link side: requests at every
-  moment, stale conditions, repeated attempts, a builder that crashes,
+  section 8, with a scripted steward on the link side: requests at every
+  moment, stale conditions, repeated attempts, a steward that crashes,
   hangs or never blesses (testing.md, sections 3 and 8).
 - **Faults from the seed:** the activator's crash at any step, power
   cuts, tools that fail or time out, firmware quirks, a store whose
@@ -1154,15 +1176,16 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
   target: cuts at every byte, oversized lengths, unknown kinds,
   truncated bodies; the account parsers also take hostile lines from an
   output.
-- **The pair:** a system world runs the builder's domain and the
-  activator's together through the link's vocabulary, from a desired
-  revision to a blessed slot, crashing either process at any point
-  (testing.md, section 8).
+- **The pair:** a system world runs the steward's and the builder's
+  domains and the activator's together, through the link's and the
+  jobs' vocabularies, from a desired revision to a blessed slot,
+  crashing any of the three at any point (testing.md, section 8;
+  steward.md, section 8).
 - **The VM tier** runs the real pair on an Incus VM: bootstrap, a
   prepare, both kinds of trial, a bless, a dead-man fall back
   (testing.md, section 7).
 - **Live changes** (M3): the fake machine's mount namespaces, overlays
-  and PID 1's jobs (testing.md, 3.13), with a scripted builder that
+  and PID 1's jobs (testing.md, 3.13), with a scripted steward that
   asks `TryLive` with plans that lie (a change digest that differs, a
   never-live unit), and faults at every phase: a job that fails, a unit
   that dies in the settle, a crash or a power cut from L1 to L9, a
@@ -1199,21 +1222,22 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
   alone shows an unchanged layer.
 - **Formats across releases:** how many versions back an activator reads
   its state; depends on how long a previous slot may stay blessed.
-- **The builder's diagnostics:** whether its traces reach the journal
+- **The steward's diagnostics:** whether its traces reach the journal
   through its own standard error, or through the activator; depends on
-  skein's spawn.
+  skein's spawn. The builder's standard error is the steward's
+  (steward.md, 3.1 and section 10).
 - **One generation for the whole secret store:** any import, even of an
   unrelated secret, prepares every target's slot again. One generation
   per target, or per secret a slot names, would spare the others;
   depends on how often secrets rotate (wire.md, 4.6).
 - **Telling the running activator of an import:** it listens to nothing,
-  so the client asks the builder to refresh the facts; whether that is
+  so the client asks the steward to refresh the facts; whether that is
   enough depends on wire.md, section 3.
 - **The shift's walk in the activator's loop:** skein's file driver runs
   one request at a time, so a long walk shares the loop with the link;
   whether facts stay timely during a prepare, or the walk moves to a
   child, depends on measurement. A live trial's L2 walk asks the same.
 - **The child that enters a container's mount namespace [M5]:** the
-  activator's own binary spawned with a fixed argument, as the builder
+  activator's own binary spawned with a fixed argument, as the steward
   is, or skein spawning straight into a namespace; depends on what
   skein's contained process trees offer (README, 8.1).
