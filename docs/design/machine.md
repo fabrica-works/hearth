@@ -276,7 +276,7 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
   `emergency.target` rather than start a service on the slot's own copy
   of the path (slots.md, 5.3).
 - **The snapshots are not mounted:** a person reads one through
-  `hearth shell`, read-only (wire.md, 3.7), and `@hearth.snapshots`
+  `hearth shell`, read-only (client/README.md, 3.7), and `@hearth.snapshots`
   stays the activator's.
 - **The store is `nosuid`:** it holds setuid binaries owned by the
   builder's range, behind a `0700` root. Builds run as root inside their
@@ -815,10 +815,10 @@ A soft reboot skips the initramfs, so the activator mounts
 ### 8.1 The command
 
 `hearth bootstrap` runs on a live or rescue system, as root, with the
-client running the activator's domain in-process (wire.md, 3.6). It is
+client running the activator's domain in-process (client/README.md, 3.6). It is
 the only way a machine gets its first slot. Its arguments name the disk,
 the machine's configuration and a directory of secrets to import;
-wire.md, 3.8 owns their syntax:
+client/README.md, 3.8 owns their syntax:
 
 ```
 hearth bootstrap --disk /dev/nvme0n1 --wipe --target x1-prod
@@ -828,15 +828,15 @@ hearth bootstrap --disk /dev/nvme0n1 --wipe --target x1-prod
 ```
 
 The machine's configuration, which bootstrap writes once (8.2, step 4;
-wire.md, 3.8):
+client/README.md, 3.8):
 
 | Field | Standalone | Following an engine [M4] |
 |---|---|---|
-| mode | `standalone` | `engine`: never both (wire.md, 3.1) |
+| mode | `standalone` | `engine`: never both (client/README.md, 3.1) |
 | target | the machine's target, such as `x1-prod`; its containers come from that target's spec [M5] (wire.md, 4.7) | the same |
 | repository | the IaC repository's URL (wire.md, 4.1) | the same |
 | desired revision | a commit, or a branch to follow with its interval, and `trial: auto` or `manual` (wire.md, 4.1) | none: the engine orders revisions (wire.md, 5.4) |
-| operators | the uids that may run every socket command (wire.md, 3.4) | the same |
+| operators | the uids that may run every socket command (client/README.md, 3.4) | the same |
 | mutable | `refuse`, or `accept` with `--accept-mutable`: whether the activator places mutable targets (development.md, 4.3); in its machine record | `refuse`: the run side never deploys one |
 | engine | none | its address, what to trust it by, and the machine's credential if the identity chosen is one (wire.md, 5.1 and 5.3) |
 
@@ -847,7 +847,7 @@ client changes only the desired revision and its trial mode
 
 **Before it touches the disk,** bootstrap renders the target: it makes
 the `hearth` user (8.3) and spawns `/proc/self/exe render` as that user,
-in-process render with no store (wire.md, 3.5), given the repository's
+in-process render with no store (client/README.md, 3.5), given the repository's
 read credential (`--repo-credential`) through a `0600` file it owns. Then
 it refuses to start, naming every reason at once, unless:
 
@@ -974,7 +974,7 @@ revision built and placed, and converges from there.
 host's own target only. From its first boot, the host's hearth builds
 and prepares each container's first slot as any change (wire.md, 4.7),
 and tries it with nothing to fall back to (slots.md, 12.3). A
-container's secrets are imported for its own target (wire.md, 3.6),
+container's secrets are imported for its own target (client/README.md, 3.6),
 before or after: a missing secret only makes its prepare wait
 (wire.md, 4.4).
 

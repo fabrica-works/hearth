@@ -460,7 +460,7 @@ Every build records, and reports as facts (wire.md, section 6):
   connector needs (temper's `factory.md`, section 7). The steward takes
   the order and runs it as its builder's job (steward.md, 3.3).
 - **The client:** resolve a recipe at a commit to its key and pin
-  (7.1), and build it locally (wire.md, section 3).
+  (7.1), and build it locally (client/README.md, section 3).
 
 ## 6. Compile caches
 

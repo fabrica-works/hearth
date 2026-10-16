@@ -46,7 +46,7 @@ layer is walked and published is store.md. What is open is in section
   each step cost is a fact.
 - **On a developer's machine the client builds in-process** (M2), as a
   regular user with a subordinate range and a btrfs store of its own
-  (wire.md, 3.5; store.md, section 9).
+  (client/README.md, 3.5; store.md, section 9).
 
 ## 2. Recipes
 

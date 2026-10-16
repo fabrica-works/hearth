@@ -1,7 +1,8 @@
 # Development
 
-Provisional, 2026-10-09. How an agent, or a person, develops and
-changes a machine or a container before anything lands: a cheap
+Provisional, 2026-10-09, revised 2026-10-16. How an agent, or a
+person, develops and changes a machine or a container before anything
+lands: a cheap
 machine of its own, a root it may change by hand, a capture of what it
 changed, and its working tree applied to the machine as a revision. M3
 builds mutable machines, the capture and applying a working tree; M3b
@@ -100,7 +101,7 @@ production is developed as a machine of its own (3.4).
 
 `hearth dev up <target>… [--count <n>] [--containers <c>,… | --no-containers] [--at <rev>] [--repo <path>] [--secrets <dir>]`:
 
-1. **Render each target in-process** from the checkout (wire.md, 3.5),
+1. **Render each target in-process** from the checkout (client/README.md, 3.5),
    at the working tree's commit (6.1) or at `--at`. A container's
    target is refused, naming the machine it runs on (3.4), and a
    machine's not placed on an EFI VM; both before Incus is touched.
@@ -114,7 +115,7 @@ production is developed as a machine of its own (3.4).
    for slot `a`, blessed, then [M5] for each container it runs.
 
 `hearth retarget` is how a clone takes its target. It is root-only and
-in-process, as bootstrap is (wire.md, 3.6), and refused unless the
+in-process, as bootstrap is (client/README.md, 3.6), and refused unless the
 configuration accepts mutable targets (4.3) and the placement has the
 machine record's kind and firmware. It runs bootstrap's steps 5 to 7 and
 9 on the machine's own top level (machine.md, 8.2): import the secrets;
@@ -236,7 +237,7 @@ fstab, so the line is the sealed twin's and the kernel's rule holds
   mutable target [M4]; the lab's may allow one on development pools.
 - **A standalone machine's configuration says,** `mutable: accept` or
   `refuse`, `refuse` by default, set only by bootstrap's
-  `--accept-mutable` (wire.md, 3.8): no command on the socket makes a
+  `--accept-mutable` (client/README.md, 3.8): no command on the socket makes a
   machine a development machine. Sealed targets run there too.
 - **The activator enforces it:** the setting is in its machine record,
   and it refuses a place whose `boot` part is mutable on a machine that
@@ -299,13 +300,13 @@ typed records, so the steward reads no file of the slot itself
 - **Contents only on a mutable machine,** up to 1 MiB a file and 16 MiB
   in all. Elsewhere it is drift by path and digest, so a production
   machine's files never reach the client. The exit code is `diff`'s
-  (wire.md, 3.3); a container's [M5] is captured through its host.
+  (client/README.md, 3.3); a container's [M5] is captured through its host.
 
 ### 5.2 Suggestions
 
 `--suggest` turns each kind into a draft fragment of a task
 (format.md, section 5): a pure function of the capture, in
-`hearth-domain-dev`, run by the client.
+`hearth-client-domain-dev`, run by the client.
 
 | Captured | Suggested |
 |---|---|
@@ -364,7 +365,7 @@ whole history.
   desired revision; a missing prerequisite is refused, and the driver
   sends the whole history. The pass never fetches the commit, which the
   clone holds (wire.md, 4.2). Any standalone machine accepts it from an
-  operator, as `revision set` accepts any commit (wire.md, 3.1).
+  operator, as `revision set` accepts any commit (client/README.md, 3.1).
 
 ### 6.3 What the machine does
 
@@ -388,7 +389,7 @@ the kernel and its command line are the host's.
   machine runs (render.md, section 6), pushes, sets the revision, and
   follows `hearth status` until the pass converges, is refused or falls
   back, with a line per target (3.4); its exit code is `status
-  --check`'s, and `--how` is `hearth trial`'s (wire.md, 3.1). A trial that falls back refuses its prepare key, as
+  --check`'s, and `--how` is `hearth trial`'s (client/README.md, 3.1). A trial that falls back refuses its prepare key, as
   anywhere (wire.md, 4.4).
 - **Without the driver** [M3]: `hearth revision bundle`, any copy, and
   `hearth revision set --bundle` on any standalone machine.
@@ -435,7 +436,7 @@ the same loop, its engine in the agent's place.
 
 ### 8.2 Its domain
 
-`hearth-domain-dev`, a domain root of its own, hosted by the client
+`hearth-client-domain-dev`, a domain root of its own, hosted by the client
 (`programming-model.md`, section 4):
 
 - **Machines are entities named by handles,** one per instance, in one
@@ -449,11 +450,11 @@ the same loop, its engine in the agent's place.
   `user.hearth.commit` and `user.hearth.image` keys.
 - **Its other parts are pure:** the working tree's commit (6.1), whose
   git commands go to `hearth-protocol-git`, and the suggestions (5.2).
-  It renders through the builder's domain, in-process (wire.md, 3.5).
+  It renders through the builder's domain, in-process (client/README.md, 3.5).
 
 ### 8.3 incus as a tool
 
-`hearth-protocol-incus` holds incus's argument vectors and decodes its
+`hearth-client-protocol-incus` holds incus's argument vectors and decodes its
 output; the domain never sees its text:
 
 ```
@@ -469,7 +470,7 @@ incus delete --force rhi-dev --project hearth-dev
 `incus list --format json` is decoded strictly, unknown fields skipped
 (README.md, 8.1); `incus exec` returns the command's exit code, and the
 hearth inside answers in `--json` records, which
-`hearth-protocol-client` decodes. Failures are typed: an instance
+`hearth-client-protocol-records` decodes. Failures are typed: an instance
 missing or already there, an agent not answering yet (retried with
 backoff), a timeout, a full pool.
 
@@ -490,9 +491,9 @@ backoff), a timeout, a full pool.
 
 ## 10. Its world
 
-- **`hearth-dev-world`** [M3b], under `tests/dev`, runs
-  `hearth-domain-dev` against `hearth-fake-incus` on the fake machine
-  (testing.md, sections 3 and 4): a pool whose copy is a snapshot,
+- **`hearth-client-dev-world`** [M3b], under `tests/dev`, runs
+  `hearth-client-domain-dev` against `hearth-client-fake-incus` on the
+  fake machine (testing.md, sections 3 and 4): a pool whose copy is a snapshot,
   agents that answer late or never, and `incus exec` running a scripted
   hearth, or hearth's domains on a fake machine of the instance's own.
   Scenarios: `up` of one, of `--count 3`, of a cluster built once; a
@@ -512,7 +513,7 @@ backoff), a timeout, a full pool.
   and a live trial on one runs only over an unexplored root.
 - **The bundle, in the standalone world** [M3] (wire.md, section 10):
   imported, refused without its prerequisite, never fetched.
-  `hearth-protocol-incus`'s machine world [M3b] is fed recordings of
+  `hearth-client-protocol-incus`'s machine world [M3b] is fed recordings of
   real runs (testing.md, 4.5), and the VM tier runs the whole loop on a
   real development host (testing.md, 7.6).
 

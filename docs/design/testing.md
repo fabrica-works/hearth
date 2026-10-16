@@ -182,11 +182,13 @@ crates/*/src/tests.rs               step tests
 testing/hearth-fake-machine         the fake machine (section 3)
 testing/hearth-fake-<tool>          a tool's fake: its domain and its face (section 4)
 testing/hearth-fake-engine          the engine's fake [M4] (4.6)
+testing/hearth-client-fake-<tool>   a fake of a tool only the client runs: incus [M3b]
 testing/recordings/<tool>/<version> recordings of real runs (4.5)
 testing/repos                       the test IaC repositories, cue tasks included (8.2)
 testing/mirror                      the local mirror's pin, its extras, its fetch script (6.2)
 tests/<name>                        a domain's world, hearth-<name>-world
 tests/system                        hearth-system-world: the system worlds (2.3)
+tests/client, tests/dev             the client's worlds, hearth-client-world and hearth-client-dev-world [M3, M3b]
 tests/*/tests/*.rs                  focused tests
 tests/*/tests/fuzzy_*.rs            fuzzy tests
 tests/conformance/tests/*.rs        conformance (section 5)
@@ -893,9 +895,9 @@ kernel (testing-strategy.md, section 5).
 
 | Scenario | The real side | What is compared |
 |---|---|---|
-| resolve | `mmdebstrap --simulate --mode=chrootless` on the local mirror (render.md, 5.2) | the closure: names, architectures, versions; the `Packages` stanzas it left |
+| resolve | `mmdebstrap --simulate --mode=chrootless` through the local mirror, as its proxy (6.2; render.md, 5.2) | the closure: names, architectures, versions; the `Packages` stanzas it left |
 | resolve, both modes [M2] | the same requests simulated with `--mode=chrootless` and with `--mode=unshare`, for every variant | the two closures, which must be equal: os and the bash fleet resolved chrootless and built unshare, and a reason once found for preferring unshare was lost (render.md, section 10). With M2's real builds, since unshare needs the subordinate range (6.4) |
-| fetch | `apt-helper download-file` on the local mirror, over loopback HTTP | files by digest; a 404's and a mismatch's exit, lines and leftovers |
+| fetch | `apt-helper download-file` through the local mirror, as its proxy, over loopback | files by digest; a 404's and a mismatch's exit, lines and leftovers |
 | bootstrap | mmdebstrap as build.md (5.4, 8.3) runs it: as the root of a sandbox's user namespace, `--mode=unshare`, chrooted into a staging layer | the installed set; dpkg's status, stanza by stanza; the tree: paths, kinds, modes, owners as the namespace sees them, attributes, link targets, contents by digest |
 | the same, `--mode=root` | the bootstrap again in root mode | the two trees, to settle build.md's open choice (section 15) |
 | install the extras | the bootstrap with the extras repository | users made; conffiles recorded; setuid bits; version 3 capabilities and their root id; a failing postinst's status and tail |
@@ -989,11 +991,19 @@ real costs of each step.
   file checked as any fetch is (`InRelease`, then SHA-256). A run whose
   digest is present fetches nothing, as mmdebstrap's `make_mirror.sh` is
   a no-op when nothing changed.
-- **Served over HTTP on loopback,** at a fixed address, by the harness:
-  the fetch takes only `http` and `https` (build.md, 5.1), and the
-  address is in the test targets' sources, so in their keys. The build
-  then makes its own local repository from its cache, as on any machine
-  (build.md, 5.3). No test reaches beyond loopback.
+- **Served on loopback as an HTTP proxy,** by the harness, at a port it
+  chooses: it answers each request for
+  `http://snapshot.debian.org/archive/…` with the file the mirror holds
+  at that path (`by-hash` paths included), and any other request with
+  404, so no test reaches beyond loopback. The builder under test takes
+  it as its proxy (render.md, 5.2's `Acquire::http::Proxy`; the fetch's
+  apt configuration [M2], build.md, 5.1), as a builder takes an
+  apt-cacher-ng: the proxy is the builder's configuration, made by the
+  test (client/README.md, 3.5), and never in a key (render.md, 5.1). So
+  the test targets' sources are any target's at the pinned timestamp,
+  with format.md, 5.3's fixed URLs, and their keys are those any
+  builder computes for them. The build then makes its own local
+  repository from its cache, as on any machine (build.md, 5.3).
 
 ### 6.3 The base layer, once per mirror digest
 
@@ -1213,8 +1223,8 @@ cause one in a VM is open (section 11).
 development.md's loop runs here too, on the VM tier's machines and, from
 M3b, on a development host with the Incus driver. Its worlds live with
 the others: capture and the bundle in the slots', activator's and
-standalone worlds [M3], and `hearth-dev-world` under `tests/dev`, with
-`hearth-fake-incus` under `testing/`, for the driver [M3b]
+standalone worlds [M3], and `hearth-client-dev-world` under `tests/dev`, with
+`hearth-client-fake-incus` under `testing/`, for the driver [M3b]
 (development.md, section 10).
 
 | Scenario | What happens | What must hold |
@@ -1248,13 +1258,15 @@ standalone worlds [M3], and `hearth-dev-world` under `tests/dev`, with
 | `hearth-checks-world` | checks, on units and signals | M5 |
 | `hearth-backups-world` | class snapshots, their retention and restores; from M6, send streams and a backup peer | M5 |
 | `hearth-artifacts-world` | the second recipe | M6 |
-| `hearth-dev-world` | the development driver's domain, on `hearth-fake-incus` (development.md, section 10) | M3b |
+| `hearth-client-world` | the client's protocol layer, against the steward's domain (client/README.md, section 4) | M3 |
+| `hearth-client-dev-world` | the development driver's domain, on `hearth-client-fake-incus` (development.md, section 10) | M3b |
 
 Each document's own world section names its scenarios:
 render.md, section 9; store.md, section 11; build.md, section 13;
 machine.md, section 10; slots.md, section 13; activator.md, section 9;
-steward.md, section 8; wire.md, section 10; operating.md, section 9; artifacts.md, section 8;
-development.md, section 10.
+steward.md, section 8; wire.md, section 10; client/README.md, section
+4; operating.md, section 9; artifacts.md, section 8; development.md,
+section 10.
 
 ### 8.2 Scenarios, cues and the referee
 

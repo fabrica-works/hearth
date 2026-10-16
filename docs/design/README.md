@@ -104,8 +104,9 @@ beside this one.
    steward, the link, the activator's operations and what it verifies.
 9. **steward.md:** the unprivileged side: the steward and the builder it
    spawns for work, the jobs between them, failures, the bless's render.
-10. **wire.md:** hearth's faces: the command-line client, standalone
-    mode, the wire to an engine, bytes by digest.
+10. **wire.md:** hearth's faces: standalone mode, the wire to an
+    engine, bytes by digest; and **client/README.md**, the command-line
+    client, with the client's other designs under `client/`.
 11. **operating.md:** after a rollout: checks, facts, telemetry,
     operational effects, snapshots and backups.
 12. **testing.md:** how `testing-strategy.md` applies to hearth: the fake
@@ -129,9 +130,9 @@ every milestone, from the first (testing.md, section 10).
 
 | | Milestone | Gives | Builds |
 |---|---|---|---|
-| M1 | Render | specs with digests; the rendered diff of any change | format.md, but for checks and artifacts; render.md; the client's render and diff; store.md's encoding and a store without layers (2.4) |
+| M1 | Render | specs with digests; the rendered diff of any change | format.md, but for checks and artifacts; render.md; the client's render and diff (client/README.md); store.md's encoding and a store without layers (2.4) |
 | M2 | Build | outputs keyed by digest, built unprivileged, layer by layer | store.md, but for peers; build.md; the tree helper |
-| M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, installed from scratch | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; steward.md, but for peers and artifacts; wire.md's client and standalone mode; a minimal bless; development.md's mutable machines, capture and working trees |
+| M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, installed from scratch | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; steward.md, but for peers and artifacts; client/README.md's client and wire.md's standalone mode; a minimal bless; development.md's mutable machines, capture and working trees |
 | M3b | BIOS; development machines | BIOS machines, which most IaaS providers offer; development machines on Incus | machine.md's BIOS path; slots.md's trial through GRUB; development.md's Incus driver |
 | M4 | The wire | hearth as a system behind an engine | wire.md's wire, facts and events |
 | M5 | Operating | the machine's end of the run side | operating.md, but for backups; checks as task data; local snapshots of each class, and restores from them (operating.md, section 7); containers and pool hosts (slots.md, section 12); clusters and containers in development (development.md) |
@@ -189,7 +190,7 @@ a machine
 - **The client runs the builder's domain in-process** when no daemon
   runs, on a developer's machine (M1, M2), and whenever it renders a
   local repository: the daemon renders only its own clone
-  (wire.md, section 3).
+  (client/README.md, section 3).
 - **Bootstrap runs the activator's code in-process,** as root from a
   live system, and it spawns a steward over a link as the daemon does
   (machine.md, section 8).
@@ -197,8 +198,9 @@ a machine
 ### 4.2 Crates
 
 Crates are named by their layer (`programming-model.md`, section 4):
-`hearth-domain-*`, `hearth-protocol-*`, `hearth-service-*`. The crate
-graph is the role graph.
+`hearth-domain-*`, `hearth-protocol-*`, `hearth-service-*`; the
+client's are `hearth-client-*` (below). The crate graph is the role
+graph.
 
 ```
 lib                           no_std, skein-lib only
@@ -213,7 +215,6 @@ hearth-domain-builder         the builder's root: routes between its children; j
 hearth-domain-steward         the steward's root: routes between its children; orders, facts, jobs  M3
 ├── hearth-domain-converge    the desired revision, orders, a slot's decisions (wire.md)  M3
 └── hearth-domain-checks      checks, signals, windows (operating.md)                     M5
-hearth-domain-dev             the client's development loop; the Incus driver from M3b (development.md)  M3
 hearth-domain-activator       the activator's root (activator.md)                         M3
 ├── hearth-domain-slots       slot state, prepare, trial, bless, fall back, drift         M3
 ├── hearth-domain-boot        boot entries and files: EFI, then GRUB (machine.md)         M3
@@ -240,15 +241,18 @@ hearth-protocol-efi           EFI variables from efivarfs; efibootmgr's argument
 hearth-protocol-systemd       systemctl, systemd-run and the journal's queries            M3
 hearth-protocol-proc          /proc/<pid>/mountinfo and cgroup: mounts, overlays, units   M3
 hearth-protocol-keygen        ssh-keygen and the other identity tools                     M3
-hearth-protocol-client        the client's records and their printer                      M1, M3
 hearth-protocol-grub          grub-editenv, GRUB's configuration and env                  M3b
-hearth-protocol-incus         incus's argument vectors and JSON output (development.md, 8.3)  M3b
 hearth-protocol-wire          the wire to an engine, over skein's channel                 M4
 hearth-protocol-probe         probes of a service as its users see it (operating.md, 2.5) M5
 hearth-protocol-http          bytes by digest                                             M6
 hearth-protocol-builder       the builder's protocol layer: routes its machines           M1
 hearth-protocol-steward       the steward's protocol layer: routes its machines           M3
 hearth-protocol-activator     the activator's protocol layer: routes its machines         M3
+
+client                        what exists for the client, under one prefix, each crate held to its layer's rules (client/README.md, section 2)
+hearth-client-protocol-records  the client's records and their printer                    M1, M3
+hearth-client-domain-dev      the client's development loop; the Incus driver from M3b (development.md)  M3
+hearth-client-protocol-incus  incus's argument vectors and JSON output (development.md, 8.3)  M3b
 
 service and shell
 hearth-service-builder        the builder's iterate                                       M1
@@ -261,17 +265,35 @@ testing
 hearth-fake-machine           the fake machine (testing.md, section 3)                    M1
 hearth-fake-<tool>            one fake per tool, acting on the fake machine               M1
 hearth-fake-engine            an engine at the wire's far end (testing.md)                M4
+hearth-client-fake-incus      incus's fake, for the client's development loop             M3b
 hearth-system-world           the builder's and the tree helper's domains; the steward's and the activator's from M3     M2
 hearth-<name>-world           the other worlds, under tests/
+hearth-client-world           the client's world, under tests/client (client/README.md, section 4)  M3
+hearth-client-dev-world       the development loop's world, under tests/dev (development.md, section 10)  M3b
 ```
 
 - **Three crates start before their milestone.** M1 builds what render
   needs of them, and the later milestone grows each: `hearth-domain-store`
   holds resolutions and cache files' records, over a store without layers
   (store.md, 2.4); `hearth-protocol-tree` decodes the frame and records of
-  kinds 1, 4 and 5 (store.md, 6.1); `hearth-protocol-client` holds the
-  records of `render` and `diff` and prints them (render.md, 8.1;
-  wire.md, 3.2).
+  kinds 1, 4 and 5 (store.md, 6.1); `hearth-client-protocol-records`
+  holds the records of `render` and `diff` and prints them (render.md,
+  8.1; client/README.md, 3.2).
+- **Client crates live under one prefix,** as jig's do (jig's design
+  `README.md`, section 15). A crate that exists for the client is
+  `hearth-client-{domain,protocol,<kind>}-<name>`: after the prefix
+  comes its layer, as for the daemon's crates, or its kind (a test kit's
+  `-fake-`, a world's name ending in `-world`), so that everything the
+  client alone needs lives under `hearth-client`. It is the client's
+  domain, its protocol (the records it speaks, even where the steward
+  reads them too), its tools' protocols, its fakes and its worlds. A
+  crate the client hosts but the daemon runs too keeps the daemon's
+  name: the builder's domain and protocol layer, `hearth-protocol-git`,
+  the activator's crates for the root-only commands. The binary keeps
+  the project's name alone, `hearth`, and composes the client; the
+  prefix's base, `hearth-client`, is kept for a crate that composes it
+  apart from the binary, should another program need one. The client's
+  designs live under `client/` (client/README.md).
 - **`hearth-lib` is hearth's one crate in the lib role:** the canonical
   encoding and `H` are needed by domains in three processes, which may
   depend only on lib and their own children (`programming-model.md`,
@@ -289,7 +311,7 @@ hearth-<name>-world           the other worlds, under tests/
   vocabulary the first two share, through `hearth-protocol-link`; the
   jobs' are the only one the last two share, through
   `hearth-protocol-jobs`. The client hosts the builder's domain
-  in-process (wire.md, 3.5), and needs no steward for it.
+  in-process (client/README.md, 3.5), and needs no steward for it.
 - **Drift is the activator's** (slots.md, section 10): it wrote the slot
   record and alone can read every file of a slot.
 - **`hearth-domain-tree` has two parents in two processes:** the tree
@@ -339,7 +361,7 @@ hearth-<name>-world           the other worlds, under tests/
 | boot partition | the FAT partition the firmware or GRUB writes: the ESP on EFI, GRUB's env on BIOS (machine.md) |
 | activator, steward, builder | the three processes: root and closed; persistent, deciding and facing; spawned for work (activator.md, steward.md) |
 | link, jobs | the pipe pairs between the activator and its steward, and between the steward and its builder |
-| client | the command-line face (wire.md, section 3) |
+| client | the command-line face (client/README.md, section 3) |
 | engine | what orders a machine: the run side's or the lab's (temper's `factory.md`) |
 | plane | the lab or the run side: outputs and credentials never cross between them |
 | standalone | hearth with no engine, converging to its desired revision |
@@ -353,7 +375,10 @@ hearth-<name>-world           the other worlds, under tests/
 ## 6. Conventions
 
 - **A bare file name** names a document of this directory: `store.md`;
-  with a section, `store.md, section 4` or `(store.md, 4.2)`. The
+  with a section, `store.md, section 4` or `(store.md, 4.2)`. A
+  document in a directory beneath it is named by its path from here,
+  `client/README.md, 3.5`, and names the others as this directory's
+  documents do. The
   brainstorm is `draft/brainstorm.md`.
 - **skein's foundation documents** are named by their file names:
   `programming-model.md`, `testing-strategy.md`, `notes.md`. Other
@@ -550,7 +575,7 @@ that last:
   `x1-prod` reboots into a new slot only when its user chooses
   (wire.md, 4.1).
 - **A machine follows an engine or converges alone, never both**
-  (wire.md, 3.1 and 3.8).
+  (client/README.md, 3.1 and 3.8).
 - **A bless can be held** by the engine while a canary bakes; the
   `bless` order releases it, and a timer that does not depend on hearth
   ends a hold that outlives its ceiling (slots.md, 7.4;
@@ -661,6 +686,10 @@ user (`testing-strategy.md`, section 9). From the earliest:
 | contained process trees (skein's draft `process.md`), with id maps through `newuidmap`, a composed root and `pivot_root`, network and uts namespaces, fresh `/proc`, `/sys` and `/dev`, `no_new_privs` and limits (build.md, 8.8) | sandboxes | M2 |
 | a closed list of synchronous ioctls in the ring adapter: `GET_SUBVOL_INFO`, `GET_SUBVOL_ROOTREF`, `INO_LOOKUP_USER`, `SUBVOL_CREATE_V2`, `SNAP_CREATE_V2`, `SNAP_DESTROY_V2`, `SUBVOL_SETFLAGS` (store.md, 5.8) | the store and the slots, unprivileged where they can be | M2 |
 | a digest of a world's state, for replay (testing.md, 8.4) | replay checks in hearth's worlds | M1 |
+| an exclusive lock on a directory, taken without waiting, which the owner asks for again on its own timer (skein's `kernel.md`, 6.1; `io.md`, 5) | the store's lock (store.md, 8.2, step 1) | M1 |
+| a rename from one directory to another (skein's `io.md`, 5) | a resolution's indices moved from its scratch directory into the cache (render.md, 5.3; store.md, 6.4) | M1 |
+| a directory listed page by page (skein's `io.md`, 5) | the startup scan of `cache/` and `resolutions/`, whatever their size (store.md, 8.2) | M1 |
+| `statfs`'s filesystem type | the scan's subvolume steps, on btrfs alone (store.md, 2.4) | M2 |
 | Unix sockets with peer credentials | the client | M3 |
 | redialling and identity on the channel's TLS client | the wire | M4 |
 | `syncfs` | a layer's data durable before its record | M2 |

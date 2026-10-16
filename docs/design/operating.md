@@ -523,7 +523,7 @@ renewal, snapshots and backups). The operational effects start with three
   unit inside the container, restarted through `systemctl --machine=`
   (activator.md, 5.9).
 - **In standalone mode,** `hearth rollback` and `hearth restore` are
-  the client's (wire.md, 3.1). A person on the machine restarts a unit
+  the client's (client/README.md, 3.1). A person on the machine restarts a unit
   with `systemctl` as root; hearth does not wrap it.
 - **Any other effect waits until one is needed,** such as a reload or
   draining a service.
@@ -565,7 +565,7 @@ lack of disk, and had no off-machine backup of service data at all.
   while the steward is down or the machine is on trial.
 - **On the machine, for a person:** `hearth snapshots` lists them, and
   `hearth shell --snapshot <class>@<seq>` shows one read-only, as any
-  slot is shown (wire.md, 3.1 and 3.7), so a file can be copied out by
+  slot is shown (client/README.md, 3.1 and 3.7), so a file can be copied out by
   hand.
 - **Crash-consistent only.** A service whose files are consistent only
   at rest needs more (a quiescing command before the snapshot); that is
@@ -654,7 +654,7 @@ lack of disk, and had no off-machine backup of service data at all.
   by the order's key and conditional on the class subvolume being the
   one decided from (its UUID, reported in the `data` fact). It is
   an operation of the activator (activator.md, 5.12). In standalone
-  mode, `hearth restore` asks for it (wire.md, 3.1).
+  mode, `hearth restore` asks for it (client/README.md, 3.1).
 - **From a local snapshot [M5], or from the peer [M6]:** a snapshot the
   machine no longer has is first received from the peer, which sends it
   encrypted to this target's own backup key, as in 7.2, into this

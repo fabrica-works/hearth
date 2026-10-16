@@ -5,7 +5,7 @@ the steward, which runs for as long as the machine does, and the
 builder, which the steward spawns for work and which exits once the work
 is done. The activator above them is activator.md's. M3 builds both;
 from M1 the client hosts the builder's domain in its own process
-(wire.md, 3.5). What the steward does is told where it belongs: the pass
+(client/README.md, 3.5). What the steward does is told where it belongs: the pass
 and the faces in wire.md, checks and telemetry in operating.md. This
 document holds the split itself: who does what, the jobs between them,
 how a failed builder is handled, and the bless's render. What is open is
@@ -67,7 +67,7 @@ a machine
 |---|---|---|---|
 | the desired revision, the pass, refusals, the hold | ✓ | | wire.md, section 4 |
 | requests to the activator, and its facts | ✓ | | activator.md, sections 4 and 5 |
-| the client's socket | ✓ | | wire.md, 3.4 |
+| the client's socket | ✓ | | client/README.md, 3.4 |
 | the wire, orders, facts and events [M4] | ✓ | | wire.md, sections 5 and 6 |
 | checks, signals, the journal, telemetry on demand [M5] | ✓ | | operating.md, sections 2 and 5 |
 | backup streams, between the activator and a peer [M6] | ✓ | | operating.md, 7.2 |
@@ -167,8 +167,8 @@ kind's limit before the body is read.
 | plan live | the running slot's output and the new one, with both specs' live parts | the plan, or the rules it breaks (slots.md, 6.7) | the pass, `trying`; after a prepare, for the `activation` fact and `status` (wire.md, section 6) | M3 |
 | verify | a layer the activator found not to match its record | intact, or deleted with its descendants (store.md, 4.4) | a failed place | M3 |
 | collect | — | what was deleted, and why (store.md, 7.2) | after a pass; the store's free-space floor | M3 |
-| render, diff or build for a client | as the command names them | the command's records | the client (wire.md, 3.1) | M3 |
-| credential | the repository's read credential | stored under the store's `credentials/` (render.md, 2.2) | the client's `credential` (wire.md, 3.1) | M3 |
+| render, diff or build for a client | as the command names them | the command's records | the client (client/README.md, 3.1) | M3 |
+| credential | the repository's read credential | stored under the store's `credentials/` (render.md, 2.2) | the client's `credential` (client/README.md, 3.1) | M3 |
 | a change set's or a blob's bytes; a peer's change set received | a layer key or a digest; a peer | a stream, or the layer | a peer (wire.md, section 8); a prepare order's sources | M6 |
 | an artifact | artifacts.md, section 4 | the artifact's record | an order | M6 |
 

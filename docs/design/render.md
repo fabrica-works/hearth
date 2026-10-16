@@ -5,7 +5,7 @@ of an IaC repository and a target into a spec: what render reads and how
 it reads it, its pipeline, the spec's parts and their digests, package
 resolution, the rendered diff of a change, its errors, its crates and
 how it is tested. The format it reads is format.md. Milestone M1 builds
-it, with the client's `render` and `diff` (wire.md, section 3). Open
+it, with the client's `render` and `diff` (client/README.md, section 3). Open
 questions are in section 10.
 
 ## 1. In one page
@@ -49,7 +49,7 @@ questions are in section 10.
   - **a local one,** which `hearth render` and `hearth diff` name with
     `--repo` or a path: the client renders it in its own process, with
     its own user's access, and never hands the path to a daemon
-    (wire.md, section 3);
+    (client/README.md, section 3);
   - **the builder's own clone,** `@hearth.store/repo/`, which the
     daemon's builder fetches and renders in jobs its steward gives it,
     and the only repository the daemon renders (wire.md, section 4;
@@ -71,6 +71,10 @@ git diff --no-index --no-color --no-ext-diff --no-textconv --diff-algorithm=myer
     -- <store>/cache/<before> <store>/cache/<after>                              a changed file's hunks (6.1)
 ```
 
+- **git is `/usr/bin/git`,** Debian's, spawned by its path: skein's
+  `Spawn` searches no `PATH`. The builder's tools are named by fixed
+  paths, as mmdebstrap's is (5.2); in M1 nothing configures them
+  (client/README.md, 3.5).
 - **The environment is given whole:** `LC_ALL=C`, `GIT_CONFIG_NOSYSTEM=1`,
   `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_NO_REPLACE_OBJECTS=1`,
   `GIT_TERMINAL_PROMPT=0`, and `HOME` an empty directory. No user's or
@@ -101,7 +105,8 @@ git diff --no-index --no-color --no-ext-diff --no-textconv --diff-algorithm=myer
 ### 2.3 Bounds
 
 Render's limits are configured (`programming-model.md`, section 7); these
-are the defaults.
+are the defaults. M1's client, the one builder of M1, runs on the
+defaults alone (client/README.md, 3.5).
 
 | Limit | Default |
 |---|---|
@@ -608,8 +613,16 @@ and, with both pockets on, `<suite>-updates` from the same archive and
   indices move into the cache by a rename; it is removed after. One
   resolution runs at a time (5.5), and the store's lock keeps other
   builders out (store.md, 8.2).
-- **The environment is given whole:** `LC_ALL=C`, a fixed `PATH`, and
-  `TMPDIR` the scratch directory.
+- **mmdebstrap is `/usr/bin/mmdebstrap`,** spawned by its path, as git
+  is (2.2).
+- **The environment is given whole:** `LC_ALL=C`,
+  `PATH=/usr/sbin:/usr/bin:/sbin:/bin` for the tools mmdebstrap and apt
+  run, and `TMPDIR` the scratch directory.
+- **The proxy is the builder's configuration,** never in a key (5.1):
+  none by default, and none in M1 (client/README.md, 3.5); an
+  apt-cacher-ng where the builder has one (build.md, 5.2); the local
+  mirror in the test tiers, which serves the fixed URLs above
+  (testing.md, 6.2).
 
 ### 5.3 What it yields
 
@@ -634,8 +647,9 @@ and, with both pockets on, `<suite>-updates` from the same archive and
   Before the scratch directory is removed, each source line's
   `InRelease` and each `Packages` file moves into the store's cache by
   SHA-256 (store.md, 6.4): the protocol layer hashes each in the pass
-  that reads its stanzas, and the domain then has it renamed to
-  `cache/<sha256>`, with no copy, and recorded (store.md, 6.5). If apt
+  that reads its stanzas, and the domain then has it synced and renamed
+  from the scratch directory to `cache/<sha256>`, with no copy, and
+  recorded (store.md, 6.5 and 6.8). If apt
   kept them compressed (section 10), each is streamed through the
   decompressor into the cache instead. The record names them by those
   digests. build.md's local repository serves them at plain paths
@@ -712,7 +726,7 @@ resolution record                                                            sto
   hold is needed, and the spec says so (3.8, 9.2). No mmdebstrap runs,
   and nothing reaches the network.
 - **The client resolves on request.** `hearth render --resolve` and
-  `hearth diff --resolve` (wire.md, 3.1) resolve each needed key, one at
+  `hearth diff --resolve` (client/README.md, 3.1) resolve each needed key, one at
   a time (5.5), and record each closure before they print: render's
   targets' keys, and for a diff the keys of the targets whose
   resolution key changed, on both sides, so that its packages change
@@ -757,7 +771,7 @@ rebuild
   three lines of context, and `hearth-protocol-git` hands up at most 200
   lines a file, with the count of those left out, or that the file is
   binary. Step code computes no text diff. The hunks are part of the
-  typed diff, so its JSON carries them (wire.md, 3.2), and a client that
+  typed diff, so its JSON carries them (client/README.md, 3.2), and a client that
   cannot read the daemon's store [M3] receives them with the rest.
 - **Secrets show names and places,** never values, since render has none.
 
@@ -795,7 +809,7 @@ ion-prod                                            nothing to build
 ```
 
 - The client prints it as text, or as JSON for agents
-  (wire.md, section 3). The typed diff is the same either way.
+  (client/README.md, section 3). The typed diff is the same either way.
 - The coupling is visible: carbon-prod changes because it reads ion-prod's
   exports, and carbon-lab does not, because exports stay in their
   environment.
@@ -896,12 +910,12 @@ hearth-protocol-builder          the builder's protocol layer: routes its machin
   `hearth-protocol-template` before translating the whole declaration
   into render's types.
 - **The client runs the same domain in-process** when no daemon
-  answers, or for a local repository (README, 4.1; wire.md, 3.5); in
+  answers, or for a local repository (README, 4.1; client/README.md, 3.5); in
   the daemon, the builder's root takes the steward's jobs through
   `hearth-protocol-jobs` (steward.md, section 3).
-- **The client prints with `hearth-protocol-client`'s printer** (wire.md,
-  3.2), a machine that writes the spec, the diff and the errors as text
-  and as JSON lines: M1 brings forward that crate's records of render
+- **The client prints with `hearth-client-protocol-records`'s
+  printer** (client/README.md, 3.2), a machine that writes the spec,
+  the diff and the errors as text and as JSON lines: M1 brings forward that crate's records of render
   and diff and their printer, and M3 adds the rest. Which crate of the
   client routes the builder's answers to it is the plan's, within
   README.md, 4.2's roles.
@@ -999,7 +1013,7 @@ every request                                          Failed { request, class, 
   ```
 
   Digests and keys are cut to 12 hex digits, as every table of the
-  client's is (wire.md, 3.2); its JSON gives them whole. With the
+  client's is (client/README.md, 3.2); its JSON gives them whole. With the
   resolution in the store, its line reads `resolution 0c7d9e41c0d2
   known`, and a last line gives the layer keys: `keys  packages …
   software … config …`.

@@ -239,7 +239,7 @@ WantedBy=multi-user.target
 | process group | its own, so the activator can signal it and its children: an ask of skein (README, 8.1) |
 
 Before the spawn, the activator makes `/run/hearth/`, owner `hearth`,
-mode 0755, where the steward binds the client's socket (wire.md, 3.4);
+mode 0755, where the steward binds the client's socket (client/README.md, 3.4);
 its own mounts live apart, under `/run/hearth-activator/` (0700, root),
 where neither the steward nor its builder can replace a directory under
 them. The same pair runs at bootstrap, where the client process is the
@@ -565,7 +565,7 @@ Identity { target, items: [ { item, kind, algorithm } ] }
 ### 5.8 Import secrets
 
 Run by the client as root, in its own process, with the activator's
-domain (wire.md, section 3), never over the link: no value ever passes
+domain (client/README.md, section 3), never over the link: no value ever passes
 through the steward or its builder.
 
 - **Input:** files named on the command line, or a directory of them,
@@ -586,7 +586,7 @@ through the steward or its builder.
 - **Readers read the index, then the files it names,** so they always
   see one consistent generation. The running activator reads the index
   before every prepare and every facts report; the client then asks the
-  steward to refresh its facts (wire.md, section 3).
+  steward to refresh its facts (client/README.md, section 3).
 - **A crash** leaves value files no index names, removed by the next
   import.
 
@@ -1232,7 +1232,7 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
   depends on how often secrets rotate (wire.md, 4.6).
 - **Telling the running activator of an import:** it listens to nothing,
   so the client asks the steward to refresh the facts; whether that is
-  enough depends on wire.md, section 3.
+  enough depends on client/README.md, section 3.
 - **The shift's walk in the activator's loop:** skein's file driver runs
   one request at a time, so a long walk shares the loop with the link;
   whether facts stay timely during a prepare, or the walk moves to a

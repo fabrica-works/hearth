@@ -64,11 +64,12 @@ What is open is in section 12.
 │   ├── <key>.tree                 its tree file: entries and change set (6.3), 0600
 │   ├── <key>.staging              a layer being built: a writable subvolume (4.2)
 │   ├── <key>.trash                a layer being deleted (7.3)
-│   └── <name>.tmp                 a record or tree file being written (6.8)
+│   └── <name>.tmp                 a tree file being written (6.8)
 ├── resolutions/<key>.record       a resolution (6.4)
 ├── cache/<sha256>                 bytes by content: downloads, kept indices, render's blobs; 0644, never modified (2.2)
 ├── cache/<sha256>.record          where they came from (6.5)
 ├── cache/<random>.tmp             a file being written, whose digest is known at its end: renamed to <sha256> (6.8)
+├── <record>.skein-<16 hex>        beside any record, in any directory: skein's Store replacing it (6.8)
 ├── targets/<H("target", name)>.record   a target's last builds (6.6)
 ├── state/                         the steward's records and rings (8.3)
 ├── artifacts/                     [M6] artifacts, as layers/ holds layers: <key>, .record, .tree, .staging, .trash
@@ -83,8 +84,10 @@ What is open is in section 12.
   then a suffix for its kind; nothing is named by a target, a path or a
   time. The one exception is a cache file being written, whose digest is
   known only at its end: it is named by 64 random hex digits, drawn from
-  the builder's generator, and `.tmp`. The top's names are the fixed ones
-  above. A name of no known
+  the builder's generator, and `.tmp`. The other is a record being
+  replaced: skein's `Store` writes it as `<record's name>.skein-<16 hex>`
+  beside it (6.8). The top's names are the fixed ones above, and
+  `store.record`'s temporary. A name of no known
   shape is not hearth's: the startup scan reports it and leaves it alone
   (8.2).
 - **Directories are 0700, records and tree files 0600,** all the
@@ -128,7 +131,7 @@ What is open is in section 12.
 
 A store whose filesystem is not btrfs, or whose builder has built no
 layer, holds what render keeps: its cache and its resolutions. M1's
-`render` and `diff` use one (wire.md, 3.5), and so may a builder that
+`render` and `diff` use one (client/README.md, 3.5), and so may a builder that
 only renders.
 
 - **Any filesystem,** in a directory of the user's own, 0700: btrfs and
@@ -140,10 +143,13 @@ only renders.
   resolution's (render.md, 5.2). The layout and the records are those of
   a store with layers, so a builder of M2 reads it as its own.
 - **The lock and the scan hold:** a builder takes 8.2's lock on the
-  store's root, and its startup scan runs steps 1, 2 and 7, settling 4.4's
-  rows for temporaries, staging and cache files. Steps 3 to 6, the
-  subvolumes', are skipped on a filesystem that is not btrfs (`statfs`'s
-  magic), and find none on one that is.
+  store's root, and its startup scan runs steps 1 and 2, step 6 for its
+  resolutions and its cache alone, and step 7, settling 4.4's rows for
+  temporaries, staging, resolutions and cache files. Steps 3 to 5, the
+  subvolumes', belong to a builder that builds [M2], which runs them on
+  btrfs and skips them elsewhere, telling the two by `statfs`'s
+  filesystem type (README.md, 8.1). M1's builder builds no layer and
+  runs none of them: a store it makes has no `layers/`.
 - **Everything in it can be made again:** a resolution is resolved
   again, a cache file fetched or rendered again. A store without layers
   may be deleted whole, and made again as a btrfs subvolume when its user
@@ -478,7 +484,7 @@ The startup scan (8.2) settles what a crash left:
 | `<key>` with no record | a deletion began (7.3, step 1) | deletes it |
 | a record with no `<key>` | a publish stopped before its rename | deletes the record and tree file |
 | a record whose uuids are not the subvolume's | the subvolume is not the one recorded | deletes both |
-| `*.tmp`; anything in `staging/` | a write or a step in flight | deletes it |
+| `*.tmp`; `*.skein-<16 hex>`, skein's `Store`'s temporary (6.8); anything in `staging/` | a write or a step in flight | deletes it |
 | `cache/<sha256>` with no record | a cut between a cache file's rename and its record, or before the file was durable (6.8) | deletes it |
 | `cache/<sha256>.record` with no file | a deletion stopped (7.5) | deletes the record |
 
@@ -869,9 +875,11 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
 
 ### 6.8 Written by rename; versioned
 
-- **Atomic:** `<name>.tmp` written, synced, renamed over `<name>`, the
-  directory synced (skein's `Store` does this: skein's `io.md`, section
-  5). A reader sees the old record or the new.
+- **Atomic:** a record is replaced whole by skein's `Store` (skein's
+  `io.md`, sections 5 and 5.2): its temporary, `<name>.skein-<16 hex>`,
+  written beside it, synced, renamed over `<name>`, the directory
+  synced. A reader sees the old record or the new. A tree file [M2] is
+  written the same way by the builder itself, as `<name>.tmp`.
 - **Ordered:** the layer's files synced (`syncfs`) and its tree file
   in place before its record, a record before the publishing rename
   (4.2), an unrecording before the subvolume is touched (7.3). The
@@ -882,8 +890,12 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   sees half a file under a digest; then its record is written. Several
   files may be made durable with one `syncfs` before their records [M2].
   A file whose name is already present is not written again: its
-  temporary is removed. A cut anywhere leaves a temporary, or a file
-  with no record, which the startup scan deletes (4.4).
+  temporary is removed. An index a resolution keeps is synced where apt
+  left it, renamed from its scratch directory into `cache/<sha256>`
+  (skein's `io.md`, 5: a rename between two directories), and `cache/`
+  synced, before its record (render.md, 5.3). A cut anywhere leaves a
+  temporary, or a file with no record, which the startup scan deletes
+  (4.4).
 - **Versioned per kind, across releases** (activator.md, 7.2's rule): a
   release reads its own version of each kind and the previous one, and
   writes only versions the previous release can read. After a fall back,
@@ -979,6 +991,9 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   rebuild soon after a collection fetches nothing.
 - **Deleting one** unlinks its name and record; a staging link keeps the
   inode until its step ends.
+- **Nothing is collected in M1.** A store without layers grows with
+  each resolution and each rendered or streamed file, and is full at a
+  limit of 8.1; its user deletes it whole (2.4).
 
 ## 8. hearth's own state
 
@@ -992,8 +1007,21 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   asked for again finds or redoes its layers.
 - **The in-memory index** holds one entry per published layer (key,
   kind, parent, tree digest, uuid, counts, when), bounded by the store's
-  layer limit (4,096 by default), and the resolutions and cache files by
-  key and size. Tree files are never held whole.
+  layer limit (4,096 by default); one per resolution, by key, bounded by
+  its resolution limit (1,024); and one per cache file, by digest,
+  bounded by its cache limit (262,144 files). The three limits are
+  configured (`programming-model.md`, section 7). Tree files are never
+  held whole, and the scan reads no cache file's record: it pairs files
+  and records by name, and a record is read when its file is used.
+- **A store at a limit is full.** A scan that counts more resolutions or
+  cache files than their limits stops there: the builder holds no index,
+  and answers every request that reads or adds to the store with an
+  operational error naming the store, the limit and what passed it
+  (render.md, 7.2). A resolution or a cache file that would pass its
+  limit while the builder runs is refused the same way, and its file is
+  removed. Nothing is evicted to make room: collection is M2's (7.5),
+  and from M2 a builder collects before it calls its store full. A store
+  without layers that is full is deleted whole and made again (2.4).
 
 ### 8.2 The startup scan
 
@@ -1002,10 +1030,16 @@ work (steward.md, 4.2), so what a crash, a kill or a power cut left is
 settled before the first job of every pass.
 
 1. **The lock:** an exclusive `flock` on the store's root directory,
-   held until the builder exits. A second builder over the same store,
-   a daemon's or a client's in-process on a developer's store, waits for
-   it (steward.md, 3.4). The root, not `store.record`, which 6.8 may
-   write again by rename onto another inode.
+   taken without waiting (skein's `io.md`, 5: `Lock`) and held until the
+   builder exits. A second builder over the same store, a daemon's or a
+   client's in-process on a developer's store, waits for it
+   (steward.md, 3.4): while the lock is busy it asks again every 200 ms,
+   and says once, after its first second of waiting, that it waits (on
+   the client's standard error, client/README.md, 3.5; as an event of
+   its job [M3]). It sets no limit of its own: the person at the client
+   may interrupt it, and a daemon's job has its steward's deadline
+   (steward.md, 5.2). The root, not `store.record`, which 6.8 may write
+   again by rename onto another inode.
 2. **The store's record** (6.6): version and range.
 3. **Every subvolume under the store,** with
    `BTRFS_IOC_GET_SUBVOL_ROOTREF` on its root: the child subvolumes'
@@ -1019,7 +1053,11 @@ settled before the first job of every pass.
    recomputed, a resolution's among them (6.4), and each cache file with
    its record. A subvolume inside a layer (`GET_SUBVOL_ROOTREF` on the
    layer) is refused, and the layer deleted. A store without layers runs
-   this step for its resolutions and its cache alone (2.4).
+   this step for its resolutions and its cache alone (2.4). `cache/`,
+   `resolutions/` and `layers/` are listed page by page (skein's
+   `io.md`, 5: `ListPage`), 1,024 entries a page, each counted against
+   8.1's limits as it comes, so a directory of any size is scanned in
+   bounded memory.
 7. **Settled:** deletions done (7.3), strays (any name 2.1 does not
    list) reported, and the index built. `state/` is the steward's, read
    at its own start (8.3).
@@ -1065,7 +1103,7 @@ What the steward must keep across restarts and reboots lives in
 - **The store is a btrfs subvolume of its own:** `@hearth.store` on a
   machine, mounted at `/var/lib/hearth/store` in every slot (machine.md,
   3.2 and 3.3), or one a developer makes with `btrfs subvolume create`,
-  which needs no privilege, and names with `--store` (wire.md, 3.5). The scan lists the store's child subvolumes, so the
+  which needs no privilege, and names with `--store` (client/README.md, 3.5). The scan lists the store's child subvolumes, so the
   store must be their parent. Only layers need it: a store that only
   renders may be a plain directory (2.4).
 - **Linux 4.18 or later,** for unprivileged `rmdir` of an empty

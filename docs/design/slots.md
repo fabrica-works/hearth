@@ -1330,7 +1330,7 @@ throughout:
   target until it has booted natively.
 - **Who asks:** an engine's order, an operational effect granted by
   policy [M5] (operating.md, section 6); standalone, a person through
-  the client (wire.md, section 3).
+  the client (client/README.md, section 3).
 
 ## 10. Drift
 
