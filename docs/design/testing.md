@@ -1,15 +1,15 @@
 # Testing hearth
 
-Provisional, 2026-10-09. How hearth is tested. The strategy is
-`testing-strategy.md`: the tiers, faults, what every fake shares, what
-every world checks, scenarios and the referee, the two suites, and where
-a failure is fixed. This document keeps what is hearth's: its tiers and
-the three it adds outside the gate (section 2), the fake machine
-(section 3), the fakes of its tools (section 4), conformance (section 5),
-real builds (section 6), the VM tier (section 7), its worlds and their
-invariants (section 8), budgets and costs (section 9), and what each
-milestone adds (section 10). It applies from M1 and grows with every
-milestone. What is open is in section 11.
+Provisional, 2026-10-09, revised 2026-10-16. How hearth is tested. The
+strategy is `testing-strategy.md`: the tiers, faults, what every fake
+shares, what every world checks, scenarios and the referee, the two
+suites, and where a failure is fixed. This document keeps what is
+hearth's: its tiers and the three it adds outside the gate (section 2),
+the fake machine (section 3), the fakes of its tools (section 4),
+conformance (section 5), real builds (section 6), the VM tier (section
+7), its worlds and their invariants (section 8), budgets and costs
+(section 9), and what each milestone adds (section 10). It applies from
+M1 and grows with every milestone. What is open is in section 11.
 
 ## 1. In one page
 
@@ -741,8 +741,13 @@ out   bytes on stdout and stderr, in chunks over the world's time: progress;
   anyone else needs `newuidmap`, which `no_new_privs` disables.
 - **Output follows recordings.** Every line it prints has the shape of a
   recorded real run (4.5), with its varying fields (names, versions,
-  counts) filled from the fake's state. Recordings are of the tools
-  Debian trixie ships, run as hearth runs them, not on a terminal.
+  counts) filled from the fake's state. Recordings are of real tools,
+  run as hearth runs them, not on a terminal, each under the version
+  that made it (4.5), and a parser holds to every version recorded. M1's
+  come from the machine its plan runs on, whatever Debian it runs;
+  trixie's and forky's join when a machine that has them records, as a
+  tool that moves does (5.5). Which versions must be recorded is open
+  (section 11).
 - **Faults come from the seed,** each one that real runs meet, and a
   sweep asserts that each fell (testing-strategy.md, section 3).
 - **Time:** each takes the time its work takes, on the world's clock,
@@ -758,7 +763,7 @@ out   bytes on stdout and stderr, in chunks over the world's time: progress;
 | `apt-helper download-file` | `hearth-protocol-dpkg` | each file named, by URI, into its target, checked by its SHA-256 | a stall; a 404; a hash or size mismatch; a reset; a full disk | M2 |
 | dpkg-query | `hearth-protocol-dpkg` | build.md 5.7's four fields per package, from the layer's dpkg database | a package left half-configured by an earlier failure | M2 |
 | the target's tools: `systemd-sysusers`, `systemd-tmpfiles`, `systemctl preset-all` with `SYSTEMD_OFFLINE=1`, `tar` | `hearth-protocol-builder`'s generic machine | users, files and preset links made in the layer, as its root, inside it | a tool missing from the target; a failure with a tail | M2 |
-| git | `hearth-protocol-git` | render.md 2.2's `rev-parse`, `ls-tree` and `cat-file --batch` on a repository, and the fetch of wire.md, section 4 | a remote unreachable; a revision missing; a branch rewritten; a stall | M1 |
+| git | `hearth-protocol-git` | render.md 2.2's `rev-parse`, `ls-tree` and `cat-file --batch` on a repository, and its `diff --no-index` of two files, by a line diff of the fake's own; the fetch of wire.md, section 4 | a remote unreachable; a revision missing; a branch rewritten; a stall | M1 |
 | efibootmgr | `hearth-protocol-efi` | writes only: creates at a fixed number, deletes, `--bootnext`, `--delete-bootnext`, `--bootorder`, on the variables of efivarfs | the variable store full; efivarfs not writable; a number already taken | M3 |
 | systemctl, at run time | `hearth-protocol-systemd` | `soft-reboot`, `reboot`, `reboot -ff`, `is-system-running`, `show`, `stop`; for a live trial, `daemon-reload`, `start`, `reload`, `restart` and `reload-or-restart` on PID 1's jobs (3.13); `restart` [M5]; a container's nspawn unit and `--machine=` (3.12) [M5] | a unit that fails; a job that times out; a reload that fails; a container that never comes up | M3 |
 | systemd-tmpfiles and nscd, at run time | `hearth-protocol-activator` | a live trial's `--create` of `hearth.conf` in the running `/var`; nscd's `--invalidate` | a line that fails; nscd absent | M3 |
@@ -889,14 +894,14 @@ kernel (testing-strategy.md, section 5).
 | Scenario | The real side | What is compared |
 |---|---|---|
 | resolve | `mmdebstrap --simulate --mode=chrootless` on the local mirror (render.md, 5.2) | the closure: names, architectures, versions; the `Packages` stanzas it left |
-| resolve, both modes | the same requests simulated with `--mode=chrootless` and with `--mode=unshare`, for every variant | the two closures, which must be equal: os and the bash fleet resolved chrootless and built unshare, and a reason once found for preferring unshare was lost (render.md, section 10) |
+| resolve, both modes [M2] | the same requests simulated with `--mode=chrootless` and with `--mode=unshare`, for every variant | the two closures, which must be equal: os and the bash fleet resolved chrootless and built unshare, and a reason once found for preferring unshare was lost (render.md, section 10). With M2's real builds, since unshare needs the subordinate range (6.4) |
 | fetch | `apt-helper download-file` on the local mirror, over loopback HTTP | files by digest; a 404's and a mismatch's exit, lines and leftovers |
 | bootstrap | mmdebstrap as build.md (5.4, 8.3) runs it: as the root of a sandbox's user namespace, `--mode=unshare`, chrooted into a staging layer | the installed set; dpkg's status, stanza by stanza; the tree: paths, kinds, modes, owners as the namespace sees them, attributes, link targets, contents by digest |
 | the same, `--mode=root` | the bootstrap again in root mode | the two trees, to settle build.md's open choice (section 15) |
 | install the extras | the bootstrap with the extras repository | users made; conffiles recorded; setuid bits; version 3 capabilities and their root id; a failing postinst's status and tail |
 | query | `dpkg-query` on the bootstrapped layer, in build.md 5.7's format | stdout, byte for byte |
 | the target's tools | `systemd-sysusers`, `systemd-tmpfiles` and `SYSTEMD_OFFLINE=1 systemctl preset-all`, inside a bootstrapped layer | users and groups made, files made, links made |
-| git | real git on scratch repositories | revisions resolved, listings, blobs |
+| git | real git on scratch repositories | revisions resolved, listings, blobs; hunks of `diff --no-index` on changes whose shortest diff is unique (a line changed, added or removed, lines appended), where any two line diffs agree |
 | host keys | `ssh-keygen` as activator.md (5.7) runs it, into a scratch directory | file names, modes and formats; never the keys |
 | the btrfs rules | the builder's and the tree helper's operations on the real tier's btrfs | each row of 3.3's table, as 5.4 says |
 | env file [M3b] | `grub-editenv` on a scratch file | the file, byte for byte; `set` truncating it and rewriting it in place |
@@ -935,9 +940,12 @@ the model.
 
 ### 5.5 When it runs
 
-`cargo nextest run --profile conformance`, as a regular user, with the
-real tier's prerequisites (6.4) and the mirror; firmware scenarios run
-in the VM tier. It runs when a fake or a recording changes, when a tool
+`cargo nextest run --profile conformance`, as a regular user, with its
+scenarios' prerequisites and the mirror; firmware scenarios run in the
+VM tier. The profile needs what its scenarios need: in M1 (resolve and
+git), git, mmdebstrap and the mirror's indexes, and none of 6.4's; from
+M2, 6.4's too. Without them it refuses to start, naming what is missing
+(6.4). It runs when a fake or a recording changes, when a tool
 moves (a trixie point release, a mirror bump), and before a milestone
 lands. With recording on, it rewrites the recordings (4.5).
 
@@ -966,6 +974,15 @@ real costs of each step.
 - **The extras:** a few test packages built from sources in the
   repository with `dpkg-deb`, as a regular user: a postinst that fails,
   a conffile, a user made by a postinst, a setuid file, a capability.
+- **At M1, indexes only:** a snapshot of forky, `main`, amd64, without
+  the updates and security pockets; the suite's `InRelease` and its
+  `Packages` index, whole and signed, so apt verifies them as it would
+  snapshot.debian.org's and any request resolves. `test-min` and
+  `test-boot` are targets of the test repository (`testing/repos`) with
+  the requests above, and the resolve scenario compares their closures
+  (5.2). The pin's first timestamp is the canonical one
+  snapshot.debian.org gives for the time the pin is made; a bump is a
+  commit.
 - **Fetched once, online,** by a script: indexes only at M1, then the
   closure's .debs through hearth's own fetch step [M2], into a cache
   directory named by the mirror digest, outside the repository, each
@@ -1353,8 +1370,11 @@ development.md, section 10.
 - **Replay:** a seed replays to the same trace, the same fake machine,
   whose state the fake digests itself, and the same digest of hearth's
   own state: a digest over the state types' derived `Hash`, which
-  hearth asks of skein (README.md, 8.1; skein's `lib.md` plans it).
-  Until skein has it, replay compares the trace and the fake's digest.
+  hearth asks of skein (README.md, 8.1; skein's `lib.md`, 5.1). Each
+  process's `state_digest` and the fake machine's are read at the end of
+  a run, and after every iteration when a world asks (skein's
+  `testing.md`, section 5). Until skein has it, replay compares the
+  trace and the fake's digest.
 - **Transition coverage:** `cargo llvm-cov` over both suites lists the
   handlers never reached; each is a missing scenario.
 - **Fuzzing:** each machine and decoder alone; step functions fed
@@ -1423,7 +1443,7 @@ first step:
 
 | Profile | Runs | Needs | Ceiling |
 |---|---|---|---|
-| `conformance` | section 5 | 6.4 and the mirror | 2 minutes |
+| `conformance` | section 5 | its scenarios' (5.5): in M1 git, mmdebstrap and the mirror's indexes; from M2, 6.4's too | 2 minutes |
 | `real` | section 6 | 6.4 and the mirror | 5 minutes |
 | `vm` | section 7 | KVM and Incus | 30 minutes |
 | `measure` | both suites with `-j 1`, timing each test | — | none |
@@ -1466,7 +1486,7 @@ finding, as a failing check is.
 
 | | Tiers added | The fake machine grows | Fakes of tools | Outside the gate |
 |---|---|---|---|---|
-| M1 | step; domain (render, builder); machine (config, template, git, mmdebstrap); protocol (builder and tools); simulated (builder); real loop (render, real git); end to end (render, diff) | files with owners and modes; processes; the universe's index at snapshot timestamps | git; mmdebstrap `--simulate` | conformance: resolve, git; the mirror's indexes |
+| M1 | step; domain (render, builder, with the store's resolutions and cache, store.md, 2.4); machine (config, template, git, mmdebstrap); protocol (builder and tools); simulated (builder); real loop (render, real git); end to end (render, diff) | files with owners and modes; processes; the universe's index at snapshot timestamps | git; mmdebstrap `--simulate` | conformance: resolve, git; the mirror's indexes |
 | M2 | domain (store, build, tree); system (builder and tree helper); machine (dpkg, tree); protocol (tree helper); real loop (tree helper, process groups) | btrfs and its ownership rule; ids, maps of several extents, namespaces, cgroups, sandboxes; `openat2`'s flags; attributes, inodes, ctimes; the full universe, `systemd-container` included; full disks; power cuts on files and subvolumes, and `syncfs` | mmdebstrap's bootstrap; `apt-helper`; dpkg-query; the target's systemd tools and `tar` | conformance: bootstrap in both modes, extras, fetch, query, the target's tools, the btrfs rules; real builds |
 | M3 | domain (steward, converge, slots, boot, disk, activator); system (the steward and the activator join); machine (link, jobs, efi, systemd, keygen, client, proc), each fuzzed; protocol (link, jobs, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client); builders lost at every job, and the bless's render (steward.md, section 8); capture and the bundle (development.md, section 10) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode and its jobs; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; mount namespaces, the new mount API and overlayfs (3.13); out-of-memory kills within a cgroup (3.10); cues; a mutable root changed by hand, apt and dpkg on a running slot | efibootmgr; systemctl at run time, its unit verbs included; systemd-tmpfiles; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools; git's bundles | VM tier on OVMF, live changes included, builders killed for memory and mid-pass, and mutable slots, capture and working trees (7.6); conformance: firmware, host keys, overlays in a user namespace |
 | M3b | machine (grub, incus); domain (dev) | SeaBIOS; msdos and the post-MBR gap; GRUB on FAT, its environment pair, its boot counter, saves that fail, and the slots' fragments; Incus's instances and pool | grub-editenv; grub-install; incus | VM tier on SeaBIOS, and the development loop on a development host (7.6); conformance: env file, GRUB, incus |

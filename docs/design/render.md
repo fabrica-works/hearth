@@ -1,12 +1,12 @@
 # Render
 
-Provisional, 2026-10-09. How hearth turns a revision of an IaC repository
-and a target into a spec: what render reads and how it reads it, its
-pipeline, the spec's parts and their digests, package resolution, the
-rendered diff of a change, its errors, its crates and how it is tested.
-The format it reads is format.md. Milestone M1 builds it, with the
-client's `render` and `diff` (wire.md, section 3). Open questions are in
-section 10.
+Provisional, 2026-10-09, revised 2026-10-16. How hearth turns a revision
+of an IaC repository and a target into a spec: what render reads and how
+it reads it, its pipeline, the spec's parts and their digests, package
+resolution, the rendered diff of a change, its errors, its crates and
+how it is tested. The format it reads is format.md. Milestone M1 builds
+it, with the client's `render` and `diff` (wire.md, section 3). Open
+questions are in section 10.
 
 ## 1. In one page
 
@@ -67,6 +67,8 @@ section 10.
 git --git-dir=<repository> rev-parse --verify --quiet <revision>^{commit}
 git --git-dir=<repository> ls-tree -r -l -z --full-tree <commit>
 git --git-dir=<repository> cat-file --batch
+git diff --no-index --no-color --no-ext-diff --no-textconv --diff-algorithm=myers --unified=3
+    -- <store>/cache/<before> <store>/cache/<after>                              a changed file's hunks (6.1)
 ```
 
 - **The environment is given whole:** `LC_ALL=C`, `GIT_CONFIG_NOSYSTEM=1`,
@@ -85,10 +87,16 @@ git --git-dir=<repository> cat-file --batch
   render writes `<oid>\n` and reads `<oid> <type> <size>\n`, the bytes,
   and `\n`. The header's size must equal the listing's and fit the
   blob's kind (2.3) before render demands the body.
+- **`git diff --no-index` gives hunks,** for the diff alone (6.1): it
+  runs outside any repository, on two cache files, and exits 1 when they
+  differ, as they do when their digests do. Its output is unified: the
+  headers before the first `@@`, which are skipped, then hunks; a file
+  git takes for binary prints one `Binary files … differ` line and no
+  hunk. An exit past 1 is a tool error.
 - **`hearth-protocol-git` builds the vectors and parses the outputs** into
   typed records; the domain sees a listing, decoded documents and
-  templates, and the digests of static files, never git's text (README,
-  section 4.2).
+  templates, the digests of static files and a diff's hunks as lines,
+  never git's text (README, section 4.2).
 
 ### 2.3 Bounds
 
@@ -291,7 +299,9 @@ overwrote silently, in alphabetical order of task.
   declarations and the produced files, sorted as format.md, 4.3 says,
   encoded canonically and digested.
 - **Render also gives the resolution key** (5.1), and the layer keys when
-  the store already holds that key's resolution (4.5).
+  the store already holds that key's resolution (4.5). When it does not,
+  the key is needed, and the layer keys are unknown until it is resolved
+  (5.7).
 - **The live part maps each covered path to its consumers,** from every
   task's `live` entries (format.md, 5.14): the eligibility input that
   only a spec holds. Render decides nothing about a change: the builder
@@ -536,9 +546,10 @@ spec digest        = H("spec", the digests of meta and of every part)
 store.md, section 3 defines the encoding and H. Render relies on it for:
 
 - **one injective encoding of typed records:** integers at fixed width,
-  byte strings and lists with their lengths, booleans and enumerations
-  as tags, optional fields with a presence mark, maps sorted by key
-  bytes, and a record's fields in a fixed order;
+  byte strings and lists with their lengths, booleans as kinds of their
+  own, enumerations as their variants' names, optional fields left out
+  when absent, sets as sorted lists, maps sorted by key bytes, and a
+  record's fields as a map of its field names (store.md, 3.1);
 - **a tag per kind of record,** distinct between part digests and keys,
   with a version, so equal bytes of two kinds never share a digest and a
   change of encoding changes every key;
@@ -592,8 +603,11 @@ and, with both pockets on, `<suite>-updates` from the same archive and
   and need them.
 - **`--verbose`** makes apt print its `Inst` lines; **`--skip=cleanup/apt/lists`**
   keeps the indices apt fetched, which 5.3 reads.
-- **The scratch directory** is new and empty for each run, in the
-  builder's temporary area, and removed after.
+- **The scratch directory** is new and empty for each run,
+  `staging/<resolution key>/` in the store (store.md, 2.1), so that its
+  indices move into the cache by a rename; it is removed after. One
+  resolution runs at a time (5.5), and the store's lock keeps other
+  builders out (store.md, 8.2).
 - **The environment is given whole:** `LC_ALL=C`, a fixed `PATH`, and
   `TMPDIR` the scratch directory.
 
@@ -616,13 +630,16 @@ and, with both pockets on, `<suite>-updates` from the same archive and
 - **The indices are kept.** Debian, and so snapshot.debian.org,
   publishes no uncompressed `Packages` file; `InRelease` lists the
   uncompressed file's size and SHA-256 so that apt can check it after
-  decompressing. apt's lists hold the decompressed, verified files. Before
-  the scratch directory is removed, the protocol layer streams each
-  source line's `InRelease` and each `Packages` file into the store's
-  cache by SHA-256 (store.md, section 2), hashing as the bytes pass, and
-  the record names them by those digests. build.md's local repository
-  serves them at plain paths (build.md, 5.3), so the build reads the
-  indices apt verified, offline.
+  decompressing. apt's lists hold the decompressed, verified files.
+  Before the scratch directory is removed, each source line's
+  `InRelease` and each `Packages` file moves into the store's cache by
+  SHA-256 (store.md, 6.4): the protocol layer hashes each in the pass
+  that reads its stanzas, and the domain then has it renamed to
+  `cache/<sha256>`, with no copy, and recorded (store.md, 6.5). If apt
+  kept them compressed (section 10), each is streamed through the
+  decompressor into the cache instead. The record names them by those
+  digests. build.md's local repository serves them at plain paths
+  (build.md, 5.3), so the build reads the indices apt verified, offline.
 - **The closure** is, per package: name, architecture, version, source,
   archive filename, size and SHA-256, sorted by name, then architecture.
   It is what build.md's fetch step needs to fetch each `.deb` by digest
@@ -635,7 +652,7 @@ and, with both pockets on, `<suite>-updates` from the same archive and
 ```
 resolution record                                                            store.md, 6.4
   key           the resolution key                                           5.1
-  inputs        sources, request, architecture, variant, options, as render gave them
+  inputs        sources, request, variant, apt: the key's values (5.1), as the packages part holds them
   sources       per source line: uri, suite, components;
                   InRelease { sha256 }, in the cache;
                   each Packages index { path in the archive, sha256, size, its InRelease entry }, in the cache
@@ -688,6 +705,24 @@ resolution record                                                            sto
 - **The cache is a record in the store,** not the previous spec's
   `versions.json`, and there is no `--resolved` injection.
 
+### 5.7 When render resolves
+
+- **Render never resolves of its own accord.** It gives the resolution
+  key and asks the store for its record (8.2); a key the store does not
+  hold is needed, and the spec says so (3.8, 9.2). No mmdebstrap runs,
+  and nothing reaches the network.
+- **The client resolves on request.** `hearth render --resolve` and
+  `hearth diff --resolve` (wire.md, 3.1) resolve each needed key, one at
+  a time (5.5), and record each closure before they print: render's
+  targets' keys, and for a diff the keys of the targets whose
+  resolution key changed, on both sides, so that its packages change
+  lists what was added, removed and moved (6.1). A resolution that fails
+  is that target's error (7.2): operational or configuration as 5.5
+  classifies it.
+- **A build resolves what its plan needs** (build.md, 4.1) [M2], and the
+  daemon's builder resolves for its jobs as they need it (steward.md,
+  3.3) [M3].
+
 ## 6. The rendered diff
 
 ### 6.1 Typed
@@ -716,10 +751,14 @@ rebuild
   from packages { resolution: known | needed } | from software | from config | slot only | nothing
 ```
 
-- **A changed file carries its two digests and sizes.** The printer adds
-  hunks from the two contents in the store's cache (wire.md, section 3):
-  line diffs of text files under 1 MiB a side, with three lines of
-  context, at most 200 lines a file. Step code computes no text diff.
+- **A changed file carries its two digests and sizes, and its hunks.**
+  The domain asks for them (8.2) when both sides are under 1 MiB: git
+  computes them from the two contents in the store's cache (2.2), with
+  three lines of context, and `hearth-protocol-git` hands up at most 200
+  lines a file, with the count of those left out, or that the file is
+  binary. Step code computes no text diff. The hunks are part of the
+  typed diff, so its JSON carries them (wire.md, 3.2), and a client that
+  cannot read the daemon's store [M3] receives them with the rest.
 - **Secrets show names and places,** never values, since render has none.
 
 ### 6.2 Targets touched and costs
@@ -833,10 +872,12 @@ tasks/boot/task.json:22:7: carbon-lab: boot: requires modules: no initramfs modu
 
 ```
 hearth-domain-builder            the builder's root: routes between its children
-└── hearth-domain-render         configuration to spec; resolution's decisions; the diff        M1
+├── hearth-domain-render         configuration to spec; resolution's decisions; the diff        M1
+└── hearth-domain-store          M1: resolutions and cache files' records; M2: the rest         M1, M2
 
 hearth-protocol-builder          the builder's protocol layer: routes its machines, translates to render's types
-├── hearth-protocol-git          git's argument vectors; ls-tree and cat-file records             M1
+├── hearth-protocol-git          git's argument vectors; ls-tree, cat-file and diff records       M1
+├── hearth-protocol-tree         M1: the frame, 3.1's decoder, records of kinds 1, 4 and 5        M1, M2
 ├── hearth-protocol-config       strict JSON to typed documents and declarations, with positions  M1
 ├── hearth-protocol-template     template and expression text to instruction sequences            M1
 └── hearth-protocol-mmdebstrap   simulate's argument vector; Inst lines; Packages stanzas; tails  M1
@@ -858,6 +899,12 @@ hearth-protocol-builder          the builder's protocol layer: routes its machin
   answers, or for a local repository (README, 4.1; wire.md, 3.5); in
   the daemon, the builder's root takes the steward's jobs through
   `hearth-protocol-jobs` (steward.md, section 3).
+- **The client prints with `hearth-protocol-client`'s printer** (wire.md,
+  3.2), a machine that writes the spec, the diff and the errors as text
+  and as JSON lines: M1 brings forward that crate's records of render
+  and diff and their printer, and M3 adds the rest. Which crate of the
+  client routes the builder's answers to it is the plan's, within
+  README.md, 4.2's roles.
 
 ### 8.2 What crosses
 
@@ -868,12 +915,16 @@ Read { commit, blobs: (oid, as) }                      Read { oid, a document | 
   as: document | declaration | template | cached       Cached { oid, size, sha256 }: streamed into the cache
 Keep { sha256, bytes }: a rendered file                Kept { sha256 }
 Resolve { key, sources, request, variant, apt }        Resolved { key, closure, indices, versions, cost }
+Hunks { before: sha256, after: sha256 }                Hunks { lines: (kind, text), left out, binary }
 every request                                          Failed { request, class, at, tail }
 ```
 
 - **Resolution records** go through the builder's root to the store and
   back (store.md, section 6): render asks for a key and records a new
-  closure; it never touches a file.
+  closure; it never touches a file. In M1 the store's domain is
+  `hearth-domain-store`'s first part: resolutions and cache files' records
+  alone, over `hearth-protocol-tree`'s frame and its kinds 1, 4 and 5
+  (store.md, 2.4 and 6.1); M2 grows both.
 - **Every request gets one terminal event** (`programming-model.md`,
   5.2), and a resolution's deadline is render's to set.
 
@@ -933,18 +984,25 @@ every request                                          Failed { request, class, 
   ```
   target       x1-prod   base x1   environment prod
   placement    metal efi 7th-gen
-  packages     part 4be1…   resolution key 0c7d…
+  spec         9a0c5e1f2b3d
+  packages     part 4be1c0d2a7f1   resolution 0c7d9e41c0d2 needed
     sources    forky amd64 main contrib non-free-firmware 20261001T030405Z
     request    btrfs-progs ca-certificates dbus efibootmgr firmware-intel-sound …
     variant    apt
     preseed    locales/default_environment_locale select en_US.UTF-8
     initramfs  btrfs nvme
-  config       part e7c2…
-    /etc/hostname            file 0644 root:root 3f1c…
+  config       part e7c2a0d95b13
+    /etc/hostname            file 0644 root:root 3f1c2ab07e44
     tmpfiles   /var/log/journal d 2755 root systemd-journal
-  data         part 51aa…
+  data         part 51aa0c7d9e41
     journal    /var/log/journal
   ```
+
+  Digests and keys are cut to 12 hex digits, as every table of the
+  client's is (wire.md, 3.2); its JSON gives them whole. With the
+  resolution in the store, its line reads `resolution 0c7d9e41c0d2
+  known`, and a last line gives the layer keys: `keys  packages …
+  software … config …`.
 
 - **`HEARTH_BLESS=1` rewrites the expected files and still fails,** so a
   blessed change is always reviewed (os's practice).
@@ -1039,9 +1097,6 @@ Over generated repositories, valid by construction and then mutated:
   targets is shown (README, section 9).
 - **The defaults of 2.3 and the printer's bounds on hunks,** to set from
   the first measurements of the fleet.
-- **Resolution records before the store holds layers** (M1): in the
-  store's record directory alone, or in the client's cache until M2; it
-  depends on store.md, section 6.
 - **Classifying mmdebstrap's failures by pattern,** which recordings of
   real failures will confirm or correct.
 - **Keeping decoded documents across revisions** within one builder's

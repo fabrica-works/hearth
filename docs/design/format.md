@@ -1,10 +1,10 @@
 # The IaC format
 
-Provisional, 2026-10-09. The format of an IaC repository as hearth reads
-it: the repository's files, how targets are made from bases and
-environments, how layers merge, what a task declares and the schema of
-its settings, the template language, exports between targets, and how
-secrets, identity and software are named. It takes os's
+Provisional, 2026-10-09, revised 2026-10-16. The format of an IaC
+repository as hearth reads it: the repository's files, how targets are
+made from bases and environments, how layers merge, what a task declares
+and the schema of its settings, the template language, exports between
+targets, and how secrets, identity and software are named. It takes os's
 `config-format.md` and `task-format.md` further, for agents and digests
 (draft/brainstorm.md, section 7), and is written fresh: there is no
 converter from os's configurations. Milestone M1 builds it, but for
@@ -2026,7 +2026,8 @@ artifacts.md (7.3) cite it.
   postfix task's `queue` check, as `postfix`, needs the postfix task to
   declare `"postfix": {"from": "package"}`.
 - **Until M5, render refuses a task that declares checks,** so nothing in
-  a repository is silently ignored.
+  a repository is silently ignored. A declaration without effect would
+  be ignored silently, which the format never does.
 
 ## 12. What changes from os
 
@@ -2101,8 +2102,6 @@ artifacts.md (7.3) cite it.
   one target with `backup_peer` is an error (8.7).
 - **hearth's fixed uid, 59999,** to verify against the ids the fleet's
   packages and sysusers files take.
-- **Whether a task may declare checks before M5** without effect, rather
-  than be refused.
 - **A static file whose name ends in `.j2`** must be written as a
   template wrapped in `raw`; whether that is enough depends on what
   tasks ship.

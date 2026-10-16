@@ -1,14 +1,15 @@
 # hearth's design
 
-Provisional, 2026-10-09. The design of hearth, the factory's build
-daemon (temper's `factory.md`, section 7): what it makes, how it makes
-it, how a machine runs what it made, and how all of it is tested. It
-takes `draft/brainstorm.md` further and holds where the two differ
-(section 7). The mechanics are those of skein's `programming-model.md`;
-the tests follow `testing-strategy.md`. This document is the overview:
-the reading order, the milestones, the structure, the names, the
-conventions, the decisions taken, what hearth asks of others and what is
-open. Each part has a document of its own beside this one.
+Provisional, 2026-10-09, revised 2026-10-16. The design of hearth, the
+factory's build daemon (temper's `factory.md`, section 7): what it
+makes, how it makes it, how a machine runs what it made, and how all of
+it is tested. It takes `draft/brainstorm.md` further and holds where the
+two differ (section 7). The mechanics are those of skein's
+`programming-model.md`; the tests follow `testing-strategy.md`. This
+document is the overview: the reading order, the milestones, the
+structure, the names, the conventions, the decisions taken, what hearth
+asks of others and what is open. Each part has a document of its own
+beside this one.
 
 ## 1. In one page
 
@@ -128,7 +129,7 @@ every milestone, from the first (testing.md, section 10).
 
 | | Milestone | Gives | Builds |
 |---|---|---|---|
-| M1 | Render | specs with digests; the rendered diff of any change | format.md, but for checks and artifacts; render.md; the client's render and diff |
+| M1 | Render | specs with digests; the rendered diff of any change | format.md, but for checks and artifacts; render.md; the client's render and diff; store.md's encoding and a store without layers (2.4) |
 | M2 | Build | outputs keyed by digest, built unprivileged, layer by layer | store.md, but for peers; build.md; the tree helper |
 | M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, installed from scratch | machine.md's EFI path and bootstrap; slots.md, but for containers; activator.md; steward.md, but for peers and artifacts; wire.md's client and standalone mode; a minimal bless; development.md's mutable machines, capture and working trees |
 | M3b | BIOS; development machines | BIOS machines, which most IaaS providers offer; development machines on Incus | machine.md's BIOS path; slots.md's trial through GRUB; development.md's Incus driver |
@@ -206,7 +207,7 @@ hearth-lib                    the canonical encoding and H (store.md, 3.1 and 3.
 domain                        no_std, skein-lib, hearth-lib and their own children only
 hearth-domain-builder         the builder's root: routes between its children; jobs (steward.md)
 ├── hearth-domain-render      configuration to spec (format.md, render.md)                M1
-├── hearth-domain-store       layers, keys, records, pins, collection (store.md)          M2
+├── hearth-domain-store       layers, keys, records, pins, collection (store.md)          M1, M2
 ├── hearth-domain-build       plans and steps (build.md)                                  M2
 └── hearth-domain-artifacts   the second recipe (artifacts.md)                            M6
 hearth-domain-steward         the steward's root: routes between its children; orders, facts, jobs  M3
@@ -227,7 +228,7 @@ hearth-protocol-template      the template language's parser (format.md, section
 hearth-protocol-git           git's argument vectors and output                           M1
 hearth-protocol-mmdebstrap    mmdebstrap: simulate, bootstrap, progress, failure tails    M1
 hearth-protocol-dpkg          dpkg-query and apt                                          M2
-hearth-protocol-tree          the tree helper's records; the store's records and tree files  M2
+hearth-protocol-tree          the tree helper's records; the store's records and tree files  M1, M2
 hearth-protocol-accounts      passwd, group and shadow lines                              M2
 hearth-protocol-tail          a tool's output tail, kept for a failure                    M2
 hearth-protocol-xattr         file capabilities and POSIX ACLs                            M2
@@ -239,7 +240,7 @@ hearth-protocol-efi           EFI variables from efivarfs; efibootmgr's argument
 hearth-protocol-systemd       systemctl, systemd-run and the journal's queries            M3
 hearth-protocol-proc          /proc/<pid>/mountinfo and cgroup: mounts, overlays, units   M3
 hearth-protocol-keygen        ssh-keygen and the other identity tools                     M3
-hearth-protocol-client        the client's records                                        M3
+hearth-protocol-client        the client's records and their printer                      M1, M3
 hearth-protocol-grub          grub-editenv, GRUB's configuration and env                  M3b
 hearth-protocol-incus         incus's argument vectors and JSON output (development.md, 8.3)  M3b
 hearth-protocol-wire          the wire to an engine, over skein's channel                 M4
@@ -264,6 +265,13 @@ hearth-system-world           the builder's and the tree helper's domains; the s
 hearth-<name>-world           the other worlds, under tests/
 ```
 
+- **Three crates start before their milestone.** M1 builds what render
+  needs of them, and the later milestone grows each: `hearth-domain-store`
+  holds resolutions and cache files' records, over a store without layers
+  (store.md, 2.4); `hearth-protocol-tree` decodes the frame and records of
+  kinds 1, 4 and 5 (store.md, 6.1); `hearth-protocol-client` holds the
+  records of `render` and `diff` and prints them (render.md, 8.1;
+  wire.md, 3.2).
 - **`hearth-lib` is hearth's one crate in the lib role:** the canonical
   encoding and `H` are needed by domains in three processes, which may
   depend only on lib and their own children (`programming-model.md`,

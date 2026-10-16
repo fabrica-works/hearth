@@ -1,11 +1,13 @@
 # The store
 
-Provisional, 2026-10-09. The builder's store on btrfs: its layout, the
-canonical encoding every digest uses, layer keys and tree digests, a
-layer's life, the tree helper, records, pins and collection, how each
-builder reads the store back, the steward's records beside it, what the
-machine must provide, and how peers exchange layers. M2 builds it, but
-for peers (section 10, M6). How a layer's contents are made is build.md.
+Provisional, 2026-10-09, revised 2026-10-16. The builder's store on
+btrfs: its layout, the canonical encoding every digest uses, layer keys
+and tree digests, a layer's life, the tree helper, records, pins and
+collection, how each builder reads the store back, the steward's records
+beside it, what the machine must provide, and how peers exchange layers.
+M2 builds it, but for peers (section 10, M6). M1 builds the encoding and
+`H` (3.1, 3.2), and a store without layers, which holds render's cache
+and resolutions (2.4). How a layer's contents are made is build.md.
 What is open is in section 12.
 
 ## 1. In one page
@@ -66,18 +68,23 @@ What is open is in section 12.
 ├── resolutions/<key>.record       a resolution (6.4)
 ├── cache/<sha256>                 bytes by content: downloads, kept indices, render's blobs; 0644, never modified (2.2)
 ├── cache/<sha256>.record          where they came from (6.5)
+├── cache/<random>.tmp             a file being written, whose digest is known at its end: renamed to <sha256> (6.8)
 ├── targets/<H("target", name)>.record   a target's last builds (6.6)
 ├── state/                         the steward's records and rings (8.3)
 ├── artifacts/                     [M6] artifacts, as layers/ holds layers: <key>, .record, .tree, .staging, .trash
 ├── sources/, caches/              [M6] artifacts' sources and compile caches, as subvolumes (artifacts.md, 3.2, 6.1)
 ├── repo/                          the builder's clone of the IaC repository (render.md, 2.2)
 ├── credentials/                   0700: the builder's own read credential for it (render.md, 2.2)
-└── staging/<key>/                 scratch of a layer being built: fetched files, the local repository, inputs
+└── staging/<key>/                 scratch of a layer being built: fetched files, the local repository, inputs;
+                                   or of a resolution being made, by its resolution key (render.md, 5.2)
 ```
 
 - **Every name beneath the top is a digest,** 64 lowercase hex digits,
   then a suffix for its kind; nothing is named by a target, a path or a
-  time. The top's names are the fixed ones above. A name of no known
+  time. The one exception is a cache file being written, whose digest is
+  known only at its end: it is named by 64 random hex digits, drawn from
+  the builder's generator, and `.tmp`. The top's names are the fixed ones
+  above. A name of no known
   shape is not hearth's: the startup scan reports it and leaves it alone
   (8.2).
 - **Directories are 0700, records and tree files 0600,** all the
@@ -117,6 +124,31 @@ What is open is in section 12.
   `<key>.staging`, published as `<key>` and retired as `<key>.trash`,
   all within `layers/`.
 
+### 2.4 A store without layers
+
+A store whose filesystem is not btrfs, or whose builder has built no
+layer, holds what render keeps: its cache and its resolutions. M1's
+`render` and `diff` use one (wire.md, 3.5), and so may a builder that
+only renders.
+
+- **Any filesystem,** in a directory of the user's own, 0700: btrfs and
+  the subordinate range are prerequisites of layers alone (section 9).
+  `build` refuses a store that is not a btrfs subvolume [M2], naming what
+  is missing (9.1).
+- **What it holds:** `store.record` (6.6), `cache/` with its records
+  (6.5), `resolutions/` (6.4) and `staging/`, whose only scratch is a
+  resolution's (render.md, 5.2). The layout and the records are those of
+  a store with layers, so a builder of M2 reads it as its own.
+- **The lock and the scan hold:** a builder takes 8.2's lock on the
+  store's root, and its startup scan runs steps 1, 2 and 7, settling 4.4's
+  rows for temporaries, staging and cache files. Steps 3 to 6, the
+  subvolumes', are skipped on a filesystem that is not btrfs (`statfs`'s
+  magic), and find none on one that is.
+- **Everything in it can be made again:** a resolution is resolved
+  again, a cache file fetched or rendered again. A store without layers
+  may be deleted whole, and made again as a btrfs subvolume when its user
+  starts to build.
+
 ## 3. Digests and keys
 
 ### 3.1 The canonical encoding
@@ -132,11 +164,33 @@ uint n         03  n as 8 bytes, big-endian
 bytes b        04  the length of b as 8 bytes, big-endian; then b
 digest d       05  the 32 bytes of d
 list [v…]      06  the count as 8 bytes, big-endian; then each v, encoded
-map {k: v…}    07  the count as 8 bytes, big-endian; then, for each entry, k as bytes, then v
+map {k: v…}    07  the count as 8 bytes, big-endian; then, for each entry, k encoded as bytes (04, its length, k), then v
 ```
 
 - **Map keys are byte strings, strictly increasing bytewise;** a
-  duplicate is not a map. A record's field names are map keys.
+  duplicate is not a map. A record's field names are map keys. The order
+  is that of the keys' own bytes, not of their encodings, whose lengths
+  come first.
+- **An optional field is left out when absent.** A record's map holds the
+  fields it has: `gid?` without a gid, `security` with the pocket off, a
+  container's packages part without `initramfs`. A field a later
+  milestone adds (`[M5]`, `[M6]`) is optional, and absent where a record
+  has none of it, so a record that does not use it keeps its digest
+  across the release that adds it.
+- **`none` is a value, not an absence:** it is for a field that is always
+  present and may hold nothing, written `| none` (a layer's `parent`,
+  6.2).
+- **An enumeration is its variant's name,** as `bytes`, in the words the
+  design gives it: `file`, `link` and `directory` in a config part's
+  tree; `enable` and `disable`; `core`, `data` and `cache`; `none` and
+  `generic` for `microcode`, which are names, never the `none` kind. A
+  variant that carries fields is the map of its fields with one more,
+  `kind`, its name. Booleans are `false` and `true`. The tree digest's
+  entries (3.4) keep their kinds as numbers, fixed there.
+- **A set is a list,** without duplicates, in its members' order: text
+  bytewise, a pair by its first member and then its second, unless the
+  part names another order, as a packages part's components do
+  (render.md, 4.2).
 - **Text is its UTF-8 bytes as given,** with no normalisation and no
   terminator.
 - **No signed integers, no floats.** A value that needs one enters as
@@ -193,7 +247,18 @@ H("packages", digest 00…00, digest 01…01)
   = 22d5156ffefadb1f0df4eb2c4d405b2c8937215e044486b06b1725e3506b238d
 H("tree", list [ list [bytes "", 1, 0o755, 0, 0, map {}, none] ])        the empty layer's tree
   = 6022d1fbc6ad38d08d2ae02cefc21e7e6af5a35e6be9d115f0ba267fdb0d005a
+encode(map { "a": uint 1 })                                               a key as bytes
+  = 07 0000000000000001 04 0000000000000001 61 03 0000000000000001
+H("test", map { "adm": map { "gid": uint 4 }, "staff": map {} })          staff's gid absent
+  = 8291ea66351528fd3979b84aec0397019d25dae6f8d8aa9a0318331d2fd164f5
+H("test", map { "kind": bytes "file", "mode": uint 0o644, "owner": bytes "root" })   a variant by name
+  = 72653b9931df15f292b4f5f17e091263cd9fb738b0f2c06cce1cd74242b5b211
 ```
+
+`test` is the vectors' tag alone; no record of hearth's uses it. The
+last three pin 3.1's rules for keys, absent fields and enumerations:
+with the key's `04` left out, the second would be `3f4edef7…`, and with
+`gid: none` for staff, `ab3793df…`.
 
 ### 3.3 Keys
 
@@ -414,8 +479,11 @@ The startup scan (8.2) settles what a crash left:
 | a record with no `<key>` | a publish stopped before its rename | deletes the record and tree file |
 | a record whose uuids are not the subvolume's | the subvolume is not the one recorded | deletes both |
 | `*.tmp`; anything in `staging/` | a write or a step in flight | deletes it |
+| `cache/<sha256>` with no record | a cut between a cache file's rename and its record, or before the file was durable (6.8) | deletes it |
+| `cache/<sha256>.record` with no file | a deletion stopped (7.5) | deletes the record |
 
-An interrupted build is built again when next asked for.
+An interrupted build is built again when next asked for, and a cache
+file deleted so is fetched or rendered again.
 
 - **A layer that no longer matches its record** is found by a check, not
   by the scan, which reads no file: the activator's verification of what
@@ -639,7 +707,7 @@ the builder and its tree helper. Beside them the builder calls
 
 ```
 magic      8 bytes   "hearth\0r"
-kind       u16 BE    1 store, 2 layer, 3 tree, 4 resolution, 5 download, 6 target, 7 state, 8 ring [M5], 9 artifact [M6]
+kind       u16 BE    1 store, 2 layer, 3 tree, 4 resolution, 5 cache file, 6 target, 7 state, 8 ring [M5], 9 artifact [M6]
 version    u16 BE    the kind's format, from 1
 reserved   u32       zero
 length     u64 BE    the body's length, checked against the kind's bound first
@@ -648,6 +716,21 @@ body       a map of named fields (3.1); for a tree file, a sequence of items (6.
 
 `hearth-protocol-tree`'s machines decode records; the domain gets typed
 values.
+
+**Bounds.** Each kind's bound on its body, and the limits within it, are
+configured (`programming-model.md`, section 7), with these defaults:
+
+| Kind | Body | Within it |
+|---|---|---|
+| 1 store | 4 KiB | — |
+| 4 resolution | 4 MiB | 8,192 packages in a closure, 8 source lines, 16 indices a line; a path or a filename of 4,096 bytes; a name, a version or an architecture of 256 |
+| 5 cache file | 8 KiB | a URI or a path of 4,096 bytes |
+
+A body past its bound, or a field past its limit, is a record of a
+version the builder cannot read (6.8). A resolution whose closure would
+pass 8,192 packages is an error of kind resolution (render.md, 7.2),
+never a record. The other kinds' bounds are set with the milestone that
+writes them, M2 for layers, tree files and targets.
 
 ### 6.2 A layer's record
 
@@ -711,8 +794,9 @@ boot             list, per kernel the layer holds; empty for a container:
 the store keeps them. What the packages layer needs from one:
 
 ```
-key        digest   H("resolution", …), over its inputs (render.md, section 5)
-inputs     map      sources, request, architecture, variant, options, as render gave them
+key        digest   H("resolution", sources, request, variant, apt), over its inputs (render.md, 5.1)
+inputs     map      { sources, request, variant, apt }: the key's values, as the packages part holds them
+                      (render.md, 4.2); the architecture is the sources'
 sources    list     per source line: list [ uri, suite, components,
                       indices: list [ path, size, sha256 ] ]      kept in cache/: its InRelease first, then each
                                                                   Packages file, decompressed, at the path and with
@@ -723,6 +807,9 @@ digest     digest   H("closure", list [ list [ name, architecture, version, sha2
 made       map      { at, apt, mmdebstrap, costs }
 ```
 
+- **The key recomputes from `inputs`,** as a layer's from its record
+  (6.2), and the startup scan checks it: a record whose key does not is
+  deleted.
 - **Every byte the packages step installs is named by SHA-256 here:**
   each `.deb` by its `Packages` entry, each `Packages` file by its
   `InRelease` entry, each `InRelease` by the digest it had when apt
@@ -731,8 +818,9 @@ made       map      { at, apt, mmdebstrap, costs }
   uncompressed `Packages` file, so the digest an `InRelease` gives for
   one names nothing a mirror serves. Resolution moves each `InRelease`
   and each decompressed `Packages` file, as apt verified them, from its
-  scratch directory into `cache/<sha256>` before the directory is
-  removed (render.md, section 5). The fetch then gets only `.deb`s
+  scratch directory, `staging/<resolution key>/`, into `cache/<sha256>`
+  before the directory is removed: hashed as it is read for its stanzas,
+  then renamed, with no copy (render.md, 5.3). The fetch then gets only `.deb`s
   (build.md, 5.1), and the local repository serves the kept indices
   (build.md, 5.3).
 - **The digest covers what is installed;** where it came from does not
@@ -740,15 +828,31 @@ made       map      { at, apt, mmdebstrap, costs }
 
 ### 6.5 A cache file's record
 
-`cache/<sha256>.record`: the digest, the size, where it came from (a
-URI it was fetched from, the resolution that kept it, or a render), when,
-and how long it took. It is provenance and cost; whether a file is kept
-depends on who names it (7.5).
+`cache/<sha256>.record`, kind 5, version 1:
+
+```
+sha256     digest   the file's SHA-256: its name
+size       uint     its length in bytes
+origin     map      where it first came from, one of:
+                      { kind: "fetch", uri }                  fetched (build.md, 5.1)
+                      { kind: "index", resolution: digest }   an index a resolution kept (6.4), by its key
+                      { kind: "blob", oid: bytes }            a static file render streamed from git, by its object id
+                      { kind: "rendered", path: bytes }       a file render produced, by its template's path in the revision
+at         uint     when it entered the cache: wall time in ns
+took       uint     how long it took to enter, in ns: the fetch, the stream or the write
+```
+
+It is provenance and cost; whether a file is kept depends on who names
+it (7.5). A file that enters again, from another origin, keeps its first
+record.
 
 ### 6.6 The store, targets and state
 
-- **`store.record`:** the layout's version; the subordinate base, count
-  and builder's uid it was made with; when. A builder configured with
+- **`store.record`,** kind 1, version 1: `layout`, the layout's version,
+  1; `uid`, the builder's; `range`, `{ base, count }`, the subordinate
+  range its layers are owned by; `made`, wall time in ns. A store without
+  layers (2.4) has no `range`; the builder records it, by rename, before
+  its first layer [M2]. Once it is recorded, a builder configured with
   another base refuses to start: every layer on disk is the recorded
   range's.
 - **`targets/<H("target", name)>.record`:** the name and the last N
@@ -772,13 +876,21 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   in place before its record, a record before the publishing rename
   (4.2), an unrecording before the subvolume is touched (7.3). The
   startup scan repairs any prefix (4.4).
+- **A cache file is durable before its record.** It is written to
+  `cache/<random>.tmp` (2.1), hashed as it is written, synced, and
+  renamed to `cache/<sha256>`, in its own directory, so a reader never
+  sees half a file under a digest; then its record is written. Several
+  files may be made durable with one `syncfs` before their records [M2].
+  A file whose name is already present is not written again: its
+  temporary is removed. A cut anywhere leaves a temporary, or a file
+  with no record, which the startup scan deletes (4.4).
 - **Versioned per kind, across releases** (activator.md, 7.2's rule): a
   release reads its own version of each kind and the previous one, and
   writes only versions the previous release can read. After a fall back,
   the blessed slot's older builder and steward read what the newer ones
   wrote.
 - **An unknown version never stops the builder.** A layer, tree file,
-  resolution, download or target record of a version it cannot read is
+  resolution, cache file or target record of a version it cannot read is
   treated as absent: the layer deleted (7.3), the rest made again, which
   costs time and breaks no slot, since slots are copies. A
   `store.record` it cannot read is written again, and every layer it
@@ -904,8 +1016,10 @@ settled before the first job of every pass.
 5. **Each one's identity,** with `BTRFS_IOC_GET_SUBVOL_INFO`: uuid,
    parent uuid, read-only flag, generation.
 6. **Matched against the records:** 4.4's cases, 4.5's uuids, each key
-   recomputed. A subvolume inside a layer (`GET_SUBVOL_ROOTREF` on the
-   layer) is refused, and the layer deleted.
+   recomputed, a resolution's among them (6.4), and each cache file with
+   its record. A subvolume inside a layer (`GET_SUBVOL_ROOTREF` on the
+   layer) is refused, and the layer deleted. A store without layers runs
+   this step for its resolutions and its cache alone (2.4).
 7. **Settled:** deletions done (7.3), strays (any name 2.1 does not
    list) reported, and the index built. `state/` is the steward's, read
    at its own start (8.3).
@@ -952,7 +1066,8 @@ What the steward must keep across restarts and reboots lives in
   machine, mounted at `/var/lib/hearth/store` in every slot (machine.md,
   3.2 and 3.3), or one a developer makes with `btrfs subvolume create`,
   which needs no privilege, and names with `--store` (wire.md, 3.5). The scan lists the store's child subvolumes, so the
-  store must be their parent.
+  store must be their parent. Only layers need it: a store that only
+  renders may be a plain directory (2.4).
 - **Linux 4.18 or later,** for unprivileged `rmdir` of an empty
   subvolume (`/sys/fs/btrfs/features/rmdir_subvol`) and 8.2's ioctls.
   Trixie's 6.12 has them.
