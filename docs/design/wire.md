@@ -109,6 +109,7 @@ a machine                             │
 | `hearth revision set <commit> [--bundle <file>]` | sets the desired revision to a commit; with `--bundle`, imports it first from a git bundle into the builder's clone (4.1; development.md, 6.2) | the steward; the bundle by a builder's fetch job | operators | refused |
 | `hearth revision bundle <file> [--repo <path>] [--since <commit>]` | commits a working tree to an object on no branch and writes it as a git bundle; prints the commit (development.md, 6.1) | in-process | anyone | yes |
 | `hearth revision follow <branch> [--every <d>] [--trial auto\|manual]` | follows a branch, polled every `d` | the steward | operators | refused |
+| `hearth containers [--only <c>… \| --all \| --none]` [M5] | shows, or on a development machine sets, which of its spec's containers the machine runs (4.7) | the steward | anyone to show; operators to set | refused |
 | `hearth prepare [--at <rev>]` | prepares the inactive slot; keyed by target and revision | the steward, then the activator | operators | refused |
 | `hearth trial [--how auto\|live\|full]` | tries the prepared slot: live when eligible, else by a soft or a one-shot reboot (slots.md, 6.1); conditional on the facts read | the steward, then the activator | operators | refused |
 | `hearth rollback` | rolls back to the other slot (slots.md, section 9); conditional on the facts read | the steward, then the activator | operators | refused |
@@ -117,7 +118,7 @@ a machine                             │
 | `hearth retry <target>` | clears the target's refusals, so the pass may try those slots again (4.4) | the steward | operators | refused |
 | `hearth credential <file>` | replaces the builder's read credential for the repository (3.8) | the steward; a builder's job writes it | operators | yes |
 | `hearth bootstrap …` | partitions, formats and makes the first slot from a live system (machine.md, section 8); its arguments are 3.8's | in-process, as root | root | yes, before the daemon exists |
-| `hearth retarget <target> --revision <commit> [--bundle <file>] [--secrets <dir>]` [M3b] | a development machine cloned from a base image takes its target: its first slot built, placed and blessed as bootstrap's are (development.md, 3.2) | in-process, as root | root | refused |
+| `hearth retarget <target> --revision <commit> [--bundle <file>] [--secrets <dir>] [--containers <c>,… \| --no-containers]` [M3b] | a development machine cloned from a base image takes its target: its first slot built, placed and blessed as bootstrap's are, and from M5 its container selection written (development.md, 3.2 and 3.4) | in-process, as root | root | refused |
 | `hearth secrets import <path>…` | imports secrets into the secret store (activator.md, 5.8), then asks the steward to read its facts afresh | in-process, as root | root | refused but at bootstrap |
 | `hearth identity` | the public halves of the machine's identity, to record as data (format.md, section 8) | the steward, from the activator's facts | anyone | yes |
 | `hearth logs [--unit <u>] [--since <d>] [-n <lines>]` | a bounded window of the journal, read locally (section 7); M3 | the steward, in `systemd-journal` | operators | yes |
@@ -125,9 +126,9 @@ a machine                             │
 | `hearth snapshots [--target <t>]` [M5] | each class's snapshots: sequence, age, the buckets that keep it, and from M6 whether the peer holds it (operating.md, 7.1) | the steward, from the activator's facts | anyone | yes |
 | `hearth restore <entry> \| --class <class> --from <seq> [--target <t>]` [M5] | restores one entry's directory, or a whole class, from a snapshot, then reboots (operating.md, 7.4); conditional on the facts read | the steward, then the activator | operators | refused |
 | `hearth artifact <repository> <recipe> [--at <commit>] [--build]` [M6] | resolves a recipe at a commit to its key and prints the pin; with `--build`, builds it (artifacts.md, 5.7 and 7.1) | the steward, by a builder's job; or in-process | anyone; operators to build on the daemon | yes |
-| `hearth dev up <target>… [--count <n>] [--at <rev>] [--repo <path>] [--secrets <dir>]` [M3b] | development machines cloned from the base image, each retargeted to its target (development.md, section 3) | in-process, on the development host, driving `incus` | a user who may use Incus | — |
+| `hearth dev up <target>… [--count <n>] [--containers <c>,… \| --no-containers] [--at <rev>] [--repo <path>] [--secrets <dir>]` [M3b] | development machines cloned from the base image, each retargeted to its target, a machine's never a container's; from M5 each runs the containers placed on it, all or a selection (development.md, section 3) | in-process, on the development host, driving `incus` | a user who may use Incus | — |
 | `hearth dev apply <machine>… [--repo <path>] [--how auto\|live\|full]` [M3b] | the working tree as each machine's desired revision, followed until it converges or falls back (development.md, 6.3) | as `dev up` | as `dev up` | — |
-| `hearth dev shell <machine>`, `hearth dev diff <machine> [--suggest [--out <dir>]]` [M3b] | a root shell in the machine; its capture, the drafts written on the host (development.md, 4.4 and section 5) | as `dev up` | as `dev up` | — |
+| `hearth dev shell <machine> [-c <container>]`, `hearth dev diff <machine> [-c <container>… \| --all] [--suggest [--out <dir>]]` [M3b] | a root shell in the machine, or from M5 in one of its containers; their capture, the drafts written on the host (development.md, 3.4, 4.4 and section 5) | as `dev up` | as `dev up` | — |
 | `hearth dev list`, `hearth dev down <machine>…`, `hearth dev image` [M3b] | the development machines; deleting them; making the base image (development.md, section 3) | as `dev up` | as `dev up` | — |
 
 - **"With an engine"** is the machine's mode, set at bootstrap (3.8)
@@ -414,6 +415,7 @@ hearth bootstrap --disk <device> [--wipe]
     repository   the IaC repository's URL     written at bootstrap (3.8)
     revision     commit 3f1c2ab0…  |  branch main, every 10 min  |  commit c07a11e9…, from a bundle
     trial        auto | manual
+    containers   all  |  mail-dev, chat-dev  |  none    [M5] a development machine's selection (4.7)
     set by       uid 1000, 2 days ago
     generation   7                            bumped at every change
   ```
@@ -724,6 +726,14 @@ be made or run, so its prepare key is refused.
   the same pass, before the host's own target: the steward asks its
   activator to stop it and delete its slots, which unpins their outputs,
   and its data stays, reported as orphaned (slots.md, 12.7).
+- **A development machine may run a selection** of its containers, set
+  by `hearth containers`, by `retarget` or by `hearth dev up`
+  (development.md, 3.4), and refused on a machine that does not accept
+  mutable targets, so the run side's hosts always run their whole spec.
+  The pass converges only the selected containers; one left out is
+  never built, prepared or started, and one that ran is removed as
+  above, its data kept, and reported as left out rather than orphaned.
+  The host's own spec, output and prepare key are unchanged.
 
 ## 5. The wire [M4]
 
@@ -1094,7 +1104,7 @@ Application kinds of skein's channel; each belongs to one direction.
 | `drift` | fact | per slot: clean, or the stable ids of what differs (slots.md, section 10) | activator | M3 |
 | `identity` | fact | per target, public halves: SSH host keys (type, key), the machine-id | activator | M3 |
 | `secrets` | fact | the secret store's generation; declared secrets missing, by name | activator | M3 |
-| `desired` | fact | standalone: revision, trial policy, generation | steward | M3 |
+| `desired` | fact | standalone: revision, trial policy, generation; on a development machine [M5], the containers it runs and those it leaves out (4.7) | steward | M3 |
 | `pass` | fact | standalone: stage; the job in flight; last outcome; refused keys with why; backoff left | steward | M3 |
 | `hold` | fact | standalone: who, reason, age | steward | M3 |
 | `store` | fact | bytes used and free; outputs; layers; pins | builder | M3 |

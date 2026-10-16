@@ -18,10 +18,11 @@ What is open is in section 11.
   (section 3) [M3b]: copy-on-write on a btrfs pool, booted in seconds,
   it takes its target once as bootstrap would, then converges as any
   standalone machine, fetching through the host's apt-cacher-ng.
-- **A container is developed in its host** (3.4) [M5]: `hearth dev up
-  mail-dev`, for a container placed on `rhi-dev`, brings up `rhi-dev`'s
-  VM, whose hearth runs the container as any host does; every `hearth
-  dev` command naming `mail-dev` reaches it through that host.
+- **`hearth dev` names machines, never containers** (3.4) [M5]: a
+  container has no instance of its own. `hearth dev up rhi-dev` brings
+  up the machine with the containers `dev` places on it, all of them or
+  a selection; `shell` and `diff` reach one with `--container`; `apply`
+  sends one revision to the machine and its containers, as they run.
 - **A mutable machine may be changed by hand** (section 4): its
   environment marks the placement `mutable`, so the slot is not sealed
   and its root is read-write. The run side never deploys one; a
@@ -59,19 +60,21 @@ mail stack, which `dev` places as a container on `rhi-dev` as `prod`
 places `mail-prod` on `rhi-prod` (format.md, 3.1):
 
 ```
-hearth dev up mail-dev                       rhi-dev's VM, cloned (3.2), runs mail-dev as its host (3.4): seconds, then the builds
-hearth dev shell mail-dev                    in the container: apt install opendkim; edit /etc/opendkim.conf; systemctl enable opendkim
-hearth dev diff mail-dev --suggest --out d   the capture and its drafts, through the host (section 5): about a second
-                                             the drafts move into tasks/mail, the conf as a template
-hearth dev apply mail-dev                    a packages change (section 6): the container restarted on a new slot; the hand-made changes go
-hearth dev apply mail-dev                    a template tweak with a reload entry: live inside the container, in seconds
-git commit && git push                       a change, its rendered diff, the lab's gate (section 7)
+hearth dev up rhi-dev --containers mail-dev      rhi-dev's VM, cloned (3.2), running mail-dev alone of its containers (3.4)
+hearth dev shell rhi-dev -c mail-dev             in the container: apt install opendkim; edit /etc/opendkim.conf; systemctl enable opendkim
+hearth dev diff rhi-dev -c mail-dev --suggest --out d
+                                                 the capture and its drafts (section 5): about a second
+                                                 the drafts move into tasks/mail, the conf as a template
+hearth dev apply rhi-dev                         a packages change in mail-dev (section 6): the container restarted on a new slot,
+                                                 the hand-made changes gone; rhi-dev's own slot untouched
+hearth dev apply rhi-dev                         a template tweak with a reload entry: live inside the container, in seconds
+git commit && git push                           a change, its rendered diff, the lab's gate (section 7)
 ```
 
-A machine's own target, `rhi-dev` itself, is developed the same way in
-its VM, where a packages change is a soft reboot rather than a
-container's restart. Until M5, a target that runs as a container is
-developed as a machine of its own (3.4).
+`rhi-dev`'s own target is developed with the same commands without
+`-c`, where a packages change is a soft reboot rather than a
+container's restart. Until M5, a target that runs as a container in
+production is developed as a machine of its own (3.4).
 
 ## 3. Development machines [M3b]
 
@@ -95,33 +98,34 @@ developed as a machine of its own (3.4).
 
 ### 3.2 Up
 
-`hearth dev up <target>… [--count <n>] [--at <rev>] [--repo <path>] [--secrets <dir>]`:
+`hearth dev up <target>… [--count <n>] [--containers <c>,… | --no-containers] [--at <rev>] [--repo <path>] [--secrets <dir>]`:
 
 1. **Render each target in-process** from the checkout (wire.md, 3.5),
-   at the working tree's commit (6.1) or at `--at`; a container's
-   target is brought up through its host (3.4), and any other target
-   not placed on an EFI VM is refused before Incus is touched.
+   at the working tree's commit (6.1) or at `--at`. A container's
+   target is refused, naming the machine it runs on (3.4), and a
+   machine's not placed on an EFI VM; both before Incus is touched.
 2. **Copy** `hearth-dev-seed` to `rhi-dev`, a snapshot on the btrfs
    pool, set the instance's keys (8.2), start it, and wait for its agent.
 3. **Push** the commit's bundle (6.2), the secrets, and the hearth
    binary the target's `hearth` task pins (format.md, 5.12), fetched
    once by its digest.
 4. **Retarget:** `incus exec rhi-dev -- <binary> retarget rhi-dev --revision
-   <commit> --bundle <file> --secrets <dir>`; wait for slot `a`, blessed.
+   <commit> --bundle <file> --secrets <dir> [--containers <c>,…]`; wait
+   for slot `a`, blessed, then [M5] for each container it runs.
 
 `hearth retarget` is how a clone takes its target. It is root-only and
 in-process, as bootstrap is (wire.md, 3.6), and refused unless the
 configuration accepts mutable targets (4.3) and the placement has the
-machine record's kind and firmware. It runs bootstrap's steps 5 to 7
-and 9 on the machine's own top level (machine.md, 8.2): import the
-secrets; stop the daemon; build the output as `hearth` unless the store
-holds it; place it into `@rhi-dev.a`, the target's identity made anew;
-give it the first bless (slots.md, section 4); write the target and the
-desired revision; reboot. It writes as the release it places, checked
-as bootstrap checks its own (activator.md, 7.2). The new slot's first
-start deletes the retired seed's slots, entries, ESP files, records and
-identity (activator.md, 7.4). A failed first boot is a VM to throw
-away, as after a bootstrap.
+machine record's kind and firmware. It runs bootstrap's steps 5 to 7 and
+9 on the machine's own top level (machine.md, 8.2): import the secrets;
+stop the daemon; build the output as `hearth` unless the store holds it;
+place it into `@rhi-dev.a`, the target's identity made anew; give it the
+first bless (slots.md, section 4); write the target, the desired
+revision and [M5] the container selection (3.4); reboot. It writes as
+the release it places, checked as bootstrap checks its own
+(activator.md, 7.2). The new slot's first start deletes the retired
+seed's slots, entries, ESP files, records and identity (activator.md,
+7.4). A failed first boot is a VM to throw away, as after a bootstrap.
 
 ### 3.3 Several machines, and down
 
@@ -140,44 +144,66 @@ away, as after a bootstrap.
 - **`hearth dev down <machine>…`** runs `incus delete --force`,
   conditional on the instance's target; `hearth dev list` lists them.
 
-### 3.4 Containers [M5]
+### 3.4 Machines and their containers [M5]
 
-- **A container is developed in its host,** as it runs: placement is
-  the environment's (format.md, 3.4), and `dev` places a container on
-  one of its own hosts, as `prod` does. `hosts/mail/mail-dev.json`:
+- **`hearth dev` names machines only.** An instance is a machine, an
+  Incus VM with slots of its own. A container has none: it runs inside
+  the machine its development environment places it on, as in
+  production. `hosts/mail/mail-dev.json`:
 
   ```json
   { "placement": { "kind": "container", "on": "rhi-dev", "mutable": true } }
   ```
 
   A placement is replaced whole (format.md, 3.4), so it names `mutable`
-  again, which `envs/dev.json`'s VM placement set.
-- **`hearth dev up mail-dev` brings up the host:** it renders
-  `mail-dev`, finds `rhi-dev` in its placement, and brings `rhi-dev` up
-  as 3.2 does, unless an instance of it already runs. The host's hearth
-  builds and starts every container its environment places on it, as
-  any host's does (wire.md, 4.7; slots.md, section 12), and `up` waits
-  until `mail-dev`'s slot is blessed by its host.
-- **Every command naming `mail-dev` goes through its host:** `shell`
-  enters the container (4.4); `diff` captures it through the host's
-  hearth (5.1); `apply` ships the bundle to the host, whose passes
-  converge its own target and its containers', one at a time (wire.md,
-  4.3). A change to `mail-dev` alone prepares a new slot of `mail-dev`
-  only, tried live inside the container when eligible (slots.md, 12.8),
-  otherwise by restarting it on the new slot (slots.md, 12.2): seconds,
-  with the host untouched.
-- **`down` names instances,** so a container goes with its host:
-  `hearth dev down rhi-dev`.
-- **A host runs everything placed on it.** When `rhi-dev` carries more
-  than an agent needs, `dev` may place the container on a small host of
-  its own instead, a base with only the `core` and `hearth` tasks:
-  placement is the environment's, so production does not change.
-- **Before M5,** with no containers anywhere, a target that runs as a
-  container in production is developed as a machine of its own: its
-  `dev` placement a VM, and its base-env file adding what a machine
-  needs and a container lacks, the `hearth` and `boot` tasks, as
-  `mail-lab` runs in the lab until M5 (format.md, 3.1). What that leaves
-  untried, the container's parameters and its host, is the lab's.
+  again, which `envs/dev.json`'s VM placement set. `hearth dev up
+  mail-dev` is refused before Incus is touched: `mail-dev is a container
+  on rhi-dev: hearth dev up rhi-dev`. What counts is the placement in
+  `dev`, so a service `dev` places on a VM of its own is a machine
+  there, as before M5 (the last bullet).
+- **A machine comes up with its containers.** `hearth dev up rhi-dev`
+  brings up its VM (3.2), whose hearth then builds and starts every
+  container `dev` places on it, as any host's does (wire.md, 4.7;
+  slots.md, section 12). `--containers mail-dev,chat-dev` runs those
+  alone, `--no-containers` none. The selection is the machine's own
+  setting, kept by its hearth (wire.md, 4.1 and 4.7) and reported as a
+  fact; the host's spec stays whole, and nothing in any key changes. A
+  second `up` of a running instance sets its selection again; a
+  container it leaves out is stopped and its slots deleted, as a
+  removed container's are (slots.md, 12.7), its data kept for the next
+  time it runs.
+- **One revision for the machine and its containers** (wire.md, 4.7),
+  so `apply` names machines too. `hearth dev apply rhi-dev` ships the
+  working tree; the host's pass converges each container it runs, then
+  its own target; the report has a line per target: unchanged, live,
+  restarted, rebooted or fell back. A commit that changes the host and
+  a container is one apply. One that changes only `mail-dev` prepares a
+  new slot of `mail-dev` alone, tried live inside the container when
+  eligible (slots.md, 12.8), else by restarting it on the new slot
+  (12.2): seconds, with the host's own slot untouched.
+- **`shell` and `diff` take `--container`** (`-c`): `hearth dev shell
+  rhi-dev -c mail-dev` enters the container (4.4), and `hearth dev diff
+  rhi-dev -c mail-dev` captures it through the host's hearth (5.1).
+  Without it they act on the machine's own root. `diff` takes several
+  `-c`, or `--all` for the machine and every container it runs, each
+  captured apart, its drafts under `<dir>/<target>/` (5.2).
+- **Several at once:** several containers of one machine come up
+  together, all or the ones `--containers` names; containers of several
+  machines are those machines named together, `hearth dev up rhi-dev
+  ion-dev`, each machine running the listed containers placed on it; a
+  machine and one of its containers are one instance, developed
+  together as they run. `--count <n>` gives each copy the same
+  selection, each container with its own identity per copy.
+- **`down` and `list` name machines:** a container goes down with its
+  machine, and `list` shows each machine's containers, run or left out,
+  with their states.
+- **A machine of its own before M5,** with no containers anywhere: a
+  target that runs as a container in production is placed on a VM in
+  `dev`, its base-env file adding what a machine needs and a container
+  lacks, the `hearth` and `boot` tasks, as `mail-lab` runs in the lab
+  until M5 (format.md, 3.1). It is then a machine, and `up` takes it.
+  What that leaves untried, the container's parameters and its host, is
+  the lab's.
 
 ## 4. Mutable machines
 
@@ -222,8 +248,9 @@ fstab, so the line is the sealed twin's and the kernel's rule holds
 
 - **`hearth dev shell rhi-dev`** is `incus exec rhi-dev -- bash -l`,
   root, with `http_proxy` naming the host's apt-cacher-ng, so apt
-  fetches through it with nothing written to `/etc`; a container's [M5]
-  is `incus exec rhi-dev -- machinectl shell mail-dev` (3.4). There the
+  fetches through it with nothing written to `/etc`; `hearth dev shell
+  rhi-dev -c mail-dev` [M5] is `incus exec rhi-dev -- machinectl shell
+  mail-dev` (3.4). There the
   agent installs from the slot's own sources, the pinned snapshot's
   (build.md, 5.6), edits `/etc`, fills `/opt`, enables units, adds
   users.
@@ -356,12 +383,13 @@ restart of the container on its new slot, and the host is untouched;
 the kernel and its command line are the host's.
 
 - **`hearth dev apply <machine>… [--repo <path>] [--how auto|live|full]`**
-  makes the commit and its bundle, prints the rendered diff against the
-  revision the machine runs (render.md, section 6), pushes, sets the
-  revision, and follows `hearth status` until the pass converges, is
-  refused or falls back; its exit code is `status --check`'s, and
-  `--how` is `hearth trial`'s (wire.md, 3.1). A trial that falls back
-  refuses its prepare key, as anywhere (wire.md, 4.4).
+  makes the commit and its bundle, prints the rendered diff of the
+  machine's target and each container it runs against the revision the
+  machine runs (render.md, section 6), pushes, sets the revision, and
+  follows `hearth status` until the pass converges, is refused or falls
+  back, with a line per target (3.4); its exit code is `status
+  --check`'s, and `--how` is `hearth trial`'s (wire.md, 3.1). A trial that falls back refuses its prepare key, as
+  anywhere (wire.md, 4.4).
 - **Without the driver** [M3]: `hearth revision bundle`, any copy, and
   `hearth revision set --bundle` on any standalone machine.
 
@@ -413,7 +441,8 @@ the same loop, its engine in the agent's place.
 - **Machines are entities named by handles,** one per instance, in one
   state each: `copying`, `starting`, `retargeting`, `converging`, `ready`,
   `applying`, `deleting` or `failed`; at most 16 a command, each stage
-  under a deadline.
+  under a deadline. Containers are not entities of their own: a
+  machine's report carries them, read from its hearth's facts (3.4).
 - **Keyed effects, no state of its own:** `up` is keyed by the
   instance's name and target, `apply` by the commit, `down` conditional
   on the target, all read back from each instance's `user.hearth.target`,
@@ -468,7 +497,10 @@ backoff), a timeout, a full pool.
   hearth, or hearth's domains on a fake machine of the instance's own.
   Scenarios: `up` of one, of `--count 3`, of a cluster built once; a
   copy that fails half-way; `down` during `up`; one tree applied twice;
-  a bundle without its prerequisite. Invariants: every instance carries
+  a bundle without its prerequisite; [M5] `up` of a container's target,
+  refused with its machine named; a selection set, then changed by a
+  second `up`; one apply that converges a host and one of its
+  containers. Invariants: every instance carries
   its keys; an `up` ends with each machine converged or reported failed;
   an apply ships exactly the working tree's commit, and a second one
   nothing; `down` deletes only what it names.

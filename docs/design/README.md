@@ -413,8 +413,10 @@ that last:
 - **The development loop** (development.md): up, explore, capture,
   encode in IaC, apply from the working tree, land. A development
   machine is an Incus VM cloned from a base image and driven by `hearth
-  dev`, a client outside the daemon [M3b]; a container is developed in
-  its host's VM, as it runs [M5]. An environment may mark its
+  dev`, a client outside the daemon [M3b]. `hearth dev` names machines,
+  never containers: a machine comes up with the containers placed on
+  it, all or a selection, and a container is reached through its
+  machine [M5]. An environment may mark its
   placement `mutable`: slots not sealed, roots read-write, taken only by
   a machine bootstrapped with `--accept-mutable` and never by the run
   side. `hearth diff --running` captures what was done by hand and
