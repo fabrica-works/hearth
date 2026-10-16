@@ -1,0 +1,47 @@
+# Agent guidance for hearth
+
+- **main moves only through skein's `land`,** which runs the gate,
+  `scripts/check.sh`, and pushes to `origin`'s `main`
+  (`docs/development/workflow.md`, section 1). Do not run the gate
+  yourself before `land`. A change to Markdown files only lands with
+  `land --docs`. Run what compiles and the tests of the crates you touch
+  through `heavy` (skein's development.md, section 8.3).
+- The default test suite (unit tests and the worlds' focused tests under
+  `tests/`) takes at most 15 seconds; the fuzzy suite (the worlds'
+  `tests/fuzzy_*.rs`, randomized tests) at most 1 minute. Keep new tests
+  within these budgets: see the same document. Every test runs as a
+  regular user; conformance, real builds and the VM tier are outside the
+  gate (`testing.md`, 2.8).
+- **hearth is the factory's build daemon** (temper's `factory.md`,
+  section 7): it renders, builds and runs a machine's outputs. Read
+  [docs/design/README.md](docs/design/README.md) first: its section 2 is
+  the reading order, its section 3 the milestones.
+  [docs/design/STATUS.md](docs/design/STATUS.md) says how far the code
+  is from the design.
+- **hearth builds on skein alone,** and follows skein's foundation
+  documents: `programming-model.md`, `testing-strategy.md` and
+  `notes.md`. Read them before writing code. Citations use those file
+  names and their sections. hearth depends on no crate of smith, jig or
+  temper.
+- **hearth's design is `docs/design/`.** Inside hearth, a bare file name
+  names one of its documents (`render.md, 8.3`); other projects'
+  documents carry their project's name, never a path (skein's
+  `json.md`, temper's `factory.md`): `README.md`, section 6. Code cites a
+  section at module or type level, never stamped on every field.
+- **Every crate of hearth is step code under the strict subset** of
+  programming-model.md, section 10, except the fakes and the test kits
+  under `testing/`, the worlds under `tests/`, and the binary's shell,
+  which are ordinary Rust. The root `Cargo.toml` and `clippy.toml` hold
+  the step crates' lints; a crate of ordinary Rust declares its own.
+- **Step code depends on skein's crates and hearth's own, and nothing
+  else:** no serde, and no template engine; hearth parses its own
+  templates (`render.md`, 8.3). MiniJinja 2 is a dev-dependency only,
+  pinned to an exact version, as the template world's oracle
+  (`render.md`, 9.5).
+- **skein is named by its GitHub URL,**
+  `{ git = "https://github.com/forgetic/skein.git" }`, in the root
+  `Cargo.toml`'s `[workspace.dependencies]`, with no `rev`, `branch` or
+  `tag`: `Cargo.lock` pins it (skein's development.md, sections 5.7 and
+  9.5).
+- **Work on a branch in a worktree of your own,** never in the primary
+  checkout. `land` is the only push; do not push or publish otherwise.

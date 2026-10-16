@@ -1,0 +1,37 @@
+# The two test suites (docs/development/workflow.md, section 2): the focused
+# one, every test but the fuzzy ones, within 15 seconds; and the fuzzy one, the
+# test binaries named fuzzy_* beside each world's focused tests, within 1
+# minute. A suite past its budget fails, naming the tests it stopped; a test
+# past its slow period is flagged SLOW as it runs. The profiles outside the
+# gate (testing.md, 9.2) come with their tiers, and their binaries join these
+# filters' exclusions.
+#
+# nextest refuses a filter that names a binary no crate has, so until the
+# first world's fuzzy test lands the fuzzy profile selects none(), and the
+# default profile everything. The landing that adds that test gives both
+# profiles their filters, the two lines marked below; scripts/check.sh fails
+# it otherwise (workflow.md, section 1).
+
+[profile.default]
+# With the first fuzzy test: default-filter = "not binary(/^fuzzy_/)"
+global-timeout = "15s"
+slow-timeout = { period = "500ms" }
+
+# The worlds' tests first, the longest, then the many short unit tests behind
+# them, so that the run ends close to its total over the threads.
+[[profile.default.overrides]]
+filter = "kind(test)"
+priority = 10
+
+[profile.fuzzy]
+# With the first fuzzy test: default-filter = "binary(/^fuzzy_/)"
+default-filter = "none()"
+global-timeout = "60s"
+slow-timeout = { period = "5s" }
+
+# Measuring, not gating: no budget. With -j 1, each test's own time:
+#   cargo nextest run --workspace --profile measure -j 1
+#   cargo nextest run --workspace --profile measure -j 1 --ignore-default-filter -E 'binary(/^fuzzy_/)'
+[profile.measure]
+global-timeout = "1h"
+slow-timeout = { period = "60s" }

@@ -273,7 +273,9 @@ hearth-<name>-world           the other worlds, under tests/
   (`programming-model.md`, 4.5).
 - **Every format is its own machine crate,** lib-only and fuzzed alone;
   a process's protocol layer only routes between its machines
-  (`programming-model.md`, section 4; activator.md, 8.1).
+  (`programming-model.md`, section 4; activator.md, 8.1). JSON's machine
+  is skein's tokenizer, which `hearth-protocol-config` composes
+  (render.md, 8.1).
 - **The activator's domain never depends on the steward's, nor the
   steward's on the builder's.** The link's records are the only
   vocabulary the first two share, through `hearth-protocol-link`; the
@@ -644,7 +646,7 @@ user (`testing-strategy.md`, section 9). From the earliest:
 | Need | For | Milestone |
 |---|---|---|
 | a public, streaming SHA-256 in lib, usable by the domain | digests | M1 |
-| JSON: skipping a value; refusing duplicate keys | strict configuration | M1 |
+| JSON: each of the tokenizer's tokens and errors with its position in the document, its byte offset, line and column (the column in bytes, both from 1). `hearth-protocol-config` reads every document through skein-json's tokenizer, and refuses duplicate keys itself, at every depth, as it decodes each object's keys | strict configuration (format.md, 2.2); the file, line and column of every render error (render.md, 3.1 and section 7; format.md, 6.5) | M1 |
 | a full stat by name, without following links; readlink; extended attributes | the tree helper's walk | M2 |
 | writing a tree's metadata: symlink, link, chmod, chown, utimes, mkdir, truncate | change sets; the shift | M2 |
 | spawning as another user, with supplementary groups; signalling a process group | the steward under the activator, the builder under the steward; stopping a tool | M2 |

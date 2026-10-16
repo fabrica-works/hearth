@@ -170,7 +170,8 @@ and step 4 reads other targets of the same environment.
   each before it goes up:
   - JSON through skein's tokenizer into `hearth-protocol-config`, which
     refuses duplicate keys, non-integer numbers and U+0000, drops
-    `_note`, and gives typed values, each with its line and column;
+    `_note`, and gives typed values, each with its line and column, from
+    the position the tokenizer gives each token (README, 8.1);
   - a declaration into its fixed shape (format.md, 5.1), its `if` and
     `for_each` fields and its interpolated strings passed through
     `hearth-protocol-template`;
@@ -845,10 +846,12 @@ hearth-protocol-builder          the builder's protocol layer: routes its machin
   documents; composition and RFC 7386; validation; evaluation; exports;
   collisions; parts and digests; resolution's keys, records and closures;
   the diff. It depends on lib and nothing else.
-- **The machines depend on lib only** (`programming-model.md`, 4).
-  `hearth-protocol-config` cannot call the template machine, so it hands
-  up a declaration's expression strings as text with their positions,
-  and `hearth-protocol-builder` passes each through
+- **The machines depend on lib only** (`programming-model.md`, 4), but
+  for `hearth-protocol-config`, which composes skein's JSON tokenizer and
+  depends on `skein-json` too, as skein's `skein-llm` does (skein's
+  `llm.md`). `hearth-protocol-config` cannot call the template machine,
+  so it hands up a declaration's expression strings as text with their
+  positions, and `hearth-protocol-builder` passes each through
   `hearth-protocol-template` before translating the whole declaration
   into render's types.
 - **The client runs the same domain in-process** when no daemon
