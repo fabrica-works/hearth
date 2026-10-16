@@ -248,7 +248,7 @@ The postfix task, its checks and the user its command check runs as:
   `mail-prod`'s public probe changes `mail-prod`'s and its probers'
   `checks` parts, and nothing else.
 - **The prober's hearth reports the result** as its own fact, naming the
-  probed target: `mail-prod/postfix.smtp-public` run by `rhi-prod`. The
+  probed target: `mail-prod/postfix.smtp-public` run by `ion-prod`. The
   engine pairs it with the probed machine; neither hearth needs the
   other.
 - **Within one environment.** A lab target never probes production, and

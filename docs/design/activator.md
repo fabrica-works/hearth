@@ -32,7 +32,7 @@ open is in section 10.
   must equal the record's.
 - **It carries live changes itself** (5.17 to 5.19): it builds a
   verified delta of a prepared slot, mounts it over the running slot's
-  `/etc`, `/usr` and `/opt` with the new mount API, acts on the units
+  `/etc`, `/usr/local` and `/opt` with the new mount API, acts on the units
   the steward's plan names, and falls back without a reboot, or with
   `reboot -ff` when a step of the fall back fails.
 - **Secrets never cross the link.** They enter the secret store from a
@@ -147,7 +147,7 @@ changes nothing.
   pool host its faults' rules (5.15).
 - **The running slot:** nothing, since it is sealed; it changes systemd's
   state through `systemctl`, and, for a live change, mounts read-only
-  overlays over its `/etc`, `/usr` and `/opt` (slots.md, 6.8), which
+  overlays over its `/etc`, `/usr/local` and `/opt` (slots.md, 6.8), which
   write nothing either.
 
 ### 2.5 What the steward and its builder never get
@@ -192,13 +192,13 @@ from the `hearth` task (format.md, 5.12); a container's activator is its
 host's [M5]:
 
 ```
-# /usr/lib/systemd/system/hearth-activator.service
+# /etc/systemd/system/hearth-activator.service
 [Unit]
 Description=hearth's activator
 RequiresMountsFor=/var/lib/hearth/state /var/lib/hearth/store
 
 [Service]
-ExecStart=/usr/bin/hearth activator
+ExecStart=/usr/local/bin/hearth activator
 Restart=always
 RestartSec=1s
 KillMode=control-group
@@ -230,7 +230,7 @@ WantedBy=multi-user.target
 
 | | |
 |---|---|
-| program | `/proc/self/exe`, argument `steward`: the activator's own binary, wherever it lives (on a live system, not in `/usr/bin`) |
+| program | `/proc/self/exe`, argument `steward`: the activator's own binary, wherever it lives (on a live system, not in `/usr/local/bin`) |
 | cgroup | `steward/` (3.1), through skein's contained process trees (README, 8.1) |
 | user | `hearth`'s fixed uid and gid (format.md, 5.12; store.md, 9.2), and its supplementary groups as the running slot's `/etc/group` lists them, in practice `systemd-journal`, so the steward reads the journal for telemetry (wire.md, section 7); no capabilities. An ask of skein: spawning as another user (README, 8.1) |
 | environment | given whole: `LANG=C.UTF-8`, and the store's path |
@@ -1123,7 +1123,7 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 | `/usr/bin/mount`, `/usr/bin/umount` | the top level, the boot partition, `/run/nextroot` | `hearth-protocol-activator` | success, or exit and tail |
 | `/usr/bin/systemctl` | `soft-reboot`, `reboot`, `is-system-running`, `list-units --state=failed`, `show`, `stop`; for a live trial, `start` and `stop` of the base's dead-man, `daemon-reload`, `reload`, `restart`, `reload-or-restart`, `start` and `stop` of the plan's units (slots.md, 6.8); `restart` [M5]; for a container [M5], `start`, `restart` and `is-active` of `systemd-nspawn@<container>.service`, and `is-system-running` and `list-units` with `--machine=<container>`; `--machine=<container> kill` [M6] | `hearth-protocol-systemd` | a state, a count, an id, a list of units |
 | `/usr/bin/systemd-run` | the hold's timer [M4]; checks as transient units, `--machine=<container>` for a container's [M5] | `hearth-protocol-systemd` | the unit's exit status and `Result`, nothing of its output |
-| `/usr/bin/systemd-tmpfiles` | `--create /usr/lib/tmpfiles.d/hearth.conf` in a live trial (slots.md, 6.8) | `hearth-protocol-activator` | success, or exit and tail |
+| `/usr/bin/systemd-tmpfiles` | `--create /etc/tmpfiles.d/hearth.conf` in a live trial (slots.md, 6.8) | `hearth-protocol-activator` | success, or exit and tail |
 | `/usr/sbin/nscd` | `--invalidate passwd` and `group`, in a live trial, when nscd runs | `hearth-protocol-activator` | success, or exit and tail |
 | `/usr/bin/ssh-keygen` | identity's host keys | `hearth-protocol-keygen` | success; the keys as files |
 | `/usr/sbin/wipefs`, `/usr/sbin/parted`, `/usr/sbin/partprobe`, `/usr/bin/udevadm`, `/usr/sbin/mkfs.vfat`, `/usr/sbin/mkfs.btrfs`, `/usr/sbin/useradd`, `/usr/sbin/usermod` | bootstrap; disks as an effect [M6] | `hearth-protocol-activator` | success, or exit and tail |
@@ -1207,7 +1207,7 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
   measured cost and on how the lab's builders differ from production's
   (README, section 9).
 - **Placing only known hearth binaries:** whether the activator should
-  refuse an output whose `/usr/bin/hearth` has a digest it does not
+  refuse an output whose `/usr/local/bin/hearth` has a digest it does not
   already hold (its own, or one a person or the engine vouched for),
   since that binary is root at the next trial (2.6); depends on how
   hearth releases are vetted and distributed.

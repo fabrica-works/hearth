@@ -20,8 +20,8 @@ is activator.md's. What is open is in section 15.
 - **Four facts, kept apart:** the slot running (the root subvolume's
   identity, never `/proc/cmdline`), the default (what the firmware or
   GRUB boots), the slot on trial (the activator's marker), and the live
-  state (hearth's overlays on `/etc`, `/usr` and `/opt`, read from the
-  mount table).
+  state (hearth's overlays on `/etc`, `/usr/local` and `/opt`, read from
+  the mount table).
 - **One state machine per slot,** written as a total table: empty,
   preparing, prepared, trying, on trial, on live trial, live-blessed,
   blessed, fell back. Its invariant: **the default always boots a
@@ -37,7 +37,7 @@ is activator.md's. What is open is in section 15.
   one-shot reboot, `BootNext` or GRUB's `next_entry`. The default does
   not move.
 - **Configuration and in-house software change live, with no reboot**
-  (6.6 to 6.9). When a change touches only `/etc`, `/usr` and `/opt`
+  (6.6 to 6.9). When a change touches only `/etc`, `/usr/local` and `/opt`
   over the same packages, and every changed path has a declared
   consumer, the activator builds a delta of the new slot, mounts it over
   the running slot's hierarchies with an atomic swap, and reloads,
@@ -164,13 +164,13 @@ live record    live/<target>
   previous           the delta it replaced, kept until the next live bless (6.9); or none
   carries            the output key and prepare key the delta was built from, and the slot that
                      holds them, while one does
-  hierarchies        which of /etc, /usr and /opt it overlays
+  hierarchies        which of /etc, /usr/local and /opt it overlays
   swapped at         wall clock; the boot id and soft reboot count at the swap
 ```
 
 - **The manifest beside it,** `live/<target>.manifest`, is the merged
   view's expected entries, made at L2 (6.8): the base's manifest under
-  `etc/`, `usr/` and `opt/`, with the change's paths replaced or
+  `etc/`, `usr/local/` and `opt/`, with the change's paths replaced or
   removed. Drift compares the live view against it (section 10), and it
   survives the slot being prepared over (6.9).
 - **Written at every swap** (6.8, L5) and every swap back (8.5);
@@ -188,11 +188,11 @@ live record    live/<target>
 | **running** | `BTRFS_IOC_GET_SUBVOL_INFO` on `/`: the root subvolume's uuid, matched with the slot records; cross-checked with `/.hearth/slot` | never; `none` on a live system or a root hearth did not prepare |
 | **default** | EFI: the first of the target's entries in `BootOrder`; BIOS: `default` in the valid environment file (machine.md, 4.4 and 5.6) | a firmware that reorders or forgets entries: reported, and put right at start |
 | **trial** | the trial marker in `@hearth.state` (6.4) | never: it is the activator's own record |
-| **live** | `/proc/self/mountinfo`: an overlay on `/etc`, `/usr` or `/opt` with source `hearth-live`, whose layers are a delta `@<target>.live.<n>` over the running slot's directory; checked against the live record (2.4) and the marker | after a person's soft reboot, which keeps the overlays on `/etc` and `/usr` and drops `/opt`'s (to verify): the disagreement is found at start, and ends in a full reboot (section 11) |
+| **live** | `/proc/self/mountinfo`: an overlay on `/etc`, `/usr/local` or `/opt` with source `hearth-live`, whose layers are a delta `@<target>.live.<n>` over the running slot's directory; checked against the live record (2.4) and the marker | after a person's soft reboot, which keeps the overlay on `/etc` and drops `/usr/local`'s and `/opt`'s (to verify): the disagreement is found at start, and ends in a full reboot (section 11) |
 
 - **Running stays the root subvolume.** A live state changes what
-  `/etc`, `/usr` and `/opt` show, never which subvolume `/` is: prepare,
-  the guards and `slot.root.*` still name the base.
+  `/etc`, `/usr/local` and `/opt` show, never which subvolume `/` is:
+  prepare, the guards and `slot.root.*` still name the base.
 - **What runs, derived:** the prepare key the machine's files come from,
   the live record's while a verified live state is in place, else the
   running slot's; and the effective slot, the slot that holds it, if
@@ -804,13 +804,13 @@ stays the root: no reboot and no soft reboot. With `x1-prod` running
   live trial reads it; nothing runs from it.
 - **The delta, `@x1-prod.live.<n>`,** a read-only subvolume at the top
   level, holds only what differs between `a` and `b` under `etc/`,
-  `usr/` and `opt/`: reflink clones of `b`'s changed and added files,
+  `usr/local/` and `opt/`: reflink clones of `b`'s changed and added files,
   with `b`'s owners, modes, extended attributes and capabilities, and an
   overlayfs whiteout, a 0/0 character device, at each deleted path. `n`
   only grows, from the live record (2.4).
 - **The overlays:** one read-only overlayfs per hierarchy the delta
   changes, the delta over the base's directory, which the activator
-  mounts on `/etc`, `/usr` and `/opt` itself. A process that opens a
+  mounts on `/etc`, `/usr/local` and `/opt` itself. A process that opens a
   path afterwards gets `b`'s file; one already open stays `a`'s, and
   nothing on disk changes, so there is no `ETXTBSY` and no torn file.
 - **The units** that read the changed files are stopped, reloaded,
@@ -860,16 +860,16 @@ why (wire.md, section 6).
 |---|---|---|---|
 | 1 | **The same packages layer:** both outputs have one packages key | packages, the kernel, its modules, the initramfs's inputs, systemd, dbus and libc stay; a packages change is never live | builder; activator, from the layer records' parents (activator.md, 6.1) |
 | 2 | **The prepare key equal but for the output,** the window and the units allowed to fail: the same `data`, `secrets` and `boot` digests, the same identity and secret store generations | a new data entry, a class changed or a policy changed alters the `data` part: a new bind changes fstab and the class's directory must be made and seeded at prepare; a new command line changes the boot; a rotated secret is not in the output's diff | both, from the slot records |
-| 3 | **Changes only under `etc/`, `usr/` and `opt/`,** none under `usr/lib/modules/` | `/var` content reaches a slot only at prepare; `/boot` and the modules are packages anyway | both |
+| 3 | **Changes only under `etc/`, `usr/local/` and `opt/`** | `/var` content reaches a slot only at prepare; `/boot` and the rest of `/usr` are the packages', which rule 1 keeps and the build refuses above them (build.md, 9.3) | both |
 | 4 | **No boot-time or PID 1 configuration** (format.md, 5.14) | read only at boot or at PID 1's re-exec; applied live it is not what a boot does (a removed sysctl is not reverted), so the trial would test the wrong thing | both |
 | 5 | **Users and groups only added:** no line of `passwd`, `group`, `shadow`, `gshadow`, `subuid` or `subgid` removed, no id changed | a renumbering touches files in `/var` and data; a removal strands running processes | builder; activator, with its account parsers (activator.md, 2.3) |
-| 6 | **tmpfiles only creatable:** the changed lines of `usr/lib/tmpfiles.d/hearth.conf` are of types `systemd-tmpfiles --create` applies whole; none is `r`, `R` or `D` | the output's `/var` got them at build; the running `/var` needs them now, and nothing removes live | builder |
+| 6 | **tmpfiles only creatable:** the changed lines of `etc/tmpfiles.d/hearth.conf` are of types `systemd-tmpfiles --create` applies whole; none is `r`, `R` or `D` | the output's `/var` got them at build; the running `/var` needs them now, and nothing removes live | builder |
 | 7 | **Every changed path has a consumer:** a task's `live` entry, or one hearth knows (format.md, 5.14); a deleted path's from the running slot's spec, every other path's from the new one | hearth must know what to reload or restart; guessing from paths is how this fails | builder |
 | 8 | **Nothing never-live** (format.md, 5.14): systemd's own units and configuration, dbus (its policy files are allowed, with a reload of dbus), logind, journald, udevd, networkd, NetworkManager, the gettys, AppArmor, and hearth itself for now | restarting them live is risky or wrong | builder; activator, for the plan's units |
-| 9 | **No file dpkg owns** under `usr/` or `opt/` changed by the software layer, by the packages layer's dpkg database; conffiles in `etc/` are fine | a download over a packaged file is a packages change in disguise | builder |
+| 9 | **No file dpkg owns** under `usr/local/` or `opt/` changed by the software layer, by the packages layer's dpkg database; conffiles in `etc/` are fine | a download over a packaged file is a packages change in disguise | builder |
 | 10 | **The machine fits:** Linux 6.8 or later (`MOVE_MOUNT_BENEATH` since 6.5, overlayfs's `lowerdir+` since 6.8; trixie runs 6.12); `etc`, `usr` and `opt` are directories in the base; no mount on or beneath them but hearth's; running = default = blessed; no trial; at most one live state, whose base is the running slot; [M5] the new slot's window no longer than the base's | the swap's mechanisms; a base proven by a native boot; the base's dead-man ends the trial | activator |
-| 11 | **Sandboxes beneath the hierarchies:** units whose mount namespace has a mount beneath `/etc`, `/usr` or `/opt` join the restarts, and if one is never-live the change is not eligible | the overlay, propagated into the unit's namespace, shadows that mount until the unit restarts | activator, as root, from `/proc/<pid>/mountinfo` of every process and its cgroup |
-| 12 | **An unexplored base, on a mutable machine:** a metadata walk of the base's `etc/`, `usr/` and `opt/` matches its manifest (development.md, 4.4) | what was changed by hand beneath the overlay would stay visible and fail L2; a soft reboot discards it instead | activator |
+| 11 | **Sandboxes beneath the hierarchies:** units whose mount namespace has a mount beneath `/etc`, `/usr/local` or `/opt` join the restarts, and if one is never-live the change is not eligible | the overlay, propagated into the unit's namespace, shadows that mount until the unit restarts | activator, as root, from `/proc/<pid>/mountinfo` of every process and its cgroup |
+| 12 | **An unexplored base, on a mutable machine:** a metadata walk of the base's `etc/`, `usr/local/` and `opt/` matches its manifest (development.md, 4.4) | what was changed by hand beneath the overlay would stay visible and fail L2; a soft reboot discards it instead | activator |
 
 - **What the steward sends:** `try live`, with the digest of the change
   from the base's output to the new one, which the delta will hold, and
@@ -897,9 +897,9 @@ Every step that leaves the state starts by writing the journal
 | **L1. Build the delta** | make `@x1-prod.live.<n>` and fill it from the change (below) | none |
 | **L2. Verify, then seal** | walk the merged view in no mount namespace anyone sees (below); then `BTRFS_SUBVOL_RDONLY` on the delta | none |
 | **L3. Arm** | write the marker: kind `live`, phase `arming`, base `a`, the delta, the previous one, the boot id and soft reboot count. Write `/run/hearth-trial/x1-prod.a`, then `systemctl start hearth-trial.timer`: `a`'s own dead-man (5.5), whose condition the file meets and whose `OnActiveSec=` counts from now; check it is active | `armed`; `b` is `on live trial` |
-| **L4. Stop** | `systemctl stop`, one call: the units being removed or disabled, and each `restart` unit with a changed path under `usr/` or `opt/`; every job's result checked | `armed` |
-| **L5. Swap** | for `/etc`, then `/usr`, then `/opt`: the overlay built and moved beneath the current top (below); the mount table read back; the live record written | `swapped` |
-| **L6. Act** | `systemctl daemon-reload` if a unit file, drop-in or `.wants` link changed; `systemd-tmpfiles --create /usr/lib/tmpfiles.d/hearth.conf` if it changed; `systemctl reload dbus` if D-Bus policy changed; `nscd --invalidate` for `passwd` and `group` if nscd runs and the accounts changed. Then the declared reloads, restarts and starts as one batch (below), every job checked. Then answer the request and spawn the steward anew (activator.md, 3.3), so the live bless comes from a steward started in the new files, whose builder renders the slot's revision (steward.md, section 6) | `running` |
+| **L4. Stop** | `systemctl stop`, one call: the units being removed or disabled, and each `restart` unit with a changed path under `usr/local/` or `opt/`; every job's result checked | `armed` |
+| **L5. Swap** | for `/etc`, then `/usr/local`, then `/opt`: the overlay built and moved beneath the current top (below); the mount table read back; the live record written | `swapped` |
+| **L6. Act** | `systemctl daemon-reload` if a unit file, drop-in or `.wants` link changed; `systemd-tmpfiles --create /etc/tmpfiles.d/hearth.conf` if it changed; `systemctl reload dbus` if D-Bus policy changed; `nscd --invalidate` for `passwd` and `group` if nscd runs and the accounts changed. Then the declared reloads, restarts and starts as one batch (below), every job checked. Then answer the request and spawn the steward anew (activator.md, 3.3), so the live bless comes from a steward started in the new files, whose builder renders the slot's revision (steward.md, section 6) | `running` |
 | **L7. Settle** | 60 seconds to start, within the base's window: every unit L4 to L6 touched stays `active` with the `InvocationID` and `NRestarts` L6 read; the minimal criterion holds (7.1); from M5, the blessing checks pass (operating.md, section 3) | `running` |
 | **L8. Live bless** | asked by the steward: 7.6. The default does not move | `live-blessed`; `b` is `live-blessed` |
 | **L9. The native boot** | the next boot consumes the one-shot and boots `b`'s trial entry: `b` runs on trial (6.3), its dead-man armed by `hearth.trial=`; its activator sets the marker `running`; its steward blesses it (7.3), the default moves to `b`, and the delta is deleted | the marker removed by the bless |
@@ -926,26 +926,27 @@ prepare resolves them (section 5), the delta's beneath the delta's:
   bits and capabilities as the shift left them; the overlay presents
   them unchanged.
 
-**L2, the merged view.** The three overlays are built exactly as L5
-will build them, with `fsopen` and `fsmount`, and never attached: a
-detached mount is in an anonymous mount namespace no process sees, and
-the activator walks it through its descriptor (activator.md, 6.5). The
-walk must give the expected manifest: `a`'s manifest under `etc/`,
-`usr/` and `opt/`, with each path of the change replaced by `b`'s entry
-or removed. It compares type, mode, owners, size, extended attributes
-and link targets for every entry, and contents for the delta's files;
-not inode numbers or change times, which an overlay reports from its
-layers or itself. Any difference fails the trial, and the delta is
-deleted. The expected manifest becomes the live record's (2.4). It is
-store.md, 3.5's rule for a change set, kept for a delta: applied and
-walked, it must give the child's tree. Then the delta is sealed: nothing
-writes a layer once it is merged, which overlayfs calls undefined.
+**L2, the merged view.** The three overlays are built exactly as L5 will
+build them, with `fsopen` and `fsmount`, and never attached: a detached
+mount is in an anonymous mount namespace no process sees, and the
+activator walks it through its descriptor (activator.md, 6.5). The walk
+must give the expected manifest: `a`'s manifest under `etc/`,
+`usr/local/` and `opt/`, with each path of the change replaced by `b`'s
+entry or removed. It compares type, mode, owners, size, extended
+attributes and link targets for every entry, and contents for the
+delta's files; not inode numbers or change times, which an overlay
+reports from its layers or itself. Any difference fails the trial, and
+the delta is deleted. The expected manifest becomes the live record's
+(2.4). It is store.md, 3.5's rule for a change set, kept for a delta:
+applied and walked, it must give the child's tree. Then the delta is
+sealed: nothing writes a layer once it is merged, which overlayfs calls
+undefined.
 
 **L4 and L6, the units.** Each changed path's consumers
 (format.md, 5.14) decide:
 
 - **Before the swap** stop what must not straddle it: a `restart` unit
-  whose binary, library or tree under `usr/` or `opt/` changes, so it
+  whose binary, library or tree under `usr/local/` or `opt/` changes, so it
   never runs new code with old files or the reverse (NixOS stops changed
   units first for the same reason), and a unit whose file is removed or
   whose `.wants` link goes, since `ExecStop=` may name a file the delta
@@ -985,11 +986,13 @@ otherwise:                 move_mount(mnt, "", AT_FDCWD, "/etc", MOVE_MOUNT_F_EM
   opening a file in a tight loop. A `move_mount` that fails leaves the
   old top in place, so a failed hierarchy changes nothing.
 - **Exec is allowed** on all three; `nosuid` is set on `/etc` only,
-  since `/usr` holds setuid programs.
+  until setuid files above the packages are settled (build.md,
+  section 15): if they are refused, `/usr/local` and `/opt` take it
+  too.
 - **A hierarchy the new delta does not change** loses a previous overlay
   by `umount2(MNT_DETACH)` alone, and shows the base.
 - **The hierarchies are not atomic with each other:** `/etc`, then
-  `/usr`, then `/opt`, which is why software stops first (L4).
+  `/usr/local`, then `/opt`, which is why software stops first (L4).
 - **Read back** `/proc/self/mountinfo`: each hierarchy an overlay with
   source `hearth-live`, its layers this delta over the base.
 - **The layers' source,** `/run/hearth-activator/layers`, is a clone of
@@ -1004,14 +1007,14 @@ otherwise:                 move_mount(mnt, "", AT_FDCWD, "/etc", MOVE_MOUNT_F_EM
   in a namespace of its own.
 
 **A person's soft reboot while live** (`systemctl soft-reboot` with no
-`/run/nextroot`) keeps the overlays on `/etc` and `/usr`, which systemd
-treats as extrinsic, and unmounts `/opt`'s (to verify). The next start
-finds the base still running, the boot id unchanged, the soft reboot
-count higher and the mount table disagreeing with the live record, and
-runs `reboot -ff`: the default, or the trial a one-shot names, boots
-natively. hearth's own soft reboot into a `live-blessed` slot (a `try`,
-6.2) is not this: the new root is that slot's, and the start removes
-the live record whose base no longer runs.
+`/run/nextroot`) keeps the overlay on `/etc`, which systemd may treat as
+extrinsic, and unmounts `/usr/local`'s and `/opt`'s (to verify). The
+next start finds the base still running, the boot id unchanged, the soft
+reboot count higher and the mount table disagreeing with the live
+record, and runs `reboot -ff`: the default, or the trial a one-shot
+names, boots natively. hearth's own soft reboot into a `live-blessed`
+slot (a `try`, 6.2) is not this: the new root is that slot's, and the
+start removes the live record whose base no longer runs.
 
 ### 6.9 A later live change
 
@@ -1343,7 +1346,7 @@ ids are facts; drift is never repaired in place.
 | `slot.var.subvolume` | `/var` is the slot's var subvolume, by uuid |
 | `slot.mounts` | every fstab line is mounted, from its subvolume, with its options |
 | `slot.live.mounts` | with a live record: each hierarchy it names carries one overlay with source `hearth-live`, its layers the record's delta over the base, the delta read-only; the others none. Without one: no `hearth-live` overlay anywhere |
-| `slot.live.tree` | with a live record: a walk of the merged `/etc`, `/usr` and `/opt` matches the record's manifest (2.4), comparing type, mode, owners, size, extended attributes and link targets |
+| `slot.live.tree` | with a live record: a walk of the merged `/etc`, `/usr/local` and `/opt` matches the record's manifest (2.4), comparing type, mode, owners, size, extended attributes and link targets |
 | `slot.boot.files` | EFI: the slot's ESP files match their digests |
 | `slot.boot.entry` | EFI: the slot's two entries match; BIOS: covered by `slot.root.tree` |
 | `machine.default` | the default is the slot the records say, and blessed |
@@ -1668,8 +1671,8 @@ by its host's activator from outside, since no hearth runs inside:
   child of the host's activator builds each overlay in the host's
   namespace, where the layers' paths resolve, then `setns` into the
   mount namespace of the container's leader (`/proc/<leader>/ns/mnt`),
-  moves the overlay beneath `/etc`, `/usr` or `/opt` there as L5 does,
-  and reads the container's mount table back. The activator itself
+  moves the overlay beneath `/etc`, `/usr/local` or `/opt` there as L5
+  does, and reads the container's mount table back. The activator itself
   never leaves the host's namespace.
 - **The units' actions** go through `systemctl --machine=<container>`
   (`stop`, `daemon-reload`, `reload`, `restart`, `reload-or-restart`,
@@ -1834,33 +1837,33 @@ soft reboot and its fall back, and every live scenario
   (testing.md, 7.3) on trixie's systemd 257 and forky's 262, Incus with
   OVMF:
   - real root and real ids: `trusted.overlay.*` whiteouts and opaque
-    directories honoured as the `user.*` forms were; owners, setuid
-    programs (`/usr/bin/passwd` in a delta), v2 capabilities and ACLs
+    directories honoured as the `user.*` forms were; owners, v2
+    capabilities and ACLs
     through the overlay; a delta built from a shifted slot exactly what
     L2 expects;
   - `MOVE_MOUNT_BENEATH` from the host's namespace, PID 1's shared `/`,
     with real services: `ProtectSystem=strict` and `full`,
     `ReadWritePaths=/etc`, `InaccessiblePaths=` and `BindPaths=` beneath
-    `/etc` and `/usr`, `PrivateTmp=`, `DynamicUser=` and
+    `/etc` and `/usr/local`, `PrivateTmp=`, `DynamicUser=` and
     `RootDirectory=` units;
   - PID 1 around a swap: `daemon-reload` with new, changed and removed
     fragments of running units, new `.wants` links and masks;
-    `NeedDaemonReload=`; whether dynamic `etc.mount`, `usr.mount` and
-    `opt.mount` units appear, whether `daemon-reload` disturbs them, and
+    `NeedDaemonReload=`; whether dynamic `etc.mount`, `usr-local.mount`
+    and `opt.mount` units appear, whether `daemon-reload` disturbs them, and
     what shutdown does with them;
   - soft reboots: the overlays gone with the old root when
-    `/run/nextroot` is set; `/etc`'s and `/usr`'s kept and `/opt`'s
-    dropped without it (6.8);
+    `/run/nextroot` is set; `/etc`'s kept and `/usr/local`'s and
+    `/opt`'s dropped without it (6.8);
   - the base's dead-man started after boot from
     `/run/hearth-trial/<target>.a`; `reboot -ff` landing on the default;
     `BootNext` to a trial entry surviving days of uptime and consumed by
     a power cut, on OVMF and real firmware;
-  - timing on a real tree of 100k inodes in `/usr`: L1's build, L2's
-    walk, the swap under a load of opens;
+  - timing on a real tree: L1's build, L2's walk of `/etc`,
+    `/usr/local` and `/opt`, the swap under a load of opens;
   - Debian's specifics: `/opt` present in outputs; trixie's kernel
     configuration without overlayfs's `XINO_AUTO`, `INDEX` or `METACOPY`
     defaults; AppArmor profiles on overlay paths, exec transitions for
-    `/usr/bin` and `/opt` programs; dbus-daemon's `ReloadConfig` after a
+    `/usr/local/bin` and `/opt` programs; dbus-daemon's `ReloadConfig` after a
     policy change; glibc reading `nsswitch.conf`, `hosts` and
     `resolv.conf` afresh after a swap; `sshd -t` failing a reload
     reported as a failed job;

@@ -137,7 +137,7 @@ Exceeding a limit is an error of the revision, with the path at fault.
   secret store: a forge token or a deploy key kept in the store under
   `credentials/`, 0700, user `hearth`, imported at bootstrap
   (machine.md, section 8), and given to git by a fixed variable:
-  - over HTTPS, `GIT_ASKPASS=/usr/lib/hearth/askpass`, a program the
+  - over HTTPS, `GIT_ASKPASS=/usr/local/lib/hearth/askpass`, a program the
     hearth task ships that prints `hearth` for a username and the token
     in `<store>/credentials/token` for a password;
   - over SSH, `GIT_SSH_COMMAND=ssh -F /dev/null -i <store>/credentials/deploy_key

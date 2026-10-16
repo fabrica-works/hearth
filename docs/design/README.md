@@ -41,15 +41,18 @@ open. Each part has a document of its own beside this one.
   declare are writable: a directory per entry in one of the target's
   three class subvolumes, `core`, `data` and `cache`, bound at the
   entry's path and snapshotted by class. Nothing on a running machine
-  is changed in place: a fix is a new slot. A development machine may
-  be mutable instead (development.md, section 4).
+  is changed in place: a fix is a new slot, prepared beside the running
+  one. Its configuration and in-house software may still reach the
+  running machine with no reboot, as a delta of the new slot mounted
+  over the old (the live changes below; slots.md, 6.6). A development
+  machine may be mutable instead (development.md, section 4).
 - **Slots try before they commit** (slots.md): prepare, trial, bless,
   fall back. A new slot runs once; the boot default moves only when the
   slot's own hearth blesses it (a container's, its host's), and any
   failure during the trial ends in a reboot into the old default.
 - **Configuration and in-house software change live** (slots.md, 6.6):
-  when a change touches only `/etc`, `/usr` and `/opt` over the same
-  packages, and every changed path has a declared consumer, the
+  when a change touches only `/etc`, `/usr/local` and `/opt` over the
+  same packages, and every changed path has a declared consumer, the
   activator mounts a delta of the new slot over the running one with an
   atomic swap and reloads or restarts the declared units, with no
   reboot; a failure puts the old files back. Its bless arms the new
@@ -321,7 +324,7 @@ hearth-<name>-world           the other worlds, under tests/
 | secret store | root-only, on the machine: the target's secrets and the machine's identity |
 | identity | what makes a machine itself: its machine-id, its host keys |
 | running, default, trial, live | the four facts: the slot running, the boot default, the slot on trial, and the live state over the running slot (slots.md, section 3); a container's, read by its host (slots.md, 12.6) |
-| live change, delta, live bless | a trial with no reboot: a delta of the new slot (`@<target>.live.<n>`) mounted over the running slot's `/etc`, `/usr` and `/opt`, the declared units acted on; its bless arms the new slot's native trial (slots.md, 6.6 and 7.6) |
+| live change, delta, live bless | a trial with no reboot: a delta of the new slot (`@<target>.live.<n>`) mounted over the running slot's `/etc`, `/usr/local` and `/opt`, the declared units acted on; its bless arms the new slot's native trial (slots.md, 6.6 and 7.6) |
 | prepare, trial, bless, fall back, roll back | a slot's transitions (slots.md, section 4) |
 | boot partition | the FAT partition the firmware or GRUB writes: the ESP on EFI, GRUB's env on BIOS (machine.md) |
 | activator, steward, builder | the three processes: root and closed; persistent, deciding and facing; spawned for work (activator.md, steward.md) |
@@ -397,7 +400,7 @@ that last:
   (machine.md, section 12).
 - **Live changes, with hearth's own overlays** (slots.md, 6.6 to 6.9;
   format.md, 5.14), built in M3, a container's in M5. A change confined
-  to `/etc`, `/usr` and `/opt`, over the same packages layer, with a
+  to `/etc`, `/usr/local` and `/opt`, over the same packages layer, with a
   declared consumer for every changed path, is applied with no reboot:
   a delta of the prepared slot, mounted over the running slot, the
   declared units reloaded, restarted or started. The activator mounts
@@ -410,7 +413,8 @@ that last:
 - **The development loop** (development.md): up, explore, capture,
   encode in IaC, apply from the working tree, land. A development
   machine is an Incus VM cloned from a base image and driven by `hearth
-  dev`, a client outside the daemon [M3b]. An environment may mark its
+  dev`, a client outside the daemon [M3b]; a container is developed in
+  its host's VM, as it runs [M5]. An environment may mark its
   placement `mutable`: slots not sealed, roots read-write, taken only by
   a machine bootstrapped with `--accept-mutable` and never by the run
   side. `hearth diff --running` captures what was done by hand and
@@ -429,6 +433,16 @@ that last:
     GRUB's files and its env, which GRUB cannot write on btrfs, so that
     `next_entry` is a one-shot; two env files, so a torn write never
     loses the default (machine.md, sections 4 and 5).
+- **`/usr` is the packages', but `/usr/local`** (2026-10-16;
+  format.md, 5.5; build.md, 9.3). Above the packages layer, tasks'
+  files, downloads, scripts and hearth itself write `/usr` only under
+  `/usr/local`, as os did (its helpers in `/usr/local/bin`, its shared
+  tree in `/usr/local/share`): hearth's binary is
+  `/usr/local/bin/hearth`, and its unit and its generated sysusers,
+  tmpfiles and preset files are in `/etc`. Render refuses a task's path
+  elsewhere in `/usr`, and the build fails a step that writes there. So
+  a live change overlays `/etc`, `/usr/local` and `/opt`, never the
+  `/usr` every process maps (slots.md, 6.6).
 - **The steward and its builder** (2026-10-14; steward.md). The
   unprivileged side is two processes, by failure rather than privilege:
   the steward, persistent, holds converge, the client's socket, the

@@ -67,9 +67,9 @@ in section 12.
 |---|---|---|---|---|---|---|
 | bare metal on EFI | the vendor's UEFI | NVMe; ESP | live, soft reboot, or `BootNext` | iTCO where the chipset has it (to verify per machine) | `x1-prod` | M3 |
 | Incus VM with its own disk | OVMF | a virtio disk; ESP | live, soft reboot, or `BootNext` | iTCO on q35 | the VM tier's machines (testing.md, section 7) | M3 |
-| IaaS VM on BIOS | the provider's BIOS | a virtio disk; FAT environment partition | live, soft reboot, or `next_entry` | none known | `rhi-prod`, `ion-prod`, `mail-prod` | M3b |
+| IaaS VM on BIOS | the provider's BIOS | a virtio disk; FAT environment partition | live, soft reboot, or `next_entry` | none known | `rhi-prod`, `ion-prod` | M3b |
 | IaaS VM on EFI, NVRAM unreliable | the provider's UEFI | a virtio disk; ESP | open (9.4) | none known | vul | later |
-| container | none: the host's kernel | slots on the host's top level | live, or restart | the host's | `chat-prod` on `rhi-prod`; `mail-lab` in a lab pool | M5 |
+| container | none: the host's kernel | slots on the host's top level | live, or restart | the host's | `chat-prod` and `mail-prod` on `rhi-prod`; `mail-lab` in a lab pool | M5 |
 | VM with a virtiofs root | Incus direct kernel boot | slots on the pool host's top level | stop, repoint, start | the host's | the bash fleet's lab | later |
 
 ### 2.1 Bare metal on EFI
@@ -263,7 +263,7 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 | `/run/hearth-activator/boot` | the boot partition | the activator, for each write, then unmounted | `vfat`, `umask=0077,nodev,nosuid,noexec` |
 | `/run/nextroot` | a slot's root, for a soft reboot | the activator (slots.md, section 6) | `ro,subvol=/@x1-prod.a` |
 | `/run/hearth-activator/layers` | a clone of the top level: the live overlays' layers | the activator, when it starts | `ro`, private; without `noexec` and `nosuid` (slots.md, 6.8) |
-| `/etc`, `/usr`, `/opt`, while a live state runs | overlayfs, source `hearth-live`: a delta over the running slot's directory | the activator (slots.md, 6.8) | `ro,nodev`; `nosuid` on `/etc` only |
+| `/etc`, `/usr/local`, `/opt`, while a live state runs | overlayfs, source `hearth-live`: a delta over the running slot's directory | the activator (slots.md, 6.8) | `ro,nodev`; `nosuid` on `/etc` only |
 
 - **The store and the state hang below `/var`,** which is per slot, so
   each slot's `/var` gets their mount points at prepare (slots.md, 5.3).
@@ -907,7 +907,7 @@ failure finds what the first run made, up to the disk's wipe.
    (`systemd-run --scope --property=Delegate=yes`) and lays out its
    cgroups as the daemon does (activator.md, 3.1; steward.md,
    section 7); its activator's domain spawns the steward from
-   `/proc/self/exe` (the live system has no `/usr/bin/hearth`) over a
+   `/proc/self/exe` (the live system has no `/usr/local/bin/hearth`) over a
    link, as on a running machine (activator.md, 3.2), with the store
    mounted at `/var/lib/hearth/store`. The steward spawns a builder for
    its jobs (steward.md, section 3), which renders the target at its

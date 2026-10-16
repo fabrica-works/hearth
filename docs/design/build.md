@@ -88,7 +88,7 @@ recipe artifact [M6]                                         artifacts.md
 |---|---|---|---|---|
 | packages | empty | `H("packages", resolution digest, packages part)` | the bootstrapped system: every package's files and what its maintainer scripts made, dpkg's database, the kernel and initramfs in `/boot`, `/var` as installed | fetch; mmdebstrap; verify (section 5) |
 | software | packages | `H("software", packages key, software part)` | downloads placed; what each `software.sh` made (`/usr/local`, `/opt`) | fetch; place; `software.sh` (section 6) |
-| config | software | `H("config", software key, config part)` | users; the file tree (`/etc`, `/usr/local/share` and more); tmpfiles' paths in the image; unit links from presets; what each `customize.sh` made | users; file tree; tmpfiles; presets; `customize.sh` (section 7) |
+| config | software | `H("config", software key, config part)` | users; the file tree (`/etc`, `/usr/local`, `/opt` and more, but never the rest of `/usr`); tmpfiles' paths in the image; unit links from presets; what each `customize.sh` made | users; file tree; tmpfiles; presets; `customize.sh` (section 7) |
 
 - **A layer is one staging subvolume;** its steps run on it in order,
   and it is walked once, after the last (store.md, 4.2).
@@ -526,10 +526,10 @@ H("initramfs",
 
 - **The part's groups, users and memberships** (render.md, 4.2) become
   sysusers lines (`g`, `u`, `m`), written to
-  `/usr/lib/sysusers.d/hearth.conf` (a put), then:
+  `/etc/sysusers.d/hearth.conf` (a put), then:
 
   ```
-  systemd-sysusers /usr/lib/sysusers.d/hearth.conf
+  systemd-sysusers /etc/sysusers.d/hearth.conf
   ```
 
   Given a path, it runs that file alone (systemd-sysusers(8)).
@@ -564,15 +564,15 @@ H("initramfs",
 
 ### 7.4 tmpfiles
 
-- **The part's lines go to `/usr/lib/tmpfiles.d/hearth.conf`** for every
+- **The part's lines go to `/etc/tmpfiles.d/hearth.conf`** for every
   boot, and at build are applied to paths in the image:
 
   ```
-  systemd-tmpfiles --create -E --exclude-prefix=/tmp --exclude-prefix=/var/tmp /usr/lib/tmpfiles.d/hearth.conf
+  systemd-tmpfiles --create -E --exclude-prefix=/tmp --exclude-prefix=/var/tmp /etc/tmpfiles.d/hearth.conf
   ```
 
   `-E` excludes `/dev`, `/proc`, `/run` and `/sys`. A line for `/etc` or
-  `/usr` takes effect in the root, read-only at boot, where the line
+  `/usr/local` takes effect in the root, read-only at boot, where the line
   then finds its work done; one for `/var` lands in the output's
   `/var`, which every slot copies; one for a data entry's path is
   applied again at boot, through the entry's bind, on its directory in
@@ -587,8 +587,9 @@ H("initramfs",
 ### 7.5 Presets
 
 - **The part's presets go to
-  `/usr/lib/systemd/system-preset/00-hearth.preset`,** which sorts
-  before every other preset file, so its lines win; then:
+  `/etc/systemd/system-preset/00-hearth.preset`,** which sorts before
+  every other preset file, in whichever directory, so its lines win;
+  then:
 
   ```
   SYSTEMD_OFFLINE=1 systemctl preset-all
@@ -861,6 +862,11 @@ be shared between machines and peers.
 - **A finding fails the layer,** naming the step's layer, the path and
   the rule. Nothing is removed silently above the packages step: a
   `customize.sh` that makes a host key fails its build.
+- **Above packages, `/usr` is fixed but `/usr/local`** (format.md,
+  5.5): a change in the software or config layer under `usr/` outside
+  `usr/local/` is a finding, a `software.sh` or a `customize.sh` that
+  writes there included. The rest of `/usr` is the packages', and a
+  live change overlays `/usr/local` alone of it (slots.md, 6.6).
 - **Above packages, the boot files are fixed.** A change in the
   software or config layer to `boot/`, `usr/lib/modules/` or
   `etc/tiny-initramfs/` is a finding: nothing above packages makes the

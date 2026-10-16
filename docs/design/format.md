@@ -184,7 +184,7 @@ render.md. Open questions are in section 13.
 | `x1-prod` | x1 | prod | metal, efi, 7th-gen |
 | `rhi-prod` | rhi | prod | vm, bios, serverhino |
 | `ion-prod` | ion | prod | vm, bios, ionos |
-| `mail-prod` | mail | prod | vm, bios, its provider's profile |
+| `mail-prod` | mail | prod | container on `rhi-prod` |
 | `mail-lab` | mail | lab | vm, efi, incus; a container of a lab pool from M5 |
 | `chat-prod` | chat | prod | container on `rhi-prod` |
 | `stoa-1-lab` | stoa, member 1 | lab | the lab's |
@@ -753,6 +753,13 @@ nothing.
   tighten a conffile.
 - **Directories a path implies** are created 0755 and root-owned, only
   where the layers beneath lack them; a declared directory sets its own.
+- **Under `/usr`, only `/usr/local`.** The rest of `/usr` is the
+  packages layer's, as it was under os, whose tasks' helpers went to
+  `/usr/local/bin` and their shared files to `/usr/local/share`. A unit
+  a task ships goes in `/etc/systemd/system/`. So nothing above the
+  packages changes what every process maps from `/usr`, and a live
+  change overlays `/usr/local` alone of it (slots.md, 6.6). The build
+  holds scripts to the same rule (build.md, 9.3).
 - **Forbidden destinations:** anything under a data path or a class's
   mount point (5.7), which a mount would hide, and the paths hearth
   reserves (5.11).
@@ -841,8 +848,9 @@ nothing.
   `owner`, `group`, `age` and `argument`, as tmpfiles.d(5) reads them.
   Build applies them to the image and writes them for every boot
   (build.md, 7.4), which is what directories inside `/var` and the
-  data entries need. Lines that make subvolumes, and lines that
-  write over what is there outside `/var`, are refused (5.11).
+  data entries need. Lines that make subvolumes, lines that write over
+  what is there outside `/var`, and lines for a path under `/usr` but
+  `/usr/local`, are refused (5.11).
 - **Homes live on persistent data:** the users task declares each
   account's home as a `data` entry of its own (5.7, 6.6).
 
@@ -1053,6 +1061,7 @@ declares it (render.md, 7.2):
 | task files at `/etc/passwd`, `/etc/group`, `/etc/shadow`, `/etc/gshadow`, `/etc/subuid`, `/etc/subgid`, `/etc/machine-id`, `/var/lib/dbus/machine-id` | users are declared (5.6); identity is written at prepare | build.md, 7.3 and 9.2 |
 | task files at `/etc/ssh/ssh_host_*_key` and their `.pub`, `/etc/dropbear/dropbear_*_host_key`, anything under `/etc/ssl/private/`, `/var/lib/systemd/random-seed`, `/var/lib/systemd/credential.secret` | identity and secrets: `identity` and `secrets` entries name these paths, files never do | build.md, 9.2 |
 | anything under `/var/lib/hearth/` | the mount points of hearth's state and store | machine.md, 3.4 |
+| task files, links, downloads and tmpfiles lines under `/usr` but `/usr/local` | the rest of `/usr` is the packages layer's: nothing above it may change what every process maps, and live changes overlay `/usr/local` alone | 5.5; 10.1; build.md, 9.3; slots.md, 6.6 |
 | anything under `/srv/core`, `/srv/data` or `/srv/cache`; a data path beneath them but `/srv/<class>/<name>` | the class subvolumes' mounts hide what the slot holds there | 5.7; machine.md, 3.4 |
 | anything under `/dev`, `/proc`, `/sys`, `/run`, `/tmp`, `/var/tmp`; a file under `/var/log` that is not empty; `/etc/.git`, `/etc/.etckeeper` | runtime, noise, history | build.md, 9.2 |
 | a task file at `/etc/tiny-initramfs/tiny-initramfs.conf`, so `AUTO_MODULES=yes` and `MICROCODE=yes` cannot reach an output | the packages part's, written before the kernel installs | build.md, 5.5; machine.md, 7.1 |
@@ -1060,7 +1069,7 @@ declares it (render.md, 7.2):
 | preseeds of type `password` | they leave the password in `/var/cache/debconf/passwords.dat` | build.md, 9.2 |
 | a secret or identity file owned by user `hearth`, or by a group `hearth` belongs to (`systemd-journal`); a secret's mode readable by others | neither the steward nor its builder may ever read a secret | activator.md, section 2; 9.1 |
 | an owner of a data path, a secret or an identity file without a fixed id; a download's owner other than `root` or a package user with a fixed id | ids that move between builds; no sysusers user exists when software is placed | 5.6; 10.1 |
-| `live` entries that name a never-live unit or path (5.14); a `unit` with `none`, or none with another action; a path outside `/etc`, `/usr` and `/opt` | a never-live unit must not be acted on live, and a change elsewhere is never live | 5.14; slots.md, 6.7 |
+| `live` entries that name a never-live unit or path (5.14); a `unit` with `none`, or none with another action; a path outside `/etc`, `/usr/local` and `/opt` | a never-live unit must not be acted on live, and a change elsewhere is never live | 5.14; slots.md, 6.7 |
 | presets and links that enable `systemd-sysext.service` or `systemd-confext.service`; anything under `/etc/extensions`, `/usr/lib/confexts`, `/usr/local/lib/confexts`, `/var/lib/extensions` or `/var/lib/confexts` | nothing may merge extensions over hearth's live overlays, at boot or after a soft reboot, a container's included, which has no `hearth` task to disable them | 5.12; slots.md, 6.6 |
 
 ### 5.12 The hearth task
@@ -1120,7 +1129,7 @@ declares it (render.md, 7.2):
     "software": {
       "hearth": {
         "url": "https://git.ekanayaka.io/ai/hearth/releases/download/v0.1.0/hearth-x86_64-linux",
-        "sha256": "…", "unpack": "file", "path": "/usr/bin/hearth", "mode": "0755"
+        "sha256": "…", "unpack": "file", "path": "/usr/local/bin/hearth", "mode": "0755"
       }
     },
     "users": {
@@ -1137,10 +1146,11 @@ declares it (render.md, 7.2):
   }
   ```
 
-  with `tree/usr/lib/systemd/system/hearth-activator.service`, the unit of
-  activator.md (3.1); `tree/usr/lib/hearth/askpass`, which gives git the
-  fetch's credential (render.md, 2.4); and `tree/etc/hearth/alarms.json.j2`,
-  which is `{{ settings.alarms | tojson }}`.
+  with `tree/etc/systemd/system/hearth-activator.service`, the unit of
+  activator.md (3.1); `tree/usr/local/lib/hearth/askpass`, which gives
+  git the fetch's credential (render.md, 2.4); and
+  `tree/etc/hearth/alarms.json.j2`, which is
+  `{{ settings.alarms | tojson }}`.
 - **The uid, gid and range are constants of the task,** not settings:
   every slot of a machine mounts the same `@hearth.store`, owned by them
   (machine.md, 8.3; store.md, 9.2). The range is 64 Ki at base 262144.
@@ -1227,12 +1237,12 @@ an error.
   |---|---|---|---|
   | `unit` | unit name | required, but with `none` | the systemd unit that reads the paths |
   | `action` | enum `reload`, `restart`, `reload-or-restart`, `start`, `none` | required | what happens to the unit once the change is mounted |
-  | `paths` | list of absolute paths under `/etc`, `/usr` or `/opt` | required | what it consumes; a path ending in `/` covers its subtree |
+  | `paths` | list of absolute paths under `/etc`, `/usr/local` or `/opt` | required | what it consumes; a path ending in `/` covers its subtree |
 
   | Action | For | Done |
   |---|---|---|
   | `reload` | a daemon that reads its configuration again on `ExecReload=`: postfix, nginx, sshd | `systemctl reload` after the swap; a reload that fails, as sshd's on a bad `sshd_config`, fails the live trial |
-  | `restart` | a daemon whose binary, libraries or data change, or that reads its configuration only at start | for a changed path under `/usr` or `/opt`, stopped before the swap and started after, so the old binary never reads new files; for one under `/etc` only, restarted after |
+  | `restart` | a daemon whose binary, libraries or data change, or that reads its configuration only at start | for a changed path under `/usr/local` or `/opt`, stopped before the swap and started after, so the old binary never reads new files; for one under `/etc` only, restarted after |
   | `reload-or-restart` | a unit that may lack a reload | `systemctl reload-or-restart` after the swap |
   | `start` | a unit whose run applies the change: a oneshot, a timer | `systemctl start` after the swap |
   | `none` | inert files, read afresh at every use: a command-line tool, its manual, data a short-lived command reads | nothing |
@@ -1287,12 +1297,12 @@ an error.
 
   | Path | Consumer |
   |---|---|
-  | a unit file or drop-in in `etc/systemd/system/` or `usr/lib/systemd/system/` | its unit: `daemon-reload`, then restarted if it runs, started if new and wanted, stopped before the swap if its file goes |
+  | a unit file or drop-in in `etc/systemd/system/` or `usr/local/lib/systemd/system/` | its unit: `daemon-reload`, then restarted if it runs, started if new and wanted, stopped before the swap if its file goes |
   | a `.wants/` or `.requires/` link | the unit it names: started when the link comes, stopped before the swap when it goes |
   | `etc/passwd`, `etc/group`, `etc/shadow`, `etc/gshadow`, `etc/subuid`, `etc/subgid` | the accounts, entries only added (slots.md, 6.7, rule 5); `nscd --invalidate` if nscd runs |
-  | `usr/lib/tmpfiles.d/hearth.conf` | `systemd-tmpfiles --create` on that file (rule 6) |
-  | D-Bus policy in `usr/share/dbus-1/system.d/` and `etc/dbus-1/system.d/` | `systemctl reload dbus` |
-  | `usr/lib/sysusers.d/hearth.conf`, `usr/lib/systemd/system-preset/00-hearth.preset` | none: their effects, account lines and unit links, are in the change already (build.md, 7.2 and 7.5) |
+  | `etc/tmpfiles.d/hearth.conf` | `systemd-tmpfiles --create` on that file (rule 6) |
+  | D-Bus policy in `etc/dbus-1/system.d/` | `systemctl reload dbus` |
+  | `etc/sysusers.d/hearth.conf`, `etc/systemd/system-preset/00-hearth.preset` | none: their effects, account lines and unit links, are in the change already (build.md, 7.2 and 7.5) |
 
 - **Never live.** A change to any of these takes an ordinary trial,
   whatever a task declares, and render refuses a `live` entry that names
@@ -1300,22 +1310,25 @@ an error.
   at PID 1's re-exec:
 
   ```
-  etc/systemd/system.conf  etc/systemd/system.conf.d/  usr/lib/systemd/system.conf.d/
-  etc/systemd/system-generators/  usr/lib/systemd/system-generators/
-  etc/systemd/system-environment-generators/  usr/lib/systemd/system-environment-generators/
-  etc/udev/  usr/lib/udev/  etc/modprobe.d/  usr/lib/modprobe.d/  etc/modules
-  etc/modules-load.d/  usr/lib/modules-load.d/  etc/sysctl.conf  etc/sysctl.d/  usr/lib/sysctl.d/
-  etc/binfmt.d/  usr/lib/binfmt.d/  etc/kernel/  usr/lib/kernel/  usr/lib/modules/
+  etc/systemd/system.conf  etc/systemd/system.conf.d/  usr/local/lib/systemd/system.conf.d/
+  etc/systemd/system-generators/  usr/local/lib/systemd/system-generators/
+  etc/systemd/system-environment-generators/  usr/local/lib/systemd/system-environment-generators/
+  etc/udev/  usr/local/lib/udev/  etc/modprobe.d/  usr/local/lib/modprobe.d/  etc/modules
+  etc/modules-load.d/  usr/local/lib/modules-load.d/  etc/sysctl.conf  etc/sysctl.d/  usr/local/lib/sysctl.d/
+  etc/binfmt.d/  usr/local/lib/binfmt.d/  etc/kernel/  usr/local/lib/kernel/
   etc/initramfs-tools/  etc/tiny-initramfs/  etc/crypttab  etc/default/grub  etc/fstab
   etc/hostname  etc/localtime  etc/locale.conf  etc/vconsole.conf  etc/machine-id
-  etc/os-release  usr/lib/os-release
+  etc/os-release
   ```
+
+  Their counterparts under `usr/lib/` are the packages' alone (5.5),
+  which never change live (slots.md, 6.7, rule 1).
 
   and the services that must not restart live:
 
   | What | Units and paths | Why |
   |---|---|---|
-  | systemd's own | every unit the `systemd` packages ship; `etc/systemd/*.conf`, their `.d/` directories and `usr/lib/systemd/*.conf.d/` (journald, logind, networkd, resolved, timesyncd and the rest) | PID 1's and its daemons' state does not survive a careless restart |
+  | systemd's own | every unit the `systemd` packages ship; `etc/systemd/*.conf`, their `.d/` directories and `usr/local/lib/systemd/*.conf.d/` (journald, logind, networkd, resolved, timesyncd and the rest) | PID 1's and its daemons' state does not survive a careless restart |
   | the core services | `dbus.service` and `dbus.socket` (their policy files are allowed, with a reload of dbus); `systemd-logind`, `systemd-journald`, `systemd-udevd`, `systemd-networkd`, `NetworkManager`; `getty@`, `serial-getty@`, `console-getty`; `apparmor.service` and `etc/apparmor.d/` | a restart ends sessions, loses logs, devices or the network; a profile needs `apparmor_parser -r` (slots.md, section 15) |
   | hearth itself, for now | every file of the `hearth` task (5.12) and every path 5.11 reserves | until live changes are proven (slots.md, section 15) |
 
@@ -1941,11 +1954,10 @@ artifacts.md (7.3) cite it.
 - **No setuid, setgid or file capability:** a `file`'s mode has no such
   bit, and an archive whose members carry setuid or setgid fails the
   build. A program that needs privilege comes from a package.
-- **Paths are outside `/etc` and `/var`,** which configuration and the
-  slot own, and outside every path of the file tree and every other
-  download's: an overlap is an error. `/opt` and `/usr/local` are the
-  usual places, the bash fleet's rule for software; hearth's own binary
-  is `/usr/bin/hearth` (5.12; activator.md, 3.1).
+- **Paths are under `/opt` or `/usr/local`,** the bash fleet's and
+  os's places for software (5.5), and outside every path of the file
+  tree and every other download's: an overlap is an error. hearth's own
+  binary is `/usr/local/bin/hearth` (5.12; activator.md, 3.1).
 - **A version moves with its digest.** A task pins both in `task.json`; a
   bump edits both, in one change whose rendered diff shows it. os's
   `%VERSION%` in a URL goes.

@@ -1228,7 +1228,7 @@ wire, not in traits: another backend is another daemon speaking it.
 | an output, by key | the config layer, on software and packages layers, on btrfs (store.md) |
 | parts, by name and digest | packages, software, config, data, secrets, boot: names the engine's policy may match ("caution follows what changed", temper's `factory.md`, 6.3), never interprets |
 | a slot, by label, and the four facts | `@<target>.<label>` and its `/var`; `BootNext`, `BootOrder`, GRUB's env (machine.md); a delta subvolume and overlays in the mount table; for a container, its link and the default its host records [M5] (slots.md, 12.6) |
-| an activation: live, soft reboot, reboot, restart | overlays swapped beneath `/etc`, `/usr` and `/opt` with the units acted on (slots.md, 6.8); `systemctl soft-reboot` into `/run/nextroot`; `systemctl reboot` with `SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT=1` (slots.md, section 6); a container's restart |
+| an activation: live, soft reboot, reboot, restart | overlays swapped beneath `/etc`, `/usr/local` and `/opt` with the units acted on (slots.md, 6.8); `systemctl soft-reboot` into `/run/nextroot`; `systemctl reboot` with `SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT=1` (slots.md, section 6); a container's restart |
 | a unit, by name | a systemd unit of the running slot |
 | a check, by id, with its result | a unit, a command or a probe (operating.md) |
 | drift, by stable ids | a slot compared with its record |

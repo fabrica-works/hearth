@@ -710,8 +710,8 @@ half's.
   stays loaded while active. dbus and nscd are units with a reload.
 - **Soft reboots and overlays:** with `/run/nextroot`, the old root's
   overlays go with it; a person's soft reboot without it keeps the
-  overlays on `/etc` and `/usr` and drops `/opt`'s. Both are to verify
-  (7.3), so until then the seed draws either.
+  overlay on `/etc` and drops `/usr/local`'s and `/opt`'s. Both are to
+  verify (7.3), so until then the seed draws either.
 - **Cues** (8.2) that only a live trial meets: `test-reload-fails`,
   whose `ExecReload=` fails when its configuration says so, and
   `test-dies-later`, which dies a drawn time after it starts.
@@ -1138,12 +1138,12 @@ Live changes, on the same VMs (slots.md, 6.6 to 6.9):
 
 The VM tier also settles what slots.md, section 15 lists as to verify
 for live changes, on trixie's systemd 257 and forky's 262: real ids,
-setuid programs, capabilities and ACLs through the overlay;
-`MOVE_MOUNT_BENEATH` from PID 1's shared root, with real sandboxed
-services; `daemon-reload` and the dynamic `etc.mount`, `usr.mount` and
-`opt.mount` units around a swap; overlays across soft reboots; the
-base's dead-man started after boot; `BootNext` kept over days and
-consumed by a power cut; timing on a tree of 100k inodes; Debian's
+capabilities and ACLs through the overlay; `MOVE_MOUNT_BENEATH` from
+PID 1's shared root, with real sandboxed services; `daemon-reload` and
+the dynamic `etc.mount`, `usr-local.mount` and `opt.mount` units around
+a swap; overlays across soft reboots; the base's dead-man started after
+boot; `BootNext` kept over days and consumed by a power cut; timing on
+a real tree; Debian's
 specifics (AppArmor, dbus's `ReloadConfig`, glibc rereading
 `nsswitch.conf`, `hosts` and `resolv.conf`); and whether a lower mount's
 `noexec` reaches the merged files.
