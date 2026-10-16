@@ -433,13 +433,15 @@ that last:
     GRUB's files and its env, which GRUB cannot write on btrfs, so that
     `next_entry` is a one-shot; two env files, so a torn write never
     loses the default (machine.md, sections 4 and 5).
-- **`/usr` is the packages', but `/usr/local`** (2026-10-16;
-  format.md, 5.5; build.md, 9.3). Above the packages layer, tasks'
-  files, downloads, scripts and hearth itself write `/usr` only under
+- **`/usr` is the packages', but `/usr/local`** (2026-10-16; format.md,
+  5.5; build.md, 9.3). Above the packages layer, tasks' files,
+  downloads, scripts and hearth itself write `/usr` only under
   `/usr/local`, as os did (its helpers in `/usr/local/bin`, its shared
   tree in `/usr/local/share`): hearth's binary is
   `/usr/local/bin/hearth`, and its unit and its generated sysusers,
-  tmpfiles and preset files are in `/etc`. Render refuses a task's path
+  tmpfiles and preset files are in `/etc`. `/usr/lib` is Debian
+  packages' alone: should hearth become one, it moves there with the
+  packages layer (format.md, 5.12). Render refuses a task's path
   elsewhere in `/usr`, and the build fails a step that writes there. So
   a live change overlays `/etc`, `/usr/local` and `/opt`, never the
   `/usr` every process maps (slots.md, 6.6).

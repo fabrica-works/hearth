@@ -1151,6 +1151,12 @@ declares it (render.md, 7.2):
   git the fetch's credential (render.md, 2.4); and
   `tree/etc/hearth/alarms.json.j2`, which is
   `{{ settings.alarms | tojson }}`.
+- **Where hearth's files live:** under `/usr/local` and `/etc`, as
+  every download and every task file does (5.5, 10.1), since `/usr/lib`
+  and the rest of `/usr` are Debian packages' alone. Should hearth
+  become a Debian package, the task installs it as one, and it moves to
+  `/usr` with the packages layer, its unit in `/usr/lib/systemd/system/`
+  as any package's.
 - **The uid, gid and range are constants of the task,** not settings:
   every slot of a machine mounts the same `@hearth.store`, owned by them
   (machine.md, 8.3; store.md, 9.2). The range is 64 Ki at base 262144.
