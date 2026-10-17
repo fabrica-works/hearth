@@ -683,6 +683,13 @@ None yet.
      git 2.47.3 prints `fatal: not a tree object` and exits 128 for a missing tree, as the records' sketch says.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+144. **hearth 43.2's round trips compare with their input** (process, hearth 43.2's block of 2026-10-17T18:56:12Z).
+     Ruling 144. hearth 43.2 writes its round trips as 43-evaluate-translated.md, 43.2, prescribes: `fixtures::every_op() -> [template::Op; 26]` in `src/tests/fixtures.rs`, and `each_operation_translates_to_render_and_back` asserts `assert_eq!(back, op, "row {row}: hearth 05's Op through render's and back")`. `each_filter_translates_to_render_and_back` (17 rows) and `missing_translates_to_render_and_back` take the same form.
+
+     A round trip's expected value is its input: the 17:12:49Z steer's "A test states its expected value as a literal in the assertion, or as a plain `const` of its type" holds for one-way tests, and a round trip's literal is its input row. `template::Op`'s `String(Box<[u8]>)`, `Name { name: Box<[u8]>, .. }` and `Key { name: Box<[u8]>, .. }` cannot be `const`, so the table is the session file's `#[must_use]` fn returning an array, which the one test loops over by value. It keeps the steer's other rules: two or more rows, no constant index, no `.first().expect(..)`.
+
+     The plan's README gains this as a rule for every session's `…_and_back` tests (hearth 11, 12, 13, 15, 17, 21, 23, 25, 31 name such tests). Unchanged: one-way tests state literal expected values; 43.2's Files, Shape, Proof and Size.
+
 ## For the user
 
 The long-term choices the user may veto:

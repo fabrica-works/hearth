@@ -305,6 +305,14 @@ the closing repins (Repin). The increments of each session are in its file.
   or asserts the value as a literal, never `values[0]` or `TABLE[2]`. An
   increment that edits a test file first fixes its one-row tables and
   constant-index reads.
+- **A round trip's expected value is its input** (ruling 144): a test
+  named `…_and_back` asserts `assert_eq!(back, input, "row {row}: …")`.
+  Its input table holds two or more rows: a `const` slice when its
+  values can be `const`, otherwise a `#[must_use]` fn in the crate's
+  `src/tests/fixtures.rs` returning an array (`every_op() ->
+  [template::Op; 26]`), which the one test loops over by value
+  (`.into_iter().enumerate()`). A one-way test still states its
+  expected value as a literal or a plain `const`.
 - **One land at a time in each repository:** a session runs `land` only
   under its repository's lock, held for the whole of `land`, its retries
   included: `flock ~/src/rust/tmp/hearth/render/land-hearth.lock land …`
