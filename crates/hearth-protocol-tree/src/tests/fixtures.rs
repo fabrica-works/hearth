@@ -51,3 +51,51 @@ pub fn items(body: &[u8], limits: &Limits) -> Result<Box<[Item]>, Malformed> {
     }
     unreachable!("an item uses at least one byte")
 }
+
+pub fn frame_of(kind: crate::frame::Kind, items: &[Item]) -> Box<[u8]> {
+    let mut measure = hearth_lib::encode::Encoder::measuring();
+    for item in items {
+        measure.item(item);
+    }
+    let mut writer = hearth_lib::encode::Encoder::writing(measure.measured());
+    for item in items {
+        writer.item(item);
+    }
+    crate::frame::write(kind, &writer.written(), &SHIPPED).expect("fixture fits its frame")
+}
+pub fn text(value: &[u8]) -> Item {
+    Item::Bytes(bytes::copy_of(value))
+}
+pub fn a_cache_file() -> crate::cache_file::CacheFile {
+    crate::cache_file::CacheFile {
+        at: skein_lib::Wall::from_nanos(1_760_000_000_000_000_000),
+        origin: crate::cache_file::Origin::Rendered { path: bytes::copy_of(b"tasks/core/tree/etc/motd.j2") },
+        sha256: hearth_lib::encode::Digest(
+            hex("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+                .as_ref()
+                .try_into()
+                .expect("a digest"),
+        ),
+        size: 0,
+        took: skein_lib::Duration::from_nanos(1_500_000),
+    }
+}
+pub fn cache_items(origin: &[Item], took: bool) -> Box<[Item]> {
+    let mut result = List::with_capacity(32);
+    let record = a_cache_file();
+    for item in [Item::Map(if took { 5 } else { 4 }), text(b"at"), Item::Uint(record.at.as_nanos()), text(b"origin")] {
+        result.push(item).expect("fixture room");
+    }
+    for item in origin {
+        result.push(item.clone()).expect("fixture room");
+    }
+    for item in [text(b"sha256"), Item::Digest(record.sha256), text(b"size"), Item::Uint(0)] {
+        result.push(item).expect("fixture room");
+    }
+    if took {
+        for item in [text(b"took"), Item::Uint(record.took.as_nanos())] {
+            result.push(item).expect("fixture room");
+        }
+    }
+    result.into_boxed()
+}

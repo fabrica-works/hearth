@@ -47,11 +47,17 @@ pub enum Unreadable {
     Bound { length: u64 },
     Length { length: u64, after: u64 },
     Body(Malformed),
+    Record,
+    Missing(&'static [u8]),
+    Shape(&'static [u8]),
+    Limit(&'static [u8]),
+    Unknown,
 }
 /// Why a body cannot be framed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refused {
     Bound { length: u64 },
+    Limit(&'static [u8]),
 }
 
 /// Checks a frame in header order, checking the kind's bound before its body.
