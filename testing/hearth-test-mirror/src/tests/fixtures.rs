@@ -19,3 +19,21 @@ pub fn laid(dir: &Path) -> Mirror {
     fs::write(checked.join("Packages"), b"index\n").unwrap();
     Mirror::find_in(dir, &pin).unwrap()
 }
+
+/// One complete GET, read until the proxy closes its connection.
+pub fn get(proxy: &crate::Proxy, url: &str) -> Vec<u8> {
+    request(proxy, &format!("GET {url} HTTP/1.1\r\nHost: snapshot.debian.org\r\n\r\n"))
+}
+pub fn request(proxy: &crate::Proxy, head: &str) -> Vec<u8> {
+    use std::{
+        io::{Read, Write},
+        net::TcpStream,
+        time::Duration,
+    };
+    let mut stream = TcpStream::connect(("127.0.0.1", proxy.port())).unwrap();
+    stream.set_read_timeout(Some(Duration::from_secs(1))).unwrap();
+    stream.write_all(head.as_bytes()).unwrap();
+    let mut answer = Vec::new();
+    stream.read_to_end(&mut answer).unwrap();
+    answer
+}
