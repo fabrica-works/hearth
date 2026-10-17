@@ -80,7 +80,11 @@ says what it does (hearth 24 and 31 call it: hearth 33, "What hearth 24 calls").
   new `Request::Unopened { to: ReplyTo, why: store::vocabulary::Why }`; the
   protocol layer writes records' `Startup::Unopened { what: Opened::Store,
   path: None, error }` (startup.rs:11; hearth 33.3 gives the path) to
-  standard error and ends the call with 75. `error` is `lock failed`
+  standard error, its second output (`Service::adopt_error_pipe` and
+  `adopt_error_file` beside `adopt_output_*`, service `lib.rs:72`, `:80`;
+  `Client::open` takes `error: Fd`, which `main.rs:42` passes as
+  `Fd::new(2)`; protocol `client.rs:19`'s `output` gains `error` beside it),
+  and ends the call with 75. `error` is `lock failed`
   (`Why::Lock`), `store.record failed` (`Why::Record`), or `store.record is
   uid <recorded>'s, not uid <builder>'s` (`Why::Owner`): `hearth: cannot
   open the store: store.record is uid 1001's, not uid 1000's` LF.
@@ -125,12 +129,13 @@ Files: root `Cargo.toml`, `Cargo.lock` (shared); new
 src/tests.rs, src/tests/fixtures.rs}` (`fixtures.rs:4`'s `LIMITS` takes
 `store`; `a_render_call_reaches_render`, `tests.rs:11`, sees the store's
 `Open` first); `crates/hearth-protocol-builder/`: `Cargo.toml`
-(`hearth-protocol-tree`), `src/{lib, limits, cache}.rs` (04.1's `Rename`
+(`hearth-protocol-tree`), `src/{lib, limits, cache, client}.rs` (04.1's `Rename`
 form), new `src/store.rs`, new `src/translate/store.rs`, `src/translate.rs`,
 `src/tests/{fixtures, store, translate}.rs`;
-`crates/hearth-service-builder/src/{lib, limits}.rs`, `src/tests/fixtures.rs`
+`crates/hearth-service-builder/src/{lib, limits}.rs`, `src/tests.rs`
+(`adopt_error_*`), `src/tests/fixtures.rs`
 (`:7`'s `Configuration` takes `uid`, `:8`'s `Roots` `resolutions` and
-`staging`); `crates/hearth/src/lib.rs`; `tests/builder/Cargo.toml`
+`staging`); `crates/hearth/src/{lib, main}.rs`; `tests/builder/Cargo.toml`
 (`hearth-protocol-tree`, `hearth-domain-store`, `skein-lib` for `Duration`,
 `Time`, `Wall`, `Queue`), `src/fixtures.rs` (shared),
 new `tests/store.rs`.
@@ -150,8 +155,17 @@ frame::largest(Kind::Store, &limits.tree) as a `u32`, no_follow: true }`, read b
 None }`); `WriteRecord` → `Store` of `store::write`'s bytes. The service:
 `Configuration::uid`, `Files::whole` (`FileIo::with_whole_limit`'s `max_file`,
 `frame::largest(Kind::Resolution, &limits.tree)` as a `u32`, 4,194,328, so that hearth 33.2 loads with
-it), `Roots` with `resolutions` and `staging`, each adopted. `Client::open`
-makes them 0700 and reads `effective_user()`.
+it), `Roots` with `resolutions` and `staging`, each adopted; `Files::files` 32 (`limits.rs:34`
+holds 2, and the four roots, the lock, `Load` and `Store` need more), which
+23.2 keeps; `files.seed_randomness(seed)` (skein `file_layer.rs:374`) in
+`Service::new`, without which `Store` fails `InvalidArgument` at admission
+(`store.rs:176`). At its terminal the protocol sends `file::Request::Close`
+for each root's token: adopted roots count in `open_files`, which the
+service's `is_empty` (`lib.rs:102`) waits on. So `Client` drops its `store`
+and `cache` keepers, `is_empty`'s `&& self.store.is_none()` (`lib.rs:78`) and
+`drain`'s closes; only `Client::open`'s error paths, before the service
+exists, still close them. `Client::open` makes them 0700 and reads
+`effective_user()`.
 Test shape: unit (`src/tests/`, under 20 ms each, the step crates' lints), with
 `fixtures::Harness` (a `Store` at given limits and uid; `step(now, Event)`,
 `step_at(now, wall, Event)`, `fire(now)`, each `-> Box<[Output]>`;
@@ -230,7 +244,7 @@ Files: `crates/hearth-domain-store/src/{lib, limits, vocabulary}.rs`, new
 `src/{scan, index}.rs`, `src/tests/{fixtures, scan}.rs`;
 `crates/hearth-protocol-builder/src/store.rs`, new `src/store/names.rs`,
 `src/tests/store.rs`; `crates/hearth-service-builder/src/limits.rs`
-(`Files::entries: 1_024`, `files: 32`); `tests/builder/{src/fixtures.rs,
+(`Files::entries: 1_024`; `files` is 23.1's 32); `tests/builder/{src/fixtures.rs,
 tests/store.rs}`.
 Shape: after the record, `List { directory: Top, max: page }`, then `Cache`
 twice, `Next` until `last`, then the settlement, then `Ready`. Pass one:

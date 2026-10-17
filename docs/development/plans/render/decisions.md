@@ -663,6 +663,14 @@ None yet.
      The `Path` rows of 43.1 stand: format.md's `path` is "absolute; no empty, `.` or `..` segment; no trailing `/`" (`format.md:1558`), though this machine's systemd 257 escapes `/a//b/`, `/a/./b`, `a/b` and `''`; the unit tests take literals, not the tool.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+141. **hearth 23.1's roots, seed and standard error** (steer of 2026-10-17T18:50:18Z).
+     hearth 23's re-check after 32.1, against hearth 76d7da7 to a29cf9f and skein 841f487 (three tests in the service confirm 1 to 3; default 677 of 677, fuzzy 17 of 17), corrects 23.1 in 23-store.md:
+     1. `Files::files` is 32 in 23.1, not 23.2: service `limits.rs:34` holds 2, so a third `adopt_root` (skein `file_layer.rs:363`) gives `None`; 23.2 changes only `entries`.
+     2. At its terminal the protocol sends `file::Request::Close` for each adopted root's token: the service's `is_empty` (`lib.rs:102`) waits for `open_files() == 0`. `Client` (hearth `src/lib.rs`) drops its `store` and `cache` keepers, `is_empty`'s `&& self.store.is_none()` (`:78`) and `drain`'s closes, which would close them twice; `Client::open`'s error paths, before the service exists, still close them.
+     3. `Service::new` calls `files.seed_randomness(seed)` (skein `file_layer.rs:374`): unseeded, `Store` fails `InvalidArgument` at admission (`file_layer/store.rs:176`), and `store.record` is never written.
+     4. `Startup::Unopened` goes to standard error as the protocol's second output: `Service::adopt_error_pipe` and `adopt_error_file` beside `adopt_output_*` (service `lib.rs:72`, `:80`), `Client::open` taking `error: Fd`, which `main.rs:42` passes as `Fd::new(2)`, and protocol `client.rs:19`'s `output` gaining `error` beside it. 23.1's Files gain protocol `src/client.rs`, service `src/tests.rs` and the root's `src/main.rs`.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
