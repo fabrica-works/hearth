@@ -337,3 +337,37 @@ pub fn store_cursor(layer: &mut Layer, directory: builder::store::vocabulary::Di
     drop(layer.asked());
     layer.file_up(io::file::Event::Opened { owner: STORE_OWNER, file: Token::new(88), len: 0 });
 }
+
+/// Every operation, with distinct payloads where it carries one.
+#[must_use]
+pub fn every_op() -> [hearth_protocol_template::Op; 26] {
+    use hearth_protocol_template::{Filter, Missing, Op};
+    [
+        Op::String(bytes::copy_of(b"text")),
+        Op::Integer(-17),
+        Op::Boolean(true),
+        Op::Name { name: bytes::copy_of(b"settings"), missing: Missing::Error },
+        Op::Key { name: bytes::copy_of(b"wifi"), missing: Missing::Undefined },
+        Op::Item { missing: Missing::Undefined },
+        Op::List { length: 7 },
+        Op::Filter(Filter::Default),
+        Op::Not,
+        Op::Equal,
+        Op::NotEqual,
+        Op::Less,
+        Op::LessOrEqual,
+        Op::Greater,
+        Op::GreaterOrEqual,
+        Op::In,
+        Op::NotIn,
+        Op::Concat,
+        Op::Add,
+        Op::Subtract,
+        Op::Defined,
+        Op::NotDefined,
+        Op::JumpIfFalseKeeping { over: 11 },
+        Op::JumpIfTrueKeeping { over: 13 },
+        Op::JumpIfFalse { over: 17 },
+        Op::Jump { over: 19 },
+    ]
+}

@@ -217,6 +217,7 @@ dependencies = [
  "hearth-lib",
  "hearth-protocol-config",
  "hearth-protocol-git",
+ "hearth-protocol-template",
  "hearth-protocol-tree",
  "skein-io",
  "skein-json",
@@ -273,6 +274,8 @@ version = "0.0.0"
 dependencies = [
  "hearth-domain-render",
  "hearth-lib",
+ "hearth-protocol-builder",
+ "hearth-protocol-template",
  "skein-lib",
  "skein-world",
 ]

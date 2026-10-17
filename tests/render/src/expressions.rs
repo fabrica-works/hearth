@@ -1,9 +1,6 @@
 //! Generated trees and contexts, independent of the postfix evaluator's implementation.
 use hearth_domain_render::{
-    evaluate::{
-        self, Binding, Bindings, Budget, Context, Entry, Evaluator, Expression, Filter, Missing, Op, Operand,
-        Operation, Value,
-    },
+    evaluate::{self, Binding, Bindings, Budget, Context, Entry, Evaluator, Filter, Missing, Operand, Value},
     limits::Limits,
 };
 use skein_lib::Rng;
@@ -82,23 +79,6 @@ const BINARIES: &[Binary] = &[
     Binary::Add,
     Binary::Subtract,
 ];
-impl Binary {
-    const fn op(self) -> Op {
-        match self {
-            Self::Equal => Op::Equal,
-            Self::NotEqual => Op::NotEqual,
-            Self::Less => Op::Less,
-            Self::LessOrEqual => Op::LessOrEqual,
-            Self::Greater => Op::Greater,
-            Self::GreaterOrEqual => Op::GreaterOrEqual,
-            Self::In => Op::In,
-            Self::NotIn => Op::NotIn,
-            Self::Concat => Op::Concat,
-            Self::Add => Op::Add,
-            Self::Subtract => Op::Subtract,
-        }
-    }
-}
 
 pub type Plain = Value;
 #[must_use]
@@ -210,91 +190,135 @@ fn leaf(rng: &mut Rng) -> Tree {
         ),
     }
 }
-pub fn flatten(tree: &Tree, out: &mut Vec<Operation>) {
-    let op = match tree {
-        Tree::String(v) => Op::String(v.clone().into_boxed_slice()),
-        Tree::Int(v) => Op::Integer(*v),
-        Tree::Bool(v) => Op::Boolean(*v),
-        Tree::Name(v) => Op::Name { name: Box::from(*v), missing: Missing::Error },
-        Tree::Key(v, k, missing) => {
-            flatten(v, out);
-            Op::Key { name: Box::from(*k), missing: *missing }
-        }
-        Tree::Item(v, i, missing) => {
-            flatten(v, out);
-            flatten(i, out);
-            Op::Item { missing: *missing }
-        }
-        Tree::List(items) => {
-            for item in items {
-                flatten(item, out);
+/// A generated tree as source for the real expression compiler.
+#[must_use]
+pub fn text(tree: &Tree) -> Vec<u8> {
+    printed(tree).into_bytes()
+}
+fn wrapped(tree: &Tree) -> String {
+    match tree {
+        Tree::String(_) | Tree::Int(_) | Tree::Bool(_) | Tree::List(_) => printed(tree),
+        Tree::Name(_)
+        | Tree::Key(..)
+        | Tree::Item(..)
+        | Tree::Defined(..)
+        | Tree::Filter(..)
+        | Tree::Not(_)
+        | Tree::Binary(..)
+        | Tree::And(..)
+        | Tree::Or(..)
+        | Tree::Conditional { .. }
+        | Tree::Output(_) => format!("({})", printed(tree)),
+    }
+}
+pub(super) fn chain(tree: &Tree) -> bool {
+    match tree {
+        Tree::Name(_) => true,
+        Tree::Key(input, _, _) | Tree::Item(input, _, _) => chain(input),
+        Tree::String(_)
+        | Tree::Int(_)
+        | Tree::Bool(_)
+        | Tree::List(_)
+        | Tree::Defined(..)
+        | Tree::Filter(..)
+        | Tree::Not(_)
+        | Tree::Binary(..)
+        | Tree::And(..)
+        | Tree::Or(..)
+        | Tree::Conditional { .. }
+        | Tree::Output(_) => false,
+    }
+}
+fn lookup(tree: &Tree) -> String {
+    if chain(tree) { printed(tree) } else { wrapped(tree) }
+}
+fn printed(tree: &Tree) -> String {
+    match tree {
+        Tree::String(value) => {
+            let mut quoted = String::from("'");
+            for character in core::str::from_utf8(value).expect("generated UTF-8").chars() {
+                match character {
+                    '\\' => quoted.push_str("\\\\"),
+                    '\'' => quoted.push_str("\\'"),
+                    '\n' => quoted.push_str("\\n"),
+                    '\r' => quoted.push_str("\\r"),
+                    '\t' => quoted.push_str("\\t"),
+                    character => quoted.push(character),
+                }
             }
-            Op::List { length: u32::try_from(items.len()).expect("small") }
+            quoted.push('\'');
+            quoted
         }
-        Tree::Defined(v, negated) => {
-            flatten(v, out);
-            if *negated { Op::NotDefined } else { Op::Defined }
+        Tree::Int(value) => value.to_string(),
+        Tree::Bool(value) => value.to_string(),
+        Tree::Name(name) => core::str::from_utf8(name).expect("generated name").to_owned(),
+        Tree::Key(input, key, _) => format!("{}.{}", lookup(input), core::str::from_utf8(key).expect("key")),
+        Tree::Item(input, index, _) => format!("{}[{}]", lookup(input), printed(index)),
+        Tree::List(items) => format!("[{}]", items.iter().map(printed).collect::<Vec<_>>().join(",")),
+        Tree::Defined(input, negated) => {
+            format!("{} is {}defined", lookup(input), if *negated { "not " } else { "" })
         }
         Tree::Filter(input, filter, arguments) => {
-            flatten(input, out);
-            for argument in arguments {
-                flatten(argument, out);
-            }
-            Op::Filter(*filter)
-        }
-        Tree::Not(v) => {
-            flatten(v, out);
-            Op::Not
-        }
-        Tree::Binary(a, op, b) => {
-            flatten(a, out);
-            flatten(b, out);
-            op.op()
-        }
-        Tree::And(a, b) | Tree::Or(a, b) => {
-            flatten(a, out);
-            let at = out.len();
-            emit(out, Op::Jump { over: 0 });
-            flatten(b, out);
-            let over = u32::try_from(out.len() - at - 1).expect("small");
-            out[at].op = if matches!(tree, Tree::And(..)) {
-                Op::JumpIfFalseKeeping { over }
-            } else {
-                Op::JumpIfTrueKeeping { over }
+            let name = match filter {
+                Filter::Default => "default",
+                Filter::Join => "join",
+                Filter::Split => "split",
+                Filter::First => "first",
+                Filter::Last => "last",
+                Filter::Length => "length",
+                Filter::Replace => "replace",
+                Filter::Items => "items",
+                Filter::Keys => "keys",
+                Filter::Values => "values",
+                Filter::Sort => "sort",
+                Filter::Tojson => "tojson",
+                Filter::ShellQuote => "shell_quote",
+                Filter::SystemdEscape => "systemd_escape",
+                Filter::SystemdEscapePath => "systemd_escape_path",
+                Filter::Basename => "basename",
+                Filter::Dirname => "dirname",
             };
-            return;
+            let input = if *filter == Filter::Default { lookup(input) } else { wrapped(input) };
+            format!("{input} | {name}({})", arguments.iter().map(printed).collect::<Vec<_>>().join(","))
         }
+        Tree::Not(input) => format!("not {}", wrapped(input)),
+        Tree::Binary(left, binary, right) => {
+            let symbol = match binary {
+                Binary::Equal => "==",
+                Binary::NotEqual => "!=",
+                Binary::Less => "<",
+                Binary::LessOrEqual => "<=",
+                Binary::Greater => ">",
+                Binary::GreaterOrEqual => ">=",
+                Binary::In => "in",
+                Binary::NotIn => "not in",
+                Binary::Concat => "~",
+                Binary::Add => "+",
+                Binary::Subtract => "-",
+            };
+            format!("{} {symbol} {}", wrapped(left), wrapped(right))
+        }
+        Tree::And(left, right) => format!("{} and {}", wrapped(left), wrapped(right)),
+        Tree::Or(left, right) => format!("{} or {}", wrapped(left), wrapped(right)),
         Tree::Conditional { condition, yes, no } => {
-            flatten(condition, out);
-            let branch = out.len();
-            emit(out, Op::Jump { over: 0 });
-            flatten(yes, out);
-            let jump = out.len();
-            emit(out, Op::Jump { over: 0 });
-            out[branch].op = Op::JumpIfFalse { over: u32::try_from(out.len() - branch - 1).expect("small") };
-            flatten(no, out);
-            out[jump].op = Op::Jump { over: u32::try_from(out.len() - jump - 1).expect("small") };
-            return;
+            format!("{} if {} else {}", wrapped(yes), wrapped(condition), wrapped(no))
         }
-        Tree::Output(v) => {
-            flatten(v, out);
-            return;
-        }
-    };
-    emit(out, op);
-}
-fn emit(out: &mut Vec<Operation>, op: Op) {
-    out.push(Operation { at: u32::try_from(out.len()).expect("small"), op });
+        Tree::Output(input) => printed(input),
+    }
 }
 /// # Errors
 /// Returns the first evaluation fault kind.
 pub fn evaluate(tree: &Tree, roots: &Roots, limits: &Limits) -> Result<Option<Plain>, &'static str> {
-    let mut operations = vec![];
-    flatten(tree, &mut operations);
-    let expression = Expression {
-        values: u32::try_from(operations.len()).expect("small"),
-        operations: operations.into_boxed_slice(),
-    };
+    let text = text(tree);
+    let compiled = hearth_protocol_template::expression::compile(
+        &text,
+        &hearth_protocol_template::limits::Limits {
+            expression: u32::try_from(text.len()).expect("generated text fits"),
+            ..hearth_protocol_template::limits::SHIPPED
+        },
+    )
+    .unwrap_or_else(|error| panic!("generated expression {}: {error:?}", String::from_utf8_lossy(&text)));
+    let expression = hearth_protocol_builder::translate::operations::expression(compiled);
     let mut bindings = Bindings::with_capacity(u32::try_from(roots.bindings.len()).expect("small"));
     for (name, value) in &roots.bindings {
         bindings.push(Binding { name, value: Operand::Value(value) }).expect("room");

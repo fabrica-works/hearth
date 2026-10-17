@@ -548,3 +548,145 @@ fn each_store_record_field_translates_and_back() {
     }
 }
 mod errors;
+
+mod back {
+    use crate::render::evaluate as source;
+    use hearth_protocol_template as target;
+    use skein_lib::List;
+    #[must_use]
+    pub fn expression(expression: source::Expression) -> target::Expression {
+        let source::Expression { operations, values } = expression;
+        let mut translated = List::with_capacity(u32::try_from(operations.len()).expect("bounded operations"));
+        for item in operations {
+            translated.push(operation(item)).expect("operation room");
+        }
+        target::Expression { operations: translated.into_boxed(), values }
+    }
+    #[must_use]
+    pub fn operation(operation: source::Operation) -> target::Operation {
+        let source::Operation { at, op: value } = operation;
+        target::Operation { at, op: op(value) }
+    }
+    #[must_use]
+    pub fn op(op: source::Op) -> target::Op {
+        match op {
+            source::Op::String(v) => target::Op::String(v),
+            source::Op::Integer(v) => target::Op::Integer(v),
+            source::Op::Boolean(v) => target::Op::Boolean(v),
+            source::Op::Name { name, missing: mark } => target::Op::Name { name, missing: missing(mark) },
+            source::Op::Key { name, missing: mark } => target::Op::Key { name, missing: missing(mark) },
+            source::Op::Item { missing: mark } => target::Op::Item { missing: missing(mark) },
+            source::Op::List { length } => target::Op::List { length },
+            source::Op::Filter(value) => target::Op::Filter(filter(value)),
+            source::Op::Not => target::Op::Not,
+            source::Op::Equal => target::Op::Equal,
+            source::Op::NotEqual => target::Op::NotEqual,
+            source::Op::Less => target::Op::Less,
+            source::Op::LessOrEqual => target::Op::LessOrEqual,
+            source::Op::Greater => target::Op::Greater,
+            source::Op::GreaterOrEqual => target::Op::GreaterOrEqual,
+            source::Op::In => target::Op::In,
+            source::Op::NotIn => target::Op::NotIn,
+            source::Op::Concat => target::Op::Concat,
+            source::Op::Add => target::Op::Add,
+            source::Op::Subtract => target::Op::Subtract,
+            source::Op::Defined => target::Op::Defined,
+            source::Op::NotDefined => target::Op::NotDefined,
+            source::Op::JumpIfFalseKeeping { over } => target::Op::JumpIfFalseKeeping { over },
+            source::Op::JumpIfTrueKeeping { over } => target::Op::JumpIfTrueKeeping { over },
+            source::Op::JumpIfFalse { over } => target::Op::JumpIfFalse { over },
+            source::Op::Jump { over } => target::Op::Jump { over },
+        }
+    }
+    #[must_use]
+    pub fn missing(missing: source::Missing) -> target::Missing {
+        match missing {
+            source::Missing::Error => target::Missing::Error,
+            source::Missing::Undefined => target::Missing::Undefined,
+        }
+    }
+    #[must_use]
+    pub fn filter(filter: source::Filter) -> target::Filter {
+        match filter {
+            source::Filter::Default => target::Filter::Default,
+            source::Filter::Join => target::Filter::Join,
+            source::Filter::Split => target::Filter::Split,
+            source::Filter::First => target::Filter::First,
+            source::Filter::Last => target::Filter::Last,
+            source::Filter::Length => target::Filter::Length,
+            source::Filter::Replace => target::Filter::Replace,
+            source::Filter::Items => target::Filter::Items,
+            source::Filter::Keys => target::Filter::Keys,
+            source::Filter::Values => target::Filter::Values,
+            source::Filter::Sort => target::Filter::Sort,
+            source::Filter::Tojson => target::Filter::Tojson,
+            source::Filter::ShellQuote => target::Filter::ShellQuote,
+            source::Filter::SystemdEscape => target::Filter::SystemdEscape,
+            source::Filter::SystemdEscapePath => target::Filter::SystemdEscapePath,
+            source::Filter::Basename => target::Filter::Basename,
+            source::Filter::Dirname => target::Filter::Dirname,
+        }
+    }
+}
+
+use crate::translate::operations;
+use hearth_protocol_template as template;
+#[test]
+fn each_operation_translates_to_render_and_back() {
+    for (row, op) in super::fixtures::every_op().into_iter().enumerate() {
+        let back = back::op(operations::op(op.clone()));
+        assert_eq!(back, op, "row {row}: hearth 05's Op through render's and back");
+    }
+}
+const MISSING: &[template::Missing] = &[template::Missing::Error, template::Missing::Undefined];
+#[test]
+fn missing_translates_to_render_and_back() {
+    for &missing in MISSING {
+        assert_eq!(back::missing(operations::missing(missing)), missing, "{missing:?}");
+    }
+}
+const FILTERS: &[template::Filter] = &[
+    template::Filter::Default,
+    template::Filter::Join,
+    template::Filter::Split,
+    template::Filter::First,
+    template::Filter::Last,
+    template::Filter::Length,
+    template::Filter::Replace,
+    template::Filter::Items,
+    template::Filter::Keys,
+    template::Filter::Values,
+    template::Filter::Sort,
+    template::Filter::Tojson,
+    template::Filter::ShellQuote,
+    template::Filter::SystemdEscape,
+    template::Filter::SystemdEscapePath,
+    template::Filter::Basename,
+    template::Filter::Dirname,
+];
+#[test]
+fn each_filter_translates_to_render_and_back() {
+    for &filter in FILTERS {
+        assert_eq!(back::filter(operations::filter(filter)), filter, "{filter:?}");
+    }
+}
+#[test]
+fn an_expressions_offsets_and_values_cross_unchanged() {
+    let expression = template::Expression {
+        values: 2,
+        operations: Box::new([
+            template::Operation { at: 7, op: template::Op::String(skein_lib::bytes::copy_of(b"text")) },
+            template::Operation { at: 19, op: template::Op::Integer(-17) },
+        ]),
+    };
+    assert_eq!(
+        back::expression(operations::expression(expression)),
+        template::Expression {
+            values: 2,
+            operations: Box::new([
+                template::Operation { at: 7, op: template::Op::String(skein_lib::bytes::copy_of(b"text")) },
+                template::Operation { at: 19, op: template::Op::Integer(-17) },
+            ]),
+        }
+    );
+}

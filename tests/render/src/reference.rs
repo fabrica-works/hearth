@@ -26,6 +26,19 @@ fn charge(left: &mut u64, n: u64) -> Result<(), &'static str> {
     Ok(())
 }
 fn run(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Made, &'static str> {
+    run_lookup(tree, roots, limits, left, Missing::Error)
+}
+fn marked(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Made, &'static str> {
+    let missing = if super::expressions::chain(tree) { Missing::Undefined } else { Missing::Error };
+    run_lookup(tree, roots, limits, left, missing)
+}
+fn run_lookup(
+    tree: &Tree,
+    roots: &Roots,
+    limits: &Limits,
+    left: &mut u64,
+    missing: Missing,
+) -> Result<Made, &'static str> {
     let value = match tree {
         Tree::String(v) => {
             charge(left, u64::try_from(v.len()).expect("small"))?;
@@ -41,14 +54,14 @@ fn run(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Ma
             b"exports" => roots.exports.clone(),
             _ => roots.bindings.iter().rev().find(|(key, _)| key == n).ok_or("unknown")?.1.clone(),
         }),
-        Tree::Key(v, k, missing) => key(run(v, roots, limits, left)?.value, k, *missing)?,
-        Tree::Item(v, i, missing) => {
-            let container = run(v, roots, limits, left)?;
+        Tree::Key(v, k, _) => key(run_lookup(v, roots, limits, left, missing)?.value, k, missing)?,
+        Tree::Item(v, i, _) => {
+            let container = run_lookup(v, roots, limits, left, missing)?;
             let index = run(i, roots, limits, left)?.value;
             match (container.value, index) {
-                (None, _) => absent(*missing, "undefined")?,
+                (None, _) => absent(missing, "undefined")?,
                 (Some(_), None) => return Err("undefined"),
-                (Some(Value::Map(entries)), Some(Value::String(k))) => key(Some(Value::Map(entries)), &k, *missing)?,
+                (Some(Value::Map(entries)), Some(Value::String(k))) => key(Some(Value::Map(entries)), &k, missing)?,
                 (Some(Value::List(items)), Some(Value::Int(i))) => {
                     if let Some(v) = usize::try_from(i).ok().and_then(|i| items.get(i)) {
                         if let Some(made) = container.items {
@@ -56,7 +69,7 @@ fn run(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Ma
                         }
                         Some(v.clone())
                     } else {
-                        absent(*missing, "index")?
+                        absent(missing, "index")?
                     }
                 }
                 _ => return Err("type"),
@@ -75,7 +88,7 @@ fn run(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Ma
             }
             return Ok(Made { value: Some(Value::List(values)), depth, items: Some(made) });
         }
-        Tree::Defined(v, negated) => Some(Value::Bool(run(v, roots, limits, left)?.value.is_some() != *negated)),
+        Tree::Defined(v, negated) => Some(Value::Bool(marked(v, roots, limits, left)?.value.is_some() != *negated)),
         Tree::Not(v) => Some(Value::Bool(!truthy(run(v, roots, limits, left)?.value.as_ref()))),
         Tree::And(a, b) => {
             let a = run(a, roots, limits, left)?;
@@ -99,7 +112,11 @@ fn run(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Ma
             Some(binary(a.value.ok_or("undefined")?, *op, b.value.ok_or("undefined")?, left)?)
         }
         Tree::Filter(input, filter, arguments) => {
-            let input = run(input, roots, limits, left)?;
+            let input = if *filter == Filter::Default {
+                marked(input, roots, limits, left)?
+            } else {
+                run(input, roots, limits, left)?
+            };
             let arguments =
                 arguments.iter().map(|argument| run(argument, roots, limits, left)).collect::<Result<Vec<_>, _>>()?;
             return filtered(input, *filter, arguments, limits, left);
