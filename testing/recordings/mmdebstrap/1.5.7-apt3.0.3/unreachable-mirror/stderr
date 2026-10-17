@@ -1,0 +1,18 @@
+I: skipping emulation check in chrootless mode
+I: finding correct signed-by value...
+I: automatically chosen format: directory
+I: running apt-get update...
+Ign:1 http://snapshot.debian.org/archive/debian/20261017T143929Z forky InRelease
+Ign:1 http://snapshot.debian.org/archive/debian/20261017T143929Z forky InRelease
+Ign:1 http://snapshot.debian.org/archive/debian/20261017T143929Z forky InRelease
+Err:1 http://snapshot.debian.org/archive/debian/20261017T143929Z forky InRelease
+  Could not connect to 127.0.0.1:PORT (127.0.0.1). - connect (111: Connection refused)
+  Unable to connect to 127.0.0.1:PORT:
+Reading package lists...
+E: Failed to fetch http://snapshot.debian.org/archive/debian/20261017T143929Z/dists/forky/InRelease  Unable to connect to 127.0.0.1:PORT:
+E: Some index files failed to download. They have been ignored, or old ones used instead.
+E: apt-get update --error-on=any -oAPT::Status-Fd=<$fd> -oDpkg::Use-Pty=false failed: process exited with 100 and error in console output
+W: hooklistener errored out: E: received eof on socket
+
+I: main() received signal PIPE: waiting for setup...
+E: mmdebstrap failed to run

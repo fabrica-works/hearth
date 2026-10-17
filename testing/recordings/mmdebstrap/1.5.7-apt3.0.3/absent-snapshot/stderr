@@ -1,0 +1,14 @@
+I: skipping emulation check in chrootless mode
+I: finding correct signed-by value...
+I: automatically chosen format: directory
+I: running apt-get update...
+Ign:1 http://snapshot.debian.org/archive/debian/20000101T000000Z forky InRelease
+Err:2 http://snapshot.debian.org/archive/debian/20000101T000000Z forky Release
+  404  Not Found [IP: 127.0.0.1 PORT]
+Reading package lists...
+E: The repository 'http://snapshot.debian.org/archive/debian/20000101T000000Z forky Release' does not have a Release file.
+E: apt-get update --error-on=any -oAPT::Status-Fd=<$fd> -oDpkg::Use-Pty=false failed: process exited with 100 and error in console output
+W: hooklistener errored out: E: received eof on socket
+
+I: main() received signal PIPE: waiting for setup...
+E: mmdebstrap failed to run

@@ -14,6 +14,8 @@ pub struct Recording {
     pub stderr: Vec<u8>,
     pub exit: Box<str>,
     pub expect: Option<Vec<u8>>,
+    pub lists: Option<Vec<u8>>,
+    pub stanzas: Option<Vec<u8>>,
 }
 fn root(tool: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../recordings").join(tool)
@@ -55,6 +57,8 @@ fn read_at(dir: &Path, version: &str) -> Recording {
         stderr: get("stderr"),
         exit: String::from_utf8(get("exit")).expect("exit text").trim().into(),
         expect: optional("expect"),
+        lists: optional("lists"),
+        stanzas: optional("stanzas"),
     }
 }
 #[must_use]
@@ -99,7 +103,12 @@ fn write_at(dir: &Path, recording: &Recording) {
     ] {
         fs::write(dir.join(name), bytes).expect("recording file");
     }
-    for (name, bytes) in [("stdin", &recording.stdin), ("expect", &recording.expect)] {
+    for (name, bytes) in [
+        ("stdin", &recording.stdin),
+        ("expect", &recording.expect),
+        ("lists", &recording.lists),
+        ("stanzas", &recording.stanzas),
+    ] {
         if let Some(bytes) = bytes {
             fs::write(dir.join(name), bytes).expect("optional recording file");
         }
@@ -108,11 +117,19 @@ fn write_at(dir: &Path, recording: &Recording) {
 #[derive(Debug)]
 pub struct Mask {
     scratch: Vec<u8>,
+    further: Vec<(Vec<u8>, Vec<u8>)>,
 }
 impl Mask {
     #[must_use]
     pub fn new(scratch: &Path) -> Self {
-        Self { scratch: scratch.as_os_str().as_encoded_bytes().to_vec() }
+        Self { scratch: scratch.as_os_str().as_encoded_bytes().to_vec(), further: Vec::new() }
+    }
+    /// Mask another literal after the scratch path.
+    #[must_use]
+    pub fn also(mut self, from: &[u8], to: &[u8]) -> Self {
+        assert!(!from.is_empty(), "a mask literal is nonempty");
+        self.further.push((from.to_vec(), to.to_vec()));
+        self
     }
     #[must_use]
     pub fn bytes(&self, bytes: &[u8]) -> Vec<u8> {
@@ -130,6 +147,20 @@ impl Mask {
                 at += 1;
             }
         }
+        for (from, to) in &self.further {
+            let mut replaced = Vec::new();
+            let mut at = 0;
+            while at < result.len() {
+                if result[at..].starts_with(from) {
+                    replaced.extend_from_slice(to);
+                    at += from.len();
+                } else {
+                    replaced.push(result[at]);
+                    at += 1;
+                }
+            }
+            result = replaced;
+        }
         result
     }
     pub fn recording(&self, recording: &mut Recording) {
@@ -139,7 +170,10 @@ impl Mask {
         for bytes in [&mut recording.dir, &mut recording.stdout, &mut recording.stderr] {
             *bytes = self.bytes(bytes);
         }
-        for bytes in [&mut recording.stdin, &mut recording.expect].into_iter().flatten() {
+        for bytes in [&mut recording.stdin, &mut recording.expect, &mut recording.lists, &mut recording.stanzas]
+            .into_iter()
+            .flatten()
+        {
             *bytes = self.bytes(bytes);
         }
     }

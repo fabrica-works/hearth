@@ -206,3 +206,7 @@ impl Scenario {
         run
     }
 }
+
+/// A tiny Packages input for resolve's independent stanza cutter.
+pub const RESOLVE_INDEX: &[u8] =
+    b"Package: apt\nVersion: 3.3\nArchitecture: amd64\nOther: kept\n\nPackage: base\nVersion: 1\nArchitecture: all\n\n";

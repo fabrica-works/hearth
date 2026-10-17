@@ -24,14 +24,16 @@ const RECORDING_FILES: &[(&str, &[u8])] = &[
 fn fixture() -> Recording {
     Recording {
         version: "2.test".into(),
-        argv: lines(RECORDING_FILES[0].1),
-        env: lines(RECORDING_FILES[1].1),
-        dir: RECORDING_FILES[2].1.to_vec(),
-        stdin: Some(RECORDING_FILES[3].1.to_vec()),
-        stdout: RECORDING_FILES[4].1.to_vec(),
-        stderr: RECORDING_FILES[5].1.to_vec(),
+        argv: lines(b"tool\narg\n"),
+        env: lines(b"A=b\n"),
+        dir: b"/scratch/store".to_vec(),
+        stdin: Some(vec![0, 255]),
+        stdout: vec![1, 0, 255],
+        stderr: b"error\n".to_vec(),
         exit: "signal 9".into(),
-        expect: Some(RECORDING_FILES[7].1.to_vec()),
+        expect: Some(b"expected\n".to_vec()),
+        lists: None,
+        stanzas: None,
     }
 }
 #[test]
@@ -58,4 +60,30 @@ fn replacing_a_recording_removes_its_old_optional_files() {
         assert!(!dir.join(name).exists(), "old {name} removed");
     }
     assert_eq!(read_at(&dir, "2.test"), replaced);
+}
+
+const RESOLVE_FILES: &[(&str, &[u8])] = &[
+    ("lists", b"directory partial\nfile 4 index_Packages\n"),
+    ("stanzas", b"Package: apt\nVersion: 3.3.3\nArchitecture: amd64\n\n"),
+];
+#[test]
+fn a_recording_s_lists_and_stanzas_read_back_file_for_file() {
+    let scratch = skein_scratch::Scratch::new("resolve-recording");
+    let dir = scratch.path().join("case");
+    let original = Recording {
+        lists: Some(b"directory partial\nfile 4 index_Packages\n".to_vec()),
+        stanzas: Some(b"Package: apt\nVersion: 3.3.3\nArchitecture: amd64\n\n".to_vec()),
+        ..fixture()
+    };
+    write_at(&dir, &original);
+    assert_eq!(read_at(&dir, "2.test"), original);
+    for (name, expected) in RESOLVE_FILES {
+        assert_eq!(fs::read(dir.join(name)).expect("resolve recording file"), *expected, "{name}");
+    }
+}
+#[test]
+fn a_further_mask_replaces_its_literal_after_the_scratch() {
+    let mask =
+        Mask::new(Path::new("/tmp/example")).also(b"scratch", b"masked").also(b"127.0.0.1:1234", b"127.0.0.1:PORT");
+    assert_eq!(mask.bytes(b"/tmp/example 127.0.0.1:1234"), b"/masked 127.0.0.1:PORT");
 }

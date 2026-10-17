@@ -1,0 +1,3 @@
+LC_ALL=C
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+TMPDIR=/scratch

@@ -6,6 +6,8 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+hearth-protocol-mmdebstrap.workspace = true
+hearth-test-mirror.workspace = true
 hearth-protocol-git.workspace = true
 hearth-recordings.workspace = true
 hearth-git-world.workspace = true

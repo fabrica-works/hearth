@@ -1,0 +1,518 @@
+I: skipping emulation check in chrootless mode
+I: finding correct signed-by value...
+I: automatically chosen format: directory
+I: running apt-get update...
+Get:1 http://snapshot.debian.org/archive/debian/20261017T143929Z forky InRelease [151 kB]
+Get:2 http://snapshot.debian.org/archive/debian/20261017T143929Z forky/main amd64 Packages [10.0 MB]
+Fetched 10.2 MB in 1s (12.3 MB/s)
+Reading package lists...
+I: simulate downloading packages with apt...
+NOTE: This is only a simulation!
+      apt-get needs root privileges for real execution.
+      Keep also in mind that locking is deactivated,
+      so don't depend on the relevance to the real current situation!
+Reading package lists...
+Building dependency tree...
+The following additional packages will be installed:
+  debconf gcc-16-base libacl1 libattr1 libaudit-common libaudit1 libblkid1
+  libbz2-1.0 libc-gconv-modules-extra libc6 libcap-ng0 libcrypt1 libdb5.3t64
+  libdebconfclient0 libgcc-s1 libgmp10 liblzma5 libmd0 libmount1
+  libpam-modules libpam-modules-bin libpam-runtime libpam0g libpcre2-8-0
+  libselinux1 libsmartcols1 libssl3t64 libsystemd0 libtinfo6 libudev1 libuuid1
+  libzstd1 mawk openssl-provider-legacy zlib1g
+Suggested packages:
+  bash-doc debconf-doc debconf-kde-helper debconf-utils libgtk3-perl
+  libnet-ldap-perl libterm-readline-gnu-perl perl whiptail | dialog
+  diffutils-doc wdiff gnulib-l10n apt debsig-verify less glibc-doc libc-l10n
+  locales libnss-nis cryptsetup-bin libpam-doc liblz4-1 uuid-runtime
+  sensible-utils bzip2 ncompress xz-utils tar-scripts tar-doc dosfstools kbd
+  util-linux-extra util-linux-locales wtmpdb
+Recommended packages:
+  bash-completion apt | apt-utils debconf-i18n manpages libidn2-0
+  selinux-utils sensible-utils
+The following NEW packages will be installed:
+  base-files base-passwd bash coreutils dash debconf debianutils diffutils
+  dpkg findutils gcc-16-base grep gzip hostname init-system-helpers libacl1
+  libattr1 libaudit-common libaudit1 libblkid1 libbz2-1.0 libc-bin
+  libc-gconv-modules-extra libc6 libcap-ng0 libcrypt1 libdb5.3t64
+  libdebconfclient0 libgcc-s1 libgmp10 liblzma5 libmd0 libmount1
+  libpam-modules libpam-modules-bin libpam-runtime libpam0g libpcre2-8-0
+  libselinux1 libsmartcols1 libssl3t64 libsystemd0 libtinfo6 libudev1 libuuid1
+  libzstd1 mawk ncurses-base ncurses-bin openssl-provider-legacy perl-base sed
+  sysvinit-utils tar util-linux zlib1g
+0 upgraded, 56 newly installed, 0 to remove and 0 not upgraded.
+Inst gcc-16-base (16.2.0-3 Debian:testing [amd64])
+Conf gcc-16-base (16.2.0-3 Debian:testing [amd64])
+Inst libc-gconv-modules-extra (2.43-7 Debian:testing [amd64])
+Conf libc-gconv-modules-extra (2.43-7 Debian:testing [amd64])
+Inst libc6 (2.43-7 Debian:testing [amd64]) []
+Inst libgcc-s1 (16.2.0-3 Debian:testing [amd64])
+Conf libgcc-s1 (16.2.0-3 Debian:testing [amd64])
+Conf libc6 (2.43-7 Debian:testing [amd64])
+Inst mawk (1.3.4.20260302-2 Debian:testing [amd64])
+Conf mawk (1.3.4.20260302-2 Debian:testing [amd64])
+Inst base-files (14.2 Debian:testing [amd64])
+Conf base-files (14.2 Debian:testing [amd64])
+Inst libtinfo6 (6.6+20260608-2 Debian:testing [amd64])
+Conf libtinfo6 (6.6+20260608-2 Debian:testing [amd64])
+Inst debianutils (5.24 Debian:testing [amd64])
+Conf debianutils (5.24 Debian:testing [amd64])
+Inst bash (5.3-4 Debian:testing [amd64])
+Conf bash (5.3-4 Debian:testing [amd64])
+Inst libacl1 (2.4.0-1 Debian:testing [amd64])
+Conf libacl1 (2.4.0-1 Debian:testing [amd64])
+Inst libattr1 (1:2.6.0-1 Debian:testing [amd64])
+Conf libattr1 (1:2.6.0-1 Debian:testing [amd64])
+Inst libgmp10 (2:6.3.0+dfsg-5+b2 Debian:testing [amd64])
+Conf libgmp10 (2:6.3.0+dfsg-5+b2 Debian:testing [amd64])
+Inst libpcre2-8-0 (10.48-3.1 Debian:testing [amd64])
+Conf libpcre2-8-0 (10.48-3.1 Debian:testing [amd64])
+Inst libselinux1 (3.11-2.1 Debian:testing [amd64])
+Conf libselinux1 (3.11-2.1 Debian:testing [amd64])
+Inst libzstd1 (1.5.7+dfsg-4 Debian:testing [amd64])
+Conf libzstd1 (1.5.7+dfsg-4 Debian:testing [amd64])
+Inst zlib1g (1:1.3.dfsg+really1.3.2-3 Debian:testing [amd64])
+Conf zlib1g (1:1.3.dfsg+really1.3.2-3 Debian:testing [amd64])
+Inst libssl3t64 (3.6.5-1 Debian:testing [amd64]) []
+Inst openssl-provider-legacy (3.6.5-1 Debian:testing [amd64])
+Conf openssl-provider-legacy (3.6.5-1 Debian:testing [amd64])
+Conf libssl3t64 (3.6.5-1 Debian:testing [amd64])
+Inst libsystemd0 (262-1 Debian:testing [amd64])
+Conf libsystemd0 (262-1 Debian:testing [amd64])
+Inst coreutils (9.10-1 Debian:testing [amd64])
+Conf coreutils (9.10-1 Debian:testing [amd64])
+Inst dash (0.5.12-12 Debian:testing [amd64])
+Conf dash (0.5.12-12 Debian:testing [amd64])
+Inst diffutils (1:3.12-1 Debian:testing [amd64])
+Conf diffutils (1:3.12-1 Debian:testing [amd64])
+Inst libbz2-1.0 (1.0.8-6+b2 Debian:testing [amd64])
+Conf libbz2-1.0 (1.0.8-6+b2 Debian:testing [amd64])
+Inst liblzma5 (5.8.4-1 Debian:testing [amd64])
+Conf liblzma5 (5.8.4-1 Debian:testing [amd64])
+Inst libmd0 (1.3.0-1 Debian:testing [amd64])
+Conf libmd0 (1.3.0-1 Debian:testing [amd64])
+Inst dpkg (1.23.11 Debian:testing [amd64])
+Conf dpkg (1.23.11 Debian:testing [amd64])
+Inst findutils (4.11.0-3 Debian:testing [amd64])
+Conf findutils (4.11.0-3 Debian:testing [amd64])
+Inst grep (3.12-1 Debian:testing [amd64])
+Conf grep (3.12-1 Debian:testing [amd64])
+Inst gzip (1.14-1 Debian:testing [amd64])
+Conf gzip (1.14-1 Debian:testing [amd64])
+Inst hostname (3.25 Debian:testing [amd64])
+Conf hostname (3.25 Debian:testing [amd64])
+Inst ncurses-bin (6.6+20260608-2 Debian:testing [amd64])
+Conf ncurses-bin (6.6+20260608-2 Debian:testing [amd64])
+Inst libcrypt1 (1:4.5.2+20251210-1 Debian:testing [amd64])
+Conf libcrypt1 (1:4.5.2+20251210-1 Debian:testing [amd64])
+Inst perl-base (5.42.3-1 Debian:testing [amd64])
+Conf perl-base (5.42.3-1 Debian:testing [amd64])
+Inst sed (4.9-3 Debian:testing [amd64])
+Conf sed (4.9-3 Debian:testing [amd64])
+Inst tar (1.35+dfsg-6 Debian:testing [amd64])
+Conf tar (1.35+dfsg-6 Debian:testing [amd64])
+Inst libaudit-common (1:4.1.2-1 Debian:testing [all])
+Conf libaudit-common (1:4.1.2-1 Debian:testing [all])
+Inst libcap-ng0 (0.9.6-1 Debian:testing [amd64])
+Conf libcap-ng0 (0.9.6-1 Debian:testing [amd64])
+Inst libaudit1 (1:4.1.2-1+b2 Debian:testing [amd64])
+Conf libaudit1 (1:4.1.2-1+b2 Debian:testing [amd64])
+Inst libdb5.3t64 (5.3.28+dfsg2-11+b1 Debian:testing [amd64])
+Conf libdb5.3t64 (5.3.28+dfsg2-11+b1 Debian:testing [amd64])
+Inst debconf (1.5.92 Debian:testing [all])
+Conf debconf (1.5.92 Debian:testing [all])
+Inst libpam0g (1.7.0-8 Debian:testing [amd64])
+Conf libpam0g (1.7.0-8 Debian:testing [amd64])
+Inst libpam-modules-bin (1.7.0-8 Debian:testing [amd64])
+Conf libpam-modules-bin (1.7.0-8 Debian:testing [amd64])
+Inst libpam-modules (1.7.0-8 Debian:testing [amd64])
+Conf libpam-modules (1.7.0-8 Debian:testing [amd64])
+Inst libpam-runtime (1.7.0-8 Debian:testing [all])
+Conf libpam-runtime (1.7.0-8 Debian:testing [all])
+Inst libblkid1 (2.42.4-1 Debian:testing [amd64])
+Conf libblkid1 (2.42.4-1 Debian:testing [amd64])
+Inst libmount1 (2.42.4-1 Debian:testing [amd64])
+Conf libmount1 (2.42.4-1 Debian:testing [amd64])
+Inst libsmartcols1 (2.42.4-1 Debian:testing [amd64])
+Conf libsmartcols1 (2.42.4-1 Debian:testing [amd64])
+Inst libudev1 (262-1 Debian:testing [amd64])
+Conf libudev1 (262-1 Debian:testing [amd64])
+Inst libuuid1 (2.42.4-1 Debian:testing [amd64])
+Conf libuuid1 (2.42.4-1 Debian:testing [amd64])
+Inst util-linux (2.42.4-1 Debian:testing [amd64])
+Conf util-linux (2.42.4-1 Debian:testing [amd64])
+Inst libdebconfclient0 (0.283 Debian:testing [amd64])
+Conf libdebconfclient0 (0.283 Debian:testing [amd64])
+Inst base-passwd (3.6.8 Debian:testing [amd64])
+Conf base-passwd (3.6.8 Debian:testing [amd64])
+Inst init-system-helpers (1.69+nmu3 Debian:testing [all])
+Conf init-system-helpers (1.69+nmu3 Debian:testing [all])
+Inst libc-bin (2.43-7 Debian:testing [amd64])
+Conf libc-bin (2.43-7 Debian:testing [amd64])
+Inst ncurses-base (6.6+20260608-2 Debian:testing [all])
+Conf ncurses-base (6.6+20260608-2 Debian:testing [all])
+Inst sysvinit-utils (3.18-1 Debian:testing [amd64])
+Conf sysvinit-utils (3.18-1 Debian:testing [amd64])
+I: skip extracting packages because of --dry-run
+I: no essential packages -- skipping...
+NOTE: This is only a simulation!
+      apt-get needs root privileges for real execution.
+      Keep also in mind that locking is deactivated,
+      so don't depend on the relevance to the real current situation!
+Reading package lists...
+Building dependency tree...
+The following additional packages will be installed:
+  base-passwd cpio debconf debian-archive-keyring gcc-16-base git-man kmod
+  libacl1 libapt-pkg7.0 libarchive13t64 libaudit-common libaudit1 libblkid1
+  libbrotli1 libbsd0 libbz2-1.0 libc-gconv-modules-extra libc6 libcap-ng0
+  libcbor0.10 libcom-err2 libcrypt1 libcurl3t64-gnutls libcurl4-gnutls
+  libdb5.3t64 libdebconfclient0 libefiboot1t64 libefivar1t64 liberror-perl
+  libexpat1 libffi8 libfido2-1 libgcc-s1 libgdbm-compat4t64 libgdbm6t64
+  libgmp10 libgnutls30t64 libgssapi-krb5-2 libhogweed6t64 libidn2-0
+  libk5crypto3 libkeyutils1 libkmod2 libkrb5-3 libkrb5support0 libldap2
+  liblz4-1 liblzma5 libmd0 libmount1 libncursesw6 libnettle8t64 libnghttp2-14
+  libnghttp3-9 libngtcp2-16 libngtcp2-crypto-gnutls8 libp11-kit0
+  libpam-modules libpam-modules-bin libpam-runtime libpam0g libpcre2-8-0
+  libperl5.42 libpopt0 libproc2-1 libpsl5t64 libpython3-stdlib
+  libpython3.14-minimal libpython3.14-stdlib libreadline8t64 libsasl2-2
+  libsasl2-modules-db libseccomp2 libselinux1 libsemanage-common libsemanage2
+  libsepol2 libsqlite3-0 libssh2-1t64 libssl3t64 libstdc++6 libsubid6
+  libsystemd-shared libsystemd0 libtasn1-6 libtext-charwidth-perl
+  libtext-wrapi18n-perl libtinfo6 libudev1 libunistring5 libuuid1 libwrap0
+  libwtmpdb0 libxml2-16 libxxhash0 libzstd1 linux-base
+  linux-base-7.2.11+deb14-amd64 linux-base-amd64
+  linux-binary-7.2.11+deb14-amd64 linux-image-7.2.11+deb14-amd64
+  linux-modules-7.2.11+deb14-amd64 media-types netbase openssh-common
+  openssh-sftp-server openssl-provider-legacy perl perl-base perl-modules-5.42
+  procps python3 python3-minimal python3.14 python3.14-minimal readline-common
+  runit-helper sensible-utils sqv tiny-initramfs-core tzdata ucf xz-utils
+  zlib1g
+Suggested packages:
+  apt-doc aptitude | synaptic | wajig dpkg-dev gnupg | gnupg2 | gnupg1
+  powermgmt-base libarchive-dev debconf-doc debconf-kde-helper debconf-utils
+  libgtk3-perl libnet-ldap-perl libterm-readline-gnu-perl whiptail | dialog
+  gettext-base git-doc git-email git-gui gitk gitweb git-cvs git-svn lrzip
+  glibc-doc libc-l10n locales libnss-nis gdbm-l10n gnutls-bin krb5-doc
+  krb5-user cryptsetup-bin libpam-doc libapparmor1 libbpf1 libcryptsetup12
+  libcurl4t64 libdw1t64 libelf1t64 libfdisk1 libmicrohttpd12t64 libpwquality1
+  libqrencode4 libtss2-esys-3.0.2-0t64 libtss2-mu-4.0.1-0t64 libtss2-rc0t64
+  libtss2-tcti-device0t64 uuid-runtime debian-kernel-handbook
+  firmware-linux-free grub-pc | grub-efi-amd64 | extlinux linux-doc-7.2
+  apt-transport-tor apt-utils ca-certificates debootstrap distro-info-data
+  fakechroot fakeroot genext2fs e2fsprogs perl-doc qemu-user qemu-user-static
+  squashfs-tools-ng ncompress bzip2 lzop lz4 zstd molly-guard monkeysphere
+  ssh-askpass ufw libterm-readline-gnu-perl | libterm-readline-perl-perl make
+  libtap-harness-archive-perl python3-doc python3-tk python3-venv
+  python3.14-venv python3.14-doc binutils binfmt-support readline-doc
+  systemd-homed systemd-imds systemd-userdbd systemd-boot systemd-report
+  systemd-resolved systemd-repart polkitd
+Recommended packages:
+  ca-certificates debconf-i18n patch less ssh-client krb5-locales
+  libldap-common libgpm2 publicsuffix libsasl2-modules selinux-utils apparmor
+  arch-test gpg libdistro-info-perl libdpkg-perl mount default-logind | logind
+  | libpam-systemd ncurses-term passwd xauth psmisc linux-sysctl-defaults
+  default-dbus-system-bus | dbus-system-bus login systemd-timesyncd
+  | time-daemon systemd-tpm systemd-cryptsetup libapparmor1 libbpf1
+  libcryptsetup12 libnss-mymachines libfdisk1
+The following NEW packages will be installed:
+  apt base-passwd cpio debconf debian-archive-keyring efibootmgr gcc-16-base
+  git git-man incus-agent kmod libacl1 libapt-pkg7.0 libarchive13t64
+  libaudit-common libaudit1 libblkid1 libbrotli1 libbsd0 libbz2-1.0
+  libc-gconv-modules-extra libc6 libcap-ng0 libcbor0.10 libcom-err2 libcrypt1
+  libcurl3t64-gnutls libcurl4-gnutls libdb5.3t64 libdebconfclient0
+  libefiboot1t64 libefivar1t64 liberror-perl libexpat1 libffi8 libfido2-1
+  libgcc-s1 libgdbm-compat4t64 libgdbm6t64 libgmp10 libgnutls30t64
+  libgssapi-krb5-2 libhogweed6t64 libidn2-0 libk5crypto3 libkeyutils1 libkmod2
+  libkrb5-3 libkrb5support0 libldap2 liblz4-1 liblzma5 libmd0 libmount1
+  libncursesw6 libnettle8t64 libnghttp2-14 libnghttp3-9 libngtcp2-16
+  libngtcp2-crypto-gnutls8 libp11-kit0 libpam-modules libpam-modules-bin
+  libpam-runtime libpam0g libpcre2-8-0 libperl5.42 libpopt0 libproc2-1
+  libpsl5t64 libpython3-stdlib libpython3.14-minimal libpython3.14-stdlib
+  libreadline8t64 libsasl2-2 libsasl2-modules-db libseccomp2 libselinux1
+  libsemanage-common libsemanage2 libsepol2 libsqlite3-0 libssh2-1t64
+  libssl3t64 libstdc++6 libsubid6 libsystemd-shared libsystemd0 libtasn1-6
+  libtext-charwidth-perl libtext-wrapi18n-perl libtinfo6 libudev1
+  libunistring5 libuuid1 libwrap0 libwtmpdb0 libxml2-16 libxxhash0 libzstd1
+  linux-base linux-base-7.2.11+deb14-amd64 linux-base-amd64
+  linux-binary-7.2.11+deb14-amd64 linux-image-7.2.11+deb14-amd64
+  linux-image-amd64 linux-modules-7.2.11+deb14-amd64 media-types mmdebstrap
+  netbase openssh-common openssh-server openssh-sftp-server
+  openssl-provider-legacy perl perl-base perl-modules-5.42 procps python3
+  python3-minimal python3.14 python3.14-minimal readline-common runit-helper
+  sensible-utils sqv systemd systemd-container tiny-initramfs
+  tiny-initramfs-core tzdata ucf uidmap xz-utils zlib1g
+0 upgraded, 135 newly installed, 0 to remove and 0 not upgraded.
+Inst gcc-16-base (16.2.0-3 Debian:testing [amd64])
+Conf gcc-16-base (16.2.0-3 Debian:testing [amd64])
+Inst libc-gconv-modules-extra (2.43-7 Debian:testing [amd64])
+Conf libc-gconv-modules-extra (2.43-7 Debian:testing [amd64])
+Inst libc6 (2.43-7 Debian:testing [amd64]) []
+Inst libgcc-s1 (16.2.0-3 Debian:testing [amd64])
+Conf libgcc-s1 (16.2.0-3 Debian:testing [amd64])
+Conf libc6 (2.43-7 Debian:testing [amd64])
+Inst libcrypt1 (1:4.5.2+20251210-1 Debian:testing [amd64])
+Conf libcrypt1 (1:4.5.2+20251210-1 Debian:testing [amd64])
+Inst perl-base (5.42.3-1 Debian:testing [amd64])
+Conf perl-base (5.42.3-1 Debian:testing [amd64])
+Inst libdebconfclient0 (0.283 Debian:testing [amd64])
+Conf libdebconfclient0 (0.283 Debian:testing [amd64])
+Inst libpcre2-8-0 (10.48-3.1 Debian:testing [amd64])
+Conf libpcre2-8-0 (10.48-3.1 Debian:testing [amd64])
+Inst libselinux1 (3.11-2.1 Debian:testing [amd64])
+Conf libselinux1 (3.11-2.1 Debian:testing [amd64])
+Inst base-passwd (3.6.8 Debian:testing [amd64])
+Conf base-passwd (3.6.8 Debian:testing [amd64])
+Inst libaudit-common (1:4.1.2-1 Debian:testing [all])
+Inst libcap-ng0 (0.9.6-1 Debian:testing [amd64])
+Inst libaudit1 (1:4.1.2-1+b2 Debian:testing [amd64])
+Inst libdb5.3t64 (5.3.28+dfsg2-11+b1 Debian:testing [amd64])
+Inst debconf (1.5.92 Debian:testing [all])
+Inst libpam0g (1.7.0-8 Debian:testing [amd64])
+Inst libsystemd0 (262-1 Debian:testing [amd64])
+Inst libpam-modules-bin (1.7.0-8 Debian:testing [amd64])
+Conf libaudit-common (1:4.1.2-1 Debian:testing [all])
+Conf libcap-ng0 (0.9.6-1 Debian:testing [amd64])
+Conf libaudit1 (1:4.1.2-1+b2 Debian:testing [amd64])
+Conf libdb5.3t64 (5.3.28+dfsg2-11+b1 Debian:testing [amd64])
+Conf debconf (1.5.92 Debian:testing [all])
+Conf libpam0g (1.7.0-8 Debian:testing [amd64])
+Conf libsystemd0 (262-1 Debian:testing [amd64])
+Conf libpam-modules-bin (1.7.0-8 Debian:testing [amd64])
+Inst libpam-modules (1.7.0-8 Debian:testing [amd64])
+Inst libsystemd-shared (262-1 Debian:testing [amd64])
+Inst libblkid1 (2.42.4-1 Debian:testing [amd64])
+Inst libmount1 (2.42.4-1 Debian:testing [amd64])
+Conf libsystemd-shared (262-1 Debian:testing [amd64])
+Inst systemd (262-1 Debian:testing [amd64])
+Inst libexpat1 (2.9.0-1 Debian:testing [amd64])
+Inst linux-base (4.17 Debian:testing [all])
+Inst cpio (2.15+dfsg-2.1 Debian:testing [amd64])
+Inst liblzma5 (5.8.4-1 Debian:testing [amd64])
+Inst xz-utils (5.8.4-1 Debian:testing [amd64])
+Inst tiny-initramfs-core (0.1-8 Debian:testing [amd64])
+Inst tiny-initramfs (0.1-8 Debian:testing [all])
+Inst linux-base-7.2.11+deb14-amd64 (7.2.11-1 Debian:testing [amd64])
+Inst linux-binary-7.2.11+deb14-amd64 (7.2.11-1 Debian:testing [amd64])
+Inst libzstd1 (1.5.7+dfsg-4 Debian:testing [amd64])
+Inst zlib1g (1:1.3.dfsg+really1.3.2-3 Debian:testing [amd64])
+Inst openssl-provider-legacy (3.6.5-1 Debian:testing [amd64]) []
+Inst libssl3t64 (3.6.5-1 Debian:testing [amd64])
+Inst libkmod2 (34.2-2+b2 Debian:testing [amd64])
+Inst kmod (34.2-2+b2 Debian:testing [amd64])
+Inst linux-modules-7.2.11+deb14-amd64 (7.2.11-1 Debian:testing [amd64])
+Conf linux-base (4.17 Debian:testing [all])
+Inst linux-image-7.2.11+deb14-amd64 (7.2.11-1 Debian:testing [amd64])
+Inst libpython3.14-minimal (3.14.8-1 Debian:testing [amd64])
+Inst python3.14-minimal (3.14.8-1 Debian:testing [amd64])
+Conf libzstd1 (1.5.7+dfsg-4 Debian:testing [amd64])
+Conf zlib1g (1:1.3.dfsg+really1.3.2-3 Debian:testing [amd64])
+Conf openssl-provider-legacy (3.6.5-1 Debian:testing [amd64])
+Conf libssl3t64 (3.6.5-1 Debian:testing [amd64])
+Conf libpython3.14-minimal (3.14.8-1 Debian:testing [amd64])
+Conf libexpat1 (2.9.0-1 Debian:testing [amd64])
+Conf python3.14-minimal (3.14.8-1 Debian:testing [amd64])
+Inst python3-minimal (3.14.7-3 Debian:testing [amd64])
+Inst media-types (14.0.0 Debian:testing [all])
+Inst netbase (6.6 Debian:testing [all])
+Inst tzdata (2026e-1 Debian:testing [all])
+Inst libbz2-1.0 (1.0.8-6+b2 Debian:testing [amd64])
+Inst libffi8 (3.8.0-2 Debian:testing [amd64])
+Inst libtinfo6 (6.6+20260608-2 Debian:testing [amd64])
+Inst libncursesw6 (6.6+20260608-2 Debian:testing [amd64])
+Inst readline-common (8.3-4 Debian:testing [all])
+Inst libreadline8t64 (8.3-4 Debian:testing [amd64])
+Inst libsqlite3-0 (3.53.4-2 Debian:testing [amd64])
+Inst libuuid1 (2.42.4-1 Debian:testing [amd64])
+Inst libpython3.14-stdlib (3.14.8-1 Debian:testing [amd64])
+Inst python3.14 (3.14.8-1 Debian:testing [amd64])
+Inst libpython3-stdlib (3.14.7-3 Debian:testing [amd64])
+Conf python3-minimal (3.14.7-3 Debian:testing [amd64])
+Inst python3 (3.14.7-3 Debian:testing [amd64])
+Inst libgmp10 (2:6.3.0+dfsg-5+b2 Debian:testing [amd64])
+Inst libnettle8t64 (3.10.2-1+b1 Debian:testing [amd64])
+Inst libhogweed6t64 (3.10.2-1+b1 Debian:testing [amd64])
+Inst sqv (1.5.0-1 Debian:testing [amd64])
+Inst libxxhash0 (0.8.3-2+b2 Debian:testing [amd64])
+Inst liblz4-1 (1.10.0-10 Debian:testing [amd64])
+Inst libstdc++6 (16.2.0-3 Debian:testing [amd64])
+Inst libudev1 (262-1 Debian:testing [amd64])
+Inst libapt-pkg7.0 (3.3.3 Debian:testing [amd64])
+Inst debian-archive-keyring (2025.1 Debian:testing [all])
+Inst libseccomp2 (2.6.1-1+b1 Debian:testing [amd64])
+Inst apt (3.3.3 Debian:testing [amd64])
+Inst libpam-runtime (1.7.0-8 Debian:testing [all])
+Inst libproc2-1 (2:4.0.7-1 Debian:testing [amd64])
+Inst procps (2:4.0.7-1 Debian:testing [amd64])
+Inst sensible-utils (0.0.26 Debian:testing [all])
+Inst libcbor0.10 (0.10.2-2.2 Debian:testing [amd64])
+Inst libfido2-1 (1.17.0-2 Debian:testing [amd64])
+Inst openssh-common (1:10.6p1-1 Debian:testing [amd64])
+Inst perl-modules-5.42 (5.42.3-1 Debian:testing [all])
+Inst libgdbm6t64 (1.26-1+b2 Debian:testing [amd64])
+Inst libgdbm-compat4t64 (1.26-1+b2 Debian:testing [amd64])
+Inst libperl5.42 (5.42.3-1 Debian:testing [amd64])
+Inst perl (5.42.3-1 Debian:testing [amd64])
+Inst libtext-charwidth-perl (0.04-12+b1 Debian:testing [amd64])
+Inst libtext-wrapi18n-perl (0.06-11 Debian:testing [all])
+Inst ucf (3.0056 Debian:testing [all])
+Inst libefivar1t64 (39-2+b2 Debian:testing [amd64])
+Inst libefiboot1t64 (39-2+b2 Debian:testing [amd64])
+Inst libpopt0 (1.19+dfsg-2+b2 Debian:testing [amd64])
+Inst efibootmgr (18-4.1 Debian:testing [amd64])
+Inst libnghttp3-9 (1.17.0-1 Debian:testing [amd64])
+Inst libngtcp2-16 (1.24.0-1 Debian:testing [amd64])
+Inst libbrotli1 (1.2.0-4+b1 Debian:testing [amd64])
+Inst libunistring5 (1.4.2-1 Debian:testing [amd64])
+Inst libidn2-0 (2.3.8-5 Debian:testing [amd64])
+Inst libp11-kit0 (0.26.5-1 Debian:testing [amd64])
+Inst libtasn1-6 (4.21.0-2+b1 Debian:testing [amd64])
+Inst libgnutls30t64 (3.8.13-1 Debian:testing [amd64])
+Inst libkrb5support0 (1.22.1-3 Debian:testing [amd64])
+Inst libcom-err2 (1.47.4-1+b2 Debian:testing [amd64])
+Inst libk5crypto3 (1.22.1-3 Debian:testing [amd64])
+Inst libkeyutils1 (1.6.3-6+b2 Debian:testing [amd64])
+Inst libkrb5-3 (1.22.1-3 Debian:testing [amd64])
+Inst libgssapi-krb5-2 (1.22.1-3 Debian:testing [amd64])
+Inst libsasl2-modules-db (2.1.28+dfsg1-11 Debian:testing [amd64])
+Inst libsasl2-2 (2.1.28+dfsg1-11 Debian:testing [amd64])
+Inst libldap2 (2.6.14+dfsg-2 Debian:testing [amd64])
+Inst libnghttp2-14 (1.70.0-1 Debian:testing [amd64])
+Inst libngtcp2-crypto-gnutls8 (1.24.0-1 Debian:testing [amd64])
+Inst libpsl5t64 (0.23.3-1 Debian:testing [amd64])
+Inst libssh2-1t64 (1.11.1-6 Debian:testing [amd64])
+Inst libcurl4-gnutls (8.22.0-1 Debian:testing [amd64])
+Inst libcurl3t64-gnutls (8.22.0-1 Debian:testing [amd64])
+Inst liberror-perl (0.17030-1 Debian:testing [all])
+Inst git-man (1:2.53.0-1 Debian:testing [all])
+Inst git (1:2.53.0-1 Debian:testing [amd64])
+Inst incus-agent (7.0.1-5 Debian:testing [amd64])
+Inst libacl1 (2.4.0-1 Debian:testing [amd64])
+Inst libxml2-16 (2.15.4+dfsg-1 Debian:testing [amd64])
+Inst libarchive13t64 (3.8.9-1 Debian:testing [amd64])
+Inst libmd0 (1.3.0-1 Debian:testing [amd64])
+Inst libbsd0 (0.12.2-3 Debian:testing [amd64])
+Inst libsemanage-common (3.11-1 Debian:testing [all])
+Inst libsepol2 (3.11-1 Debian:testing [amd64])
+Inst libsemanage2 (3.11-1+b1 Debian:testing [amd64])
+Inst libsubid6 (1:4.20.3-1 Debian:testing [amd64])
+Inst libwrap0 (7.6.q-37 Debian:testing [amd64])
+Inst libwtmpdb0 (0.75.0-6 Debian:testing [amd64])
+Inst linux-base-amd64 (7.2.11-1 Debian:testing [amd64])
+Inst linux-image-amd64 (7.2.11-1 Debian:testing [amd64])
+Inst mmdebstrap (1.5.7-3 Debian:testing [all])
+Inst openssh-sftp-server (1:10.6p1-1 Debian:testing [amd64])
+Inst runit-helper (2.16.7 Debian:testing [all])
+Inst openssh-server (1:10.6p1-1 Debian:testing [amd64])
+Inst systemd-container (262-1 Debian:testing [amd64])
+Inst uidmap (1:4.20.3-1 Debian:testing [amd64])
+Conf libpam-modules (1.7.0-8 Debian:testing [amd64])
+Conf libblkid1 (2.42.4-1 Debian:testing [amd64])
+Conf libmount1 (2.42.4-1 Debian:testing [amd64])
+Conf systemd (262-1 Debian:testing [amd64])
+Conf cpio (2.15+dfsg-2.1 Debian:testing [amd64])
+Conf liblzma5 (5.8.4-1 Debian:testing [amd64])
+Conf xz-utils (5.8.4-1 Debian:testing [amd64])
+Conf tiny-initramfs-core (0.1-8 Debian:testing [amd64])
+Conf tiny-initramfs (0.1-8 Debian:testing [all])
+Conf linux-base-7.2.11+deb14-amd64 (7.2.11-1 Debian:testing [amd64])
+Conf linux-binary-7.2.11+deb14-amd64 (7.2.11-1 Debian:testing [amd64])
+Conf libkmod2 (34.2-2+b2 Debian:testing [amd64])
+Conf kmod (34.2-2+b2 Debian:testing [amd64])
+Conf linux-modules-7.2.11+deb14-amd64 (7.2.11-1 Debian:testing [amd64])
+Conf linux-image-7.2.11+deb14-amd64 (7.2.11-1 Debian:testing [amd64])
+Conf media-types (14.0.0 Debian:testing [all])
+Conf netbase (6.6 Debian:testing [all])
+Conf tzdata (2026e-1 Debian:testing [all])
+Conf libbz2-1.0 (1.0.8-6+b2 Debian:testing [amd64])
+Conf libffi8 (3.8.0-2 Debian:testing [amd64])
+Conf libtinfo6 (6.6+20260608-2 Debian:testing [amd64])
+Conf libncursesw6 (6.6+20260608-2 Debian:testing [amd64])
+Conf readline-common (8.3-4 Debian:testing [all])
+Conf libreadline8t64 (8.3-4 Debian:testing [amd64])
+Conf libsqlite3-0 (3.53.4-2 Debian:testing [amd64])
+Conf libuuid1 (2.42.4-1 Debian:testing [amd64])
+Conf libpython3.14-stdlib (3.14.8-1 Debian:testing [amd64])
+Conf python3.14 (3.14.8-1 Debian:testing [amd64])
+Conf libpython3-stdlib (3.14.7-3 Debian:testing [amd64])
+Conf python3 (3.14.7-3 Debian:testing [amd64])
+Conf libgmp10 (2:6.3.0+dfsg-5+b2 Debian:testing [amd64])
+Conf libnettle8t64 (3.10.2-1+b1 Debian:testing [amd64])
+Conf libhogweed6t64 (3.10.2-1+b1 Debian:testing [amd64])
+Conf sqv (1.5.0-1 Debian:testing [amd64])
+Conf libxxhash0 (0.8.3-2+b2 Debian:testing [amd64])
+Conf liblz4-1 (1.10.0-10 Debian:testing [amd64])
+Conf libstdc++6 (16.2.0-3 Debian:testing [amd64])
+Conf libudev1 (262-1 Debian:testing [amd64])
+Conf libapt-pkg7.0 (3.3.3 Debian:testing [amd64])
+Conf debian-archive-keyring (2025.1 Debian:testing [all])
+Conf libseccomp2 (2.6.1-1+b1 Debian:testing [amd64])
+Conf apt (3.3.3 Debian:testing [amd64])
+Conf libpam-runtime (1.7.0-8 Debian:testing [all])
+Conf libproc2-1 (2:4.0.7-1 Debian:testing [amd64])
+Conf procps (2:4.0.7-1 Debian:testing [amd64])
+Conf sensible-utils (0.0.26 Debian:testing [all])
+Conf libcbor0.10 (0.10.2-2.2 Debian:testing [amd64])
+Conf libfido2-1 (1.17.0-2 Debian:testing [amd64])
+Conf openssh-common (1:10.6p1-1 Debian:testing [amd64])
+Conf perl-modules-5.42 (5.42.3-1 Debian:testing [all])
+Conf libgdbm6t64 (1.26-1+b2 Debian:testing [amd64])
+Conf libgdbm-compat4t64 (1.26-1+b2 Debian:testing [amd64])
+Conf libperl5.42 (5.42.3-1 Debian:testing [amd64])
+Conf perl (5.42.3-1 Debian:testing [amd64])
+Conf libtext-charwidth-perl (0.04-12+b1 Debian:testing [amd64])
+Conf libtext-wrapi18n-perl (0.06-11 Debian:testing [all])
+Conf ucf (3.0056 Debian:testing [all])
+Conf libefivar1t64 (39-2+b2 Debian:testing [amd64])
+Conf libefiboot1t64 (39-2+b2 Debian:testing [amd64])
+Conf libpopt0 (1.19+dfsg-2+b2 Debian:testing [amd64])
+Conf efibootmgr (18-4.1 Debian:testing [amd64])
+Conf libnghttp3-9 (1.17.0-1 Debian:testing [amd64])
+Conf libngtcp2-16 (1.24.0-1 Debian:testing [amd64])
+Conf libbrotli1 (1.2.0-4+b1 Debian:testing [amd64])
+Conf libunistring5 (1.4.2-1 Debian:testing [amd64])
+Conf libidn2-0 (2.3.8-5 Debian:testing [amd64])
+Conf libp11-kit0 (0.26.5-1 Debian:testing [amd64])
+Conf libtasn1-6 (4.21.0-2+b1 Debian:testing [amd64])
+Conf libgnutls30t64 (3.8.13-1 Debian:testing [amd64])
+Conf libkrb5support0 (1.22.1-3 Debian:testing [amd64])
+Conf libcom-err2 (1.47.4-1+b2 Debian:testing [amd64])
+Conf libk5crypto3 (1.22.1-3 Debian:testing [amd64])
+Conf libkeyutils1 (1.6.3-6+b2 Debian:testing [amd64])
+Conf libkrb5-3 (1.22.1-3 Debian:testing [amd64])
+Conf libgssapi-krb5-2 (1.22.1-3 Debian:testing [amd64])
+Conf libsasl2-modules-db (2.1.28+dfsg1-11 Debian:testing [amd64])
+Conf libsasl2-2 (2.1.28+dfsg1-11 Debian:testing [amd64])
+Conf libldap2 (2.6.14+dfsg-2 Debian:testing [amd64])
+Conf libnghttp2-14 (1.70.0-1 Debian:testing [amd64])
+Conf libngtcp2-crypto-gnutls8 (1.24.0-1 Debian:testing [amd64])
+Conf libpsl5t64 (0.23.3-1 Debian:testing [amd64])
+Conf libssh2-1t64 (1.11.1-6 Debian:testing [amd64])
+Conf libcurl4-gnutls (8.22.0-1 Debian:testing [amd64])
+Conf libcurl3t64-gnutls (8.22.0-1 Debian:testing [amd64])
+Conf liberror-perl (0.17030-1 Debian:testing [all])
+Conf git-man (1:2.53.0-1 Debian:testing [all])
+Conf git (1:2.53.0-1 Debian:testing [amd64])
+Conf incus-agent (7.0.1-5 Debian:testing [amd64])
+Conf libacl1 (2.4.0-1 Debian:testing [amd64])
+Conf libxml2-16 (2.15.4+dfsg-1 Debian:testing [amd64])
+Conf libarchive13t64 (3.8.9-1 Debian:testing [amd64])
+Conf libmd0 (1.3.0-1 Debian:testing [amd64])
+Conf libbsd0 (0.12.2-3 Debian:testing [amd64])
+Conf libsemanage-common (3.11-1 Debian:testing [all])
+Conf libsepol2 (3.11-1 Debian:testing [amd64])
+Conf libsemanage2 (3.11-1+b1 Debian:testing [amd64])
+Conf libsubid6 (1:4.20.3-1 Debian:testing [amd64])
+Conf libwrap0 (7.6.q-37 Debian:testing [amd64])
+Conf libwtmpdb0 (0.75.0-6 Debian:testing [amd64])
+Conf linux-base-amd64 (7.2.11-1 Debian:testing [amd64])
+Conf linux-image-amd64 (7.2.11-1 Debian:testing [amd64])
+Conf mmdebstrap (1.5.7-3 Debian:testing [all])
+Conf openssh-sftp-server (1:10.6p1-1 Debian:testing [amd64])
+Conf runit-helper (2.16.7 Debian:testing [all])
+Conf openssh-server (1:10.6p1-1 Debian:testing [amd64])
+Conf systemd-container (262-1 Debian:testing [amd64])
+Conf uidmap (1:4.20.3-1 Debian:testing [amd64])
+I: skipping cleanup/apt/lists as requested
+I: cleaning apt cache...
+I: simulate creating tarball...
+I: success in 7.4746 seconds

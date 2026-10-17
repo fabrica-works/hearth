@@ -63,6 +63,53 @@ pub fn git(args: &[Vec<u8>], dir: &Path, stdin: Option<&[u8]>, env: &[(&str, &st
             stderr: output.stderr,
             exit: status.into(),
             expect: None,
+            lists: None,
+            stanzas: None,
+        },
+    }
+}
+
+/// Run render's simulation vector from its scratch directory with its whole environment.
+#[must_use]
+pub fn mmdebstrap(invocation: &hearth_protocol_mmdebstrap::vector::Invocation, scratch: &Path) -> Run {
+    use hearth_protocol_mmdebstrap::vector::PROGRAM;
+    std::fs::write(scratch.join("sources.list"), &invocation.sources_list).expect("simulation sources.list");
+    let mut command = Command::new(std::ffi::OsStr::from_bytes(PROGRAM));
+    command.env_clear().current_dir(scratch).args(invocation.args.iter().map(|a| std::ffi::OsStr::from_bytes(a)));
+    for pair in &invocation.env {
+        let at = pair.iter().position(|b| *b == b'=').expect("environment pair");
+        command.env(std::ffi::OsStr::from_bytes(&pair[..at]), std::ffi::OsStr::from_bytes(&pair[at + 1..]));
+    }
+    let output = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("conformance requires /usr/bin/mmdebstrap");
+    let exit = output.status.code().map_or_else(
+        || Exit::Signal(u32::try_from(output.status.signal().expect("signal")).expect("positive signal")),
+        |code| Exit::Code(u8::try_from(code).expect("mmdebstrap exit byte")),
+    );
+    let status = match exit {
+        Exit::Code(code) => code.to_string(),
+        Exit::Signal(signal) => format!("signal {signal}"),
+    };
+    let mut argv = vec![PROGRAM.to_vec()];
+    argv.extend(invocation.args.iter().map(|a| a.to_vec()));
+    Run {
+        exit,
+        captured: Recording {
+            version: "".into(),
+            argv,
+            env: invocation.env.iter().map(|e| e.to_vec()).collect(),
+            dir: scratch.as_os_str().as_encoded_bytes().to_vec(),
+            stdin: None,
+            stdout: output.stdout,
+            stderr: output.stderr,
+            exit: status.into(),
+            expect: None,
+            lists: None,
+            stanzas: None,
         },
     }
 }

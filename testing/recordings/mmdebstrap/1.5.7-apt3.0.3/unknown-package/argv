@@ -1,0 +1,14 @@
+/usr/bin/mmdebstrap
+--verbose
+--simulate
+--mode=chrootless
+--variant=apt
+--architectures=amd64
+--include=hearth-absent
+--aptopt=Acquire::Check-Valid-Until "false"
+--aptopt=APT::Install-Recommends "false"
+--aptopt=Acquire::http::Proxy "http://127.0.0.1:PORT/"
+--skip=cleanup/apt/lists
+forky
+/scratch/root
+/scratch/sources.list

@@ -87,7 +87,9 @@ version = "0.0.0"
 dependencies = [
  "hearth-git-world",
  "hearth-protocol-git",
+ "hearth-protocol-mmdebstrap",
  "hearth-recordings",
+ "hearth-test-mirror",
  "skein-scratch",
 ]
 
