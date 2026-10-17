@@ -693,6 +693,14 @@ None yet.
 145. **hearth-12.s1: a document's null inside a list** (steer of 2026-10-17T19:02:09Z).
      A supplement step, `hearth-12.s1` (hearth/12.s1-list-null.md), hearth 12's, needing 12.2 (landed, 0aa2743): a document's `null` inside a list becomes the decode error format.md 4.1 names ("one inside a list (`[1, null]`, `[{"a": null}]`), which replaces whole, is a `decode` error in a document (render.md, 7.2) and a bad default in a `task.json` (6.5)"). hearth 12's re-check (check/recheck-12.md, point 3) found no owner: config's `document` (`document.rs:27`) keeps it, render's `Decode` (`errors.rs:25`) has no variant, and builder `translate/documents.rs:73` maps a json `Null` to the document's `Null`. The `task.json` half stays hearth 13.3's (`Null`, "null in a default"). The step adds `Shape::ListNull` (config), `Decode::ListNull` (render and records: message `null inside a list`, code `list_null`) and their translations. Nothing else changes.
 
+146. **hearth 13's Shapes against main** (ready check of hearth-13.1).
+     hearth 13's ready check, against hearth 3ba7416 and skein 841f487, re-checked at hearth ca17d04 (clippy clean with the corrections; default 805 of 805, fuzzy 17 of 17), corrects 13-schema.md:
+     1. 13.5: `Format` also derives `Copy`: the FORMS test's `forms::check(*format, ..)` is E0507 without it.
+     2. 13.2's Files gain `tests/render/src/fixtures.rs`: `with_task()` (`:127`) pushes the unit `Decoded::Declaration`, which builds a `Declaration` once the variant carries one (E0308); `call.rs:159` and `read.rs:54`, the other two sites, are in Files already.
+     3. 13.4's Files gain render `src/evaluate.rs`: `:52`'s `.saturating_add(5 * 67_108_864)` becomes `limits.validated.saturating_mul(5)`; `validated` is a field of its own, beside 12.1's `Limits::decoded` (`limits.rs:5`, `:16`).
+     Done when 4 prints 0 at ca17d04 (ca17d04 named each field of `translate/documents.rs`'s two frames): no change.
+     A further line number these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

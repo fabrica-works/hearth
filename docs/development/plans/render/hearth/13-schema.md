@@ -94,8 +94,10 @@ Files: render `src/revision/declaration.rs`, `src/{revision, vocabulary, call,
 errors}.rs`, new `src/schema.rs`, new `src/tests/schema.rs`,
 `src/tests/fixtures.rs`; protocol new `src/translate/declarations.rs`,
 `src/{read, translate}.rs`, `src/translate/errors.rs`, `src/tests/{translate,
-fixtures}.rs`; records as 13.1's; `tests/builder/{src/fixtures.rs,
-tests/real.rs}` (`MISREAD`).
+fixtures}.rs`; records as 13.1's; `tests/render/src/fixtures.rs`
+(`with_task()`, `:127`, pushes the unit `Decoded::Declaration`: it builds
+a `Declaration`); `tests/builder/{src/fixtures.rs, tests/real.rs}`
+(`MISREAD`).
 Shape: the translation moves each box, `Spec::default` through 12.1's
 `translate::documents::value`, `Form::Object`'s specs by a `for`, naming
 `requires: _`, `scripts: _`, `exports: _`, `bless: _`, `entries: _`, no `..`.
@@ -190,6 +192,9 @@ Scope: 6.3's bottom layer; render.md 3.3's per-target check; reads (6.4); the
 roots (7.7); format.md 3.3's "validated even where no target has it" (format.md 3.3).
 Needs: nothing beyond 13.3.
 Files: render `src/{schema, compose, call, errors, limits}.rs`,
+`src/evaluate.rs` (`:52`'s `.saturating_add(5 * 67_108_864)` becomes
+`limits.validated.saturating_mul(5)`; `validated` is a field of its own,
+beside 12.1's `decoded`, `limits.rs:5` and `:16`),
 `src/tests/{schema, compose}.rs`; protocol and records as 13.1's; `tests/render/{src/fixtures.rs,
 tests/schema.rs}`; real as 13.1's.
 Shape: `compose` starts each target's settings from `Defaults::layer` of each
@@ -314,7 +319,8 @@ Removes: nothing.
 
 render owns these; the records mirror `Declared` to `Required`, `Map`, `Schema`,
 `TypeName` and `Format` variant for variant. Types derive `Clone, PartialEq, Eq,
-Hash, Debug`.
+Hash, Debug`; `Format` also derives `Copy` (13.5's FORMS test reads
+`forms::check(*format, ..)`, E0507 without it).
 
 ```rust
 // hearth-domain-render src/revision/declaration.rs (Map 13.1, rest 13.2; 16 adds `entries`, `requires`; tests build one via `fixtures::declaration`)
