@@ -67,3 +67,38 @@ pub fn x1_prod_meta() -> Meta {
 pub fn digest(text: &str) -> Digest {
     Digest(core::array::from_fn(|i| u8::from_str_radix(&text[i * 2..i * 2 + 2], 16).expect("digest hex")))
 }
+
+use hearth_domain_render::{
+    evaluate::FaultKind,
+    limits::{Limits, SHIPPED},
+};
+use skein_lib::Rng;
+use std::collections::BTreeSet;
+#[must_use]
+pub fn limits(rng: &mut Rng) -> Limits {
+    if rng.below(4) != 0 {
+        SHIPPED
+    } else {
+        Limits { made: rng.between(16, 4096), nesting: u32::try_from(rng.between(1, 8)).expect("small"), ..SHIPPED }
+    }
+}
+#[must_use]
+pub const fn kind(kind: FaultKind) -> &'static str {
+    match kind {
+        FaultKind::Unknown => "unknown",
+        FaultKind::NoKey => "key",
+        FaultKind::NoIndex => "index",
+        FaultKind::Undefined => "undefined",
+        FaultKind::Type => "type",
+        FaultKind::Overflow => "overflow",
+        FaultKind::Empty => "empty",
+        FaultKind::Path => "path",
+        FaultKind::Output => "output",
+        FaultKind::Limit => "limit",
+    }
+}
+pub fn assert_fell(fell: &BTreeSet<&str>, kinds: &[&str]) {
+    for kind in kinds {
+        assert!(fell.contains(kind), "missing {kind}");
+    }
+}

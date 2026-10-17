@@ -56,3 +56,107 @@ pub fn meta() -> Meta {
         },
     }
 }
+
+use crate::evaluate::{
+    self, Bindings, Budget, Context, Entry, Evaluator, Expression, Fault, Missing, Op, Operand, Operation, Value,
+};
+use crate::limits;
+#[derive(Debug)]
+pub struct Roots {
+    pub target: Value,
+    pub debian: Value,
+    pub settings: Value,
+    pub tasks: Value,
+    pub exports: Value,
+}
+impl Roots {
+    pub fn context(&self) -> Context<'_> {
+        Context {
+            target: &self.target,
+            debian: &self.debian,
+            settings: &self.settings,
+            tasks: &self.tasks,
+            exports: &self.exports,
+        }
+    }
+    pub fn x1_prod() -> Self {
+        Self {
+            target: evaluate::context::target(&meta()),
+            debian: map(&[(b"suite", Some(string(b"forky")))]),
+            settings: map(&[
+                (b"enabled", Some(Value::Bool(true))),
+                (b"name", Some(string(b"x1"))),
+                (
+                    b"peers",
+                    Some(map(&[
+                        (b"a", Some(map(&[(b"port", Some(Value::Int(51820)))]))),
+                        (b"b", Some(map(&[(b"port", Some(Value::Int(51821)))]))),
+                    ])),
+                ),
+                (b"port", Some(Value::Int(2222))),
+                (b"tags", Some(list(&[string(b"sudo"), string(b"wheel")]))),
+                (b"wifi", None),
+            ]),
+            tasks: map(&[(b"core", Some(map(&[(b"domain", Some(string(b"example.org")))]))), (b"wifi", None)]),
+            exports: map(&[]),
+        }
+    }
+}
+pub fn string(value: &[u8]) -> Value {
+    Value::String(bytes::copy_of(value))
+}
+pub fn list(values: &[Value]) -> Value {
+    Value::List(Box::from(values))
+}
+pub fn map(values: &[(&[u8], Option<Value>)]) -> Value {
+    let mut entries = skein_lib::List::with_capacity(u32::try_from(values.len()).expect("fixture fits"));
+    for (key, value) in values {
+        entries.push(Entry { key: bytes::copy_of(key), value: value.clone() }).expect("fixture fits");
+    }
+    Value::Map(entries.into_boxed())
+}
+pub fn op(at: u32, op: Op) -> Operation {
+    Operation { at, op }
+}
+pub fn name(at: u32, text: &[u8], missing: Missing) -> Operation {
+    op(at, Op::Name { name: bytes::copy_of(text), missing })
+}
+pub fn key(at: u32, text: &[u8], missing: Missing) -> Operation {
+    op(at, Op::Key { name: bytes::copy_of(text), missing })
+}
+pub fn evaluate(roots: &Roots, operations: &[Operation]) -> Result<Option<Value>, Fault> {
+    evaluate_at(roots, operations, &limits::SHIPPED)
+}
+pub fn evaluate_at(roots: &Roots, operations: &[Operation], limits: &limits::Limits) -> Result<Option<Value>, Fault> {
+    let mut evaluator = Evaluator::new(limits);
+    let expression = Expression {
+        operations: Box::from(operations),
+        values: u32::try_from(operations.len()).expect("fixture fits"),
+    };
+    match evaluate::expression(
+        &mut evaluator,
+        &expression,
+        &roots.context(),
+        &Bindings::with_capacity(0),
+        &mut Budget::new(limits),
+    ) {
+        Ok(value) => Ok(owned(value)),
+        Err(fault) => Err(fault),
+    }
+}
+pub fn owned(value: Operand<'_>) -> Option<Value> {
+    Some(match value {
+        Operand::Undefined => return None,
+        Operand::Value(v) => v.clone(),
+        Operand::Bool(v) => Value::Bool(v),
+        Operand::Int(v) => Value::Int(v),
+        Operand::String(v) => Value::String(v),
+        Operand::List { items, depth: _ } => {
+            let mut values = skein_lib::List::with_capacity(u32::try_from(items.len()).expect("fixture fits"));
+            for item in items {
+                values.push(owned(item).expect("list items defined")).expect("fixture fits");
+            }
+            Value::List(values.into_boxed())
+        }
+    })
+}

@@ -4,6 +4,7 @@
 extern crate alloc;
 mod call;
 pub mod compose;
+pub mod evaluate;
 pub mod limits;
 pub mod parts;
 pub mod revision;
