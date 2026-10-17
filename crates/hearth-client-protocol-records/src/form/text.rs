@@ -87,6 +87,9 @@ pub(crate) fn print(record: &Record, after: Option<Type>, most: u32) -> Result<B
 }
 fn render(lines: &mut Lines, record: &Record, after: Option<Type>) {
     match record {
+        Record::Resolving(value) => value.text(lines),
+        Record::Resolved(value) => value.text(lines),
+        Record::Unresolved(value) => value.text(lines),
         Record::Waiting(waiting) => waiting.text(lines),
         Record::Strays(strays) => strays.text(lines),
         Record::Spec(spec) => {

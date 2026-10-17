@@ -1,8 +1,13 @@
 use super::fixtures::{self, INDEX_NAMES, INDEX_PACKAGES, INRELEASE_NAME, PACKAGES_NAME};
+use crate::builder::{
+    store::vocabulary::{Origin, Request as StoreRequest},
+    vocabulary::{Event as BuilderEvent, Request as RootRequest},
+};
 use crate::render::{
     resolution::Stanza,
     vocabulary::{Digest, Event},
 };
+use skein_io::file;
 use skein_lib::List;
 #[test]
 fn the_lists_are_listed_then_each_index_read_in_order() {
@@ -98,4 +103,77 @@ fn a_successful_run_reads_its_indices_before_cleaning_the_scratch_and_resolving(
     let run = layer.resolve_with_indices();
     assert_eq!(run.trace.as_slice(), ["lists", "InRelease", "Packages", "scratch", "resolved"]);
     assert_eq!(run.events.len(), 2);
+}
+
+#[test]
+fn a_kept_index_is_synced_renamed_across_then_cache_synced_then_recorded() {
+    let (mut layer, _) = fixtures::Layer::index_arriving();
+    layer.client(RootRequest::Store(StoreRequest::Keep {
+        arrival: crate::resolve::OWNER,
+        record: fixtures::cache_record(Origin::Index { resolution: fixtures::KEY }),
+    }));
+    assert_eq!(
+        layer.asked(),
+        Some(crate::Asked::Beneath(crate::Beneath::Rename {
+            owner: fixtures::STORE_OWNER,
+            from_root: fixtures::INDEX_DIRECTORY,
+            from: fixtures::RESOLVE_INRELEASE_NAME.into(),
+            to_root: fixtures::roots().cache.fd,
+            to: b"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".as_slice().into()
+        }))
+    );
+    assert_eq!(layer.asked(), None, "the next index waits");
+    layer.file_up(file::Event::Renamed { owner: fixtures::STORE_OWNER });
+    assert_eq!(
+        layer.asked(),
+        Some(crate::Asked::File(file::Request::SyncDirectory {
+            owner: fixtures::STORE_OWNER,
+            root: fixtures::roots().cache.fd
+        }))
+    );
+    layer.file_up(file::Event::Synced { owner: fixtures::STORE_OWNER });
+    let Some(crate::Asked::File(file::Request::Store { bytes, path, root, .. })) = layer.asked() else {
+        panic!("kind 5 write")
+    };
+    assert_eq!(path.as_ref(), b"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad.record");
+    assert_eq!(root, fixtures::roots().cache.token);
+    assert_eq!(
+        crate::tree::cache_file::read(&bytes, &crate::tree::limits::SHIPPED).expect("kind 5").origin,
+        crate::tree::cache_file::Origin::Index { resolution: fixtures::KEY }
+    );
+    layer.file_up(file::Event::Stored { owner: fixtures::STORE_OWNER, digest: skein_io::digest::digest(b"record") });
+    assert_eq!(layer.told(), Some(BuilderEvent::Store(crate::builder::store::vocabulary::Event::Done)));
+}
+
+#[test]
+fn a_discarded_index_is_left_for_the_walk() {
+    use crate::builder::{
+        store::vocabulary::{Event, Request},
+        vocabulary::{Event as RootEvent, Request as RootRequest},
+    };
+    let (mut layer, _) = fixtures::Layer::index_arriving();
+    layer.client(RootRequest::Store(Request::Discard { arrival: crate::resolve::OWNER }));
+    assert_eq!(layer.asked(), None);
+    assert_eq!(layer.told(), Some(RootEvent::Store(Event::Done)));
+    let Some(crate::Asked::File(file::Request::OpenReadNoFollow { name, .. })) = layer.asked() else {
+        panic!("next index, without removing the discarded file")
+    };
+    assert!(name.ends_with(fixtures::RESOLVE_PACKAGES_NAME));
+}
+
+#[test]
+fn each_index_arrives_after_its_file_is_synced_and_closed() {
+    use crate::builder::vocabulary::Event;
+    let (_, run) = fixtures::Layer::index_arriving();
+    assert_eq!(run.trace.as_slice(), ["lists", "InRelease", "sync", "close"]);
+    assert_eq!(
+        run.events.as_slice(),
+        [Event::Index {
+            request: fixtures::REQUEST,
+            arrival: crate::resolve::OWNER,
+            sha256: fixtures::ABC,
+            size: 3,
+            took: skein_lib::Duration::ZERO
+        }]
+    );
 }

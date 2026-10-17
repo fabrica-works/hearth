@@ -314,3 +314,51 @@ fn each_resolution_field_translates_and_back() {
         assert_eq!(back, input, "row {row}: resolution record");
     }
 }
+
+#[test]
+fn a_refused_index_fails_its_resolve_and_nothing_is_recorded() {
+    let (mut builder, mut out, _) = fixtures::resolving_request();
+    step(&mut builder, &fixtures::env(), fixtures::index(), &mut out);
+    let Some(Request::Store(crate::store::vocabulary::Request::Keep { .. })) = out.pop() else { panic!("keep index") };
+    step(&mut builder, &fixtures::env(), Event::Store(crate::store::vocabulary::Event::Failed), &mut out);
+    let requests = fixtures::finish_resolution(&mut builder, &mut out);
+    assert_eq!(fixtures::error_count(&requests), 1);
+    assert_eq!(fixtures::needed_count(&requests), 1);
+    let mut writes = 0_u32;
+    for request in requests {
+        if let Request::Store(crate::store::vocabulary::Request::Write { .. }) = request {
+            writes = writes.saturating_add(1);
+        }
+    }
+    assert_eq!(writes, 0);
+}
+
+#[test]
+fn a_resolve_says_it_starts_and_ends() {
+    use crate::vocabulary::Progress;
+    let (mut builder, mut out) = fixtures::resolving_progress();
+    crate::store_step(&mut builder, &fixtures::env(), crate::store::vocabulary::Event::Room, &mut out);
+    assert_eq!(out.pop(), Some(Request::Progress(Progress::Resolving { key: fixtures::FIND_KEY })));
+    drop(out.pop());
+    drop(crate::resolution::progress(&mut builder, fixtures::resolved_render(), &mut out));
+    assert_eq!(
+        out.pop(),
+        Some(Request::Progress(Progress::Resolved {
+            key: fixtures::FIND_KEY,
+            took: skein_lib::Duration::from_millis(7)
+        }))
+    );
+}
+
+#[test]
+fn an_index_enters_with_the_key_its_resolve_holds() {
+    let (mut builder, mut out) = fixtures::resolving_progress();
+    crate::store_step(&mut builder, &fixtures::env(), crate::store::vocabulary::Event::Room, &mut out);
+    drop(out.pop());
+    drop(out.pop());
+    step(&mut builder, &fixtures::env(), fixtures::index(), &mut out);
+    let Some(Request::Store(crate::store::vocabulary::Request::Keep { record, .. })) = out.pop() else {
+        panic!("keep index")
+    };
+    assert_eq!(record.origin, crate::store::vocabulary::Origin::Index { resolution: fixtures::FIND_KEY });
+}

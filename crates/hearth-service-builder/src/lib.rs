@@ -435,6 +435,13 @@ mod tests;
 
 fn beneath(files: &FileIo, request: protocol::Beneath) -> file::Request {
     match request {
+        protocol::Beneath::Rename { owner, from_root, from, to_root, to } => file::Request::Rename {
+            owner,
+            from_root: files.descriptor(from_root).expect("lists directory token"),
+            from,
+            to_root,
+            to,
+        },
         protocol::Beneath::OpenDirectory { owner, root, name, no_follow } => file::Request::OpenDirectory {
             owner,
             root: files.descriptor(root).expect("walk directory token"),

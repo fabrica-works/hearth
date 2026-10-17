@@ -50,8 +50,11 @@ pub fn read_indices(names: &[&[u8]], release: &[u8], packages: &[u8]) -> ReadInd
             run.steps = steps.into_boxed();
             return run;
         }
-        if let Some(Event::Render(event)) = above.pop() {
-            run.events.push(event).expect("stanzas");
+        match above.pop() {
+            Some(Event::Render(event)) => run.events.push(event).expect("stanzas"),
+            Some(Event::Index { .. }) => reader.settled(),
+            Some(_) => panic!("index reader events"),
+            None => {}
         }
         let Some(Asked::File(request)) = below.pop() else { continue };
         let event = match request {
@@ -84,6 +87,7 @@ pub fn read_indices(names: &[&[u8]], release: &[u8], packages: &[u8]) -> ReadInd
                 run.read = run.read.checked_add(bytes.len()).expect("bounded reads");
                 file::Event::Read { owner, bytes }
             }
+            file::Request::Sync { owner, .. } => file::Event::Synced { owner },
             file::Request::Close { owner, .. } => {
                 run.closed = run.closed.checked_add(1).expect("close count");
                 file::Event::Closed { owner }
@@ -102,7 +106,6 @@ pub fn read_indices(names: &[&[u8]], release: &[u8], packages: &[u8]) -> ReadInd
             | file::Request::Store { .. }
             | file::Request::WriteAt { .. }
             | file::Request::Cut { .. }
-            | file::Request::Sync { .. }
             | file::Request::SyncDirectory { .. }
             | file::Request::Rename { .. }
             | file::Request::Remove { .. }
@@ -138,10 +141,10 @@ pub fn read_test_indices() -> ReadIndices {
     read_indices(INDEX_NAMES, b"abc", INDEX_PACKAGES)
 }
 
-pub const RESOLVE_INDEX_NAMES: &[&[u8]] = &[
-    b"snapshot.debian.org_archive_debian_20261001T030405Z_dists_forky_InRelease",
-    b"snapshot.debian.org_archive_debian_20261001T030405Z_dists_forky_main_binary-amd64_Packages",
-];
+pub const RESOLVE_INRELEASE_NAME: &[u8] = b"snapshot.debian.org_archive_debian_20261001T030405Z_dists_forky_InRelease";
+pub const RESOLVE_PACKAGES_NAME: &[u8] =
+    b"snapshot.debian.org_archive_debian_20261001T030405Z_dists_forky_main_binary-amd64_Packages";
+pub const RESOLVE_INDEX_NAMES: &[&[u8]] = &[RESOLVE_INRELEASE_NAME, RESOLVE_PACKAGES_NAME];
 
 fn index_step(steps: &mut List<u8>, step: &[u8]) {
     for byte in step {

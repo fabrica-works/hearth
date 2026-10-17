@@ -48,3 +48,24 @@ fn the_store_error_names_the_store_and_the_limit() {
         assert_eq!(form::print(form, &record, None, &limits::SHIPPED).as_deref(), Ok(expected), "{form:?} {fault:?}");
     }
 }
+
+const RESOLUTION_PROGRESS: &[(Record, &[u8], &[u8])] = &[
+    (Record::Resolving(crate::progress::Resolving { key: [1; 32] }), b"resolving 010101010101\n",
+     b"{\"record\":\"resolving\",\"key\":\"0101010101010101010101010101010101010101010101010101010101010101\"}\n"),
+    (Record::Resolved(crate::progress::Resolved { key: [1; 32], took: skein_lib::Duration::from_nanos(7_999_999) }), b"resolved 010101010101 in 7 ms\n",
+     b"{\"record\":\"resolved\",\"key\":\"0101010101010101010101010101010101010101010101010101010101010101\",\"took_ms\":7}\n"),
+    (Record::Unresolved(crate::progress::Unresolved { key: [1; 32] }), b"resolution 010101010101 failed\n",
+     b"{\"record\":\"unresolved\",\"key\":\"0101010101010101010101010101010101010101010101010101010101010101\"}\n"),
+];
+#[test]
+fn resolution_progress_prints_as_text_and_json_lines() {
+    for (row, (record, text, json)) in RESOLUTION_PROGRESS.iter().enumerate() {
+        for (form, expected) in [(Form::Text, *text), (Form::JsonLines, *json)] {
+            assert_eq!(
+                form::print(form, record, Some(crate::records::Type::Waiting), &limits::SHIPPED).as_deref(),
+                Ok(expected),
+                "row {row}: {form:?}"
+            );
+        }
+    }
+}

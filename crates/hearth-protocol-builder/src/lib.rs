@@ -38,18 +38,8 @@ use skein_lib::{
     Env, List, Queue, Token, bytes,
     stream::{Down, Read as StreamRead, Up},
 };
-#[derive(PartialEq, Eq, Debug)]
-pub enum Asked {
-    Io(io::Request),
-    File(io::file::Request),
-    Beneath(Beneath),
-}
-/// File operations whose directory is an io-owned token (io.md, 9).
-#[derive(PartialEq, Eq, Debug)]
-pub enum Beneath {
-    OpenDirectory { owner: Token, root: Token, name: Box<[u8]>, no_follow: bool },
-    Remove { owner: Token, root: Token, name: Box<[u8]>, directory: bool },
-}
+mod beneath;
+pub use beneath::{Asked, Beneath};
 #[derive(PartialEq, Eq, Debug)]
 pub enum Told {
     Io(io::Event),
@@ -266,10 +256,7 @@ pub fn down(
             Request::Progress(progress),
             &protocol.store_path,
         ),
-        Request::Store(request) => {
-            let temporary = protocol.temporary();
-            protocol.store.down(request, &protocol.roots, &env.limits, temporary, below);
-        }
+        Request::Store(request) => protocol.store_request(request, &env.limits, below),
         Request::Unopened { to, why } => {
             assert_eq!(to.into_token(), Token::new(0), "initial call");
             protocol.startup = Some(
@@ -375,6 +362,9 @@ pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, above: &mut Queu
             if event.owner() == store::OWNER {
                 protocol.store.up(event, &env.limits, &protocol.roots, read::current(&mut protocol.mode), above, below);
                 if !above.is_empty() {
+                    if let Some(resolve) = &mut protocol.resolving {
+                        resolve.index_settled();
+                    }
                     protocol.keeping = None;
                 }
                 return;
@@ -527,7 +517,7 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
         protocol.client.resume(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, below);
         return;
     }
-    if protocol.store.resume(above) || protocol.resume_resolve(env, above, below) {
+    if protocol.resume_store(above) || protocol.resume_resolve(env, above, below) {
         return;
     }
     if let Some(keep) = &mut protocol.keeping {

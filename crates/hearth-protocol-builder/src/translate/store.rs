@@ -86,12 +86,15 @@ pub fn progress(progress: crate::builder::vocabulary::Progress, store: &[u8]) ->
     use crate::{
         builder::{store::vocabulary::Directory, vocabulary::Progress},
         records::{
-            progress::{Strays, Waiting},
+            progress::{Resolved, Resolving, Strays, Unresolved, Waiting},
             records::Record,
         },
     };
     let store = skein_lib::bytes::copy_of(store);
     match progress {
+        Progress::Resolving { key } => Record::Resolving(Resolving { key: key.0 }),
+        Progress::Resolved { key, took } => Record::Resolved(Resolved { key: key.0, took }),
+        Progress::Unresolved { key } => Record::Unresolved(Unresolved { key: key.0 }),
         Progress::Waiting => Record::Waiting(Waiting { store }),
         Progress::Strays { count, first } => {
             let directory: &[u8] = match first.directory {

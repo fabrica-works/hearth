@@ -145,3 +145,46 @@ pub(super) fn terminal(
     let event = self::answer(request, answer);
     crate::step(builder, env, crate::vocabulary::Event::Render(event), out);
 }
+
+/// The protocol drains its scratch before the root replaces a refused resolve.
+pub(super) fn progress(
+    builder: &mut crate::Builder,
+    event: render::vocabulary::Event,
+    out: &mut skein_lib::Queue<crate::vocabulary::Request>,
+) -> render::vocabulary::Event {
+    use crate::vocabulary::{Progress, Request};
+    use render::vocabulary::{Class, Event, Failure};
+    let Some((request, key)) = builder.resolution else { return event };
+    let terminal = match &event {
+        Event::Resolved { request: token, costs, .. } if *token == request => Some(Some(costs.took)),
+        Event::Failed { request: token, .. } if *token == request => Some(None),
+        Event::Recorded { .. }
+        | Event::Inst { .. }
+        | Event::Stanza { .. }
+        | Event::Resolved { .. }
+        | Event::Found { .. }
+        | Event::Absent { .. }
+        | Event::Diff { .. }
+        | Event::Render { .. }
+        | Event::Listed { .. }
+        | Event::Unresolved { .. }
+        | Event::Read { .. }
+        | Event::Kept { .. }
+        | Event::Cached { .. }
+        | Event::Hunks { .. }
+        | Event::Failed { .. } => None,
+    };
+    let Some(took) = terminal else { return event };
+    builder.resolution = None;
+    let refused = builder.refused == Some(request);
+    out.push(Request::Progress(match took {
+        Some(took) if !refused => Progress::Resolved { key, took },
+        Some(_) | None => Progress::Unresolved { key },
+    }));
+    if refused {
+        builder.refused = None;
+        Event::Failed { request, class: Class::Operational, at: None, failure: Failure::Store }
+    } else {
+        event
+    }
+}

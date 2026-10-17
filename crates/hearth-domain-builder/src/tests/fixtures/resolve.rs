@@ -120,17 +120,9 @@ pub fn record_builder() -> (Builder, Queue<Request>) {
     let env = super::env();
     let (mut builder, mut out) = resolving_builder(&env);
     drop(out.pop());
-    crate::step(
-        &mut builder,
-        &env,
-        Event::Render(render::vocabulary::Event::Resolved {
-            request: Token::new(6),
-            lines: Box::new([]),
-            tools: render::resolution::Tools { apt: Box::new([]), mmdebstrap: Box::new([]) },
-            costs: render::resolution::Costs { took: skein_lib::Duration::ZERO, fetched: 0 },
-        }),
-        &mut out,
-    );
+    drop(out.pop());
+    crate::step(&mut builder, &env, resolved(), &mut out);
+    drop(out.pop());
     (builder, out)
 }
 pub fn finish(builder: &mut Builder, out: &mut Queue<Request>) -> Box<[Request]> {
@@ -185,4 +177,68 @@ pub fn resolutions() -> [crate::store::vocabulary::Resolution; 2] {
         sha256: super::FIND_KEY,
     }]);
     [first, second]
+}
+
+pub fn resolved() -> Event {
+    Event::Render(render::vocabulary::Event::Resolved {
+        request: Token::new(6),
+        lines: Box::new([]),
+        tools: render::resolution::Tools { apt: Box::new([]), mmdebstrap: Box::new([]) },
+        costs: render::resolution::Costs { took: skein_lib::Duration::from_millis(7), fetched: 0 },
+    })
+}
+pub fn index() -> Event {
+    Event::Index {
+        request: Token::new(6),
+        arrival: Token::new(21),
+        sha256: FIND_INDEX,
+        size: 3,
+        took: skein_lib::Duration::ZERO,
+    }
+}
+pub const FIND_INDEX: render::vocabulary::Digest = render::vocabulary::Digest([3; 32]);
+pub fn resolving_request() -> (Builder, Queue<Request>, render::vocabulary::Digest) {
+    let (builder, mut out) = resolving_builder(&super::env());
+    drop(out.pop());
+    let Some(Request::Render(render::vocabulary::Request::Resolve { key, .. })) = out.pop() else {
+        panic!("resolve request")
+    };
+    (builder, out, key)
+}
+pub fn needed_count(requests: &[Request]) -> usize {
+    let mut count = 0_usize;
+    for request in requests {
+        if let Request::Answer(crate::vocabulary::Answer::Spec(spec)) = request
+            && let Some(render::keys::Resolution::Needed { .. }) = spec.resolution.as_deref()
+        {
+            count = count.saturating_add(1);
+        }
+    }
+    count
+}
+
+pub fn finish_resolution(builder: &mut Builder, out: &mut Queue<Request>) -> Box<[Request]> {
+    let mut requests = skein_lib::List::with_capacity(64);
+    if let Some(request) = out.pop() {
+        requests.push(request).expect("store fault");
+    }
+    crate::step(builder, &super::env(), resolved(), out);
+    for request in finish(builder, out) {
+        requests.push(request).expect("resolution requests");
+    }
+    requests.into_boxed()
+}
+pub fn resolved_render() -> render::vocabulary::Event {
+    let Event::Render(event) = resolved() else { unreachable!("render input") };
+    event
+}
+pub fn resolving_progress() -> (Builder, Queue<Request>) {
+    let (_, mut requests) = resolving_builder(&super::env());
+    drop(requests.pop());
+    let Some(Request::Render(mut resolve)) = requests.pop() else { panic!("resolve input") };
+    let render::vocabulary::Request::Resolve { key, .. } = &mut resolve else { panic!("resolve") };
+    *key = super::FIND_KEY;
+    let mut builder = super::opened_builder();
+    builder.resolving = Some(resolve);
+    (builder, requests)
 }

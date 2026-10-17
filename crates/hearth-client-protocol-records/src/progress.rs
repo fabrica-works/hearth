@@ -117,3 +117,56 @@ impl StoreError {
         }
     }
 }
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Resolving {
+    pub key: [u8; 32],
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Resolved {
+    pub key: [u8; 32],
+    pub took: skein_lib::Duration,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Unresolved {
+    pub key: [u8; 32],
+}
+impl Resolving {
+    pub(crate) fn text(&self, lines: &mut Lines) {
+        lines.put(b"resolving ");
+        lines.hex12(&self.key);
+        lines.put(b"\n");
+    }
+    pub(crate) fn json(&self, json: &mut Encoder) {
+        resolution(json, b"resolving", &self.key);
+    }
+}
+impl Resolved {
+    pub(crate) fn text(&self, lines: &mut Lines) {
+        lines.put(b"resolved ");
+        lines.hex12(&self.key);
+        lines.put(b" in ");
+        lines.decimal(self.took.as_nanos() / 1_000_000);
+        lines.put(b" ms\n");
+    }
+    pub(crate) fn json(&self, json: &mut Encoder) {
+        resolution(json, b"resolved", &self.key);
+        json.key(b"took_ms");
+        json.unsigned(self.took.as_nanos() / 1_000_000);
+    }
+}
+impl Unresolved {
+    pub(crate) fn text(&self, lines: &mut Lines) {
+        lines.put(b"resolution ");
+        lines.hex12(&self.key);
+        lines.put(b" failed\n");
+    }
+    pub(crate) fn json(&self, json: &mut Encoder) {
+        resolution(json, b"unresolved", &self.key);
+    }
+}
+fn resolution(json: &mut Encoder, kind: &[u8], key: &[u8; 32]) {
+    field(json, b"record", kind);
+    json.key(b"key");
+    crate::form::json::digest(json, key);
+}

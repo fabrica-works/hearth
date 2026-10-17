@@ -34,6 +34,8 @@ pub struct Builder {
     store_error: bool,
     finding: Option<Token>,
     resolving: Option<render::vocabulary::Request>,
+    resolution: Option<(Token, render::vocabulary::Digest)>,
+    index: Option<Token>,
 }
 impl Builder {
     #[must_use]
@@ -46,6 +48,8 @@ impl Builder {
             store_error: false,
             finding: None,
             resolving: None,
+            resolution: None,
+            index: None,
             render: render::Render::new(&limits.render),
             store: store::Store::new(&limits.store, uid),
             call: None,
@@ -110,6 +114,23 @@ impl Builder {
 }
 pub fn step(builder: &mut Builder, env: &Env<Limits>, ev: Event, out: &mut Queue<Request>) {
     let event = match ev {
+        Event::Index { request, arrival, sha256, size, took } => {
+            let (active, key) = builder.resolution.expect("index during resolve");
+            assert_eq!(request, active, "current resolution");
+            builder.index = Some(request);
+            return store_step(
+                builder,
+                env,
+                store::vocabulary::Event::Arrived {
+                    arrival,
+                    sha256,
+                    size,
+                    origin: store::vocabulary::Origin::Index { resolution: key },
+                    took,
+                },
+                out,
+            );
+        }
         Event::Produced { request, path, arrival, sha256, size, took } => {
             builder.produced = Some((request, sha256));
             return store_step(
@@ -143,6 +164,7 @@ pub fn step(builder: &mut Builder, env: &Env<Limits>, ev: Event, out: &mut Queue
         }
         Event::Store(event) => return store_step(builder, env, event, out),
         Event::Render(event) => {
+            let event = resolution::progress(builder, event, out);
             if let RenderEvent::Read { request, .. } | RenderEvent::Cached { request, .. } = &event {
                 builder.remaining = builder.remaining.saturating_sub(1);
                 if builder.refused == Some(*request) {
@@ -209,6 +231,12 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
             builder.forward(env, out);
         }
         Some(Output::Answer(answer @ (Answer::Cached { .. } | Answer::Refused { .. }))) => {
+            if let Some(request) = builder.index.take() {
+                if let Answer::Refused { .. } = answer {
+                    builder.refused = Some(request);
+                }
+                return;
+            }
             if let Some((request, sha256)) = builder.produced.take() {
                 let event = match answer {
                     Answer::Cached { .. } => RenderEvent::Kept { request, sha256 },
@@ -262,7 +290,12 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
             resolution::terminal(builder, env, answer, out);
         }
         Some(Output::Answer(Answer::HasRoom)) => {
-            out.push(Request::Render(builder.resolving.take().expect("room before resolve")));
+            let request = builder.resolving.take().expect("room before resolve");
+            if let render::vocabulary::Request::Resolve { request, key, .. } = &request {
+                builder.resolution = Some((*request, *key));
+                out.push(Request::Progress(vocabulary::Progress::Resolving { key: *key }));
+            }
+            out.push(Request::Render(request));
         }
         Some(Output::Answer(Answer::Waiting)) => out.push(Request::Progress(vocabulary::Progress::Waiting)),
         Some(Output::Answer(Answer::Strays { count, first })) => {

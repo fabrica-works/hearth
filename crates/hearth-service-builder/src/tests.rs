@@ -30,3 +30,28 @@ fn a_beneath_request_reaches_io_with_its_roots_descriptor() {
         }
     );
 }
+
+#[test]
+fn a_beneath_rename_reaches_io_with_both_descriptors() {
+    use crate::protocol::{Asked, Beneath};
+    use skein_lib::{Token, bytes};
+    let mut service = fixtures::service();
+    let from_root = service.files.adopt_root(Fd::new(47)).expect("lists token");
+    service.asked.push(Asked::Beneath(Beneath::Rename {
+        owner: Token::new(20),
+        from_root,
+        from: bytes::copy_of(b"index"),
+        to_root: Fd::new(4),
+        to: bytes::copy_of(b"digest"),
+    }));
+    crate::io_down(&mut service);
+    assert_eq!(
+        service.file_submissions.pop().expect("rename").kind,
+        skein_io::kernel::Op::Rename {
+            from_dir: Fd::new(47),
+            from: bytes::copy_of(b"index"),
+            to_dir: Fd::new(4),
+            to: bytes::copy_of(b"digest")
+        }
+    );
+}

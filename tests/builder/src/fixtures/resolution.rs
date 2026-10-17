@@ -2,6 +2,10 @@ use super::File;
 use hearth_lib::encode::Item;
 use hearth_protocol_tree::resolution::{Costs, Inputs, Line, Made, Package, Resolution};
 use skein_lib::{Duration, Wall};
+pub const TEST_MIN_RESOLUTION: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
+    0x21, 0xe9, 0xa0, 0x2f, 0xeb, 0x65, 0x48, 0x83, 0xef, 0x05, 0x1d, 0x24, 0x7c, 0xb1, 0x4d, 0xb8, 0x78, 0xe0, 0x4c,
+    0x03, 0xc2, 0xf7, 0x67, 0x5c, 0x78, 0x4a, 0x67, 0x9e, 0xa0, 0x95, 0x6d, 0x5d,
+]);
 pub const TEST_MIN_KEY: &str = "21e9a02feb654883ef051d247cb14db878e04c03c2f7675c784a679ea0956d5d";
 pub const TEST_MIN_KEYS_LINE: &str = "keys         packages 46a0bdef5234   software 2dcc0e90ef26   config 408d4c837487";
 pub const TEST_MIN_DIGEST: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
@@ -41,10 +45,7 @@ pub const TEST_REPOSITORY: &[File] = &[
 #[must_use]
 pub fn test_min_recorded() -> Resolution {
     Resolution {
-        key: hearth_lib::encode::Digest([
-            0x21, 0xe9, 0xa0, 0x2f, 0xeb, 0x65, 0x48, 0x83, 0xef, 0x05, 0x1d, 0x24, 0x7c, 0xb1, 0x4d, 0xb8, 0x78, 0xe0,
-            0x4c, 0x03, 0xc2, 0xf7, 0x67, 0x5c, 0x78, 0x4a, 0x67, 0x9e, 0xa0, 0x95, 0x6d, 0x5d,
-        ]),
+        key: TEST_MIN_RESOLUTION,
         digest: TEST_MIN_DIGEST,
         inputs: Inputs {
             apt: Box::new([Item::Map(1), text(b"install_recommends"), Item::False]),
@@ -205,4 +206,49 @@ pub fn recorded_closure() -> Box<[Package]> {
     }
     packages.sort_by(|left, right| (&left.name, &left.architecture).cmp(&(&right.name, &right.architecture)));
     packages.into_boxed_slice()
+}
+
+#[must_use]
+pub fn failed_test_min(label: &str) -> (Repository, Rendered) {
+    let repository = Repository::make(label, TEST_REPOSITORY);
+    let rendered = resolve(&repository, &[b"test-min"], Form::Text, &dead_proxy());
+    (repository, rendered)
+}
+#[must_use]
+pub fn mirror_indices() -> [(&'static [u8], [u8; 32]); 2] {
+    let mirror = mirror();
+    let mut release = [0; 32];
+    for (byte, pair) in release.iter_mut().zip(mirror.pin().digest.as_bytes().chunks_exact(2)) {
+        *byte = u8::from_str_radix(std::str::from_utf8(pair).expect("hex"), 16).expect("digest");
+    }
+    [
+        (b"InRelease", release),
+        (
+            b"main/binary-amd64/Packages",
+            skein_lib::sha256::digest(&std::fs::read(mirror.index("main")).expect("mirror index")),
+        ),
+    ]
+}
+#[must_use]
+pub fn cached_index(
+    repository: &Repository,
+    digest: [u8; 32],
+) -> (std::path::PathBuf, hearth_protocol_tree::cache_file::CacheFile) {
+    let name = hex_digest(digest);
+    let cache = repository.scratch().path().join("store/cache");
+    let bytes = std::fs::read(cache.join(format!("{name}.record"))).expect("cache record");
+    (
+        cache.join(name),
+        hearth_protocol_tree::cache_file::read(&bytes, &hearth_protocol_tree::limits::SHIPPED).expect("kind 5"),
+    )
+}
+
+#[must_use]
+pub fn hex_digest(digest: [u8; 32]) -> String {
+    use std::fmt::Write;
+    let mut name = String::new();
+    for byte in digest {
+        write!(&mut name, "{byte:02x}").expect("hex name");
+    }
+    name
 }

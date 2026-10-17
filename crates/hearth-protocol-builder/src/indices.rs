@@ -17,7 +17,9 @@ enum State {
     CloseDirectory,
     Index,
     Reading,
+    SyncIndex,
     CloseIndex,
+    Arrival,
     Done,
 }
 #[derive(Debug)]
@@ -39,6 +41,7 @@ pub(super) struct Indices {
     offset: u64,
     file_read: u32,
     hash: Sha256,
+    began: skein_lib::Time,
     intake: Intake,
     demand: Read,
     decoder: packages::Stanzas,
@@ -82,6 +85,7 @@ impl Indices {
             offset: 0,
             file_read,
             hash: Sha256::new(),
+            began: env.now,
             intake: Intake::with_capacity(packages::largest_demand(&env.limits.mmdebstrap).max(file_read)),
             demand: Read::Nothing,
             decoder: packages::Stanzas::new(&env.limits.mmdebstrap),
@@ -106,7 +110,13 @@ impl Indices {
                     self.file = Some(file);
                     self.state = State::Reading;
                 }
-                State::Listing | State::CloseDirectory | State::Reading | State::CloseIndex | State::Done => {
+                State::Listing
+                | State::CloseDirectory
+                | State::Reading
+                | State::SyncIndex
+                | State::CloseIndex
+                | State::Arrival
+                | State::Done => {
                     unreachable!("index open")
                 }
             },
@@ -126,7 +136,7 @@ impl Indices {
                     for seen in &self.seen {
                         self.failed |= !seen;
                     }
-                    self.state = State::CloseDirectory;
+                    self.state = State::Index;
                 }
             }
             file::Event::Read { bytes, .. } => {
@@ -137,8 +147,9 @@ impl Indices {
                 self.intake.append(&bytes).expect("read within intake room");
             }
             file::Event::Closed { .. } => {
-                if self.directory.take().is_some() {
-                    self.state = State::Index;
+                if self.state == State::CloseDirectory {
+                    self.directory = None;
+                    self.state = State::Done;
                 } else {
                     self.file = None;
                     if !self.failed {
@@ -150,11 +161,11 @@ impl Indices {
                                 sha256: Digest(core::mem::replace(&mut self.hash, Sha256::new()).finish()),
                             })
                             .expect("index count");
-                        self.next = self.next.saturating_add(1);
+                        self.state = State::Arrival;
                     }
-                    self.state = State::Index;
                 }
             }
+            file::Event::Synced { .. } => self.state = State::CloseIndex,
             file::Event::Failed { .. } | file::Event::Cancelled { .. } | file::Event::Refused { .. } => {
                 if self.state == State::CloseDirectory {
                     self.directory = None;
@@ -175,7 +186,6 @@ impl Indices {
             | file::Event::Stated { .. }
             | file::Event::Written { .. }
             | file::Event::Cut { .. }
-            | file::Event::Synced { .. }
             | file::Event::Renamed { .. }
             | file::Event::Removed { .. } => unreachable!("indices file operation"),
         }
@@ -207,13 +217,14 @@ impl Indices {
             }
             State::Index => {
                 let Some(index) = self.files.get(self.next) else {
-                    self.state = State::Done;
-                    return Some(true);
+                    self.state = State::CloseDirectory;
+                    return None;
                 };
                 let mut path = Writer::new(self.path.len().saturating_add(index.name.len()).saturating_add(1));
                 path.put(&self.path).expect("lists path");
                 path.put(b"/").expect("slash");
                 path.put(&index.name).expect("index name");
+                self.began = env.now;
                 self.offset = 0;
                 self.eof = false;
                 self.intake.clear();
@@ -227,7 +238,7 @@ impl Indices {
                 if self.read(env, above) {
                     return None;
                 }
-                if self.state == State::CloseIndex || self.failed {
+                if self.state == State::SyncIndex || self.failed {
                     return None;
                 }
                 file::Request::ReadAt {
@@ -236,6 +247,19 @@ impl Indices {
                     offset: self.offset,
                     max: self.intake.room().min(self.file_read),
                 }
+            }
+            State::SyncIndex => file::Request::Sync { owner: OWNER, file: self.file.expect("index file") },
+            State::Arrival => {
+                let index = self.records.as_slice().last().expect("read index");
+                self.waiting = true;
+                above.push(Event::Index {
+                    request: self.request,
+                    arrival: OWNER,
+                    sha256: index.sha256,
+                    size: index.size,
+                    took: env.now.saturating_since(self.began),
+                });
+                return None;
             }
             State::CloseIndex => file::Request::Close { owner: OWNER, file: self.file.expect("index file") },
             State::Done => return Some(true),
@@ -261,7 +285,7 @@ impl Indices {
         if index.component.is_none() {
             self.intake.clear();
             if self.eof {
-                self.state = State::CloseIndex;
+                self.state = State::SyncIndex;
                 return true;
             }
             return false;
@@ -287,12 +311,25 @@ impl Indices {
                     line: u32::from(index.line),
                     stanza: translate::resolution::stanza(stanza),
                 })),
-                Some(packages::Found::Ended) => self.state = State::CloseIndex,
+                Some(packages::Found::Ended) => self.state = State::SyncIndex,
                 Some(packages::Found::Failed(_)) => self.failed = true,
                 None => break,
             }
         }
         true
+    }
+    pub fn arrival(&self) -> Option<(Token, Box<[u8]>)> {
+        if self.state != State::Arrival || !self.waiting {
+            return None;
+        }
+        Some((self.directory.expect("lists directory"), self.files.get(self.next).expect("current index").name.clone()))
+    }
+    pub fn settled(&mut self) {
+        if self.state == State::Arrival {
+            self.waiting = false;
+            self.next = self.next.saturating_add(1);
+            self.state = State::Index;
+        }
     }
     pub fn lines(&mut self) -> Box<[render::resolution::Line]> {
         let mut lines = List::with_capacity(u32::try_from(self.lines.len()).expect("source count"));

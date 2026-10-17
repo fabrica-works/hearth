@@ -18,7 +18,10 @@ pub(crate) fn print(record: &Record, after: Option<Type>, most: u32) -> Result<B
         | Record::Error(_)
         | Record::Startup(_)
         | Record::Waiting(_)
-        | Record::Strays(_) => Some(2),
+        | Record::Strays(_)
+        | Record::Resolving(_)
+        | Record::Resolved(_)
+        | Record::Unresolved(_) => Some(2),
     }
     .ok_or(Refusal::TooLong)?;
     let start = usize::from(after.is_some());
@@ -66,6 +69,9 @@ fn line(json: &mut Encoder, record: &Record, index: usize) {
         json.unsigned(u64::from(CLIENT_VERSION));
     } else {
         match record {
+            Record::Resolving(value) => value.json(json),
+            Record::Resolved(value) => value.json(json),
+            Record::Unresolved(value) => value.json(json),
             Record::Waiting(waiting) => waiting.json(json),
             Record::Strays(strays) => strays.json(json),
             Record::Change(change) => change.json(json),

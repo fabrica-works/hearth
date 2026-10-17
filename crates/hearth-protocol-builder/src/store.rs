@@ -43,26 +43,12 @@ impl Store {
         roots: &Roots,
         limits: &Limits,
         temporary: Option<Box<[u8]>>,
+        index: Option<(Token, Box<[u8]>)>,
         below: &mut Queue<Asked>,
     ) {
         assert!(self.pending.is_none(), "one store request");
         self.pending = Some(request.clone());
-        if let Request::Write { resolution } = &request {
-            match tree::resolution::write(&translate::store::tree_resolution(resolution.clone()), &limits.tree) {
-                Ok(bytes) => below.push(Asked::File(file::Request::Store {
-                    owner: OWNER,
-                    root: roots.resolutions.token,
-                    path: names::removal(builder::store::vocabulary::Removal::Record(resolution.key)),
-                    bytes,
-                    expected: file::Expect::Any,
-                    no_follow: true,
-                })),
-                Err(_) => {
-                    self.pending = None;
-                    self.deferred =
-                        Some(Event::Unwritable { max: u64::from(tree::frame::Kind::Resolution.bound(&limits.tree)) });
-                }
-            }
+        if self.write(&request, roots, limits, below) || self.index(&request, roots, index, below) {
             return;
         }
         if request == Request::Empty {
@@ -144,6 +130,66 @@ impl Store {
                 no_follow: true,
             },
         }));
+    }
+    fn write(&mut self, request: &Request, roots: &Roots, limits: &Limits, below: &mut Queue<Asked>) -> bool {
+        if let Request::Write { resolution } = &request {
+            match tree::resolution::write(&translate::store::tree_resolution(resolution.clone()), &limits.tree) {
+                Ok(bytes) => below.push(Asked::File(file::Request::Store {
+                    owner: OWNER,
+                    root: roots.resolutions.token,
+                    path: names::removal(builder::store::vocabulary::Removal::Record(resolution.key)),
+                    bytes,
+                    expected: file::Expect::Any,
+                    no_follow: true,
+                })),
+                Err(_) => {
+                    self.pending = None;
+                    self.deferred =
+                        Some(Event::Unwritable { max: u64::from(tree::frame::Kind::Resolution.bound(&limits.tree)) });
+                }
+            }
+            return true;
+        }
+        false
+    }
+    fn index(
+        &mut self,
+        request: &Request,
+        roots: &Roots,
+        index: Option<(Token, Box<[u8]>)>,
+        below: &mut Queue<Asked>,
+    ) -> bool {
+        if let Some((from_root, from)) = index {
+            match &request {
+                Request::Keep { record, .. } => {
+                    self.keeping = 1;
+                    below.push(Asked::Beneath(crate::Beneath::Rename {
+                        owner: OWNER,
+                        from_root,
+                        from,
+                        to_root: roots.cache.fd,
+                        to: names::removal(builder::store::vocabulary::Removal::File(record.sha256)),
+                    }));
+                    return true;
+                }
+                Request::Discard { .. } => {
+                    self.pending = None;
+                    self.deferred = Some(Event::Done);
+                    return true;
+                }
+                Request::Write { .. }
+                | Request::Empty
+                | Request::Load { .. }
+                | Request::List { .. }
+                | Request::Next { .. }
+                | Request::Close
+                | Request::Remove { .. }
+                | Request::Lock
+                | Request::LoadRecord
+                | Request::WriteRecord { .. } => {}
+            }
+        }
+        false
     }
     pub fn ready(&self) -> bool {
         self.deferred.is_some()
@@ -333,5 +379,26 @@ fn loaded(bytes: &[u8], pending: &Request, limits: &Limits) -> Event {
             Ok(record) => Some(translate::store::store_record(record)),
             Err(_) => None,
         },
+    }
+}
+
+impl crate::Protocol {
+    pub(super) fn store_request(&mut self, request: Request, limits: &Limits, below: &mut Queue<Asked>) {
+        let temporary = self.temporary();
+        let index = match &self.resolving {
+            Some(resolve) => resolve.index(),
+            None => None,
+        };
+        self.store.down(request, &self.roots, limits, temporary, index, below);
+    }
+
+    pub(super) fn resume_store(&mut self, above: &mut Queue<builder::vocabulary::Event>) -> bool {
+        if !self.store.resume(above) {
+            return false;
+        }
+        if let Some(resolve) = &mut self.resolving {
+            resolve.index_settled();
+        }
+        true
     }
 }

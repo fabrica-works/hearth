@@ -14,7 +14,7 @@ use skein_io::{
     kernel::{Exit, Pipe, Spawn, Way},
 };
 use skein_lib::{Env, Queue, Time, Token, Writer, bytes, stream::Up};
-pub(super) const OWNER: Token = Token::new(20);
+pub(super) const OWNER: Token = Token::new(21);
 #[derive(Debug)]
 struct PipeReader {
     token: Option<Token>,
@@ -316,6 +316,14 @@ impl Resolve {
             at: None,
             failure: Failure::TooLarge { limit: Limit::Closure, max: u64::from(env.limits.mmdebstrap.insts) },
         });
+    }
+    pub fn index(&self) -> Option<(Token, Box<[u8]>)> {
+        self.indices.as_ref()?.arrival()
+    }
+    pub fn index_settled(&mut self) {
+        if let Some(indices) = &mut self.indices {
+            indices.settled();
+        }
     }
     pub fn ready(&self) -> bool {
         if let Some(indices) = &self.indices {

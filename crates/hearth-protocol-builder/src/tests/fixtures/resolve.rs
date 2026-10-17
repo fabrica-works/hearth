@@ -90,7 +90,9 @@ impl Layer {
             match request {
                 Asked::File(request) => self.resolve_file(request),
                 Asked::Beneath(crate::Beneath::Remove { owner, .. }) => self.file_up(file::Event::Removed { owner }),
-                Asked::Beneath(crate::Beneath::OpenDirectory { .. }) => panic!("empty fixture scratch"),
+                Asked::Beneath(crate::Beneath::OpenDirectory { .. } | crate::Beneath::Rename { .. }) => {
+                    panic!("empty fixture scratch")
+                }
                 Asked::Io(io::Request::Spawn { owner, .. }) => {
                     self.spawned(owner, false, exit);
                 }
@@ -112,7 +114,10 @@ impl Layer {
     pub fn resolve_file(&mut self, request: file::Request) {
         let event = match request {
             file::Request::MakeDirectory { .. } => made(),
-            file::Request::Store { .. } => stored(),
+            file::Request::Store { owner, .. } => file::Event::Stored { owner, digest: io::digest::Digest([0; 4]) },
+            file::Request::Sync { owner, .. } | file::Request::SyncDirectory { owner, .. } => {
+                file::Event::Synced { owner }
+            }
             file::Request::OpenDirectory { owner, .. } => file::Event::Opened { owner, file: Token::new(88), len: 0 },
             file::Request::ListPage { owner, .. } => file::Event::Listed { owner, entries: Box::new([]) },
             file::Request::Close { owner, .. } => file::Event::Closed { owner },
@@ -131,8 +136,6 @@ impl Layer {
             | file::Request::WriteAt { .. }
             | file::Request::ReadAt { .. }
             | file::Request::Cut { .. }
-            | file::Request::Sync { .. }
-            | file::Request::SyncDirectory { .. }
             | file::Request::Rename { .. }
             | file::Request::List { .. } => panic!("resolve scratch operation"),
         };
@@ -234,10 +237,34 @@ pub struct ResolvedRun {
 }
 impl Layer {
     pub fn resolve_with_indices(&mut self) -> ResolvedRun {
+        self.indices_run(false)
+    }
+    pub fn index_arriving() -> (Self, ResolvedRun) {
+        let mut layer = Self::resolution();
+        layer.start_resolve();
+        layer.resolve_end();
+        layer.resolve_exit(Exit::Code(0));
+        let run = layer.indices_run(true);
+        (layer, run)
+    }
+    fn indices_run(&mut self, stop_at_index: bool) -> ResolvedRun {
         let mut run = ResolvedRun { events: List::with_capacity(8), trace: List::with_capacity(8) };
         let mut content = b"".as_slice();
         for _ in 0_u32..4096 {
             if let Some(event) = self.told() {
+                if let builder::vocabulary::Event::Store(_) = &event {
+                    continue;
+                }
+                if let builder::vocabulary::Event::Index { arrival, .. } = &event {
+                    if stop_at_index {
+                        run.events.push(event).expect("index");
+                        return run;
+                    }
+                    self.client(builder::vocabulary::Request::Store(builder::store::vocabulary::Request::Discard {
+                        arrival: *arrival,
+                    }));
+                    continue;
+                }
                 if let builder::vocabulary::Event::Render(render::vocabulary::Event::Resolved { .. }) = &event {
                     run.trace.push("resolved").expect("trace");
                 }
@@ -290,7 +317,22 @@ impl Layer {
                         bytes: bytes::copy_of(content.get(start..end).expect("read range")),
                     });
                 }
-                Asked::File(request) => self.resolve_file(request),
+                Asked::File(file::Request::Sync { owner, file }) => {
+                    assert_eq!(file, super::INDEX_FILE);
+                    if stop_at_index {
+                        run.trace.push("sync").expect("trace");
+                    }
+                    self.file_up(file::Event::Synced { owner });
+                }
+                Asked::File(request) => {
+                    if stop_at_index
+                        && let file::Request::Close { file, .. } = &request
+                        && *file == super::INDEX_FILE
+                    {
+                        run.trace.push("close").expect("trace");
+                    }
+                    self.resolve_file(request);
+                }
                 Asked::Io(io::Request::Close { entity }) => {
                     let owner = if entity == Token::new(200) { self.owner.expect("owner") } else { entity };
                     self.up(io::Event::Closed { owner });

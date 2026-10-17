@@ -453,11 +453,7 @@ pub fn lay(store: &Path, entries: &[Laid]) {
     fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("resolutions")).expect("resolutions directory");
     for entry in entries {
         if let Laid::Resolution(record) = entry {
-            use std::fmt::Write;
-            let mut name = String::new();
-            for byte in record.key.0 {
-                write!(&mut name, "{byte:02x}").expect("hex name");
-            }
+            let name = hex_digest(record.key.0);
             let bytes = hearth_protocol_tree::resolution::write(record, &limits::SHIPPED).expect("resolution record");
             fs::write(store.join("resolutions").join(format!("{name}.record")), bytes).expect("laid resolution");
             continue;
