@@ -303,8 +303,8 @@ Files: render `src/parts/{secrets, software, live, packages}.rs`, `src/diff.rs`,
 `src/form/{text, json}.rs`, `src/tests/diff.rs`; `tests/builder/{src/
 fixtures.rs, tests/real.rs}`.
 Shape: the sketches. Both sides have every part, an empty one as its record.
-Downloads and live paths are `Keyed` (18's) by path, a changed row its `after`;
-secrets are `Named`, never a value; seeds are `Keyed` by name (users
+Downloads and live paths are keyed as 18's `<Type>Keyed` (ruling 155) by path, a changed row its `after`;
+secrets are `Named`, never a value; seeds are keyed by name (users
 `<uid> <gid|->`, groups `<gid>`; list `seed user`, `seed group`); `layer` as
 Choices 8. Text under the target's line:
 `<mark> <list> <key>` padded to 52 characters, then the row (18's Choices 9).
@@ -366,7 +366,7 @@ pub enum How { File { mode: u16 }, Tar { strip: u32 } }
 pub struct Fetch { pub sha256: Digest, pub url: Box<[u8]> }
 pub fn build(expansion: &Expansion, scripts: Box<[Script]>) -> Result<Software, Box<[Error]>>;
 #[must_use] pub fn digest(software: &Software) -> Digest; // H("part:software", { downloads, scripts })
-pub struct Change { pub downloads: Box<[Keyed<Download>]>, pub scripts: Option<ScriptsChange> }
+pub struct Change { pub downloads: Box<[DownloadKeyed]>, pub scripts: Option<ScriptsChange> }
 #[must_use] pub fn change(before: &Software, after: &Software) -> Change;
 // crates/hearth-domain-render/src/parts/live.rs (19.3; change 19.5)
 /// render.md 4.4's `live`, in path order.
@@ -375,7 +375,7 @@ pub struct Covered { pub path: Box<[u8]>, pub consumers: Box<[Consumer]> }
 pub struct Consumer { pub task: Box<[u8]>, pub unit: Option<Box<[u8]>>, pub action: Action }
 pub enum Action { Reload, Restart, ReloadOrRestart, Start, None }
 pub fn build(expansion: &Expansion) -> Result<Live, Box<[Error]>>;
-pub struct Change { pub paths: Box<[Keyed<Box<[Consumer]>>]> }
+pub struct Change { pub paths: Box<[ConsumersKeyed]> }
 #[must_use] pub fn change(before: &Live, after: &Live) -> Change;
 // crates/hearth-domain-render/src/ids.rs (19.4); parts/packages.rs: `Packages` gains `seeds: Seeds`, its `Change` `seeds: SeedsChange`
 /// One owner and group asked for a fixed id, where each was written.
@@ -386,7 +386,8 @@ pub struct Seeds { pub users: Box<[SeedUser]>, pub groups: Box<[SeedGroup]> }
 pub struct SeedUser { pub name: Box<[u8]>, pub uid: u32, pub gid: Option<u32> }
 pub struct SeedGroup { pub name: Box<[u8]>, pub gid: u32 }
 /// 19.5: `Packages::Change::seeds`, by name; a user's row is `SeedIds`, a group's its `gid`.
-pub struct SeedsChange { pub users: Box<[Keyed<SeedIds>]>, pub groups: Box<[Keyed<u32>]> }
+pub struct SeedsChange { pub users: Box<[SeedUserKeyed]>, pub groups: Box<[SeedGroupKeyed]> }
+// each `<Type>Keyed` as 18's `GroupKeyed`, one enum per type (ruling 155): `ConsumersKeyed` holds `Box<[Consumer]>`, `SeedGroupKeyed` a `u32`
 pub struct SeedIds { pub uid: u32, pub gid: Option<u32> }
 // errors.rs: `Kind` gains `Ids(Ids)`, `Schema` gains `Beneath { allowed: Box<[Box<[u8]>]> }`, `Format` gains `Sha256`
 /// render.md 7.2's `ids`: whose id is missing, of what, and why.

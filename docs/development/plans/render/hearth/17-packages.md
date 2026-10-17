@@ -375,8 +375,10 @@ pub struct Inputs { pub sources: Box<[Item]>, pub request: Box<[Item]>, pub vari
 /// The part, or an `Error` per entry at fault; `set`: where `debian.components` was set.
 pub fn build(root: &Value, placement: &revision::Placement, expansion: &Expansion, set: Option<&Place>) -> Result<Packages, Box<[Error]>>;
 /// 17.5: `Some` where the field differs; 45.2 adds `resolution`.
-pub struct Change { pub request: Names, pub sources: Option<Pair<Sources>>, pub variant: Option<Pair<Variant>>, pub preseeds: Option<Pair<Box<[Preseed]>>>, pub initramfs: Option<Pair<Option<Initramfs>>>, pub apt: Option<Pair<Apt>> }
-pub struct Names { pub added: Box<[Box<[u8]>]>, pub removed: Box<[Box<[u8]>]> } // and `Pair<T> { before, after }`
+pub struct Change { pub request: Names, pub sources: Option<SourcesPair>, pub variant: Option<VariantPair>, pub preseeds: Option<PreseedsPair>, pub initramfs: Option<InitramfsPair>, pub apt: Option<AptPair> }
+pub struct Names { pub added: Box<[Box<[u8]>]>, pub removed: Box<[Box<[u8]>]> }
+// and one `<Type>Pair { before, after }` per field's type, no generic `Pair<T>` (ruling 155):
+// `PreseedsPair` holds `Box<[Preseed]>`, `InitramfsPair` `Option<Initramfs>`
 #[must_use] pub fn change(before: &Packages, after: &Packages) -> Change;
 // crates/hearth-domain-render/src/parts/boot.rs (17.4; change 17.5)
 /// render.md 4.3's `boot`.

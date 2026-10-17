@@ -216,18 +216,20 @@ pub struct Moved { pub name: Box<[u8]>, pub architecture: Box<[u8]>, pub before:
 // crates/hearth-domain-render/src/parts/meta.rs (45.1)
 /// meta's change (6.1): each field that moved, `None` for one that did not; mirrors records' `MetaChange`.
 pub struct Change {
-    pub base: Option<Pair<Box<[u8]>>>, pub member: Option<Pair<Option<Box<[u8]>>>>,
-    pub environment: Option<Pair<Box<[u8]>>>, pub placement: Option<Pair<Placement>>,
+    pub base: Option<NamePair>, pub member: Option<MemberPair>,
+    pub environment: Option<NamePair>, pub placement: Option<PlacementPair>,
 }
-/// A field before and after; mirrors records' `Pair`.
-pub struct Pair<T> { pub before: T, pub after: T }
+/// A field before and after, one struct per type (45.s1, ruling 155); mirrors records'.
+pub struct NamePair { pub before: Box<[u8]>, pub after: Box<[u8]> }
+pub struct MemberPair { pub before: Option<Box<[u8]>>, pub after: Option<Box<[u8]>> }
+pub struct PlacementPair { pub before: Placement, pub after: Placement }
 
 // the vocabularies (45.2): `Event::Diff` and the root's `Call::Diff` gain `resolve: bool`
 
 // crates/hearth-client-protocol-records/src/diff.rs (hearth 40.1's, 25's; 45.1 adds)
 pub enum PartChange { Meta(MetaChange), Config(ConfigChange) }    // Meta: 45.1
-pub struct MetaChange { pub base: Option<Pair<Box<[u8]>>>, pub member: Option<Pair<Option<Box<[u8]>>>>, pub environment: Option<Pair<Box<[u8]>>>, pub placement: Option<Pair<Placement>> }
-pub struct Pair<T> { pub before: T, pub after: T }
+pub struct MetaChange { pub base: Option<NamePair>, pub member: Option<MemberPair>, pub environment: Option<NamePair>, pub placement: Option<PlacementPair> }
+// and `NamePair`, `MemberPair`, `PlacementPair`, as render's (45.s1, ruling 155)
 // src/errors.rs (hearth 40.2's; 45.1): `Error` gains `pub side: Option<Side>`, as hearth 12's error does
 // render's errors.rs and records' (45.1): `Command`'s `Diff` is hearth 42.1's (ruling 147)
 ```

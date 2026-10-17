@@ -395,9 +395,10 @@ pub struct Script { pub task: Box<[u8]>, pub order: u16, pub content_digest: [u8
 // src/parts/data.rs (18.5); src/diff.rs: ConfigChange gains the lists, PartChange Data(DataChange)
 pub struct Data { pub entries: Box<[DataEntry]> }  pub struct DataEntry { pub name: Box<[u8]>, pub value: DataValue }
 pub struct DataValue { pub class: DataClass, pub path: Box<[u8]> }  pub enum DataClass { Core, Data, Cache }
-pub enum Keyed<T> { Added { key: Box<[u8]>, value: T }, Removed { key: Box<[u8]>, value: T }, Changed { key: Box<[u8]>, before: T, after: T } }
-pub struct ConfigChange { pub tree: Box<[EntryChange]>, pub groups: Box<[Keyed<GroupKind>]>, pub users: Box<[Keyed<UserKind>]>, pub members: Box<[MemberChange]>, pub presets: Box<[Keyed<Action>]>, pub tmpfiles: Box<[Keyed<Line>]>, pub scripts: Option<ScriptsChange> }
-pub enum MemberChange { Added(Member), Removed(Member) }  pub struct DataChange { pub entries: Box<[Keyed<DataValue>]> }
+// one enum per type, no generic `Keyed<T>` (ruling 155): `GroupKeyed`, `UserKeyed`, `PresetKeyed`, `LineKeyed`, `DataKeyed`, each
+pub enum GroupKeyed { Added { key: Box<[u8]>, value: GroupKind }, Removed { key: Box<[u8]>, value: GroupKind }, Changed { key: Box<[u8]>, before: GroupKind, after: GroupKind } }
+pub struct ConfigChange { pub tree: Box<[EntryChange]>, pub groups: Box<[GroupKeyed]>, pub users: Box<[UserKeyed]>, pub members: Box<[MemberChange]>, pub presets: Box<[PresetKeyed]>, pub tmpfiles: Box<[LineKeyed]>, pub scripts: Option<ScriptsChange> }
+pub enum MemberChange { Added(Member), Removed(Member) }  pub struct DataChange { pub entries: Box<[DataKeyed]> }
 pub struct ScriptsChange { pub before: Box<[Script]>, pub after: Box<[Script]> }
 ```
 

@@ -315,6 +315,12 @@ the closing repins (Repin). The increments of each session are in its file.
   [template::Op; 26]`), which the one test loops over by value
   (`.into_iter().enumerate()`). A one-way test still states its
   expected value as a literal or a plain `const`.
+- **No generic item in production code** (ruling 155; skein's
+  programming-model.md, 1 and 10.3): a sketch's `Pair<T>` or `Keyed<T>`
+  is one concrete struct or enum per type it holds, named for it
+  (`Pair<Sources>` is `SourcesPair { before, after }`, `Keyed<GroupKind>`
+  is `GroupKeyed`), and a helper over them one fn per type. A test's
+  `only<T>` stays.
 - **One land at a time in each repository:** a session runs `land` only
   under its repository's lock, held for the whole of `land`, its retries
   included: `flock ~/src/rust/tmp/hearth/render/land-hearth.lock land …`
