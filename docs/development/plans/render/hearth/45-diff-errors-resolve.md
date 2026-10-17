@@ -73,21 +73,42 @@ the changes (3.2); a failed `Hunks`' `tool` error; `hearth diff <from>
 <to> [--target <t>]… [--repo] [--store] [--json]` (3.1, 3.5);
 `end_to_end_diff` (testing.md, 2.7).
 Needs: hearth 25 (25.1, 25.2); hearth 22.1 (the collector: errors sorted,
-at most 256, then a count; `Answer::Error`); hearth 42.1 (the `tool` kind);
+at most 256, then a count; `Rendered`'s `left_out`); hearth 42.1 (the `tool` kind);
 hearth 32.2 (the binary's usage line).
 Files: render `src/{call, diff, errors}.rs`, `src/parts/meta.rs`,
 `src/tests/diff.rs`; protocol `src/git.rs`, `src/translate/{changes, errors}.rs`,
 `src/tests/{git, translate}.rs`; records `src/{diff.rs, errors.rs, form/,
 tests/diff.rs}`;
 `crates/hearth/{src/argv.rs, src/tests.rs, tests/end_to_end.rs}`;
-`tests/builder/tests/real.rs`.
-Shape: the sketches. `PartChange::Meta` (hearth 25's) leads the parts
-when any meta field differs (Choices). Both sides' errors go to
-hearth 22.1's one collector: 7.1's order, one 256 bound and count over
-the answer (Choices), each with its `side` (hearth 12's error and
-records' `Error` gain `side: Option<Side>`, `None` in a render, omitted in
-JSON then; text leads 7.3's line with `from: ` or `to: `), after
-the last change; errors equal in every other key sort `from` before `to`. A
+`tests/builder/tests/real.rs`. Each literal of render's or records' `Error`
+gains `side`: render `src/tests/errors.rs:18,61,79,95,129` and
+`src/call.rs:210`; `tests/render/tests/{errors.rs:27,65, compose.rs:59}`;
+protocol `src/tests/translate/errors.rs:247,263`; records
+`src/tests/{errors.rs:233,246,300, fixtures.rs:119,134}`. The failed
+`Hunks`' `Tool` reaches render on 25.2's `Event::Failed` for token 3
+(render `src/vocabulary.rs:18`, `src/lib.rs:75-77`, protocol
+`src/lib.rs:557`): unless hearth 42.1 has already made `Event::Failed`
+carry its `Tool`, it gains one (`None` but for git's failures), and its
+literals change: the root's `src/lib.rs:101,155`, render
+`src/tests/diff.rs:201`, protocol `src/tests/{cache.rs:44, git.rs:107,126,167,
+read.rs:105,151}`. `git.rs:36` pipes `Command::Diff`'s standard error for
+the tail, unless hearth 42.1 already does.
+Shape: the sketches. `PartChange` gains `Meta` (hearth 25 landed
+`Config` alone: render `diff.rs:34`, records `diff.rs:43`), which leads
+the parts when any meta field differs (Choices). Both sides' errors go
+to one collector, where hearth 22.1 left one a side (render `call.rs:20`'s
+`errors`, the diff summing their `left_out` at `call.rs:497`): at
+`call.rs:513`, `to`'s side takes over `from`'s collector instead of a
+new one, so 7.1's order, the 256 bound and the count run once over the
+answer (Choices); `from`'s errors, which `call.rs:499` answers at once,
+are answered with `to`'s after the last change. Each has its `side`
+(hearth 12's error and records' `Error` gain `side: Option<Side>`, `None`
+in a render, omitted in JSON then; text leads 7.3's line with `from: `
+or `to: `); an error's side is `From` or `To`, never `Both`, which stays
+a failed target's. `from`'s errors arrive first, so `Order`'s `arrival`
+(`errors.rs:99`) sorts `from` before `to` among errors equal in every
+other key, and `Order` gains no key. `real.rs`'s diff tests that match an
+error's record or line gain its `side`. A
 failed `Hunks` leaves its file bare and adds the target's `tool` error: git.rs
 gives 25.2's `Failed` its `Tool` (`Command::Diff`, the exit, the tail:
 hearth 42.1's).
@@ -113,7 +134,7 @@ are the call's own; 32.1 replaces one it cannot open), so a failed
 `a_diff_whose_git_fails_prints_the_change_bare_then_its_tool_error_and_exits_75`.
 End to end, under 0.5 s: `end_to_end_diff` (`MOTD` at two commits, the
 binary run with `XDG_CACHE_HOME` a scratch directory and `HOME`
-`repository.home()`, `diff <from> <to>`) asserts stdout is
+`repository.scratch().path()`, as `end_to_end.rs:11` runs it, `diff <from> <to>`) asserts stdout is
 `fixtures::MOTD_DIFF_TEXT`, the real loop's lines, and `Exit::Code(1)`.
 Proof: process, `heavy cargo nextest run -p hearth -E
 'test(=end_to_end_diff)'`: the shipped binary finds its repository and store,
@@ -134,7 +155,9 @@ Files: render `src/{vocabulary, call, diff}.rs`, `src/parts/packages.rs`,
 `src/tests/diff.rs`; the root's `src/vocabulary.rs`; protocol
 `src/translate/changes.rs`, `src/tests/translate.rs`; records
 `src/parts/packages.rs` (hearth 17's change), `src/form/`; `crates/hearth/src/{argv, tests}.rs`;
-`tests/builder/{src/fixtures.rs, tests/real.rs}`.
+`tests/builder/{src/fixtures.rs, tests/real.rs}`; the literals of
+`Event::Diff` and `Call::Diff` gain `resolve`: the root's `src/lib.rs:137`,
+render `src/lib.rs:49` and `src/tests/fixtures.rs:383`.
 Shape: the sketches. `diff::resolution`: equal keys, `Same`; both
 closures recorded, `Resolved`, one walk of the two by name, then
 architecture (store.md, 6.4): in `to` alone `added`, in `from` alone
