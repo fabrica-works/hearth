@@ -714,5 +714,7 @@ mod data;
 #[path = "real/scripts.rs"]
 mod scripts;
 
+#[path = "real/diff_resolution.rs"]
+mod diff_resolution;
 #[path = "real/software.rs"]
 mod software;

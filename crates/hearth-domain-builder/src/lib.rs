@@ -221,7 +221,9 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
                 return;
             }
             let event = match builder.call.take().expect("opening call") {
-                Call::Diff { repository, from, to, targets } => RenderEvent::Diff { repository, from, to, targets },
+                Call::Diff { resolve, repository, from, to, targets } => {
+                    RenderEvent::Diff { resolve, repository, from, to, targets }
+                }
                 Call::Render { resolve, repository, revision, targets } => {
                     RenderEvent::Render { resolve, repository, revision, targets }
                 }

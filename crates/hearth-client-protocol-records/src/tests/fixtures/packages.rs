@@ -70,6 +70,7 @@ pub fn boot_spec() -> Box<Spec> {
 #[must_use]
 pub fn package_change(request: Names) -> crate::diff::PartChange {
     crate::diff::PartChange::Packages(Change {
+        resolution: crate::diff::ResolutionChange::Same,
         request,
         sources: None,
         variant: None,

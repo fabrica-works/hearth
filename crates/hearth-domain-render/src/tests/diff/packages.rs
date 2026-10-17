@@ -24,6 +24,7 @@ fn a_field_equal_on_both_sides_is_left_out() {
     assert_eq!(
         change(&packages, &packages),
         Change {
+            resolution: diff::ResolutionChange::Same,
             request: Names { added: Box::new([]), removed: Box::new([]) },
             sources: None,
             variant: None,

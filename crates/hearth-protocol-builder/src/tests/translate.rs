@@ -774,3 +774,5 @@ mod resolve;
 mod data;
 mod directives;
 mod record_store;
+
+mod diff_resolution;

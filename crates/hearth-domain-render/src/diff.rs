@@ -1,4 +1,5 @@
 //! Typed differences and the lowest changed layer (render.md, 6.1, 6.2).
+mod resolution;
 use crate::{
     parts::{PartRecord, Spec, boot, config, data, exports, packages},
     revision::Oid,
@@ -6,6 +7,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
+pub use resolution::*;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Change {
     pub target: Box<[u8]>,

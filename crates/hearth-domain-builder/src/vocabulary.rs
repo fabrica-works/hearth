@@ -37,7 +37,7 @@ pub enum Event {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Call {
-    Diff { repository: Box<[u8]>, from: Box<[u8]>, to: Box<[u8]>, targets: Box<[Box<[u8]>]> },
+    Diff { resolve: bool, repository: Box<[u8]>, from: Box<[u8]>, to: Box<[u8]>, targets: Box<[Box<[u8]>]> },
     Render { resolve: bool, repository: Box<[u8]>, revision: Box<[u8]>, targets: Box<[Box<[u8]>]> },
 }
 #[derive(PartialEq, Eq, Debug)]

@@ -652,3 +652,23 @@ pub struct ScriptsChange {
 
 mod data;
 mod directives;
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum ResolutionChange {
+    Same,
+    NewKey,
+    Resolved { added: Box<[Listed]>, removed: Box<[Listed]>, versions_changed: Box<[Moved]> },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Listed {
+    pub name: Box<[u8]>,
+    pub architecture: Box<[u8]>,
+    pub version: Box<[u8]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Moved {
+    pub name: Box<[u8]>,
+    pub architecture: Box<[u8]>,
+    pub before: Box<[u8]>,
+    pub after: Box<[u8]>,
+}

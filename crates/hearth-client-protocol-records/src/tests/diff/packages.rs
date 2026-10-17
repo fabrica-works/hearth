@@ -8,13 +8,13 @@ use crate::{
 fn packages_json_lists_added_and_removed_names() {
     let record = fixtures::change_record(fixtures::requested_packages_change());
     assert_eq!(form::print(Form::JsonLines, &record, Some(Type::Change), &limits::SHIPPED).as_deref(), Ok(concat!(
-        r#"{"record":"change","target":"ion-prod","kind":"changed","changed":{"parts":[{"kind":"packages","packages":{"request":{"added":["vim"],"removed":["nano"]}}}],"rebuild":{"kind":"nothing"}}}"#, "\n").as_bytes()));
+        r#"{"record":"change","target":"ion-prod","kind":"changed","changed":{"parts":[{"kind":"packages","packages":{"request":{"added":["vim"],"removed":["nano"]},"resolution":{"kind":"same"}}}],"rebuild":{"kind":"nothing"}}}"#, "\n").as_bytes()));
 }
 #[test]
 fn an_equal_request_is_left_out_of_the_json() {
     let record = fixtures::change_record(fixtures::unchanged_packages_change());
     assert_eq!(form::print(Form::JsonLines, &record, Some(Type::Change), &limits::SHIPPED).as_deref(), Ok(concat!(
-        r#"{"record":"change","target":"ion-prod","kind":"changed","changed":{"parts":[{"kind":"packages","packages":{}}],"rebuild":{"kind":"nothing"}}}"#, "\n").as_bytes()));
+        r#"{"record":"change","target":"ion-prod","kind":"changed","changed":{"parts":[{"kind":"packages","packages":{"resolution":{"kind":"same"}}}],"rebuild":{"kind":"nothing"}}}"#, "\n").as_bytes()));
 }
 #[test]
 fn boot_json_keeps_the_before_and_after() {
@@ -41,6 +41,7 @@ fn packages_text_lists_added_and_removed_names() {
         form::print(Form::Text, &record, Some(Type::Change), &limits::SHIPPED).as_deref(),
         Ok(concat!(
             "ion-prod                                            nothing to build\n",
+            "  packages   resolution same\n",
             "  packages + vim\n",
             "  packages - nano\n"
         )
@@ -53,6 +54,7 @@ fn a_preseed_only_change_prints_preseeds() {
     let record = fixtures::change_record(fixtures::preseed_change());
     assert_eq!(form::print(Form::Text, &record, Some(Type::Change), &limits::SHIPPED).as_deref(), Ok(concat!(
         "ion-prod                                            nothing to build\n",
+        "  packages   resolution same\n",
         r#"  packages ~ preseeds {} → {"a/answer":{"owner":"a","type":"string","value":"word"},"tzdata/Areas":{"owner":"other","type":"select","value":"Europe"}}"#, "\n").as_bytes()));
 }
 #[test]
@@ -62,6 +64,7 @@ fn an_initramfs_only_change_prints_initramfs() {
         form::print(Form::Text, &record, Some(Type::Change), &limits::SHIPPED).as_deref(),
         Ok(concat!(
             "ion-prod                                            nothing to build\n",
+            "  packages   resolution same\n",
             r#"  packages ~ initramfs null → {"microcode":"generic","modules":["nvme"]}"#,
             "\n"
         )

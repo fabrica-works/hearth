@@ -146,6 +146,7 @@ fn diffs_revisions_and_each_target_become_the_call() {
     assert_eq!(
         invocation.call,
         Call::Diff {
+            resolve: false,
             repository: b"/".as_slice().into(),
             from: b"main".as_slice().into(),
             to: b"HEAD".as_slice().into(),
@@ -181,6 +182,27 @@ fn render_takes_resolve() {
             resolve: true,
             repository: b"/".as_slice().into(),
             revision: b"HEAD".as_slice().into(),
+            targets: Box::new([])
+        }
+    );
+}
+
+#[test]
+fn diff_takes_resolve_as_render_does() {
+    let invocation = argv::invocation(
+        &words(&["diff", "main", "HEAD", "--resolve", "--repo", "/", "--store", "/store"]),
+        None,
+        None,
+        Path::new("/"),
+    )
+    .expect("diff");
+    assert_eq!(
+        invocation.call,
+        Call::Diff {
+            resolve: true,
+            repository: b"/".as_slice().into(),
+            from: b"main".as_slice().into(),
+            to: b"HEAD".as_slice().into(),
             targets: Box::new([])
         }
     );

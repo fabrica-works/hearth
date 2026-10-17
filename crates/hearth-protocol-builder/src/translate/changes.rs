@@ -3,6 +3,7 @@ use crate::{
     records::diff as target,
     render::{diff as source, parts::config},
 };
+use alloc::boxed::Box;
 use skein_lib::List;
 #[must_use]
 pub fn change(change: source::Change) -> target::Change {
@@ -227,3 +228,29 @@ mod account_changes {
 }
 
 mod directives_changes;
+
+#[must_use]
+pub fn resolution(change: source::ResolutionChange) -> target::ResolutionChange {
+    match change {
+        source::ResolutionChange::Same => target::ResolutionChange::Same,
+        source::ResolutionChange::NewKey => target::ResolutionChange::NewKey,
+        source::ResolutionChange::Resolved { added, removed, versions_changed } => {
+            let mut moved = List::with_capacity(u32::try_from(versions_changed.len()).expect("bounded closure"));
+            for source::Moved { name, architecture, before, after } in versions_changed {
+                moved.push(target::Moved { name, architecture, before, after }).expect("closure capacity");
+            }
+            target::ResolutionChange::Resolved {
+                added: listed(added),
+                removed: listed(removed),
+                versions_changed: moved.into_boxed(),
+            }
+        }
+    }
+}
+fn listed(packages: Box<[source::Listed]>) -> Box<[target::Listed]> {
+    let mut translated = List::with_capacity(u32::try_from(packages.len()).expect("bounded closure"));
+    for source::Listed { name, architecture, version } in packages {
+        translated.push(target::Listed { name, architecture, version }).expect("closure capacity");
+    }
+    translated.into_boxed()
+}

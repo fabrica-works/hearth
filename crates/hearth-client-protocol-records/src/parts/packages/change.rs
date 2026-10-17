@@ -2,6 +2,7 @@
 use super::{Apt, Box, Initramfs, Lines, Preseed, Sources, Variant, apt, initramfs, names, preseeds, sources, variant};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Change {
+    pub resolution: crate::diff::ResolutionChange,
     pub request: Names,
     pub sources: Option<SourcesPair>,
     pub variant: Option<VariantPair>,
@@ -64,6 +65,8 @@ impl Change {
             names(json, &self.request.removed);
             json.object_end();
         }
+        json.key(b"resolution");
+        self.resolution.json(json);
         if let Some(pair) = &self.sources {
             pair_json(json, b"sources", &pair.before, &pair.after, sources);
         }
@@ -74,6 +77,7 @@ impl Change {
         json.object_end();
     }
     pub(crate) fn text(&self, lines: &mut Lines) {
+        self.resolution.text(lines);
         for (sign, names) in [(b"+".as_slice(), &self.request.added), (b"-", &self.request.removed)] {
             if !names.is_empty() {
                 lines.put(b"  packages ");

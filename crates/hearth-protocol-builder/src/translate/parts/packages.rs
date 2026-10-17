@@ -72,9 +72,10 @@ fn optional_initramfs(value: Option<source::Initramfs>) -> Option<target::Initra
 
 #[must_use]
 pub fn change(value: source::Change) -> target::Change {
-    let source::Change { request, sources, variant, preseeds, initramfs, apt } = value;
+    let source::Change { resolution, request, sources, variant, preseeds, initramfs, apt } = value;
     let source::Names { added, removed } = request;
     target::Change {
+        resolution: crate::translate::changes::resolution(resolution),
         request: target::Names { added, removed },
         sources: sources_pair(sources),
         variant: variant_pair(variant),

@@ -367,6 +367,7 @@ pub fn diff_call() -> (crate::Render, skein_lib::Env<limits::Limits>, skein_lib:
         &mut render,
         &env,
         Event::Diff {
+            resolve: false,
             repository: bytes::copy_of(b"/repo"),
             from: bytes::copy_of(b"before"),
             to: bytes::copy_of(b"after"),
@@ -792,3 +793,6 @@ mod software;
 pub use software::*;
 mod scripts;
 pub use scripts::*;
+
+mod diff_resolution;
+pub use diff_resolution::*;

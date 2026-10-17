@@ -2,6 +2,7 @@
 use super::{Apt, Box, Initramfs, List, Packages, Preseed, Sources, Variant};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Change {
+    pub resolution: crate::diff::ResolutionChange,
     pub request: Names,
     pub sources: Option<SourcesPair>,
     pub variant: Option<VariantPair>,
@@ -43,6 +44,12 @@ pub struct AptPair {
 #[must_use]
 pub fn change(before: &Packages, after: &Packages) -> Change {
     Change {
+        resolution: crate::diff::resolution(
+            crate::keys::resolution(&super::inputs(before)),
+            crate::keys::resolution(&super::inputs(after)),
+            None,
+            None,
+        ),
         request: Names {
             added: difference(&after.request, &before.request),
             removed: difference(&before.request, &after.request),

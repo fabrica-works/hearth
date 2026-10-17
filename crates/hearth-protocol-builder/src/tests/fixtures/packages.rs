@@ -71,9 +71,10 @@ fn optional_initramfs(value: Option<source::Initramfs>) -> Option<target::Initra
 
 #[must_use]
 pub fn packages_change_back(value: source::Change) -> target::Change {
-    let source::Change { request, sources, variant, preseeds, initramfs, apt } = value;
+    let source::Change { resolution, request, sources, variant, preseeds, initramfs, apt } = value;
     let source::Names { added, removed } = request;
     target::Change {
+        resolution: super::resolution_change_back(resolution),
         request: target::Names { added, removed },
         sources: sources_pair(sources),
         variant: variant_pair(variant),
@@ -159,6 +160,7 @@ pub fn boot_records() -> [crate::render::parts::boot::Boot; 2] {
 pub fn package_changes() -> [crate::render::parts::packages::Change; 2] {
     use crate::render::parts::packages::*;
     package_records().map(|packages| Change {
+        resolution: crate::render::diff::ResolutionChange::NewKey,
         request: Names { added: packages.request.clone(), removed: Box::new([]) },
         sources: Some(SourcesPair { before: packages.sources.clone(), after: packages.sources }),
         variant: Some(VariantPair { before: Variant::Apt, after: packages.variant }),

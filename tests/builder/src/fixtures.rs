@@ -222,6 +222,7 @@ pub fn diff(repository: &Repository, asked: &Asked<'_>) -> Rendered {
     run(
         repository,
         Call::Diff {
+            resolve: false,
             repository: repository.work_tree.join(".git").as_os_str().as_bytes().into(),
             from: asked.from.as_bytes().into(),
             to: asked.to.as_bytes().into(),
@@ -783,3 +784,6 @@ pub const DISTINCT_TEAMS_TEXT: &str = "target       x1-prod   base x1   environm
 pub mod data;
 pub mod scripts;
 pub mod software;
+
+mod diff_resolution;
+pub use diff_resolution::*;

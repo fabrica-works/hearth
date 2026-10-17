@@ -790,3 +790,6 @@ pub use indices::*;
 pub mod data;
 mod directives;
 pub use directives::*;
+
+mod diff_resolution;
+pub use diff_resolution::*;

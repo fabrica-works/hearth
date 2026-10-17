@@ -26,3 +26,5 @@ pub fn print(form: Form, record: &Record, after: Option<Type>, limits: &Limits) 
 }
 
 mod meta;
+
+mod resolution_change;

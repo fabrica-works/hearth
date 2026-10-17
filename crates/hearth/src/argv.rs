@@ -44,7 +44,7 @@ pub fn invocation(
     while let Some(word) = words.next() {
         match word.as_bytes() {
             b"--json" => {}
-            b"--resolve" if !diff => resolve = true,
+            b"--resolve" => resolve = true,
             b"--at" | b"--repo" | b"--store" | b"--target" => {
                 if (diff && word == "--at") || (!diff && word == "--target") {
                     return Err(usage(Misuse::Option, word));
@@ -74,6 +74,7 @@ pub fn invocation(
     Ok(Invocation {
         call: if let Some((from, to)) = pair {
             Call::Diff {
+                resolve,
                 repository: repository.as_os_str().as_bytes().into(),
                 from: from.as_bytes().into(),
                 to: to.as_bytes().into(),

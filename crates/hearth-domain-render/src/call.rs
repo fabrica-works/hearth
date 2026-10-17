@@ -1,4 +1,5 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
+mod comparison;
 mod debian;
 mod exports;
 mod files;
@@ -551,6 +552,14 @@ pub(crate) struct Call {
     pub diff: Option<Comparison>,
 }
 #[derive(Debug)]
+struct RenderedSide {
+    commit: Oid,
+    made: Map<Box<[u8]>, crate::diff::Made>,
+    sizes: Sizes,
+    finding: resolution::Finding,
+}
+
+#[derive(Debug)]
 pub(crate) struct Comparison {
     revision: Option<Box<[u8]>>,
     from: Option<RenderedSide>,
@@ -561,6 +570,8 @@ pub(crate) struct Comparison {
     pending: Option<crate::diff::Change>,
     entry: usize,
     left_out: u32,
+    deadline: Option<skein_lib::Time>,
+    from_active: bool,
 }
 impl Call {
     pub fn new(repository: Box<[u8]>, names: Box<[Box<[u8]>]>, limits: &Limits) -> Self {
@@ -580,6 +591,8 @@ impl Call {
             pending: None,
             entry: 0,
             left_out: call.side.errors.left_out(),
+            deadline: None,
+            from_active: false,
         });
         call
     }
@@ -653,7 +666,8 @@ impl Call {
             if let Some(revision) = diff.revision.take() {
                 let made = core::mem::replace(&mut self.side.made, Map::with_capacity(0));
                 let sizes = core::mem::replace(&mut self.side.sizes, Map::with_capacity(0));
-                diff.from = Some(RenderedSide { commit, made, sizes });
+                let finding = core::mem::replace(&mut self.side.finding, resolution::Finding::new(limits.targets));
+                diff.from = Some(RenderedSide { commit, made, sizes, finding });
                 let errors = core::mem::replace(&mut self.side.errors, errors::Collector::new(&limits));
                 self.side = Side::new(self.side.repository.clone(), self.side.names.clone(), &limits);
                 self.side.errors = errors;
@@ -693,13 +707,6 @@ impl Call {
     }
 }
 
-#[derive(Debug)]
-struct RenderedSide {
-    commit: Oid,
-    made: Map<Box<[u8]>, crate::diff::Made>,
-    sizes: Sizes,
-}
-
 impl Comparison {
     fn answer(&mut self, side: &mut Side, limits: Limits, out: &mut Queue<Output>) -> bool {
         if self.pending.is_some() {
@@ -708,10 +715,35 @@ impl Comparison {
             out.push(output);
             return false;
         }
+        if self.resolve_changed(side, out) {
+            return false;
+        }
         if let Some(target) = self.names.get(self.next) {
             self.next = self.next.saturating_add(1);
             let RenderedSide { made: from, .. } = self.from.as_ref().expect("from side");
-            let change = crate::diff::compare(from.get(target), side.made.get(target), crate::diff::Needs::Needed);
+            let before = from.get(target);
+            let after = side.made.get(target);
+            let finding = &self.from.as_ref().expect("from side").finding;
+            let known = match comparison::key(after) {
+                Some(key) => side.finding.record(&key).is_some(),
+                None => false,
+            };
+            let needs = if known { crate::diff::Needs::Known } else { crate::diff::Needs::Needed };
+            let mut change = crate::diff::compare(before, after, needs);
+            if let (Some(old), Some(new), crate::diff::TargetChange::Changed { parts, .. }) =
+                (comparison::key(before), comparison::key(after), &mut change)
+            {
+                for part in parts {
+                    if let crate::diff::PartChange::Packages(packages) = part {
+                        packages.resolution = crate::diff::resolution(
+                            old,
+                            new,
+                            comparison::closure(finding.record(&old)),
+                            comparison::closure(side.finding.record(&new)),
+                        );
+                    }
+                }
+            }
             let tally = self.tally.as_mut().expect("both sides listed");
             match &change {
                 crate::diff::TargetChange::Same => tally.unchanged = tally.unchanged.saturating_add(1),
@@ -730,6 +762,7 @@ impl Comparison {
         self.finish(side, out)
     }
     fn finish(&mut self, side: &mut Side, out: &mut Queue<Output>) -> bool {
+        self.outcome = self.outcome.worst(side.outcome);
         if let Some(error) = side.errors.get(side.error_next) {
             side.error_next = side.error_next.saturating_add(1);
             out.push(Output::Answer(Answer::Error(error.clone())));

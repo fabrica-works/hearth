@@ -53,10 +53,16 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             render.call = Some(call);
             out.push(Output::Request(request));
         }
-        Event::Diff { repository, from, to, targets } => {
+        Event::Diff { resolve, repository, from, to, targets } => {
             assert!(render.call.is_none(), "one render call at a time");
             let request = Request::List { request: Token::new(1), repository: repository.clone(), revision: from };
-            render.call = Some(call::Call::diff(repository, targets, to, &env.limits));
+            let mut call = call::Call::diff(repository, targets, to, &env.limits);
+            call.diff.as_mut().expect("diff").resolve(if resolve {
+                Some(env.now.saturating_add(env.limits.resolve))
+            } else {
+                None
+            });
+            render.call = Some(call);
             out.push(Output::Request(request));
         }
         Event::Listed { request, commit, entries } => {
@@ -97,7 +103,7 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
         }
         Event::Found { request, resolution } => {
             assert_eq!(request, Token::new(5), "find token");
-            render.call.as_mut().expect("active call").side.found(Some(resolution.digest), false);
+            render.call.as_mut().expect("active call").side.found(Some(resolution), false);
         }
         Event::Absent { request } => {
             assert_eq!(request, Token::new(5), "find token");

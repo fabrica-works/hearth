@@ -34,6 +34,7 @@ pub enum Event {
         request: Token,
     },
     Diff {
+        resolve: bool,
         repository: Box<[u8]>,
         from: Box<[u8]>,
         to: Box<[u8]>,
