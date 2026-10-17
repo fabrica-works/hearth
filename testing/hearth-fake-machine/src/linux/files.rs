@@ -6,10 +6,10 @@ use alloc::{
 };
 
 #[derive(Debug)]
-struct Found {
-    parent: Node,
-    name: Box<[u8]>,
-    node: Option<Node>,
+pub(super) struct Found {
+    pub(super) parent: Node,
+    pub(super) name: Box<[u8]>,
+    pub(super) node: Option<Node>,
 }
 impl Machine {
     pub(super) fn add(&mut self, parent: Node, kind: Kind, mode: u32, ids: Ids, bytes: &[u8]) -> Node {
@@ -85,7 +85,7 @@ impl Machine {
         }
         laid.into_boxed_slice()
     }
-    fn access(&self, pid: Pid, node: Node, bits: u32) -> Result<(), Refusal> {
+    pub(super) fn access(&self, pid: Pid, node: Node, bits: u32) -> Result<(), Refusal> {
         let ids = self.process(pid).ids;
         let facts = self.inode(node).facts;
         let shift = if ids.user == facts.user {
@@ -97,7 +97,7 @@ impl Machine {
         };
         if facts.mode.wrapping_shr(shift) & bits == bits { Ok(()) } else { Err(Refusal::Permission) }
     }
-    fn resolve(&self, pid: Pid, at: At, path: &[u8], how: How) -> Result<Found, Refusal> {
+    pub(super) fn resolve(&self, pid: Pid, at: At, path: &[u8], how: How) -> Result<Found, Refusal> {
         if path.is_empty() {
             return Err(Refusal::NotFound);
         }
@@ -271,7 +271,7 @@ impl Machine {
         self.change(found.parent);
         self.reclaim(node);
     }
-    fn reclaim(&mut self, node: Node) {
+    pub(super) fn reclaim(&mut self, node: Node) {
         if self.inode(node).facts.links == 0
             && !self.handles.values().any(|h| h.node == node)
             && !self.processes.values().any(|p| p.cwd == node || p.root == node)
@@ -366,7 +366,7 @@ impl Machine {
         open.cursor = end;
         Ok(Reply::Listed(page))
     }
-    pub fn call(&mut self, pid: Pid, op: Op) -> Result<Reply, Refusal> {
+    pub(super) fn operate(&mut self, pid: Pid, op: Op) -> Result<Reply, Refusal> {
         self.process(pid);
         match op {
             Op::Open { at, path, how } => self.open(pid, at, &path, how),
@@ -439,6 +439,7 @@ impl Machine {
             Op::Lock { file } => {
                 let open = self.handle(pid, file);
                 assert_ne!(open.how, How::PathNoFollow, "lock needs an open file or directory");
+                assert_eq!(open.end, None, "lock needs a file or directory, never a pipe");
                 if self.handles.iter().any(|(h, other)| *h != file && other.node == open.node && other.locked) {
                     return Err(Refusal::Busy);
                 }
@@ -446,11 +447,15 @@ impl Machine {
                 Ok(Reply::Done)
             }
             Op::Close { handle } => {
-                let node = self.handle(pid, handle).node;
-                self.handles.remove(&handle);
-                self.reclaim(node);
+                self.close(pid, handle);
                 Ok(Reply::Done)
             }
+            op @ (Op::Spawn(_)
+            | Op::Send { .. }
+            | Op::Take { .. }
+            | Op::Signal { .. }
+            | Op::Wait { .. }
+            | Op::Exit { .. }) => self.process_call(pid, op),
         }
     }
 }
