@@ -6,6 +6,7 @@ pub mod error;
 pub mod expression;
 pub mod filter;
 pub mod instruction;
+pub mod interpolation;
 pub mod limits;
 pub mod operation;
 pub mod template;
@@ -13,6 +14,7 @@ mod utf8;
 pub use error::{Error, ErrorKind, Expected};
 pub use filter::Filter;
 pub use instruction::{Does, Instruction, Names, Template};
+pub use interpolation::Interpolated;
 pub use operation::{Expression, Missing, Op, Operation};
 #[cfg(test)]
 mod tests;

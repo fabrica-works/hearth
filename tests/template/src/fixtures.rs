@@ -49,6 +49,7 @@ pub fn limits(rng: &mut Rng) -> Limits {
 #[must_use]
 pub fn kind(kind: &ErrorKind) -> &'static str {
     match kind {
+        ErrorKind::Interpolation => "interpolation",
         ErrorKind::Unmatched => "unmatched",
         ErrorKind::Unended => "unended",
         ErrorKind::Shadows => "shadows",
@@ -130,3 +131,19 @@ pub fn at_the_limits() -> Vec<LimitText> {
         })
         .collect()
 }
+
+pub const STRING_KINDS: &[&str] = &[
+    "long",
+    "character",
+    "unterminated",
+    "escape",
+    "integer",
+    "expected",
+    "deep",
+    "misplaced",
+    "filter",
+    "arity",
+    "test",
+    "unclosed",
+    "interpolation",
+];

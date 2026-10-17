@@ -1,6 +1,6 @@
 //! Templates compiled left to right to flat instructions (format.md, 7.2; render.md, 8.3).
 mod raw;
-mod scan;
+pub(crate) mod scan;
 mod statement;
 pub(crate) mod whitespace;
 use crate::{Does, Error, Expression, Instruction, Template, expression, limits::Limits};
@@ -63,7 +63,7 @@ pub fn compile(text: &[u8], limits: &Limits) -> Result<Template, Error> {
     }
     unreachable!("each tag advances the cursor")
 }
-fn expression(text: &[u8], start: usize, end: usize, limits: &Limits) -> Result<Expression, Error> {
+pub(crate) fn expression(text: &[u8], start: usize, end: usize, limits: &Limits) -> Result<Expression, Error> {
     let offset = scan::offset(start);
     let mut compiled = match expression::compile(text.get(start..end).expect("tag body"), limits) {
         Ok(value) => value,

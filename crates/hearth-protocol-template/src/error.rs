@@ -8,6 +8,8 @@ pub struct Error {
 /// Why expression text was refused (format.md, 7.4).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ErrorKind {
+    /// A statement, comment or minus marker in an interpolated string (format.md, 5.2).
+    Interpolation,
     Unmatched,
     Unended,
     Shadows,
@@ -25,7 +27,10 @@ pub enum ErrorKind {
     Misplaced,
     UnknownFilter,
     UnknownTest,
-    Arity { filter: Filter, given: u32 },
+    Arity {
+        filter: Filter,
+        given: u32,
+    },
 }
 /// The next grammatical token required.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

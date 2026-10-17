@@ -11,7 +11,7 @@ pub fn compile(text: &[u8], limits: &Limits) -> Result<Template, u32> {
     let lines = std::iter::once(0)
         .chain(text.iter().enumerate().filter(|(_, b)| **b == b'\n').map(|(at, _)| pos(at + 1)))
         .collect();
-    let mut parser = Parser { text, cursor: 0, limits };
+    let mut parser = Parser { text, cursor: 0, limits, interpolated: false };
     let (instructions, close) = parser.body(0)?;
     if let Some(close) = close {
         return Err(pos(close.word));
@@ -62,6 +62,7 @@ struct Parser<'a> {
     text: &'a [u8],
     cursor: usize,
     limits: &'a Limits,
+    interpolated: bool,
 }
 #[derive(Clone, Copy)]
 struct Tag {
@@ -180,7 +181,7 @@ impl Parser<'_> {
                 .find(|&i| self.text[i] == b'{' && b"{%#".contains(&self.text[i + 1]))
                 .unwrap_or(self.text.len());
             let kind = self.text.get(at + 1).copied().unwrap_or(b'{');
-            let end = if at < self.text.len() {
+            let end = if at < self.text.len() && !self.interpolated {
                 self.edge_before(self.cursor, at, kind, self.text.get(at + 2).copied(), false)
             } else {
                 at
@@ -192,10 +193,18 @@ impl Parser<'_> {
                 self.cursor = at;
                 return Ok(None);
             }
-            if self.raw(at, out)? {
+            if !self.interpolated && self.raw(at, out)? {
                 continue;
             }
             let kind = self.text[at + 1];
+            if self.interpolated {
+                if kind != b'{' {
+                    return Err(pos(at));
+                }
+                if self.text.get(at + 2) == Some(&b'-') {
+                    return Err(pos(at + 2));
+                }
+            }
             let marker = |b| b == b'-' || (kind != b'{' && b == b'+');
             let start = at + 2 + usize::from(self.text.get(at + 2).copied().is_some_and(marker));
             let mut end = start;
@@ -224,7 +233,10 @@ impl Parser<'_> {
                 end += 1;
             }
             let closing = (end > start).then(|| self.text[end - 1]).filter(|&b| marker(b));
-            self.cursor = self.edge_after(end + 2, kind, closing);
+            if self.interpolated && closing == Some(b'-') {
+                return Err(pos(end - 1));
+            }
+            self.cursor = if self.interpolated { end + 2 } else { self.edge_after(end + 2, kind, closing) };
             let end = end - usize::from(closing.is_some());
             if kind == b'{' {
                 out.push(Instruction { at: pos(at), does: Does::Output(self.expr(start, end, false)?) });
@@ -372,4 +384,20 @@ impl Parser<'_> {
         }
         Ok((name.into(), next))
     }
+}
+
+/// Reads a decoded string without template whitespace or statement syntax.
+/// # Errors
+/// Returns the first refused offset in the decoded text.
+pub fn interpolate(text: &[u8], limits: &Limits) -> Result<hearth_protocol_template::Interpolated, u32> {
+    use hearth_protocol_template::Interpolated;
+    if !text.windows(2).any(|s| s[0] == b'{' && b"{%#".contains(&s[1])) {
+        return Ok(Interpolated::Plain);
+    }
+    let mut parser = Parser { text, cursor: 0, limits, interpolated: true };
+    let mut out = Vec::new();
+    if let Some(tag) = parser.next(&mut out)? {
+        return Err(pos(tag.at));
+    }
+    Ok(Interpolated::Parts(out.into_boxed_slice()))
 }

@@ -1,4 +1,5 @@
 mod fixtures;
+mod interpolation;
 mod jumps;
 mod literals;
 mod lookups;

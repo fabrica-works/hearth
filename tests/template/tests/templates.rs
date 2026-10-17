@@ -10,3 +10,13 @@ fn generated_templates_compile_as_the_reference_compiles_them() {
         check::template(&compiled, &text);
     }
 }
+
+#[test]
+fn generated_strings_interpolate_as_the_reference_reads_them() {
+    for seed in 0..200 {
+        let text = generate::template::string(&mut Rng::new(seed), fixtures::SMALL);
+        let compiled =
+            hearth_protocol_template::interpolation::compile(&text, &fixtures::LIMITS).expect("valid decoded string");
+        assert_eq!(Ok(&compiled), reference::template::interpolate(&text, &fixtures::LIMITS).as_ref(), "seed {seed}");
+    }
+}

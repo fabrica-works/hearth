@@ -117,3 +117,20 @@ fn tag(rng: &mut Rng, source: &[u8]) -> Vec<u8> {
     out.extend_from_slice(SPACES[usize::try_from(rng.below(SPACES.len() as u64)).expect("space index")]);
     out
 }
+
+/// Declaration keys and fields, including one output standing alone.
+#[must_use]
+pub fn string(rng: &mut Rng, shape: Shape) -> Vec<u8> {
+    const PIECES: &[&[u8]] = &[b"/home/", b"/.ssh", b" \t\n\r", b"\xc2\xa0", b"${{ '{#' }}a[@]}", b"{ plain"];
+    let mut out = Vec::new();
+    for _ in 0..=rng.below(u64::from(shape.width.min(8))) {
+        if rng.below(2) == 0 {
+            out.extend_from_slice(b"{{ ");
+            out.extend(generate::text(rng, shape));
+            out.extend_from_slice(b" }}");
+        } else {
+            out.extend_from_slice(PIECES[usize::try_from(rng.below(PIECES.len() as u64)).expect("string piece")]);
+        }
+    }
+    out
+}

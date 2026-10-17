@@ -27,18 +27,18 @@ pub(super) fn bytes(text: &[u8], limits: &Limits) -> Result<(Box<[u32]>, u32), E
         Utf8::Within { .. } => Err(Error { at: offset(text.len()), kind: ErrorKind::Utf8 }),
     }
 }
-pub(super) fn opening(text: &[u8], at: usize) -> bool {
+pub(crate) fn opening(text: &[u8], at: usize) -> bool {
     text.get(at) == Some(&b'{') && [Some(&b'{'), Some(&b'%'), Some(&b'#')].contains(&text.get(at.saturating_add(1)))
 }
 #[derive(Debug)]
-pub(super) struct Tag {
+pub(crate) struct Tag {
     pub start: usize,
     pub end: usize,
     pub after: usize,
     pub kind: u8,
     pub close: Option<u8>,
 }
-pub(super) fn tag(text: &[u8], at: usize) -> Result<Tag, Error> {
+pub(crate) fn tag(text: &[u8], at: usize) -> Result<Tag, Error> {
     let kind = *text.get(at.saturating_add(1)).expect("opening kind");
     let mut start = at.saturating_add(2);
     if marker(text.get(start).copied(), kind) {
@@ -87,6 +87,6 @@ pub(super) fn tag(text: &[u8], at: usize) -> Result<Tag, Error> {
 fn marker(byte: Option<u8>, kind: u8) -> bool {
     byte == Some(b'-') || (kind != b'{' && byte == Some(b'+'))
 }
-pub(super) fn offset(at: usize) -> u32 {
+pub(crate) fn offset(at: usize) -> u32 {
     u32::try_from(at).expect("validated template length")
 }
