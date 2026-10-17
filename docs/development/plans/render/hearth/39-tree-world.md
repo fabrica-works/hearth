@@ -55,20 +55,24 @@ Files: `crates/hearth-protocol-tree/src/{decode.rs, limits.rs}`; new
 dev-dependency `skein-heap`); new `tests/tree/src/{lib.rs, fixtures.rs,
 generate.rs, mutate.rs, check.rs}` and `tests/tree/tests/{frames.rs,
 memory.rs, fuzzy_tree.rs}`. Shared (README, Rules): the root `Cargo.toml`
-(`members`; `skein-heap` if absent); `tests/clippy.toml`, copied from
-skein's unless another world landed it; `.config/nextest.toml` if this is
-hearth's first fuzzy test (both filters switched, comments dropped).
+(`hearth-protocol-tree = { path = "crates/hearth-protocol-tree" }` in
+`[workspace.dependencies]`; `members` globs `tests/*`, and `skein-heap` is
+there) and `Cargo.lock`; `tests/clippy.toml` and `.config/nextest.toml`
+are on main, as tests/git landed them.
 Shape:
 - `limits::worst_case` is what a read holds of its own beside the record it
-  hands out: the decoder's stack and previous keys, and the inputs'
-  `List<Item>` before it is boxed. `limits::held` is the most a record holds
+  hands out: the decoder's stack and previous keys, the inputs'
+  `List<Item>` before it is boxed, and `held(kind)`: a read that fails
+  holds the record it built so far and hands none out. `limits::held` is the most a record holds
   once read, for hearth 28.5's worst case: each list's items at the kind's
   limits, and box bytes up to the body's bound in all. Both use checked
-  arithmetic, `None` past a `u64` or past `encode::DEPTH`.
+  arithmetic: `None` past `encode::DEPTH` for every kind; past a `u64`
+  for a resolution only (`lines`, `indices` and `inputs` at `u32::MAX`).
 - `generate`: `small` (kind 1 or 5), `resolution(…, packages)`,
   `one_of_each` (records of at most 64 packages), and `resolution_at_its_limits` (8,192 packages, 8 lines of
   16 indices, filenames grown until the body is within 1 KiB of 4 MiB).
-  `check`: `Record` (with `kind()`), `read`, `write` (expects success),
+  `check`: `Record` (with `kind()`), `read` (with a `# Errors` doc
+  section: the world's lints deny its lack), `write` (expects success),
   `canonical` (a frame that reads writes back to itself; a body the decoder
   takes re-encodes through `Encoder::item` byte for byte) and `sweep(rng,
   &record, limits, seed)` (it reads back, no cut reads, and each of 8
@@ -130,7 +134,9 @@ The others: in `frames.rs`, `every_generated_record_reads_back_as_it_was_generat
 `every_body_the_decoder_takes_the_encoder_writes_again_byte_for_byte` and
 `a_frame_of_each_kind_is_unreadable_as_the_other_two`; in `memory.rs`,
 `reading_generated_cut_and_mutated_frames_holds_no_more_than_the_worst_case`,
-`worst_case_and_held_are_none_past_a_u64` and
+`worst_case_and_held_are_none_past_a_u64_for_a_resolution_only` (`None`
+for both on `Kind::Resolution`, `Some` for both on `Store` and
+`CacheFile`) and
 `worst_case_and_held_are_none_past_the_encoders_depth` (limits set to
 overflow, then `depth` one past `encode::DEPTH`);
 in `fuzzy_tree.rs`, `random_resolution_frames_cut_and_mutated_read_as_the_oracle_says`
@@ -154,9 +160,9 @@ Added to hearth 09's `limits.rs` sketch; the world's own items (`generate`,
 
 ```rust
 // crates/hearth-protocol-tree/src/limits.rs (39.1; the rest is hearth 09.1's)
-/// What one read of `kind` holds of its own beside its record; `None` past a u64 or `encode::DEPTH`.
+/// What one read of `kind` holds of its own beside its record, a failed read's partial record included; `None` past `encode::DEPTH`, and for a resolution past a u64.
 #[must_use] pub fn worst_case(kind: Kind, limits: &Limits) -> Option<u64>;
-/// The most a record of `kind` holds once read, for its holder's worst case (hearth 28.5).
+/// The most a record of `kind` holds once read, for its holder's worst case (hearth 28.5); `None` past `encode::DEPTH`, and for a resolution past a u64.
 #[must_use] pub fn held(kind: Kind, limits: &Limits) -> Option<u64>;
 ```
 

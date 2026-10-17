@@ -355,6 +355,16 @@ None yet.
 
      The check's runs, with its 13 code corrections applied: fmt clean; clippy clean (4 E0004 before the arms, and 2 in `tests/render`); nextest 210 of 210, among them `the_config_digest_is_h_of_part_config_over_its_tree` and `the_spec_digest_is_h_of_spec_over_its_parts_and_meta`, so both digests reproduce; fuzzy 4 of 4. 32.2 was checked by names only: its suites need 11.2, 11.3 and 40.2. A further exhaustive match on a grown enum gains its arm the same way, and the commit body lists it.
 
+116. **hearth 39's Shapes against main** (ready check of hearth-39.1).
+     hearth 39's Shapes against main (ready check of hearth-39.1), against hearth b9b8e06 and skein 2112fce (moved since to hearth c884571 and skein b888da9, in no file 39 reads): `hearth/39-tree-world.md` corrected.
+
+     1. Shared: the root `Cargo.toml` has `members = ["crates/*", "tests/*", "testing/hearth-*"]` (`:5`) and `skein-heap` (`:22`), not `hearth-protocol-tree`, without which `tests/tree`'s manifest fails to load: 39.1 adds it to `[workspace.dependencies]`, and `Cargo.lock` changes. `tests/clippy.toml` and `.config/nextest.toml` are on main.
+     2. `worst_case` counts `held(kind)` too: a read that fails holds the record it built so far. Without it, `reading_generated_cut_and_mutated_frames_holds_no_more_than_the_worst_case` fails, 340,414 bytes held against 331,072; with it, it passes.
+     3. `None` past a `u64` holds for a resolution only (`lines`, `indices`, `inputs` at `u32::MAX`): at its limits' maxima `worst_case(Store)` is `Some(832)`. The test becomes `worst_case_and_held_are_none_past_a_u64_for_a_resolution_only`; the sketches' docs say so.
+     4. `check::read` has a `# Errors` section: the world's own `[lints]` deny `missing_errors_doc` (the root's `Cargo.toml:61` allows it).
+
+     The check's runs, with these applied on a scratch world: clippy clean (it failed on 4 before); default 229 of 229, 9 of them hearth-tree-world; fuzzy 6 of 6, 2 of them tree. The reference memory test took 0.82 to 0.89 s against the 0.5 s aim, 0.3 s of it the check's own filename search. A further test or sketch that names the old bound takes the new one, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
