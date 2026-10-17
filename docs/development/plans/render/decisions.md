@@ -486,6 +486,14 @@ None yet.
      8. `tests/conformance`'s own `[lints]` keep pedantic (`Cargo.toml:22`), so each `pub fn` returning a `Result` has `# Errors`, and each other one returning a value `#[must_use]`.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+126. **hearth 44's Shapes against main** (re-check of hearth-44.3).
+     hearth 44's re-check after hearth 26 and 34.1, against hearth 00604e8 (44.1, 44.2) and c00ac09 (44.3, with 44.1, 44.2 and 34.1 landed), skein 78dd8fa (clippy clean on `hearth-conformance-world --all-targets` with the corrected sketch; default 400, fuzzy 10, conformance 5 of 5), corrects 44-fake-git.md's 44.3:
+     1. The gate test's sketch compares `a.case == &**case`, and `(&run.captured.stdout, &run.captured.stderr, &run.captured.exit)` with the recording's three fields: 34.1's `Run` is `{ exit: Exit, captured: Recording }` (`tests/conformance/src/run.rs:10`) and `Recording::exit` a `Box<str>` (`testing/hearth-recordings/src/lib.rs:15`), so `fake_git::run` fills `captured`, its exit as text ("0", "128", "signal N").
+     2. `REPOSITORIES` holds files by path, mode, contents and length alone (`tests/conformance/src/git.rs:4-14`); the identity and date (`IDENTITY`), the commit messages ("scenario\n", "submodule\n"), the tag `v1` ("scenario tag") and `refs/heads/main` are code in `src/fixtures.rs:15-22` and `:77-110`, which 44.3 makes data that real git's side and the fake's both read (both files are in its Files).
+     3. The real side is `run::git(args, dir, stdin, env) -> Run` (`run.rs:26`).
+     4. The recording's `dir`, `/scratch/store`, is spawned as `scratch/store` under the root handle, as 44.2's `tests/fixtures.rs` does: an absolute one is `Refusal::Escape` (`testing/hearth-fake-machine/src/linux/files.rs:118`). `big` is 10,000,000 bytes of `x`, by `length`; the repositories are bare at `/scratch/<name>`, the store at `/scratch/store`.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

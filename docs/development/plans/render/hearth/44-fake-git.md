@@ -52,9 +52,11 @@ git scenario runs on the fake too, compared with real git.
   in `hearth_git_world::expect`'s lines; the scratch path masked to
   `/scratch`) read by `testing/hearth-recordings`;
   `tests/conformance/src/git.rs`'s `REPOSITORIES` and `CASES` as data
-  (files by path, mode and contents; commits and annotated tags under
-  one identity and date; refs); the real side `run::git(args, dir,
-  stdin) -> Run`, each case run from the scratch store's root as hearth
+  (files by path, mode, contents and length, `git.rs:4-14`; the identity
+  and date, the commit messages, the tag `v1` and `refs/heads/main` are
+  code in `src/fixtures.rs:15-22` and `:77-110`, which 44.3 makes data
+  both sides read); the real side `run::git(args, dir, stdin, env) ->
+  Run` (`run.rs:26`), each case run from the scratch store's root as hearth
   runs git; the test file `tests/conformance/tests/conformance_git.rs`;
   cases `rev-parse-sha256` and `ls-tree-sha256`; 34.2's seven diff
   cases, `diff-{line-changed, line-added, line-removed, lines-appended,
@@ -252,7 +254,13 @@ a `Machine` and `Repositories`, and the case's files with their modes,
 at the masked paths (`/scratch/…`, so a recording's words replay as they
 stand); logs in the test user; spawns the
 recording's `argv` (`/usr/bin/git` first), `env`, `dir` and `stdin`;
-steps to the exit; returns hearth 34's `Run`. The live test gives it
+steps to the exit; returns hearth 34's `Run { exit, captured }`
+(`tests/conformance/src/run.rs:10`), `captured.exit` as its text ("0",
+"128", "signal N"). The recording's `dir`, `/scratch/store`, is spawned
+as `scratch/store` under the root handle, as 44.2's `tests/fixtures.rs`
+does: an absolute one is `Refusal::Escape` (`linux/files.rs:118`). `big`
+is 10,000,000 bytes of `x`, by `length`; the repositories are bare at
+`/scratch/<name>`, the store at `/scratch/store`. The live test gives it
 real git's run, masked; the gate test a recording. `ALLOWED: &[Allowed {
 case, what, reason }]` holds hearth 34's two SHA-256 cases,
 `rev-parse-sha256` and `ls-tree-sha256`, run on real git alone, and
@@ -295,9 +303,13 @@ new cases and their `failed` lines as it stands.
 fn the_fake_prints_each_git_recording_byte_for_byte() {
     let recordings = hearth_recordings::all("git"); // (case name, Recording), every version
     assert!(!recordings.is_empty(), "recordings are committed");
-    for (case, recording) in recordings.iter().filter(|(case, _)| !ALLOWED.iter().any(|a| a.case == case)) {
+    for (case, recording) in recordings.iter().filter(|(case, _)| !ALLOWED.iter().any(|a| a.case == &**case)) {
         let run = fake_git::run(case, recording);
-        assert_eq!((&run.stdout, &run.stderr, run.exit), (&recording.stdout, &recording.stderr, recording.exit), "{case}");
+        assert_eq!(
+            (&run.captured.stdout, &run.captured.stderr, &run.captured.exit),
+            (&recording.stdout, &recording.stderr, &recording.exit),
+            "{case}"
+        );
     }
 }
 ```
