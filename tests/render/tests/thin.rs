@@ -62,9 +62,20 @@ fn a_named_target_not_discovered_ends_the_call_with_usage() {
 fn a_refused_document_fails_its_targets_and_spares_the_rest() {
     for seed in 0..8 {
         let mut repository = fixtures::two_targets();
-        fixtures::set_document(&mut repository, b'3', Decoded::Refused { at: Position { line: 2, column: 3 } });
+        fixtures::set_document(
+            &mut repository,
+            b'3',
+            Decoded::Refused {
+                at: Position { line: 2, column: 3 },
+                fault: hearth_domain_render::errors::Decode::Unexpected,
+                also: None,
+            },
+        );
         let run = parent::run(&repository, &[], seed);
-        let Answer::Spec(spec) = only(&run.answers) else { panic!("one surviving spec: seed {seed}") };
+        let [Answer::Spec(spec), Answer::Error(error)] = run.answers.as_slice() else {
+            panic!("one surviving spec: seed {seed} and its error")
+        };
+        assert_eq!(error.target, None);
         assert_eq!(spec.meta.target.as_ref(), b"a-b-prod", "seed {seed}");
         assert_eq!(run.outcome, Outcome::Failed, "seed {seed}");
     }
@@ -80,7 +91,7 @@ fn targets_are_answered_in_name_order_each_once() {
             .map(|answer| match answer {
                 Answer::Spec(spec) => spec.meta.target.as_ref(),
                 Answer::Rendered { .. } => panic!("terminal is separate"),
-                Answer::Change(_) => panic!("render returns specs"),
+                Answer::Error(_) | Answer::Change(_) => panic!("render returns specs"),
             })
             .collect();
         assert_eq!(names, [b"a-b-prod".as_slice(), b"x1-prod"], "prefix-based discovery, seed {seed}");
@@ -100,7 +111,10 @@ fn a_document_above_its_limit_fails_only_its_targets_before_reading() {
     repository.entries.iter_mut().find(|entry| entry.oid == fixtures::oid(b'3')).expect("host entry").size =
         u64::from(limits::SHIPPED.document) + 1;
     let run = parent::run(&repository, &[], 0);
-    let Answer::Spec(spec) = only(&run.answers) else { panic!("one surviving target") };
+    let [Answer::Spec(spec), Answer::Error(error)] = run.answers.as_slice() else {
+        panic!("one surviving target and its error")
+    };
+    assert_eq!(error.target, None);
     assert_eq!(spec.meta.target.as_ref(), b"a-b-prod");
     assert_eq!(run.outcome, Outcome::Failed);
     let Request::Read { blobs, .. } =
@@ -125,11 +139,22 @@ fn targets_above_the_configured_limit_fail_before_reading() {
 #[test]
 fn a_malformed_task_json_fails_the_targets_that_have_the_task() {
     let mut repository = fixtures::with_task();
-    fixtures::set_document(&mut repository, b'4', Decoded::Refused { at: Position { line: 1, column: 2 } });
+    fixtures::set_document(
+        &mut repository,
+        b'4',
+        Decoded::Refused {
+            at: Position { line: 1, column: 2 },
+            fault: hearth_domain_render::errors::Decode::Unexpected,
+            also: None,
+        },
+    );
     repository.entries.push(fixtures::entry(b"hosts/a/a-prod.json", b'5'));
     repository.documents.push((fixtures::oid(b'5'), fixtures::document(Some(fixtures::placement()))));
     let run = parent::run(&repository, &[], 0);
-    let Answer::Spec(spec) = only(&run.answers) else { panic!("one unaffected target") };
+    let [Answer::Spec(spec), Answer::Error(error)] = run.answers.as_slice() else {
+        panic!("one unaffected target and its error")
+    };
+    assert_eq!(error.target, None);
     assert_eq!(spec.meta.target.as_ref(), b"a-prod");
     assert_eq!(run.outcome, Outcome::Failed);
 }

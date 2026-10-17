@@ -81,7 +81,11 @@ fn a_document_config_refuses_answers_refused_at_its_position() {
         RootEvent::Render(Event::Read {
             request: REQUEST,
             oid: crate::render::revision::Oid(bytes::copy_of(b"0123456789abcdef0123456789abcdef01234567")),
-            read: Decoded::Refused { at: Position { line: 1, column: 14 } }
+            read: Decoded::Refused {
+                at: Position { line: 1, column: 14 },
+                fault: crate::render::errors::Decode::Missing { field: crate::render::errors::Field::Kind },
+                also: None
+            }
         }),
         "configuration refusal retains its position"
     );

@@ -390,3 +390,34 @@ pub fn diff_call() -> (crate::Render, skein_lib::Env<limits::Limits>, skein_lib:
     );
     (render, env, out)
 }
+
+pub fn error_call(limits: &limits::Limits) -> crate::call::Side {
+    use crate::{
+        revision::{Entry, Mode, Oid},
+        vocabulary::Output,
+    };
+    let entries = [
+        Entry {
+            path: bytes::copy_of(b"envs/prod.json"),
+            mode: Mode::File,
+            oid: Oid(bytes::copy_of(b"environment")),
+            size: 24,
+        },
+        Entry {
+            path: bytes::copy_of(b"hosts/x1/x1-prod.json"),
+            mode: Mode::File,
+            oid: Oid(bytes::copy_of(b"host")),
+            size: 24,
+        },
+        Entry {
+            path: bytes::copy_of(b"hosts/x1/x1.json"),
+            mode: Mode::File,
+            oid: Oid(bytes::copy_of(b"base")),
+            size: 24,
+        },
+    ];
+    let mut call = crate::call::Side::new(bytes::copy_of(b"/repo"), Box::new([]), limits);
+    let mut out = skein_lib::Queue::<Output>::with_capacity(1);
+    call.listed(*limits, Oid(bytes::copy_of(b"commit")), &entries, &mut out);
+    call
+}

@@ -219,6 +219,7 @@ dependencies = [
  "hearth-protocol-git",
  "hearth-protocol-tree",
  "skein-io",
+ "skein-json",
  "skein-lib",
 ]
 

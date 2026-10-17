@@ -105,6 +105,9 @@ impl Client {
         assert!(self.takes(), "printer takes one record at a time");
         let record = match request {
             Request::Answer(Answer::Spec(spec)) => records::records::Record::Spec(Box::new(answers::spec(spec))),
+            Request::Answer(Answer::Error(error)) => {
+                records::records::Record::Error(crate::translate::errors::error(error))
+            }
             Request::Answer(Answer::Change(change)) => {
                 records::records::Record::Change(super::translate::changes::change(change))
             }

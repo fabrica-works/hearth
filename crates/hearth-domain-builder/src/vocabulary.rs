@@ -25,4 +25,5 @@ pub enum Request {
 pub enum Answer {
     Change(render::diff::Change),
     Spec(render::parts::Spec),
+    Error(render::errors::Error),
 }

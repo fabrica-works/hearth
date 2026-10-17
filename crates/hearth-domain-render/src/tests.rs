@@ -9,3 +9,5 @@ mod operators;
 
 mod compose;
 mod diff;
+
+mod errors;

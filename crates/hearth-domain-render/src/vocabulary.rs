@@ -24,6 +24,7 @@ pub enum Request {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
     Spec(Spec),
+    Error(crate::errors::Error),
     Change(crate::diff::Change),
     Rendered { outcome: Outcome, diff: Option<crate::diff::Tally> },
 }
@@ -48,7 +49,7 @@ pub enum As {
 pub enum Decoded {
     Document(Document),
     Declaration,
-    Refused { at: Position },
+    Refused { at: Position, fault: crate::errors::Decode, also: Option<Position> },
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Class {

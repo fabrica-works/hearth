@@ -8,6 +8,7 @@ publish.workspace = true
 [dependencies]
 skein-lib.workspace = true
 skein-io.workspace = true
+skein-json.workspace = true
 hearth-domain-builder.workspace = true
 hearth-protocol-git.workspace = true
 hearth-protocol-config.workspace = true

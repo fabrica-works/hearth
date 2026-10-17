@@ -54,7 +54,24 @@ fn documents_past_the_revision_s_budget_fail_the_call() {
             entry.size = 24;
         }
         let run = parent::run_with(&repository, &[], seed, limits::Limits { decoded: 64, ..limits::SHIPPED });
-        assert_eq!(run.answers, [], "seed {seed}");
+        assert_eq!(
+            run.answers,
+            [Answer::Error(hearth_domain_render::errors::Error {
+                kind: hearth_domain_render::errors::Kind::Decode(hearth_domain_render::errors::Decode::TooLarge {
+                    limit: hearth_domain_render::errors::Limit::Decoded,
+                    max: 64
+                }),
+                class: hearth_domain_render::vocabulary::Class::Configuration,
+                at: Some(hearth_domain_render::errors::Place {
+                    path: Box::from(b"hosts/x1/x1.json".as_slice()),
+                    position: None
+                }),
+                also: None,
+                target: None,
+                task: None,
+            })],
+            "seed {seed}"
+        );
         assert_eq!(run.outcome, Outcome::Failed, "seed {seed}");
         assert_eq!(run.requests.len(), 1, "budget checked before reading, seed {seed}");
     }

@@ -8,25 +8,21 @@ use crate::{
     startup::{Misuse, Opened, Startup},
 };
 use skein_lib::bytes::copy_of;
-const GUARD: [&str; 1] =
-    ["\ntasks/boot/task.json:22:7: carbon-lab: boot: requires modules: no initramfs modules for this hardware\n"];
+const GUARD: &str =
+    "\ntasks/boot/task.json:22:7: carbon-lab: boot: requires modules: no initramfs modules for this hardware\n";
 #[test]
 fn a_false_guard_prints_as_render_md_shows() {
-    for expected in GUARD {
-        let printed =
-            form::print(Form::Text, &Record::Error(fixtures::modules_guard()), Some(Type::Spec), &limits::SHIPPED);
-        assert_eq!(printed.as_deref(), Ok(expected.as_bytes()), "render.md, 7.3, after a spec's blank line");
-    }
+    let printed =
+        form::print(Form::Text, &Record::Error(fixtures::modules_guard()), Some(Type::Spec), &limits::SHIPPED);
+    assert_eq!(printed.as_deref(), Ok(GUARD.as_bytes()), "render.md, 7.3, after a spec's blank line");
 }
-const WITHOUT_TARGET: [&str; 1] =
-    ["tasks/boot/task.json:22:7: boot: requires modules: no initramfs modules for this hardware\n"];
+const WITHOUT_TARGET: &str =
+    "tasks/boot/task.json:22:7: boot: requires modules: no initramfs modules for this hardware\n";
 #[test]
 fn an_error_without_a_target_leaves_out_its_prefix() {
     let mut error = fixtures::modules_guard();
     error.target = None;
-    for expected in WITHOUT_TARGET {
-        assert_eq!(print(&Record::Error(error.clone())).as_deref(), Ok(expected.as_bytes()));
-    }
+    assert_eq!(print(&Record::Error(error.clone())).as_deref(), Ok(WITHOUT_TARGET.as_bytes()));
 }
 const ALSO: [(Option<Position>, &str); 2] = [
     (
@@ -46,45 +42,33 @@ fn a_second_place_prints_in_parentheses_last() {
         assert_eq!(print(&Record::Error(error)).as_deref(), Ok(expected.as_bytes()), "{position:?}");
     }
 }
-const PATH_ONLY: [&str; 1] =
-    ["tasks/boot/task.json: carbon-lab: boot: requires modules: no initramfs modules for this hardware\n"];
+const PATH_ONLY: &str =
+    "tasks/boot/task.json: carbon-lab: boot: requires modules: no initramfs modules for this hardware\n";
 #[test]
 fn a_place_without_a_position_prints_its_path_alone() {
     let mut error = fixtures::modules_guard();
     error.at.as_mut().expect("fixture place").position = None;
-    for expected in PATH_ONLY {
-        assert_eq!(print(&Record::Error(error.clone())).as_deref(), Ok(expected.as_bytes()));
-    }
+    assert_eq!(print(&Record::Error(error.clone())).as_deref(), Ok(PATH_ONLY.as_bytes()));
 }
-const LEFT_OUT: [&str; 1] = ["44 more errors\n"];
+const LEFT_OUT: &str = "44 more errors\n";
 #[test]
 fn the_errors_left_out_print_their_count_after_the_last() {
-    for expected in LEFT_OUT {
-        assert_eq!(print(&terminal(44)).as_deref(), Ok(expected.as_bytes()));
-    }
+    assert_eq!(print(&terminal(44)).as_deref(), Ok(LEFT_OUT.as_bytes()));
 }
-const ONE_LEFT_OUT: [&str; 1] = ["1 more error\n"];
+const ONE_LEFT_OUT: &str = "1 more error\n";
 #[test]
 fn one_error_left_out_prints_1_more_error() {
-    for expected in ONE_LEFT_OUT {
-        assert_eq!(print(&terminal(1)).as_deref(), Ok(expected.as_bytes()));
-    }
+    assert_eq!(print(&terminal(1)).as_deref(), Ok(ONE_LEFT_OUT.as_bytes()));
 }
-const JSON_GUARD: [&str; 1] = [concat!(
+const JSON_GUARD: &str = concat!(
     r#"{"record":"error","kind":"guard","guard":{"message":"no initramfs modules for this hardware","name":"modules"},"class":"configuration","at":{"column":7,"line":22,"path":"tasks/boot/task.json"},"target":"carbon-lab","task":"boot"}"#,
     "\n",
-)];
+);
 #[test]
 fn json_gives_an_error_with_its_class_and_place() {
-    for expected in JSON_GUARD {
-        let printed = form::print(
-            Form::JsonLines,
-            &Record::Error(fixtures::modules_guard()),
-            Some(Type::Error),
-            &limits::SHIPPED,
-        );
-        assert_eq!(printed.as_deref(), Ok(expected.as_bytes()));
-    }
+    let printed =
+        form::print(Form::JsonLines, &Record::Error(fixtures::modules_guard()), Some(Type::Error), &limits::SHIPPED);
+    assert_eq!(printed.as_deref(), Ok(JSON_GUARD.as_bytes()));
 }
 const OPTION_REFUSAL: [(Form, &str); 2] = [
     (Form::Text, "hearth: unknown option: --bogus\n"),
@@ -137,24 +121,20 @@ fn a_startup_refusal_for_a_command_value_or_revision_prints_its_line() {
         );
     }
 }
-const DIFF_LEFT_OUT: [&str; 1] = ["44 more errors\n\n0 of 1 target change; 0 are unchanged.\n"];
+const DIFF_LEFT_OUT: &str = "44 more errors\n\n0 of 1 target change; 0 are unchanged.\n";
 #[test]
 fn omitted_errors_precede_the_diff_tally() {
     let record =
         Record::Terminal(Terminal { outcome: Outcome::Failed, diff: Some(fixtures::tally(1, 0, 0)), left_out: 44 });
-    for expected in DIFF_LEFT_OUT {
-        assert_eq!(print(&record).as_deref(), Ok(expected.as_bytes()));
-    }
+    assert_eq!(print(&record).as_deref(), Ok(DIFF_LEFT_OUT.as_bytes()));
 }
-const JSON_LEFT_OUT: [&str; 1] = [concat!(r#"{"record":"outcome","outcome":"failed","left_out":44}"#, "\n")];
+const JSON_LEFT_OUT: &str = concat!(r#"{"record":"outcome","outcome":"failed","left_out":44}"#, "\n");
 #[test]
 fn json_reports_the_omitted_error_count_last() {
-    for expected in JSON_LEFT_OUT {
-        assert_eq!(
-            form::print(Form::JsonLines, &terminal(44), Some(Type::Error), &limits::SHIPPED).as_deref(),
-            Ok(expected.as_bytes())
-        );
-    }
+    assert_eq!(
+        form::print(Form::JsonLines, &terminal(44), Some(Type::Error), &limits::SHIPPED).as_deref(),
+        Ok(JSON_LEFT_OUT.as_bytes())
+    );
 }
 const STARTUP_OUTCOMES: [(Opened, Outcome); 2] =
     [(Opened::Store, Outcome::TryAgain), (Opened::Repository, Outcome::TryAgain)];
@@ -182,4 +162,52 @@ fn print(record: &Record) -> Result<Box<[u8]>, form::Refusal> {
 }
 fn terminal(left_out: u32) -> Record {
     Record::Terminal(Terminal { outcome: Outcome::Failed, diff: None, left_out })
+}
+
+#[test]
+fn a_decode_error_prints_its_place_message_and_also() {
+    assert_eq!(
+        print(&Record::Error(fixtures::duplicate())).as_deref(),
+        Ok(b"envs/lab.json:1:14: duplicate key \"motd\" (envs/lab.json:1:2)\n".as_slice())
+    );
+}
+#[test]
+fn a_decode_error_prints_its_json_fields_and_places() {
+    assert_eq!(form::print(Form::JsonLines, &Record::Error(fixtures::duplicate()), Some(Type::Error), &limits::SHIPPED).as_deref(),
+        Ok(concat!(r#"{"record":"error","kind":"decode","decode":{"key":"motd","kind":"duplicate"},"class":"configuration","at":{"column":14,"line":1,"path":"envs/lab.json"},"also":{"column":2,"line":1,"path":"envs/lab.json"}}"#, "\n").as_bytes()));
+}
+
+const DECODE_LINES: &[(crate::errors::Decode, &str)] = &[
+    (crate::errors::Decode::Unexpected, "envs/lab.json:1:14: not JSON: unexpected byte\n"),
+    (
+        crate::errors::Decode::TooLarge { limit: crate::errors::Limit::Document, max: 1_048_576 },
+        "envs/lab.json:1:14: a document past 1048576 bytes\n",
+    ),
+    (
+        crate::errors::Decode::TooLarge { limit: crate::errors::Limit::Decoded, max: 64 },
+        "envs/lab.json:1:14: decoded documents past 64 bytes\n",
+    ),
+    (
+        crate::errors::Decode::TooLarge { limit: crate::errors::Limit::Static, max: 8 },
+        "envs/lab.json:1:14: a static file past 8 bytes\n",
+    ),
+];
+#[test]
+fn decode_faults_print_their_messages_and_bounds() {
+    for (decode, expected) in DECODE_LINES {
+        let mut error = fixtures::duplicate();
+        error.kind = crate::errors::Kind::Decode(decode.clone());
+        error.also = None;
+        assert_eq!(print(&Record::Error(error)).as_deref(), Ok(expected.as_bytes()));
+    }
+}
+#[test]
+fn a_decode_key_prints_quotes_and_controls_on_one_line() {
+    let mut error = fixtures::duplicate();
+    error.kind = crate::errors::Kind::Decode(crate::errors::Decode::Duplicate { key: copy_of(b"a\n\"\\\x01") });
+    error.also = None;
+    assert_eq!(
+        print(&Record::Error(error)).as_deref(),
+        Ok(b"envs/lab.json:1:14: duplicate key \"a\\n\\\"\\\\\\x01\"\n".as_slice())
+    );
 }

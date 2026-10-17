@@ -1,6 +1,7 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
 use crate::{
     compose::{self, Target},
+    errors::{self, Decode, Limit},
     limits::Limits,
     parts::{self, Spec, meta},
     revision::{self, Budget, Documents, Entry, Mode, Oid},
@@ -15,6 +16,9 @@ pub(crate) struct Side {
     pub commit: Option<Oid>,
     pub targets: Box<[Target]>,
     pub documents: Documents,
+    pub errors: List<errors::Error>,
+    pub error_next: u32,
+    pub paths: Box<[Box<[u8]>]>,
     pub settings: Box<[compose::Settings]>,
     pub merge: compose::Merge,
     pub budget: Budget,
@@ -38,6 +42,9 @@ impl Side {
             commit: None,
             targets: Box::new([]),
             documents: Documents::new(&[]),
+            errors: List::with_capacity(16),
+            error_next: 0,
+            paths: Box::new([]),
             settings: Box::new([]),
             merge: compose::Merge::new(limits),
             budget: Budget::new(limits),
@@ -94,18 +101,39 @@ impl Side {
         self.entries = entries.into();
         self.documents = Documents::new(entries);
         let mut blobs = List::with_capacity(u32::try_from(entries.len()).expect("listing capacity"));
+        let mut paths = List::with_capacity(u32::try_from(entries.len()).expect("listing capacity"));
         for entry in self.documents.entries() {
             if entry.size > u64::from(limits.document) {
+                errors::push(
+                    &mut self.errors,
+                    errors::refused(
+                        &entry.path,
+                        None,
+                        Decode::TooLarge { limit: Limit::Document, max: u64::from(limits.document) },
+                        None,
+                    ),
+                );
                 self.outcome = self.outcome.worst(Outcome::Failed);
             } else if !self.budget.take(entry.size) {
+                errors::push(
+                    &mut self.errors,
+                    errors::refused(
+                        &entry.path,
+                        None,
+                        Decode::TooLarge { limit: Limit::Decoded, max: limits.decoded },
+                        None,
+                    ),
+                );
                 self.fail(Outcome::Failed);
                 return;
             } else {
                 blobs
                     .push(Blob { oid: entry.oid.clone(), size: entry.size, kind: As::Document })
                     .expect("document count");
+                paths.push(entry.path.clone()).expect("document count");
             }
         }
+        self.paths = paths.into_boxed();
         self.pending = blobs.into_boxed();
         if self.pending.is_empty() {
             self.ready = true;
@@ -128,7 +156,9 @@ impl Side {
             Decoded::Declaration => {
                 self.declarations.insert(oid.clone(), true).expect("listed declarations");
             }
-            Decoded::Refused { at: _ } => {
+            Decoded::Refused { at, fault, also } => {
+                let path = self.paths.get(self.read).expect("requested path");
+                errors::push(&mut self.errors, errors::refused(path, Some(at), fault, also));
                 self.outcome = self.outcome.worst(Outcome::Failed);
             }
         }
@@ -166,6 +196,7 @@ impl Side {
         self.cached = Map::with_capacity(capacity);
         self.declarations = Map::with_capacity(capacity);
         let mut blobs = List::with_capacity(capacity);
+        let mut paths = List::with_capacity(capacity);
         for entry in &self.entries {
             let kind = match revision::class(&entry.path) {
                 revision::Class::Declaration { task } => Some((task, As::Declaration, limits.document)),
@@ -182,16 +213,37 @@ impl Side {
             };
             if let Some((task, kind, max)) = kind
                 && self.needs(task)
-                && entry.size <= u64::from(max)
-                && !contains(&blobs, &entry.oid, kind)
             {
-                if kind == As::Declaration && !self.budget.take(entry.size) {
-                    self.fail(Outcome::Failed);
-                    return false;
+                if entry.size > u64::from(max) {
+                    let limit = match kind {
+                        As::Declaration | As::Document => Limit::Document,
+                        As::Cached => Limit::Static,
+                    };
+                    errors::push(
+                        &mut self.errors,
+                        errors::refused(&entry.path, None, Decode::TooLarge { limit, max: u64::from(max) }, None),
+                    );
+                    self.outcome = self.outcome.worst(Outcome::Failed);
+                } else if !contains(&blobs, &entry.oid, kind) {
+                    if kind == As::Declaration && !self.budget.take(entry.size) {
+                        errors::push(
+                            &mut self.errors,
+                            errors::refused(
+                                &entry.path,
+                                None,
+                                Decode::TooLarge { limit: Limit::Decoded, max: limits.decoded },
+                                None,
+                            ),
+                        );
+                        self.fail(Outcome::Failed);
+                        return false;
+                    }
+                    blobs.push(Blob { oid: entry.oid.clone(), size: entry.size, kind }).expect("listing capacity");
+                    paths.push(entry.path.clone()).expect("listing capacity");
                 }
-                blobs.push(Blob { oid: entry.oid.clone(), size: entry.size, kind }).expect("listing capacity");
             }
         }
+        self.paths = paths.into_boxed();
         self.pending = blobs.into_boxed();
         self.read = 0;
         if self.pending.is_empty() {
@@ -320,6 +372,10 @@ impl Side {
                 parts,
             });
         }
+        if let Some(error) = self.errors.get(self.error_next) {
+            self.error_next = self.error_next.saturating_add(1);
+            return Answer::Error(error.clone());
+        }
         Answer::Rendered { outcome: self.outcome, diff: None }
     }
 }
@@ -373,7 +429,7 @@ impl Call {
             let answer = self.side.answer();
             let done = match &answer {
                 Answer::Rendered { .. } => true,
-                Answer::Spec(_) | Answer::Change(_) => false,
+                Answer::Spec(_) | Answer::Change(_) | Answer::Error(_) => false,
             };
             out.push(Output::Answer(answer));
             return done;
@@ -388,6 +444,10 @@ impl Call {
                     return false;
                 }
                 Answer::Rendered { outcome, diff: _ } => diff.outcome = diff.outcome.worst(outcome),
+                Answer::Error(error) => {
+                    out.push(Output::Answer(Answer::Error(error)));
+                    return false;
+                }
                 Answer::Change(_) => unreachable!("a side renders specs"),
             }
             let Some(commit) = self.side.commit.clone() else {

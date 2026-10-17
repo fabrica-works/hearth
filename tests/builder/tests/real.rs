@@ -138,7 +138,7 @@ fn a_document_fixed_in_the_later_revision_fails_its_target_from() {
     let rendered = fixtures::diff(&repository, &asked);
     let stdout = std::str::from_utf8(&rendered.stdout).expect("JSON");
     assert_eq!(
-        stdout.lines().nth(1),
+        stdout.lines().find(|line| line.starts_with("{\"record\":\"change\"")),
         Some("{\"record\":\"change\",\"target\":\"x1-lab\",\"kind\":\"failed\",\"failed\":{\"side\":\"from\"}}"),
         "the failed earlier document"
     );
@@ -163,7 +163,7 @@ fn a_target_failing_in_the_later_revision_names_side_to() {
     let rendered = fixtures::diff(&repository, &asked);
     let stdout = std::str::from_utf8(&rendered.stdout).expect("JSON");
     assert_eq!(
-        stdout.lines().nth(1),
+        stdout.lines().find(|line| line.starts_with("{\"record\":\"change\"")),
         Some("{\"record\":\"change\",\"target\":\"ion-lab\",\"kind\":\"failed\",\"failed\":{\"side\":\"to\"}}"),
         "the later document failed"
     );
@@ -188,4 +188,31 @@ fn json_lines_give_each_targets_change_then_the_tally_in_the_outcome() {
         4,
         "one change per target including same"
     );
+}
+
+#[test]
+fn a_broken_document_prints_its_error_after_the_specs_that_rendered() {
+    let repository = Repository::make("broken-lab", &fixtures::thin_with(fixtures::BROKEN_LAB));
+    assert_eq!(
+        String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout),
+        fixtures::BROKEN_LAB_TEXT
+    );
+}
+#[test]
+fn a_broken_document_exits_with_configuration_failure() {
+    let repository = Repository::make("broken-lab-exit", &fixtures::thin_with(fixtures::BROKEN_LAB));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
+#[test]
+fn a_broken_task_json_prints_its_error_with_its_task() {
+    let repository = Repository::make("broken-task", &fixtures::broken_task());
+    assert_eq!(
+        String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout),
+        "tasks/motd/task.json:1:10: motd: duplicate key \"a\" (tasks/motd/task.json:1:2)\n"
+    );
+}
+#[test]
+fn a_broken_task_json_exits_with_configuration_failure() {
+    let repository = Repository::make("broken-task-exit", &fixtures::broken_task());
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }

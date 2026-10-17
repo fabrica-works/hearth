@@ -369,3 +369,23 @@ impl Host for Holding {
         self.client.drain();
     }
 }
+
+pub const BROKEN_LAB: &[File] = &[
+    File { path: "envs/lab.json", body: br#"{"motd": {}, "motd": {}}"#, mode: 0o644 },
+    File {
+        path: "hosts/x1/x1-lab.json",
+        body: br#"{"placement":{"kind":"vm","firmware":"efi","hardware":"incus"}}"#,
+        mode: 0o644,
+    },
+];
+/// THIN with a duplicate key in its task declaration.
+#[must_use]
+pub fn broken_task() -> Vec<File> {
+    let mut files = THIN.to_vec();
+    files.iter_mut().find(|file| file.path == "tasks/motd/task.json").expect("THIN task").body = br#"{"a": 1, "a": 2}"#;
+    files
+}
+pub const BROKEN_LAB_TEXT: &str = concat!(
+    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         9970fb4d8f97\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\n",
+    "\nenvs/lab.json:1:14: duplicate key \"motd\" (envs/lab.json:1:2)\n"
+);

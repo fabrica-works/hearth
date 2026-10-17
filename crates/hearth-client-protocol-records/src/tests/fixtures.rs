@@ -128,3 +128,15 @@ pub fn modules_guard() -> crate::errors::Error {
         task: Some(copy_of(b"boot")),
     }
 }
+
+pub fn duplicate() -> crate::errors::Error {
+    use crate::errors::{Class, Decode, Error, Kind, Place, Position};
+    Error {
+        kind: Kind::Decode(Decode::Duplicate { key: copy_of(b"motd") }),
+        class: Class::Configuration,
+        at: Some(Place { path: copy_of(b"envs/lab.json"), position: Some(Position { line: 1, column: 14 }) }),
+        also: Some(Place { path: copy_of(b"envs/lab.json"), position: Some(Position { line: 1, column: 2 }) }),
+        target: None,
+        task: None,
+    }
+}

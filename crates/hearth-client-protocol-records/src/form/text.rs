@@ -46,6 +46,19 @@ impl Lines {
             self.put(&[hex(byte >> 4), hex(byte & 15)]);
         }
     }
+    pub(crate) fn quote(&mut self, bytes: &[u8]) {
+        self.put(b"\"");
+        for byte in bytes {
+            match byte {
+                b'"' => self.put(b"\\\""),
+                b'\\' => self.put(b"\\\\"),
+                b'\n' => self.put(b"\\n"),
+                0..=31 | 127 => self.put(&[b'\\', b'x', hex(byte >> 4), hex(byte & 15)]),
+                32..=126 | 128..=255 => self.put(&[*byte]),
+            }
+        }
+        self.put(b"\"");
+    }
     pub(crate) fn decimal(&mut self, number: u64) {
         self.put(skein_lib::Decimal::of(number).as_bytes());
     }

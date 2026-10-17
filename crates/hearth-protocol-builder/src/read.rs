@@ -57,7 +57,7 @@ impl Decode {
                         | config::json::Kind::Int(_)
                         | config::json::Kind::String(_)
                         | config::json::Kind::List(_) => {
-                            Ok(Decoded::Refused { at: translate::documents::position(value.at) })
+                            Err(config::Error { at: value.at, fault: config::Fault::NotObject })
                         }
                     },
                     render::vocabulary::As::Cached => unreachable!("static bytes are never decoded"),
@@ -67,8 +67,10 @@ impl Decode {
             };
             return Some(match result {
                 Ok(decoded) => Ok(decoded),
-                Err(config::Error { at: _, fault: config::Fault::Stream(_) }) => Err(()),
-                Err(error) => Ok(Decoded::Refused { at: translate::documents::position(error.at) }),
+                Err(config::Error { at, fault }) => match translate::errors::fault(fault, &env.limits.config) {
+                    Some((fault, also)) => Ok(Decoded::Refused { at: translate::documents::position(at), fault, also }),
+                    None => Err(()),
+                },
             });
         }
         if let Some(Down::Demand { read, room: 0 }) = self.below.pop() {

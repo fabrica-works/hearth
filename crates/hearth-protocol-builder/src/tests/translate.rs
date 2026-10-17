@@ -547,3 +547,4 @@ fn each_store_record_field_translates_and_back() {
         assert_eq!(crate::translate::store::tree_store(translated), record, "{translated:?}");
     }
 }
+mod errors;

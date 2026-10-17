@@ -40,6 +40,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
             match output {
                 Output::Answer(answer) => match answer {
                     Answer::Spec(spec) => run.answers.push(Answer::Spec(spec)),
+                    Answer::Error(error) => run.answers.push(Answer::Error(error)),
                     Answer::Change(change) => run.answers.push(Answer::Change(change)),
                     Answer::Rendered { outcome, diff: _ } => {
                         run.outcome = outcome;

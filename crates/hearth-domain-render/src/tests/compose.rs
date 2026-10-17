@@ -18,7 +18,10 @@ fn a_later_layer_s_scalar_replaces_and_keeps_its_own_place() {
     let Composite::Map(pairs) = &composed.kind else { panic!("map") };
     let port = only(pairs);
     assert_eq!(port.value.kind, Composite::Int(10_127));
-    assert_eq!(port.value.from, Provenance { layer: Layer::Base, document: 2, at: at(3, 12) });
+    assert_eq!(
+        port.value.from,
+        Provenance { layer: Layer::Base, document: 2, at: crate::revision::Position { line: 3, column: 12 } }
+    );
     assert_eq!(composed.from.layer, Layer::Fleet);
 }
 #[test]
@@ -61,7 +64,10 @@ fn a_list_patch_replaces_whole_and_keeps_its_elements_places() {
     let composed = merge.merge(target, &patch, Layer::Base, 1).expect("list");
     let Composite::List(values) = composed.kind else { panic!("list") };
     assert_eq!(only(&values).kind, Composite::Int(7));
-    assert_eq!(only(&values).from, Provenance { layer: Layer::Base, document: 1, at: at(2, 2) });
+    assert_eq!(
+        only(&values).from,
+        Provenance { layer: Layer::Base, document: 1, at: crate::revision::Position { line: 2, column: 2 } }
+    );
 }
 #[test]
 fn an_object_patch_over_a_scalar_makes_a_new_object() {
@@ -70,7 +76,10 @@ fn an_object_patch_over_a_scalar_makes_a_new_object() {
     let patch = map(at(2, 1), &[(b"gone", at(2, 2), null(at(2, 10)))]);
     let composed = merge.merge(target, &patch, Layer::Base, 1).expect("map");
     assert_eq!(composed.kind, Composite::Map(Box::new([])));
-    assert_eq!(composed.from, Provenance { layer: Layer::Base, document: 1, at: at(2, 1) });
+    assert_eq!(
+        composed.from,
+        Provenance { layer: Layer::Base, document: 1, at: crate::revision::Position { line: 2, column: 1 } }
+    );
 }
 #[test]
 fn a_merge_at_the_shipped_depth_fits_its_stack() {
