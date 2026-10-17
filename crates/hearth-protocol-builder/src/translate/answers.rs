@@ -3,19 +3,20 @@ use crate::{
     records::{outcome as target, parts::meta, records},
     render::{parts as source, revision, vocabulary::Outcome},
 };
-use alloc::boxed::Box;
+use skein_lib::List;
 #[must_use]
 pub fn spec(spec: source::Spec) -> records::Spec {
     let source::Spec { meta, meta_digest, commit, digest, parts } = spec;
-    if let Some(source::Part { digest: _, record }) = parts.into_iter().next() {
-        match record {}
+    let mut translated = List::with_capacity(u32::try_from(parts.len()).expect("bounded parts"));
+    for part in parts {
+        translated.push(super::parts::part(part)).expect("part capacity");
     }
     records::Spec {
         meta: metadata(meta),
         meta_digest: meta_digest.0,
         commit: commit.0,
         digest: digest.0,
-        parts: Box::new([]),
+        parts: translated.into_boxed(),
         resolution: None,
     }
 }

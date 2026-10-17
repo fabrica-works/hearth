@@ -111,9 +111,11 @@ pub fn render_at(repository: &Repository, at: &str, targets: &[&[u8]], form: For
     let fd = Fd::new(fs::File::create(&output).expect("output file").into_raw_fd());
     let limits = hearth::limits();
     let mut client =
-        Client::open(Invocation { call, form, store: repository.scratch.path().join("store") }, &limits, fd)
+        Client::open(Invocation { call, form, store: repository.scratch.path().join("store") }, &limits, fd, 7)
             .expect("client startup");
     let mut kernel = Kernel::open(Config { operations: client.operations() }).expect("io_uring is required");
     let exit = skein_shell::drive(&mut kernel, &Clock::new(), &mut client);
     Rendered { exit, stdout: fs::read(output).expect("printed output") }
 }
+
+pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         9970fb4d8f97\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\n";

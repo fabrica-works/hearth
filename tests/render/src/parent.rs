@@ -52,20 +52,9 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                             commit: fixtures::oid(b'a'),
                             entries: repository.entries.clone().into_boxed_slice(),
                         }],
-                        Request::Read { request, blobs, .. } => blobs
-                            .iter()
-                            .map(|blob| Event::Read {
-                                request: *request,
-                                oid: blob.oid.clone(),
-                                read: repository
-                                    .documents
-                                    .iter()
-                                    .find(|(oid, _)| *oid == blob.oid)
-                                    .expect("scripted document")
-                                    .1
-                                    .clone(),
-                            })
-                            .collect(),
+                        Request::Read { request, blobs, .. } => {
+                            blobs.iter().map(|blob| blob_event(repository, blob, *request)).collect()
+                        }
                     };
                     let token = match &request {
                         Request::List { request, .. } | Request::Read { request, .. } => *request,
@@ -87,6 +76,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
             let token = match &event {
                 Event::Listed { request, .. }
                 | Event::Read { request, .. }
+                | Event::Cached { request, .. }
                 | Event::Unresolved { request }
                 | Event::Failed { request, .. } => *request,
                 Event::Render { .. } => unreachable!("only answers scheduled"),
@@ -105,4 +95,24 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
         }
     }
     panic!("render settles: seed {seed}")
+}
+
+fn blob_event(repository: &Repository, blob: &render::vocabulary::Blob, request: skein_lib::Token) -> Event {
+    if blob.kind == render::vocabulary::As::Cached {
+        let body = repository.blobs.iter().find(|(oid, _)| *oid == blob.oid).expect("scripted blob");
+        let mut hash = skein_lib::sha256::Sha256::new();
+        hash.update(&body.1);
+        Event::Cached {
+            request,
+            oid: blob.oid.clone(),
+            size: blob.size,
+            sha256: hearth_lib::encode::Digest(hash.finish()),
+        }
+    } else {
+        Event::Read {
+            request,
+            oid: blob.oid.clone(),
+            read: repository.documents.iter().find(|(oid, _)| *oid == blob.oid).expect("scripted document").1.clone(),
+        }
+    }
 }

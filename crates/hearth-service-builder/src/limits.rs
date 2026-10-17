@@ -3,12 +3,20 @@ use crate::{domain, protocol};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
     pub io: skein_io::Limits,
+    pub files: Files,
     pub protocol: protocol::limits::Limits,
     pub domain: domain::Limits,
     pub queue: u32,
 }
 
 use skein_lib::Duration;
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Files {
+    pub files: u32,
+    pub read: u32,
+    pub entries: u32,
+    pub timeout: Duration,
+}
 pub const SHIPPED: Limits = Limits {
     io: skein_io::Limits {
         sockets: 8,
@@ -23,6 +31,7 @@ pub const SHIPPED: Limits = Limits {
         close_timeout: Duration::from_secs(5),
         retry: Duration::from_millis(50),
     },
+    files: Files { files: 2, read: 16_384, entries: 1, timeout: Duration::from_secs(5) },
     protocol: protocol::limits::SHIPPED,
     domain: domain::Limits { render: domain::render::limits::SHIPPED },
     queue: 32,

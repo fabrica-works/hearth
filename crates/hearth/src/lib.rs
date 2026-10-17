@@ -1,12 +1,12 @@
 //! The shipped builder host and its startup directories (shell.md, 6).
-#![forbid(unsafe_code)]
+
 pub use hearth_service_builder as service;
 use service::{Configuration, Roots, Service};
 pub use service::{Limits, domain::vocabulary::Call, protocol::Form};
 use skein_io::kernel::{Complete, Exit, Fd, Submit};
 use skein_lib::{Queue, Time, Wall};
 use skein_shell::{Host, OutputKind};
-use std::path::PathBuf;
+use std::{os::unix::fs::DirBuilderExt, path::PathBuf};
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Invocation {
     pub call: Call,
@@ -18,23 +18,39 @@ pub struct Client {
     service: Service,
     limits: Limits,
     store: Option<Fd>,
+    cache: Option<Fd>,
 }
 impl Client {
-    pub fn open(invocation: Invocation, limits: &Limits, output: Fd) -> Result<Self, std::io::Error> {
+    pub fn open(invocation: Invocation, limits: &Limits, output: Fd, seed: u64) -> Result<Self, std::io::Error> {
+        umask(0o022);
         let kind = skein_shell::prepare_output(output)
             .map_err(|error| std::io::Error::other(format!("invalid output: {error:?}")))?;
+        std::fs::DirBuilder::new().recursive(true).mode(0o700).create(&invocation.store)?;
         let store = skein_shell::make_root(&invocation.store, 0o700).map_err(std::io::Error::from_raw_os_error)?;
-        let mut service =
-            Service::new(&Configuration { limits: *limits }, Roots { store }, invocation.call, invocation.form);
+        let cache = match skein_shell::make_root(&invocation.store.join("cache"), 0o700) {
+            Ok(cache) => cache,
+            Err(error) => {
+                skein_shell::close_keeper_fd(store);
+                return Err(std::io::Error::from_raw_os_error(error));
+            }
+        };
+        let mut service = Service::new(
+            &Configuration { limits: *limits },
+            Roots { store, cache },
+            invocation.call,
+            invocation.form,
+            seed,
+        );
         let adopted = match kind {
             OutputKind::Pipe => service.adopt_output_pipe(output),
             OutputKind::Append => service.adopt_output_file(output),
         };
         if adopted.is_err() {
+            skein_shell::close_keeper_fd(cache);
             skein_shell::close_keeper_fd(store);
             return Err(std::io::Error::other("no output slot"));
         }
-        Ok(Self { service, limits: *limits, store: Some(store) })
+        Ok(Self { service, limits: *limits, store: Some(store), cache: Some(cache) })
     }
 }
 impl Host for Client {
@@ -74,10 +90,23 @@ impl Host for Client {
     } // No heap claim until hearth 28.
     fn drain(&mut self) {
         if self.service.is_empty()
+            && let Some(cache) = self.cache.take()
+        {
+            skein_shell::close_keeper_fd(cache);
+        }
+        if self.service.is_empty()
             && let Some(store) = self.store.take()
         {
             skein_shell::close_keeper_fd(store);
         }
+    }
+}
+/// Set the process's file creation mask at startup (store.md, 2.2).
+#[expect(unsafe_code, reason = "the shell owns the process creation mask")]
+pub fn umask(mask: u16) {
+    // SAFETY: umask accepts every mode value and holds no pointers or resources.
+    unsafe {
+        libc::umask(u32::from(mask));
     }
 }
 #[must_use]

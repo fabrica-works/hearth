@@ -23,7 +23,7 @@ pub fn targets(entries: &[Entry]) -> Result<Box<[Target]>, TooMany> {
             Class::Environment { env } => {
                 environments.insert(bytes::copy_of(env), entry).expect("listing capacity");
             }
-            Class::Fleet | Class::Host { .. } | Class::Other => {}
+            Class::Fleet | Class::Host { .. } | Class::Declaration { .. } | Class::Tree { .. } | Class::Other => {}
         }
     }
     let mut discovered = Map::with_capacity(SHIPPED.targets);
@@ -52,7 +52,11 @@ pub fn targets(entries: &[Entry]) -> Result<Box<[Target]>, TooMany> {
                     return Err(TooMany);
                 }
             }
-            Class::Fleet | Class::Environment { .. } | Class::Other => {}
+            Class::Fleet
+            | Class::Environment { .. }
+            | Class::Declaration { .. }
+            | Class::Tree { .. }
+            | Class::Other => {}
         }
     }
     let mut targets = List::with_capacity(discovered.len());

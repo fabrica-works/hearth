@@ -193,3 +193,94 @@ pub fn operand(input: Input) -> Operand<'static> {
 }
 
 pub const FALSE: bool = false;
+pub fn config() -> crate::parts::config::Config {
+    use crate::{
+        parts::config::{self, Config},
+        revision::Mode,
+    };
+    Config {
+        tree: Box::new([
+            config::file(
+                b"etc/motd",
+                Mode::File,
+                digest("775324fcea7f2cdcbf11df25550e362669caceb6e69c8370374d2d436bb63123"),
+            ),
+            config::file(
+                b"usr/local/bin/motd",
+                Mode::Executable,
+                digest("f487088ec8b18ff569dfede6f12e5fa91983f9f6dd2f3e0b6cee4349a231e745"),
+            ),
+        ]),
+    }
+}
+
+pub fn removed_task() -> (crate::call::Call, crate::compose::Target) {
+    use crate::{
+        revision::{Document, Layer, Oid, Position, Task},
+        vocabulary::{As, Blob},
+    };
+    let at = Position { line: 1, column: 1 };
+    let mut call = crate::call::Call::new(bytes::copy_of(b"/repo"), Box::new([]));
+    let base = Oid(bytes::copy_of(b"base"));
+    let host = Oid(bytes::copy_of(b"host"));
+    call.entries = Box::new([
+        crate::revision::Entry {
+            path: bytes::copy_of(b"hosts/x1/x1.json"),
+            mode: crate::revision::Mode::File,
+            oid: base.clone(),
+            size: 2,
+        },
+        crate::revision::Entry {
+            path: bytes::copy_of(b"hosts/x1/x1-prod.json"),
+            mode: crate::revision::Mode::File,
+            oid: host.clone(),
+            size: 2,
+        },
+    ]);
+    call.documents = skein_lib::Map::with_capacity(2);
+    call.documents
+        .insert(
+            base.clone(),
+            Some(Document {
+                at,
+                layer: Layer {
+                    placement: Some(crate::revision::Placement {
+                        at,
+                        kind: Runs::Metal,
+                        firmware: Some(Firmware::Efi),
+                        hardware: None,
+                        on: None,
+                        mutable: false,
+                    }),
+                    tasks: Box::new([Task { name: bytes::copy_of(b"motd"), at, removed: false }]),
+                },
+            }),
+        )
+        .expect("base");
+    call.documents
+        .insert(
+            host.clone(),
+            Some(Document {
+                at,
+                layer: Layer {
+                    placement: Some(crate::revision::Placement {
+                        at,
+                        kind: Runs::Metal,
+                        firmware: Some(Firmware::Efi),
+                        hardware: None,
+                        on: None,
+                        mutable: false,
+                    }),
+                    tasks: Box::new([Task { name: bytes::copy_of(b"motd"), at, removed: true }]),
+                },
+            }),
+        )
+        .expect("base-env");
+    let target = crate::compose::Target {
+        name: bytes::copy_of(b"x1-prod"),
+        base: bytes::copy_of(b"x1"),
+        environment: bytes::copy_of(b"prod"),
+        documents: [Blob { oid: base, size: 2, kind: As::Document }, Blob { oid: host, size: 2, kind: As::Document }],
+    };
+    (call, target)
+}

@@ -1,3 +1,4 @@
+mod cache;
 mod client;
 mod fixtures;
 mod git;

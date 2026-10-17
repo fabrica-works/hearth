@@ -17,14 +17,16 @@ use skein_lib::{
 };
 #[derive(Debug)]
 struct Decode {
+    kind: render::vocabulary::As,
     held: Held,
     machine: config::json::Decoder,
     above: Queue<config::json::Event>,
     below: Queue<Down>,
 }
 impl Decode {
-    fn new(bytes: Box<[u8]>, env: &Env<Limits>) -> Self {
+    fn new(bytes: Box<[u8]>, kind: render::vocabulary::As, env: &Env<Limits>) -> Self {
         let mut decode = Self {
+            kind,
             held: Held::new(bytes),
             machine: config::json::Decoder::new(&env.limits.config),
             above: Queue::with_capacity(1),
@@ -43,12 +45,28 @@ impl Decode {
     fn resume(&mut self, env: &Env<Limits>) -> Option<Result<Decoded, ()>> {
         if let Some(event) = self.above.pop() {
             let result = match event {
-                config::json::Event::Decoded(value) => config::document::document(value),
+                config::json::Event::Decoded(value) => match self.kind {
+                    render::vocabulary::As::Document => match config::document::document(value) {
+                        Ok(document) => Ok(Decoded::Document(translate::documents::document(document))),
+                        Err(error) => Err(error),
+                    },
+                    render::vocabulary::As::Declaration => match value.kind {
+                        config::json::Kind::Map(_) => Ok(Decoded::Declaration),
+                        config::json::Kind::Null
+                        | config::json::Kind::Bool(_)
+                        | config::json::Kind::Int(_)
+                        | config::json::Kind::String(_)
+                        | config::json::Kind::List(_) => {
+                            Ok(Decoded::Refused { at: translate::documents::position(value.at) })
+                        }
+                    },
+                    render::vocabulary::As::Cached => unreachable!("static bytes are never decoded"),
+                },
                 config::json::Event::Failed(error) => Err(error),
                 config::json::Event::Closed => unreachable!("decoder is not closed"),
             };
             return Some(match result {
-                Ok(document) => Ok(Decoded::Document(translate::documents::document(document))),
+                Ok(decoded) => Ok(decoded),
                 Err(config::Error { at: _, fault: config::Fault::Stream(_) }) => Err(()),
                 Err(error) => Ok(Decoded::Refused { at: translate::documents::position(error.at) }),
             });
@@ -63,6 +81,9 @@ impl Decode {
 }
 #[derive(Debug)]
 pub(crate) struct Read {
+    root: skein_io::kernel::Fd,
+    rng: skein_lib::Rng,
+    cache: Option<crate::cache::Cache>,
     request: Token,
     blobs: Box<[Blob]>,
     index: usize,
@@ -78,9 +99,12 @@ pub(crate) struct Read {
     failed: bool,
 }
 impl Read {
-    pub fn new(request: Token, blobs: Box<[Blob]>, env: &Env<Limits>) -> Self {
+    pub fn new(request: Token, blobs: Box<[Blob]>, env: &Env<Limits>, root: skein_io::kernel::Fd, seed: u64) -> Self {
         assert!(!blobs.is_empty(), "Read asks for blobs");
         let mut read = Self {
+            root,
+            rng: skein_lib::Rng::new(seed),
+            cache: None,
             request,
             blobs,
             index: 0,
@@ -100,7 +124,12 @@ impl Read {
     }
     fn start(&mut self, env: &Env<Limits>) {
         let blob = self.blobs.get(self.index).expect("current blob");
-        self.body = Some(Writer::new(usize::try_from(blob.size).expect("render checked document bound")));
+        match blob.kind {
+            render::vocabulary::As::Document | render::vocabulary::As::Declaration => {
+                self.body = Some(Writer::new(usize::try_from(blob.size).expect("render checked document bound")));
+            }
+            render::vocabulary::As::Cached => self.cache = Some(crate::cache::Cache::new(self.root, &mut self.rng)),
+        }
         let request =
             batch::Request::Read { oid: Oid::parse(&blob.oid.0).expect("listed oid"), size: blob.size, max: blob.size };
         self.down(env, request);
@@ -147,6 +176,14 @@ impl Read {
         true
     }
     pub fn work_pending(&self) -> bool {
+        if let Some(cache) = &self.cache {
+            if cache.work_pending() || cache.done() {
+                return true;
+            }
+            if cache.busy() {
+                return false;
+            }
+        }
         self.decode.is_some()
             || !self.above.is_empty()
             || !self.below.is_empty()
@@ -154,26 +191,91 @@ impl Read {
             || (!self.finished_input && self.room != Some(false))
     }
     pub fn take_request(&mut self) -> Option<Down> {
+        if match &self.cache {
+            Some(cache) => cache.busy(),
+            None => false,
+        } {
+            return None;
+        }
         self.below.pop()
+    }
+    pub fn close_cache(&mut self, below: &mut Queue<Asked>) -> bool {
+        let Some(cache) = &mut self.cache else {
+            return true;
+        };
+        if cache.abort() {
+            return true;
+        }
+        if let Some(request) = cache.take_request() {
+            below.push(Asked::File(request));
+        }
+        false
+    }
+    pub fn cache_pending(&self) -> bool {
+        match &self.cache {
+            Some(cache) => !cache.closing() || cache.work_pending() || cache.done() || cache.failed(),
+            None => true,
+        }
     }
     pub fn failed(&self) -> bool {
         self.failed
+            || (match &self.cache {
+                Some(cache) => cache.failed(),
+                None => false,
+            })
     }
     pub fn request(&self) -> Token {
         self.request
     }
     pub fn ready(&self) -> bool {
-        self.decoded.is_some() && self.index.checked_add(1) == Some(self.blobs.len())
+        (self.decoded.is_some()
+            || (match &self.cache {
+                Some(cache) => cache.done(),
+                None => false,
+            }))
+            && self.index.checked_add(1) == Some(self.blobs.len())
     }
     pub fn take_answer(&mut self) -> render::vocabulary::Event {
         let blob = self.blobs.get(self.index).expect("current blob");
+        if match &self.cache {
+            Some(cache) => cache.done(),
+            None => false,
+        } {
+            return render::vocabulary::Event::Cached {
+                request: self.request,
+                oid: blob.oid.clone(),
+                size: blob.size,
+                sha256: self.cache.take().expect("cached blob").digest(),
+            };
+        }
         render::vocabulary::Event::Read {
             request: self.request,
             oid: blob.oid.clone(),
             read: self.decoded.take().expect("decoded blob"),
         }
     }
-    pub fn resume(&mut self, env: &Env<Limits>, above: &mut Queue<builder::vocabulary::Event>) {
+    pub fn file_up(&mut self, event: skein_io::file::Event) {
+        self.cache.as_mut().expect("cache event").up(event);
+    }
+    pub fn resume(
+        &mut self,
+        env: &Env<Limits>,
+        above: &mut Queue<builder::vocabulary::Event>,
+        below: &mut Queue<Asked>,
+    ) {
+        if let Some(cache) = &mut self.cache {
+            if let Some(request) = cache.take_request() {
+                below.push(Asked::File(request));
+                return;
+            }
+            if cache.written() {
+                self.down(env, batch::Request::Next);
+                return;
+            }
+            if !cache.readable() && !cache.done() {
+                return;
+            }
+        }
         if let Some(decode) = &mut self.decode {
             if let Some(result) = decode.resume(env) {
                 self.decode = None;
@@ -185,16 +287,34 @@ impl Read {
         } else if let Some(event) = self.above.pop() {
             match event {
                 batch::Event::Piece(bytes) => {
-                    self.body.as_mut().expect("current blob buffer").put(&bytes).expect("batch bounded piece");
-                    self.down(env, batch::Request::Next);
+                    if let Some(cache) = &mut self.cache {
+                        cache.piece(bytes);
+                    } else {
+                        self.body.as_mut().expect("current blob buffer").put(&bytes).expect("batch bounded piece");
+                        self.down(env, batch::Request::Next);
+                    }
                 }
                 batch::Event::Whole { .. } => {
-                    self.decode = Some(Decode::new(self.body.take().expect("whole blob").finish(), env));
+                    if let Some(cache) = &mut self.cache {
+                        cache.finish();
+                    } else {
+                        self.decode = Some(Decode::new(
+                            self.body.take().expect("whole blob").finish(),
+                            self.blobs.get(self.index).expect("blob").kind,
+                            env,
+                        ));
+                    }
                 }
                 batch::Event::Missing { .. } | batch::Event::Failed(_) => self.failed = true,
                 batch::Event::Closed => unreachable!("batch is not closed"),
             }
-        } else if self.decoded.is_some() && !self.ready() {
+        } else if (self.decoded.is_some()
+            || (match &self.cache {
+                Some(cache) => cache.done(),
+                None => false,
+            }))
+            && !self.ready()
+        {
             above.push(builder::vocabulary::Event::Render(self.take_answer()));
             self.index = self.index.checked_add(1).expect("bounded blobs");
             self.start(env);

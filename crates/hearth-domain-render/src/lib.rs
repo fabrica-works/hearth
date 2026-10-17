@@ -51,6 +51,10 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             assert_eq!(request, Token::new(2), "read token");
             render.call.as_mut().expect("active call").decoded(&oid, read);
         }
+        Event::Cached { request, oid, size, sha256 } => {
+            assert_eq!(request, Token::new(2), "read token");
+            render.call.as_mut().expect("active call").cached(&oid, size, sha256);
+        }
         Event::Unresolved { request } => {
             assert_eq!(request, Token::new(1), "listing token");
             render.call.as_mut().expect("active call").fail(Outcome::Usage);
@@ -64,8 +68,11 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
         }
     }
 }
-pub fn resume(render: &mut Render, _env: &Env<Limits>, out: &mut Queue<Output>) {
+pub fn resume(render: &mut Render, env: &Env<Limits>, out: &mut Queue<Output>) {
     if !render.work_pending() {
+        return;
+    }
+    if render.call.as_mut().expect("ready call").files(env.limits, out) {
         return;
     }
     let answer = render.call.as_mut().expect("ready call").answer();

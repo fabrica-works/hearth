@@ -8,6 +8,7 @@ use hearth_lib::encode::Digest;
 #[derive(Clone, Debug)]
 pub struct Repository {
     pub entries: Vec<Entry>,
+    pub blobs: Vec<(Oid, Box<[u8]>)>,
     pub documents: Vec<(Oid, Decoded)>,
 }
 #[must_use]
@@ -16,7 +17,7 @@ pub fn oid(byte: u8) -> Oid {
 }
 #[must_use]
 pub fn document(placement: Option<Placement>) -> Decoded {
-    Decoded::Document(Document { at: Position { line: 1, column: 1 }, layer: Layer { placement } })
+    Decoded::Document(Document { at: Position { line: 1, column: 1 }, layer: Layer { placement, tasks: Box::new([]) } })
 }
 #[must_use]
 pub fn placement() -> Placement {
@@ -32,6 +33,7 @@ pub fn placement() -> Placement {
 #[must_use]
 pub fn x1_prod() -> Repository {
     Repository {
+        blobs: Vec::new(),
         entries: vec![
             entry(b"envs/prod.json", b'1'),
             entry(b"hosts/x1/x1.json", b'2'),
@@ -101,4 +103,23 @@ pub fn assert_fell(fell: &BTreeSet<&str>, kinds: &[&str]) {
     for kind in kinds {
         assert!(fell.contains(kind), "missing {kind}");
     }
+}
+
+#[must_use]
+pub fn with_task() -> Repository {
+    let mut repository = x1_prod();
+    repository.documents[1].1 = Decoded::Document(Document {
+        at: Position { line: 1, column: 1 },
+        layer: Layer {
+            placement: None,
+            tasks: Box::new([hearth_domain_render::revision::Task {
+                name: b"motd".as_slice().into(),
+                at: Position { line: 1, column: 2 },
+                removed: false,
+            }]),
+        },
+    });
+    repository.entries.push(entry(b"tasks/motd/task.json", b'4'));
+    repository.documents.push((oid(b'4'), Decoded::Declaration));
+    repository
 }

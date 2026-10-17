@@ -14,6 +14,7 @@ publish = false
 # tag: Cargo.lock pins it, a repin moves it, and skein's `plan` finds it by
 # the source's "/skein.git#" (skein's development.md, sections 5.7 and 9.5):
 [workspace.dependencies]
+libc = "0.2.186"
 hearth-service-builder = { path = "crates/hearth-service-builder" }
 hearth = { path = "crates/hearth" }
 skein-shell = { git = "https://github.com/forgetic/skein.git" }

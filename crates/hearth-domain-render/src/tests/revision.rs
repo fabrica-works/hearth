@@ -8,7 +8,8 @@ const PATHS: &[(&[u8], Class<'_>)] = &[
     (b"envs/a/b.json", Class::Other),
     (b"envs/.json", Class::Other),
     (b"hosts//x1.json", Class::Other),
-    (b"tasks/motd/task.json", Class::Other),
+    (b"tasks/motd/task.json", Class::Declaration { task: b"motd" }),
+    (b"tasks/motd/tree/etc/motd", Class::Tree { task: b"motd", path: b"etc/motd" }),
     (b"README.md", Class::Other),
 ];
 #[test]

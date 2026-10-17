@@ -6,7 +6,7 @@ use skein_io::kernel::Exit;
 fn hearth_render_prints_the_thin_repositorys_spec_through_real_git() {
     let repository = Repository::make("thin", fixtures::THIN);
     let rendered = fixtures::render(&repository, &[], Form::Text);
-    assert_eq!(&*rendered.stdout, b"target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         d5942fa1a047\n", "render.md 9.2's lines");
+    assert_eq!(String::from_utf8_lossy(&rendered.stdout), fixtures::THIN_TEXT, "render.md 9.2's lines");
     assert_eq!(rendered.exit, Exit::Code(0), "client/README.md 3.3: done");
 }
 #[test]
@@ -21,7 +21,7 @@ fn json_lines_give_the_version_first_and_the_outcome_last() {
         Some("{\"record\":\"outcome\",\"outcome\":\"done\",\"left_out\":0}"),
         "terminal last"
     );
-    assert_eq!(lines.len(), 4, "version, spec, meta and outcome");
+    assert_eq!(lines.len(), 5, "version, spec, config, meta and outcome");
 }
 #[test]
 fn an_unknown_target_exits_64_after_the_listing() {
@@ -47,4 +47,33 @@ fn a_directory_that_is_no_repository_exits_75() {
 fn a_scratch_repository_without_git_on_the_path_fails_by_name_not_by_skip() {
     let scratch = skein_scratch::Scratch::new("without-git");
     let _repository = Repository::make_on(scratch.path().as_os_str(), "no-git", fixtures::THIN);
+}
+
+const CACHED: &[(&str, &[u8])] = &[
+    ("775324fcea7f2cdcbf11df25550e362669caceb6e69c8370374d2d436bb63123", b"Welcome to x1.\n"),
+    ("f487088ec8b18ff569dfede6f12e5fa91983f9f6dd2f3e0b6cee4349a231e745", b"#!/bin/sh\nexec cat /etc/motd\n"),
+];
+#[test]
+fn static_files_enter_the_cache_by_sha256_and_no_temporary_stays() {
+    use std::{fs, os::unix::fs::PermissionsExt};
+    let repository = Repository::make("cache", fixtures::THIN);
+    hearth::umask(0o077);
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(rendered.exit, Exit::Code(0));
+    let cache = repository.scratch().path().join("store/cache");
+    assert_eq!(fs::metadata(&cache).expect("cache").permissions().mode() & 0o7777, 0o700);
+    let mut names: Vec<_> =
+        fs::read_dir(&cache).expect("cache listing").map(|entry| entry.expect("cache entry").file_name()).collect();
+    names.sort();
+    assert_eq!(
+        names,
+        [
+            "775324fcea7f2cdcbf11df25550e362669caceb6e69c8370374d2d436bb63123",
+            "f487088ec8b18ff569dfede6f12e5fa91983f9f6dd2f3e0b6cee4349a231e745"
+        ]
+    );
+    for &(name, body) in CACHED {
+        assert_eq!(fs::read(cache.join(name)).expect("cached bytes"), body, "{name}");
+        assert_eq!(fs::metadata(cache.join(name)).expect("cache file").permissions().mode() & 0o7777, 0o644, "{name}");
+    }
 }

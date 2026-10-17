@@ -11,6 +11,7 @@ pub use hearth_domain_builder as builder;
 use hearth_protocol_config as config;
 use hearth_protocol_git as git_machine;
 pub use records::form::Form;
+mod cache;
 mod client;
 mod git;
 pub mod limits;
@@ -28,10 +29,12 @@ use skein_lib::{
 #[derive(PartialEq, Eq, Debug)]
 pub enum Asked {
     Io(io::Request),
+    File(io::file::Request),
 }
 #[derive(PartialEq, Eq, Debug)]
 pub enum Told {
     Io(io::Event),
+    File(io::file::Event),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct MaxOut {
@@ -63,6 +66,8 @@ enum Mode {
 #[derive(Debug)]
 pub struct Protocol {
     root: Fd,
+    cache: Fd,
+    rng: skein_lib::Rng,
     call: Option<Call>,
     client: client::Client,
     next: u64,
@@ -71,9 +76,11 @@ pub struct Protocol {
 }
 impl Protocol {
     #[must_use]
-    pub fn new(limits: &Limits, call: Call, form: Form, root: Fd) -> Self {
+    pub fn new(limits: &Limits, call: Call, form: Form, root: Fd, cache: Fd, seed: u64) -> Self {
         Self {
             root,
+            cache,
+            rng: skein_lib::Rng::new(seed),
             call: Some(call),
             client: client::Client::new(form, limits.printer),
             next: 100,
@@ -110,6 +117,11 @@ impl Protocol {
         };
         if child.closing {
             return child.work_pending() || child.done();
+        }
+        if child.failed
+            && let Some(Mode::Read(read)) = &self.mode
+        {
+            return read.cache_pending();
         }
         if child.failed || child.done() {
             return true;
@@ -164,7 +176,13 @@ pub fn down(
                 }
                 render::vocabulary::Request::Read { request, repository, commit: _, blobs } => {
                     protocol.spawn(invocation::Command::CatFile { repository: &repository }, below);
-                    protocol.mode = Some(Mode::Read(Box::new(read::Read::new(request, blobs, env))));
+                    protocol.mode = Some(Mode::Read(Box::new(read::Read::new(
+                        request,
+                        blobs,
+                        env,
+                        protocol.cache,
+                        protocol.rng.next_u64(),
+                    ))));
                 }
             }
         }
@@ -174,7 +192,17 @@ pub fn down(
     }
 }
 pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, _above: &mut Queue<Event>, below: &mut Queue<Asked>) {
-    let Told::Io(event) = ev;
+    let event = match ev {
+        Told::Io(event) => event,
+        Told::File(event) => {
+            let Some(Mode::Read(read)) = &mut protocol.mode else { unreachable!("cache read exists") };
+            read.file_up(event);
+            return;
+        }
+    };
+    io_up(protocol, env, event, below);
+}
+fn io_up(protocol: &mut Protocol, env: &Env<Limits>, event: io::Event, below: &mut Queue<Asked>) {
     if protocol.client.owns(&event) {
         protocol.client.up(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, event);
         return;
@@ -309,6 +337,12 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
             read.ready()
         }
     };
+    if child.failed
+        && let Mode::Read(read) = mode
+        && !read.close_cache(below)
+    {
+        return;
+    }
     if child.failed || (ready && child.exit.is_some()) {
         child.closing = true;
     }
@@ -339,7 +373,7 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
             if let Some(down) = read.take_request() {
                 child.stream(down, below);
             } else if !read.input(child, below) {
-                read.resume(env, above);
+                read.resume(env, above, below);
             }
         }
     }

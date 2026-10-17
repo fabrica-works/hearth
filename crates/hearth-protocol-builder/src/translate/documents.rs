@@ -11,8 +11,15 @@ pub fn position(at: config::Position) -> target::Position {
 #[must_use]
 pub fn document(document: source::Document) -> target::Document {
     let source::Document { at, layer, members: _ } = document;
-    let source::Layer { tasks: _, debian: _, placement } = layer;
-    target::Document { at: position(at), layer: target::Layer { placement: optional_placement(placement) } }
+    let source::Layer { tasks, debian: _, placement } = layer;
+    let mut translated = skein_lib::List::with_capacity(u32::try_from(tasks.len()).expect("bounded tasks"));
+    for source::Task { name, at, value } in tasks {
+        translated.push(target::Task { name, at: position(at), removed: removed(value.kind) }).expect("task capacity");
+    }
+    target::Document {
+        at: position(at),
+        layer: target::Layer { placement: optional_placement(placement), tasks: translated.into_boxed() },
+    }
 }
 #[must_use]
 pub fn placement_to_render(placement: source::Placement) -> target::Placement {
@@ -49,5 +56,16 @@ pub fn boot(firmware: source::Firmware) -> target::Firmware {
     match firmware {
         source::Firmware::Efi => target::Firmware::Efi,
         source::Firmware::Bios => target::Firmware::Bios,
+    }
+}
+
+fn removed(kind: config::json::Kind) -> bool {
+    match kind {
+        config::json::Kind::Null => true,
+        config::json::Kind::Bool(_)
+        | config::json::Kind::Int(_)
+        | config::json::Kind::String(_)
+        | config::json::Kind::List(_)
+        | config::json::Kind::Map(_) => false,
     }
 }

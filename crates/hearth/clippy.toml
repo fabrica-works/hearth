@@ -1,10 +1,11 @@
-# What the hearth client may not use. It is ordinary Rust, with the rules of
-# programming-model.md, 2.1, as skein-shell is: `unsafe` nowhere (the ring
-# adapter is skein-shell's), and no std handle types that close on drop.
+# What the shell may not use. It is ordinary Rust, with the two rules of its
+# own in programming-model.md, 2.1: `unsafe` in the ring adapter only (the
+# lints in Cargo.toml), and no std handle types that close on drop (here).
 
 doc-valid-idents = ["io_uring", ".."]
 
 disallowed-types = [
+    # A descriptor is a plain Fd, closed by a Close record.
     { path = "std::os::fd::OwnedFd", reason = "a descriptor is closed by a Close record, not on drop" },
     { path = "std::fs::File", reason = "a descriptor is closed by a Close record, not on drop" },
     { path = "std::net::TcpStream", reason = "a descriptor is closed by a Close record, not on drop" },
@@ -12,6 +13,8 @@ disallowed-types = [
     { path = "std::net::UdpSocket", reason = "a descriptor is closed by a Close record, not on drop" },
     { path = "std::process::Child", reason = "std::process is not used (io.md, 6)" },
     { path = "std::process::Command", reason = "std::process is not used (io.md, 6)" },
+    # Time is the Clock's: CLOCK_MONOTONIC as a skein_lib::Time, which the
+    # ring's wait takes as an absolute deadline.
     { path = "std::time::Instant", reason = "skein_shell::Clock, a skein_lib::Time" },
     { path = "std::time::SystemTime", reason = "skein_shell::Clock, a skein_lib::Wall" },
     { path = "std::collections::HashMap", reason = "iteration order depends on a random seed: BTreeMap" },

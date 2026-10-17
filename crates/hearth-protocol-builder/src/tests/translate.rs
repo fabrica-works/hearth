@@ -99,7 +99,10 @@ fn a_document_without_placement_keeps_its_position_and_absence() {
     };
     assert_eq!(
         documents::document(input),
-        target::Document { at: target::Position { line: 2, column: 4 }, layer: target::Layer { placement: None } },
+        target::Document {
+            at: target::Position { line: 2, column: 4 },
+            layer: target::Layer { placement: None, tasks: Box::new([]) }
+        },
         "no placement is introduced"
     );
 }
@@ -127,10 +130,12 @@ fn optional_client_firmware_back(firmware: Option<client_meta::Firmware>) -> Opt
 }
 fn spec_back(spec: records::records::Spec) -> Option<render::parts::Spec> {
     let records::records::Spec { meta, meta_digest, commit, digest, parts, resolution } = spec;
-    if let Some(records::records::Part { digest: _, record }) = parts.into_iter().next() {
-        match record {
-            records::records::PartRecord::Config(_) => return None, /* hearth 32.1 */
-        }
+    let mut translated = skein_lib::List::with_capacity(u32::try_from(parts.len()).expect("bounded parts"));
+    for records::records::Part { digest, record } in parts {
+        let record = match record {
+            records::records::PartRecord::Config(config) => render::parts::PartRecord::Config(config_back(config)),
+        };
+        translated.push(render::parts::Part { digest: hearth_lib::encode::Digest(digest), record }).expect("part room");
     }
     match resolution {
         None => {}
@@ -156,7 +161,7 @@ fn spec_back(spec: records::records::Spec) -> Option<render::parts::Spec> {
         meta_digest: hearth_lib::encode::Digest(meta_digest),
         commit: target::Oid(commit),
         digest: hearth_lib::encode::Digest(digest),
-        parts: Box::new([]),
+        parts: translated.into_boxed(),
     })
 }
 #[test]
@@ -227,4 +232,52 @@ fn each_client_outcome_translates_and_back() {
         assert_eq!(answers::outcome(*source), *expected, "outcome {source:?}");
         assert_eq!(outcome_back(*expected), Some(*source), "outcome {expected:?}");
     }
+}
+
+fn config_back(config: records::parts::config::Config) -> render::parts::config::Config {
+    let mut tree = skein_lib::List::with_capacity(u32::try_from(config.tree.len()).expect("bounded tree"));
+    for records::parts::config::TreeEntry { path, node } in config.tree {
+        let node = match node {
+            records::parts::config::Node::File { content_digest, mode, owner, group } => {
+                render::parts::config::Node::File {
+                    content_digest: hearth_lib::encode::Digest(content_digest),
+                    mode,
+                    owner,
+                    group,
+                }
+            }
+        };
+        tree.push(render::parts::config::TreeEntry { path, node }).expect("tree room");
+    }
+    render::parts::config::Config { tree: tree.into_boxed() }
+}
+#[test]
+fn a_config_part_translates_to_the_records_and_back() {
+    let source = render::parts::Part {
+        digest: hearth_lib::encode::Digest([7; 32]),
+        record: render::parts::PartRecord::Config(render::parts::config::Config {
+            tree: Box::new([render::parts::config::file(
+                b"etc/motd",
+                target::Mode::Executable,
+                hearth_lib::encode::Digest([8; 32]),
+            )]),
+        }),
+    };
+    let records::records::Part { digest, record } = crate::translate::parts::part(source);
+    assert_eq!(digest, [7; 32]);
+    let records::records::PartRecord::Config(config) = record;
+    assert_eq!(
+        config_back(config),
+        render::parts::config::Config {
+            tree: Box::new([render::parts::config::TreeEntry {
+                path: skein_lib::bytes::copy_of(b"/etc/motd"),
+                node: render::parts::config::Node::File {
+                    content_digest: hearth_lib::encode::Digest([8; 32]),
+                    mode: 0o755,
+                    owner: skein_lib::bytes::copy_of(b"root"),
+                    group: skein_lib::bytes::copy_of(b"root")
+                }
+            }])
+        }
+    );
 }

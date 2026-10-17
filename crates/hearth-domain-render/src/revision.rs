@@ -27,6 +27,8 @@ pub enum Class<'a> {
     Fleet,
     Environment { env: &'a [u8] },
     Host { base: &'a [u8], name: &'a [u8] },
+    Declaration { task: &'a [u8] },
+    Tree { task: &'a [u8], path: &'a [u8] },
     Other,
 }
 #[must_use]
@@ -54,6 +56,21 @@ pub fn class(path: &[u8]) -> Class<'_> {
             return Class::Host { base, name };
         }
     }
+    if let Some(rest) = path.strip_prefix(b"tasks/")
+        && let Some(slash) = bytes::find(rest, b"/")
+    {
+        let (task, rest) = rest.split_at_checked(slash).expect("found slash");
+        if !task.is_empty() {
+            if rest == b"/task.json" {
+                return Class::Declaration { task };
+            }
+            if let Some(path) = rest.strip_prefix(b"/tree/")
+                && !path.is_empty()
+            {
+                return Class::Tree { task, path };
+            }
+        }
+    }
     Class::Other
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -64,6 +81,13 @@ pub struct Document {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Layer {
     pub placement: Option<Placement>,
+    pub tasks: Box<[Task]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Task {
+    pub name: Box<[u8]>,
+    pub at: Position,
+    pub removed: bool,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Placement {

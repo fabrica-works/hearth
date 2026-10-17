@@ -67,7 +67,7 @@ impl Layer {
     }
     pub fn with_form(form: crate::Form, limits: limits::Limits) -> Self {
         let mut layer = Self {
-            protocol: Protocol::new(&limits, call(), form, Fd::new(3)),
+            protocol: Protocol::new(&limits, call(), form, Fd::new(3), Fd::new(4), 7),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             above: Queue::with_capacity(1),
             below: Queue::with_capacity(1),
@@ -185,7 +185,7 @@ impl Layer {
         panic!("rev-parse settles");
     }
     pub fn answer(&mut self, request: Asked, held: &mut Held, exit: Exit) {
-        let Asked::Io(request) = request;
+        let Asked::Io(request) = request else { panic!("git fixture has no cache request") };
         match request {
             io::Request::Spawn { owner, spawn } => self.spawned(owner, spawn.pipes.len() == 2, exit),
             io::Request::Stream { stream, down } => match down {
@@ -247,5 +247,51 @@ pub fn spec() -> render::parts::Spec {
         commit: oid(),
         digest: hearth_lib::encode::Digest([2; 32]),
         parts: Box::new([]),
+    }
+}
+
+pub const CACHE_OWNER: Token = Token::new(10);
+pub const CACHE_FILE: Token = Token::new(300);
+pub fn cache() -> crate::cache::Cache {
+    crate::cache::Cache::new(Fd::new(4), &mut skein_lib::Rng::new(7))
+}
+pub fn synced_cache() -> crate::cache::Cache {
+    use skein_io::file::Event;
+    let mut cache = cache();
+    drop(cache.take_request());
+    cache.up(Event::Opened { owner: CACHE_OWNER, file: CACHE_FILE, len: 0 });
+    cache.piece(bytes::copy_of(b"abc"));
+    drop(cache.take_request());
+    cache.up(Event::Written { owner: CACHE_OWNER });
+    cache.finish();
+    drop(cache.take_request());
+    cache.up(Event::Synced { owner: CACHE_OWNER });
+    drop(cache.take_request());
+    cache.up(Event::Closed { owner: CACHE_OWNER });
+    cache
+}
+
+pub fn opening_cache() -> (Layer, Token) {
+    let mut layer = Layer::new();
+    let mut blob = blob(b"abc");
+    blob.kind = render::vocabulary::As::Cached;
+    layer.read(Box::new([blob]));
+    let mut held = Held::new(batch(b"abc"));
+    for _ in 0_u32..64 {
+        let request = layer.asked().expect("cached read starts");
+        if let Asked::File(io::file::Request::Create { .. }) = request {
+            let owner = layer.owner.expect("spawned child");
+            return (layer, owner);
+        }
+        match request {
+            Asked::Io(io::Request::Spawn { owner, .. }) => layer.spawn_pending(owner, true),
+            other @ (Asked::Io(_) | Asked::File(_)) => layer.answer(other, &mut held, Exit::Code(0)),
+        }
+    }
+    panic!("cache create reached");
+}
+impl Layer {
+    pub fn file_up(&mut self, event: io::file::Event) {
+        up(&mut self.protocol, &self.env, Told::File(event), &mut self.above, &mut self.below);
     }
 }

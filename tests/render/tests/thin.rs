@@ -16,7 +16,7 @@ fn a_targets_meta_is_its_names_and_the_base_envs_placement() {
         assert_eq!(spec.meta, fixtures::x1_prod_meta(), "render.md, 4.4: the target's meta");
         assert_eq!(
             spec.digest,
-            fixtures::digest("d5942fa1a047fd65c5731c85cfba607e81d0fd16cb00f154aacfa79c44ed118c"),
+            fixtures::digest("e0d142ee5fb0ee79d5e273e4a7839d6201f9134a3abc48206432a3008aa6a009"),
             "seed {seed}"
         );
         assert_eq!(run.outcome, Outcome::Done, "seed {seed}");
@@ -32,8 +32,8 @@ fn render_lists_once_then_reads_each_targets_documents_once() {
         };
         assert_eq!(
             blobs.iter().map(|b| b.oid.clone()).collect::<Vec<_>>(),
-            [fixtures::oid(b'1'), fixtures::oid(b'3')],
-            "no base read, seed {seed}"
+            [fixtures::oid(b'1'), fixtures::oid(b'3'), fixtures::oid(b'2')],
+            "the base joins the first read, seed {seed}"
         );
     }
 }
@@ -107,7 +107,7 @@ fn targets_are_answered_in_name_order_each_once() {
         assert_eq!(names, [b"a-b-prod".as_slice(), b"x1-prod"], "prefix-based discovery, seed {seed}");
         assert_eq!(run.outcome, Outcome::Done, "seed {seed}");
         let Request::Read { blobs, .. } = &run.requests[1] else { panic!("read follows list") };
-        assert_eq!(blobs.len(), 3, "shared environment read once, seed {seed}");
+        assert_eq!(blobs.len(), 4, "shared environment read once, seed {seed}");
     }
 }
 
@@ -120,7 +120,10 @@ fn a_document_above_its_limit_fails_only_its_targets_before_reading() {
     assert_eq!(spec.meta.target.as_ref(), b"a-b-prod");
     assert_eq!(run.outcome, Outcome::Failed);
     let Request::Read { blobs, .. } = &run.requests[1] else { panic!("read follows list") };
-    assert_eq!(blobs.iter().map(|b| b.oid.clone()).collect::<Vec<_>>(), [fixtures::oid(b'1'), fixtures::oid(b'4')]);
+    assert_eq!(
+        blobs.iter().map(|b| b.oid.clone()).collect::<Vec<_>>(),
+        [fixtures::oid(b'1'), fixtures::oid(b'4'), fixtures::oid(b'2')]
+    );
 }
 
 #[test]
@@ -129,4 +132,40 @@ fn targets_above_the_configured_limit_fail_before_reading() {
     assert_eq!(run.answers, []);
     assert_eq!(run.outcome, Outcome::Failed);
     assert_eq!(run.requests.len(), 1);
+}
+
+#[test]
+fn a_malformed_task_json_fails_the_targets_that_have_the_task() {
+    let mut repository = fixtures::with_task();
+    repository.documents[3].1 = Decoded::Refused { at: Position { line: 1, column: 2 } };
+    repository.entries.push(fixtures::entry(b"hosts/a/a-prod.json", b'5'));
+    repository.documents.push((fixtures::oid(b'5'), fixtures::document(Some(fixtures::placement()))));
+    let run = parent::run(&repository, &[], 0);
+    let [Answer::Spec(spec)] = &run.answers[..] else { panic!("one unaffected target") };
+    assert_eq!(spec.meta.target.as_ref(), b"a-prod");
+    assert_eq!(run.outcome, Outcome::Failed);
+}
+#[test]
+fn a_submodule_under_a_present_tasks_tree_fails_its_target() {
+    let mut repository = fixtures::with_task();
+    let mut submodule = fixtures::entry(b"tasks/motd/tree/etc/submodule", b'5');
+    submodule.mode = hearth_domain_render::revision::Mode::Submodule;
+    repository.entries.push(submodule);
+    let run = parent::run(&repository, &[], 0);
+    assert_eq!(run.answers, []);
+    assert_eq!(run.outcome, Outcome::Failed);
+}
+#[test]
+fn a_template_and_a_link_are_left_out_of_the_tree() {
+    let mut repository = fixtures::with_task();
+    repository.entries.push(fixtures::entry(b"tasks/motd/tree/etc/template.j2", b'5'));
+    let mut link = fixtures::entry(b"tasks/motd/tree/etc/link", b'6');
+    link.mode = hearth_domain_render::revision::Mode::Link;
+    repository.entries.push(link);
+    let run = parent::run(&repository, &[], 0);
+    let [Answer::Spec(spec)] = &run.answers[..] else { panic!("one target") };
+    let [part] = spec.parts.as_ref() else { panic!("one config part") };
+    let hearth_domain_render::parts::PartRecord::Config(config) = &part.record;
+    assert_eq!(config.tree.as_ref(), []);
+    assert_eq!(run.requests.len(), 3, "only the declaration is read in the second phase");
 }

@@ -57,6 +57,7 @@ fn a_documents_blob_reaches_render_decoded_with_its_placement() {
             read: Decoded::Document(Document {
                 at: Position { line: 1, column: 1 },
                 layer: DocumentLayer {
+                    tasks: Box::new([]),
                     placement: Some(Placement {
                         at: Position { line: 1, column: 14 },
                         kind: Runs::Metal,
@@ -127,7 +128,7 @@ fn the_last_document_waits_for_successful_exit_and_resource_closure() {
             oid: crate::render::revision::Oid(bytes::copy_of(b"0123456789abcdef0123456789abcdef01234567")),
             read: Decoded::Document(Document {
                 at: Position { line: 1, column: 1 },
-                layer: DocumentLayer { placement: None }
+                layer: DocumentLayer { tasks: Box::new([]), placement: None }
             })
         }),
         "the decoded blob follows Closed for every resource"

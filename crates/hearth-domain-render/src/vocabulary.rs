@@ -4,6 +4,7 @@ use crate::{
     revision::{Document, Entry, Oid, Position},
 };
 use alloc::boxed::Box;
+pub use hearth_lib::encode::Digest;
 use skein_lib::Token;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
@@ -11,6 +12,7 @@ pub enum Event {
     Listed { request: Token, commit: Oid, entries: Box<[Entry]> },
     Unresolved { request: Token },
     Read { request: Token, oid: Oid, read: Decoded },
+    Cached { request: Token, oid: Oid, size: u64, sha256: Digest },
     Failed { request: Token, class: Class },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -37,10 +39,13 @@ pub struct Blob {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum As {
     Document,
+    Declaration,
+    Cached,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Decoded {
     Document(Document),
+    Declaration,
     Refused { at: Position },
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
