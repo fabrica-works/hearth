@@ -7,3 +7,20 @@ pub struct Limits {
     pub chunk: u32,
 }
 pub const SHIPPED: Limits = Limits { entries: 65_536, path: 4_096, paths_total: 16_777_216, chunk: 16_384 };
+
+/// The decoder whose retained heap is being priced.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Decoder {
+    Listing,
+    Batch,
+}
+/// Decoder-owned heap, including one delivery; emitted payloads are the receiver's.
+#[must_use]
+pub fn worst_case(decoder: Decoder, limits: &Limits) -> Option<u64> {
+    match decoder {
+        Decoder::Listing => skein_lib::List::<crate::listing::Entry>::worst_case(limits.entries)?
+            .checked_add(u64::from(limits.paths_total))?
+            .checked_add(u64::from(crate::listing::RECORD).checked_add(u64::from(limits.path))?),
+        Decoder::Batch => Some(u64::from(crate::batch::largest_demand(limits))),
+    }
+}

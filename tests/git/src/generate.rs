@@ -49,3 +49,35 @@ pub fn listing(rng: &mut Rng, limits: &Limits) -> Listing {
     }
     Listing { stdout, entries: entries.into_boxed_slice() }
 }
+
+#[derive(Debug)]
+pub struct Batch {
+    pub stdout: Vec<u8>,
+    pub requests: Box<[hearth_protocol_git::batch::Request]>,
+    pub blobs: Box<[crate::world::Blob]>,
+}
+/// Empty bodies, arbitrary binary bytes and missing ids, encoded independently.
+#[must_use]
+pub fn batch(rng: &mut Rng, limits: &Limits) -> Batch {
+    let mut stdout = Vec::new();
+    let mut requests = Vec::new();
+    let mut blobs = Vec::new();
+    for index in 0..rng.between(1, 8) {
+        let hex = if rng.chance(500) { format!("{index:040x}") } else { format!("{index:064x}") };
+        let oid = Oid::parse(hex.as_bytes()).expect("generated lowercase id");
+        let length = rng.between(0, u64::from(limits.chunk) * 3);
+        let missing = rng.chance(250);
+        requests.push(hearth_protocol_git::batch::Request::Read { oid, size: length, max: length });
+        if missing {
+            stdout.extend_from_slice(format!("{hex} missing\n").as_bytes());
+            blobs.push(crate::world::Blob { oid, bytes: None });
+        } else {
+            let bytes: Vec<u8> = (0..length).map(|_| u8::try_from(rng.below(256)).expect("byte")).collect();
+            stdout.extend_from_slice(format!("{hex} blob {length}\n").as_bytes());
+            stdout.extend_from_slice(&bytes);
+            stdout.push(b'\n');
+            blobs.push(crate::world::Blob { oid, bytes: Some(bytes.into_boxed_slice()) });
+        }
+    }
+    Batch { stdout, requests: requests.into_boxed_slice(), blobs: blobs.into_boxed_slice() }
+}

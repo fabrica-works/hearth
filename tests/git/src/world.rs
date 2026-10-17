@@ -81,3 +81,238 @@ fn assert_closed(machine: &mut Listing, env: &Env<Limits>, wire: &mut Wire) {
     }
     assert_eq!(wire.answer(), None, "closed has no demand");
 }
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Blob {
+    pub oid: hearth_protocol_git::oid::Oid,
+    pub bytes: Option<Box<[u8]>>,
+}
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum BatchOutcome {
+    Done(Box<[Blob]>),
+    Failed(hearth_protocol_git::batch::Error),
+    Closed,
+}
+/// Play binary blobs through a Wire, delaying Next from the seed.
+#[must_use]
+pub fn read(
+    stdout: &[u8],
+    requests: &[hearth_protocol_git::batch::Request],
+    limits: &Limits,
+    settings: &Settings,
+) -> BatchOutcome {
+    use hearth_protocol_git::batch::{self, Batch, Event, Request};
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
+    let mut machine = Batch::START;
+    let mut wire = Wire::new(settings.seed);
+    wire.write(&stdout[..settings.end.unwrap_or(stdout.len()).min(stdout.len())]);
+    wire.eof = true;
+    let mut above = Queue::with_capacity(1);
+    let mut below = Queue::with_capacity(1);
+    let mut requests = requests.iter();
+    let mut pending = requests.next().copied();
+    let mut result = Vec::new();
+    let mut bytes = Vec::new();
+    let mut rng = skein_lib::Rng::new(settings.seed);
+    let mut calls = 0;
+    for _ in 0..stdout.len().saturating_mul(30).saturating_add(100) {
+        while let Some(down) = below.pop() {
+            wire.take(down);
+        }
+        if settings.close == Some(calls) {
+            batch_closed(&mut machine, &env, &mut wire);
+            return BatchOutcome::Closed;
+        }
+        if let Some(event) = above.pop() {
+            match event {
+                Event::Piece(piece) => {
+                    assert!(piece.len() <= usize::try_from(limits.chunk).expect("chunk fits"), "bounded piece");
+                    bytes.extend_from_slice(&piece);
+                    pending = Some(Request::Next);
+                }
+                Event::Whole { oid, size } => {
+                    assert_eq!(u64::try_from(bytes.len()).expect("body fits"), size, "whole body size");
+                    result.push(Blob { oid, bytes: Some(core::mem::take(&mut bytes).into_boxed_slice()) });
+                    pending = requests.next().copied();
+                    if pending.is_none() {
+                        batch_closed(&mut machine, &env, &mut wire);
+                        return BatchOutcome::Done(result.into_boxed_slice());
+                    }
+                }
+                Event::Missing { oid } => {
+                    assert!(bytes.is_empty(), "missing has no body");
+                    result.push(Blob { oid, bytes: None });
+                    pending = requests.next().copied();
+                    if pending.is_none() {
+                        batch_closed(&mut machine, &env, &mut wire);
+                        return BatchOutcome::Done(result.into_boxed_slice());
+                    }
+                }
+                Event::Failed(error) => {
+                    batch_closed(&mut machine, &env, &mut wire);
+                    return BatchOutcome::Failed(error);
+                }
+                Event::Closed => return BatchOutcome::Closed,
+            }
+        }
+        if let Some(request) = pending {
+            if rng.chance(500) {
+                pending = None;
+                batch::down(&mut machine, &env, request, &mut above, &mut below);
+                calls += 1;
+            }
+        } else if let Some(event) = wire.answer() {
+            let event = match event {
+                Up::End if settings.fail => Up::Failed(Fault::Reset),
+                other @ (Up::Bytes(_) | Up::Room | Up::End | Up::Failed(_)) => other,
+            };
+            batch::up(&mut machine, &env, event, &mut above, &mut below);
+            calls += 1;
+        }
+    }
+    panic!("batch did not settle for {settings:?}")
+}
+fn batch_closed(machine: &mut hearth_protocol_git::batch::Batch, env: &Env<Limits>, wire: &mut Wire) {
+    use hearth_protocol_git::batch::{self, Event, Request};
+    let mut above = Queue::with_capacity(1);
+    let mut below = Queue::with_capacity(1);
+    batch::down(machine, env, Request::Close, &mut above, &mut below);
+    assert_eq!(above.pop(), Some(Event::Closed), "Close answers Closed");
+    while let Some(down) = below.pop() {
+        assert_eq!(down, skein_lib::stream::Down::Demand { read: Read::Nothing, room: 0 }, "close only withdraws");
+        wire.take(down);
+    }
+    assert_eq!(wire.answer(), None, "closed has no demand");
+}
+
+/// A held-input driver with exactly one decoder entry point per call.
+/// `pending` prepares deliveries outside the meter; `drop_events` hands outputs out.
+#[derive(Debug)]
+pub struct Stepped {
+    env: Env<Limits>,
+    decoder: hearth_protocol_git::limits::Decoder,
+    listing: Option<Listing>,
+    batch: Option<hearth_protocol_git::batch::Batch>,
+    held: skein_lib::stream::Held,
+    requests: std::vec::IntoIter<hearth_protocol_git::batch::Request>,
+    listing_events: Queue<Event>,
+    batch_events: Queue<hearth_protocol_git::batch::Event>,
+    below: Queue<skein_lib::stream::Down>,
+    read: Option<Read>,
+    action: Option<Action>,
+    closed: bool,
+}
+#[derive(Debug)]
+enum Action {
+    List,
+    Batch(hearth_protocol_git::batch::Request),
+    Up(Up),
+    Close,
+}
+impl Stepped {
+    #[must_use]
+    pub fn new(case: &crate::fixtures::Case, limits: &Limits) -> Self {
+        Self {
+            env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
+            decoder: case.decoder,
+            listing: None,
+            batch: None,
+            held: skein_lib::stream::Held::new(case.stdout.clone().into_boxed_slice()),
+            requests: Vec::from(case.requests.clone()).into_iter(),
+            listing_events: Queue::with_capacity(1),
+            batch_events: Queue::with_capacity(1),
+            below: Queue::with_capacity(1),
+            read: None,
+            action: None,
+            closed: false,
+        }
+    }
+    pub fn open(&mut self) {
+        use hearth_protocol_git::{batch::Batch, limits::Decoder};
+        match self.decoder {
+            Decoder::Listing => {
+                self.listing = Some(Listing::new(&self.env.limits));
+                self.action = Some(Action::List);
+            }
+            Decoder::Batch => {
+                self.batch = Some(Batch::START);
+                self.action = Some(Action::Batch(self.requests.next().expect("batch case has request")));
+            }
+        }
+    }
+    pub fn pending(&mut self) -> bool {
+        if self.closed {
+            return false;
+        }
+        if self.action.is_none() {
+            let read = self.read.take().expect("unfinished machine demands input");
+            self.action = Some(Action::Up(self.held.answer(read).expect("active held demand")));
+        }
+        true
+    }
+    pub fn call(&mut self) {
+        use hearth_protocol_git::{batch, limits::Decoder};
+        let action = self.action.take().expect("prepared call");
+        match self.decoder {
+            Decoder::Listing => {
+                let machine = self.listing.as_mut().expect("open listing");
+                match action {
+                    Action::List => {
+                        listing::down(machine, &self.env, Request::List, &mut self.listing_events, &mut self.below);
+                    }
+                    Action::Close => {
+                        listing::down(machine, &self.env, Request::Close, &mut self.listing_events, &mut self.below);
+                    }
+                    Action::Up(up) => listing::up(machine, &self.env, up, &mut self.listing_events, &mut self.below),
+                    Action::Batch(_) => unreachable!("listing driver"),
+                }
+            }
+            Decoder::Batch => {
+                let machine = self.batch.as_mut().expect("open batch");
+                match action {
+                    Action::Batch(request) => {
+                        batch::down(machine, &self.env, request, &mut self.batch_events, &mut self.below);
+                    }
+                    Action::Close => {
+                        batch::down(machine, &self.env, batch::Request::Close, &mut self.batch_events, &mut self.below);
+                    }
+                    Action::Up(up) => batch::up(machine, &self.env, up, &mut self.batch_events, &mut self.below),
+                    Action::List => unreachable!("batch driver"),
+                }
+            }
+        }
+    }
+    pub fn drop_events(&mut self) {
+        use hearth_protocol_git::batch;
+        if let Some(event) = self.listing_events.pop() {
+            match event {
+                Event::Listed(_) | Event::Failed(_) => self.action = Some(Action::Close),
+                Event::Closed => self.closed = true,
+            }
+            drop(event);
+        }
+        if let Some(event) = self.batch_events.pop() {
+            match event {
+                batch::Event::Piece(_) => self.action = Some(Action::Batch(batch::Request::Next)),
+                batch::Event::Whole { .. } | batch::Event::Missing { .. } => {
+                    self.action = Some(match self.requests.next() {
+                        Some(request) => Action::Batch(request),
+                        None => Action::Close,
+                    });
+                }
+                batch::Event::Failed(_) => self.action = Some(Action::Close),
+                batch::Event::Closed => self.closed = true,
+            }
+            drop(event);
+        }
+        if let Some(down) = self.below.pop() {
+            match down {
+                skein_lib::stream::Down::Demand { read: Read::Nothing, room: 0 } => self.read = None,
+                skein_lib::stream::Down::Demand { read, room: 0 } => self.read = Some(read),
+                skein_lib::stream::Down::Demand { .. }
+                | skein_lib::stream::Down::Send(_)
+                | skein_lib::stream::Down::Finish => unreachable!("read only"),
+            }
+        }
+    }
+}

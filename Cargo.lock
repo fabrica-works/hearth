@@ -27,6 +27,7 @@ name = "hearth-git-world"
 version = "0.0.0"
 dependencies = [
  "hearth-protocol-git",
+ "skein-heap",
  "skein-lib",
  "skein-world",
 ]

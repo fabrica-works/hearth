@@ -181,7 +181,7 @@ fn split(input: &[u8], delimiter: u8) -> Option<(&[u8], &[u8])> {
     let at = bytes::find(input, &[delimiter])?;
     Some((input.get(..at)?, input.get(at.checked_add(1)?..)?))
 }
-fn number(input: &[u8]) -> Option<u64> {
+pub(crate) fn number(input: &[u8]) -> Option<u64> {
     if input.is_empty() || (input.len() > 1 && input.starts_with(b"0")) {
         return None;
     }

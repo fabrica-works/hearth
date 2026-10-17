@@ -27,3 +27,42 @@ pub fn listed(stdout: &[u8], limits: &Limits) -> Event {
     }
     unreachable!("bounded records settle")
 }
+
+pub fn batched(stdout: &[u8], requests: &[crate::batch::Request], limits: &Limits) -> Box<[crate::batch::Event]> {
+    use crate::batch::{self, Batch, Event, Request};
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
+    let mut machine = Batch::START;
+    let mut held = Held::new(bytes::copy_of(stdout));
+    let mut above = Queue::with_capacity(1);
+    let mut below = Queue::with_capacity(1);
+    let mut events = skein_lib::List::with_capacity(
+        u32::try_from(stdout.len().saturating_add(requests.len())).expect("test input small"),
+    );
+    let mut next = requests.iter();
+    let Some(request) = next.next() else {
+        return events.into_boxed();
+    };
+    batch::down(&mut machine, &env, *request, &mut above, &mut below);
+    for _ in 0..stdout.len().saturating_mul(3).saturating_add(20) {
+        if let Some(event) = above.pop() {
+            let request = match event {
+                Event::Piece(_) => Some(Request::Next),
+                Event::Whole { .. } | Event::Missing { .. } => next.next().copied(),
+                Event::Failed(_) | Event::Closed => None,
+            };
+            events.push(event).expect("one event per byte or request");
+            let Some(request) = request else {
+                return events.into_boxed();
+            };
+            batch::down(&mut machine, &env, request, &mut above, &mut below);
+        }
+        match below.pop().expect("one outstanding read") {
+            Down::Demand { read, room: 0 } => {
+                let event = held.answer(read).expect("held answers read");
+                batch::up(&mut machine, &env, event, &mut above, &mut below);
+            }
+            Down::Demand { .. } | Down::Send(_) | Down::Finish => unreachable!("read only"),
+        }
+    }
+    unreachable!("bounded batch settles")
+}
