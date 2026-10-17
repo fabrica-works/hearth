@@ -2,7 +2,7 @@
 
 [workspace]
 resolver = "3"
-members = ["crates/*", "tests/*"]
+members = ["crates/*", "tests/*", "testing/hearth-*"]
 
 [workspace.package]
 version = "0.0.0"
@@ -14,6 +14,8 @@ publish = false
 # tag: Cargo.lock pins it, a repin moves it, and skein's `plan` finds it by
 # the source's "/skein.git#" (skein's development.md, sections 5.7 and 9.5):
 [workspace.dependencies]
+hearth-test-mirror = { path = "testing/hearth-test-mirror" }
+skein-scratch = { git = "https://github.com/forgetic/skein.git" }
 hearth-protocol-mmdebstrap = { path = "crates/hearth-protocol-mmdebstrap" }
 skein-world = { git = "https://github.com/forgetic/skein.git" }
 skein-heap = { git = "https://github.com/forgetic/skein.git" }
