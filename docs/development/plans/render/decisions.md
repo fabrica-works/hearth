@@ -312,6 +312,25 @@ None yet.
 
      The check's runs: clippy over the workspace with the sketches on stubs, clean; the crate and its world 42 passed (4 sketch tests stubbed), fuzzy 1 of 1. A further `Limits` literal with named fields takes `..SHIPPED` the same way, and the commit body lists it.
 
+113. **hearth 26.1's size, 747 against 290** (plan defect, hearth 26's block of 2026-10-17T16:49:59Z).
+     A plan defect, in 26.1's Size: "Size: at most 290 lines (the ledger is
+     26.2's)" (`hearth/26-fake-git.md`, 26.1) undercounts the Shape it gives,
+     which the prepared commit implements in full. 26.1 lands as prepared
+     (0af8772), at 747 lines by code-organization.md 7's command, with the
+     gate, and its report's `Size:` gives 747 and this ruling.
+
+     - implementer.md's tolerance ("An increment lands within twice its Size
+       without asking … Past that, stop on a question before landing, with the
+       count by file") was followed: 747 is 2.58 times 290.
+     - Splitting it now would land the same lines in two commits, behind a
+       second gate, with nothing between them: 26.1's Shape is one face
+       (`Op::Open` to `Op::Close`), and only 26.2 needs it within the session.
+     - code-organization.md 7's aims hold: its largest file, `files.rs`, is
+       456 lines, under 800, and the report gives every test under 40.
+
+     26.2 keeps its Size, 340, and implementer.md's tolerance: past 680, it
+     stops with the count by file, as 26.1 did.
+
 ## For the user
 
 The long-term choices the user may veto:
