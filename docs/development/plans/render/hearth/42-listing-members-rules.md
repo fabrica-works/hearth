@@ -95,7 +95,9 @@ README's round-trip form, ruling 144); records `src/errors.rs`, `src/form/{text,
 `world.rs:238` and `:266` match `Decoder` whole, and a `Tail` driver feeds it,
 `Action::Feed`); protocol `src/tests/fixtures.rs` (`:190`'s
 `spawn.pipes.len() == 2` counts standard error's pipe);
-`tests/builder/{src/fixtures.rs, tests/real.rs}`.
+`tests/builder/{src/fixtures.rs, tests/real.rs}`; the root's `src/lib.rs`
+(`:101` and `:155`: a read the store refused fails with `Failure::Store`,
+ruling 153).
 Shape: the sketches. `revision::class` gains `Template`, `Script`,
 `Readme` (accepted for hearth 15 and 18) and `Refused`, and drops `Copy`
 (`revision.rs:25`: `Refused` holds a box), so `src/tests/revision.rs:17`
@@ -332,7 +334,9 @@ pub struct Member { pub name: Box<[u8]>, pub at: Position, pub layer: Option<Lay
 // crates/hearth-domain-render/src/vocabulary.rs (42.1), beside hearth 11's and 12's
 pub enum Event { /* hearth 11's others */ Failed { request: Token, class: Class, at: Option<Box<[u8]>>, failure: Failure } }
 /// Why a request failed.
-pub enum Failure { Tool(Tool), TooLarge { limit: Limit, max: u64 } }
+/// `Store` (ruling 153): a read the store refused (33.1); the side fails `TryAgain` and render adds
+/// no error, the root answering the store's once a call (33.3).
+pub enum Failure { Tool(Tool), TooLarge { limit: Limit, max: u64 }, Store }
 
 // crates/hearth-domain-render/src/errors.rs (hearth 12's; Repository, Tool 42.1; Composition 42.2, 42.3)
 /// `Kind` gains `Repository(Repository)`, `Composition(Composition)`, `Tool(Tool)`; `Limit` gains
