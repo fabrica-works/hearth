@@ -105,7 +105,10 @@ pub fn check(document: &[u8], settings: &Settings, seed: u64) -> Run {
             | Fault::Nul
             | Fault::Keys
             | Fault::Note
-            | Fault::Shape(_) => assert_eq!(Err(error.clone()), expected, "seed {seed}, {settings:?}, {document:?}"),
+            | Fault::Shape(_)
+            | Fault::Declaration(_) => {
+                assert_eq!(Err(error.clone()), expected, "seed {seed}, {settings:?}, {document:?}");
+            }
         },
         None => assert!(settings.close.is_some(), "only close may interrupt Decode"),
     }
@@ -212,3 +215,21 @@ pub fn run(document: &[u8], settings: &Settings, seed: u64) -> Run {
 }
 /// Roomy defaults for the nine documents; generated worlds draw smaller ones.
 pub const DEFAULTS: Limits = SHIPPED;
+
+/// Decode a declaration after the stream world has checked its JSON against the reference.
+///
+/// # Errors
+/// Returns the stream or JSON fault, or the declaration's first shape fault.
+pub fn declare(
+    document: &[u8],
+    settings: &Settings,
+    seed: u64,
+) -> Result<hearth_protocol_config::declaration::Declaration, Error> {
+    let run = check(document, settings, seed);
+    match run.outcome.expect("declaration world runs Decode to completion") {
+        Outcome::Decoded => {
+            hearth_protocol_config::declaration::declaration(run.value.expect("decoded value"), &settings.limits)
+        }
+        Outcome::Failed(error) => Err(error),
+    }
+}

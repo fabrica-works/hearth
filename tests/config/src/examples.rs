@@ -18,3 +18,19 @@ pub fn all() -> &'static [Example] {
         Example { name: "carbon-lab", bytes: include_bytes!("../examples/carbon-lab.json") },
     ]
 }
+
+/// A task example from format.md.
+#[must_use]
+pub fn task(name: &str) -> Example {
+    for example in TASKS {
+        if example.name == name {
+            return *example;
+        }
+    }
+    panic!("unknown task example: {name}");
+}
+const TASKS: &[Example] = &[
+    Example { name: "reads", bytes: include_bytes!("../examples/tasks/reads.json") },
+    Example { name: "scripts", bytes: include_bytes!("../examples/tasks/scripts.json") },
+    Example { name: "bless", bytes: include_bytes!("../examples/tasks/bless.json") },
+];

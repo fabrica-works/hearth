@@ -20,7 +20,7 @@ impl Seen {
                 Fault::Nul => 1 << 6,
                 Fault::Keys => 1 << 7,
                 Fault::Note => 1 << 8,
-                Fault::Shape(_) => panic!("shape is above the machine"),
+                Fault::Shape(_) | Fault::Declaration(_) => panic!("shape is above the machine"),
             },
             None => 0,
         };
@@ -72,4 +72,13 @@ pub fn at_the_limits(limits: &Limits) -> Vec<(Vec<u8>, &'static str)> {
         (array.clone(), "full array"),
         ([array, vec![b' '; 16]].concat(), "past array length"),
     ]
+}
+
+#[must_use]
+pub const fn at(offset: u32, line: u32, column: u32) -> hearth_protocol_config::Position {
+    hearth_protocol_config::Position { offset, line, column }
+}
+#[must_use]
+pub fn text(at: hearth_protocol_config::Position, input: &[u8]) -> hearth_protocol_config::declaration::Text {
+    hearth_protocol_config::declaration::Text { at, text: input.into() }
 }

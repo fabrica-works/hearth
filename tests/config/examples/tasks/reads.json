@@ -1,0 +1,7 @@
+{
+  "reads": {
+    "core": { "settings": ["domain"] },
+    "wifi": { "settings": ["ssid"], "optional": true },
+    "mail": { "exports": true }
+  }
+}

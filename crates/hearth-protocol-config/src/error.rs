@@ -18,6 +18,40 @@ pub enum Fault {
     Keys,
     Note,
     Shape(Shape),
+    Declaration(Declared),
+}
+/// Why a decoded task.json is no declaration (format.md, 5.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Declared {
+    Unknown { of: Object },
+    Later,
+    Undecoded,
+    Wrong { expected: Expected },
+    Missing { key: Required },
+    Name,
+    Doc,
+    Order,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Object {
+    Declaration,
+    Read,
+    Guard,
+    Script,
+    Bless,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Expected {
+    Object,
+    String,
+    Strings,
+    Bool,
+    Int,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Required {
+    If,
+    Message,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Shape {

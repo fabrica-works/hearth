@@ -1,0 +1,1 @@
+{ "scripts": { "customize.sh": { "order": 300 }, "software.sh": { "order": 500 } } }

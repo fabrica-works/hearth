@@ -106,3 +106,13 @@ pub const STOA: &[u8] = br#"{
   }
 }
 "#;
+
+pub fn declaration(input: &[u8]) -> Result<crate::declaration::Declaration, Error> {
+    crate::declaration::declaration(decode(input)?, &SHIPPED)
+}
+pub const fn at(offset: u32, line: u32, column: u32) -> crate::Position {
+    crate::Position { offset, line, column }
+}
+pub fn text(at: crate::Position, input: &[u8]) -> crate::declaration::Text {
+    crate::declaration::Text { at, text: bytes::copy_of(input) }
+}
