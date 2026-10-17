@@ -631,6 +631,7 @@ impl Takes {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Schema {
+    Source { first: Box<[u8]>, second: Box<[u8]> },
     Unlisted { reader: Box<[u8]>, root: Root, task: Box<[u8]>, setting: Option<Box<[u8]>> },
     Dynamic { root: Root },
     Task { task: Box<[u8]> },

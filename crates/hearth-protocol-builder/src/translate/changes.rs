@@ -83,6 +83,12 @@ pub fn entry_change(entry: config::EntryChange) -> target::EntryChange {
 }
 fn node(node: config::Node) -> crate::records::parts::config::Node {
     match node {
+        config::Node::Link { target, owner, group } => {
+            crate::records::parts::config::Node::Link { target, owner, group }
+        }
+        config::Node::Directory { mode, owner, group } => {
+            crate::records::parts::config::Node::Directory { mode, owner, group }
+        }
         config::Node::File { content_digest, mode, owner, group } => {
             crate::records::parts::config::Node::File { content_digest: content_digest.0, mode, owner, group }
         }

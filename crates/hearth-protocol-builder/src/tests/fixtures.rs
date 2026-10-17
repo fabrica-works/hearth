@@ -763,3 +763,5 @@ pub use debian::*;
 
 mod secrets;
 pub use secrets::secret_records;
+
+pub mod files;

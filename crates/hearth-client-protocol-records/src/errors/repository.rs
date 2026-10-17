@@ -2,6 +2,8 @@ use super::{Box, Encoder, Lines, field};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Repository {
+    NoTree,
+    LinkTarget,
     Stray,
     Environment { env: Box<[u8]> },
     Name,
@@ -37,6 +39,8 @@ pub enum Ended {
 impl Repository {
     pub(super) fn text(&self, lines: &mut Lines) {
         match self {
+            Self::NoTree => lines.put(b"no tree entry at this path"),
+            Self::LinkTarget => lines.put(b"a symbolic link target out of form"),
             Self::Stray => lines.put(b"a path format.md 2.1 does not allow"),
             Self::Name => lines.put(b"a name format.md 2.4 does not allow"),
             Self::Declaration => lines.put(b"a task directory without task.json"),
@@ -59,6 +63,8 @@ impl Repository {
                 field(json, b"env", env);
                 json.object_end();
             }
+            Self::NoTree => json.string(b"no_tree"),
+            Self::LinkTarget => json.string(b"link_target"),
             Self::Stray => json.string(b"stray"),
             Self::Name => json.string(b"name"),
             Self::Declaration => json.string(b"declaration"),

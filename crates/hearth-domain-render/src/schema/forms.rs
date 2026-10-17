@@ -8,6 +8,7 @@ use skein_lib::bytes;
 #[must_use]
 pub fn check(format: Format, value: &[u8]) -> bool {
     match format {
+        Format::Link => return crate::kinds::files::link(value),
         Format::Path => {
             return value == b"/"
                 || match value.strip_prefix(b"/") {
@@ -40,7 +41,9 @@ pub fn check(format: Format, value: &[u8]) -> bool {
             Format::Debian => {
                 byte.is_ascii_lowercase() || byte.is_ascii_digit() || (index > 0 && b"+-.".contains(byte))
             }
-            Format::Path | Format::File | Format::Duration | Format::Key => unreachable!("forms checked above"),
+            Format::Link | Format::Path | Format::File | Format::Duration | Format::Key => {
+                unreachable!("forms checked above")
+            }
         };
         if !valid {
             return false;

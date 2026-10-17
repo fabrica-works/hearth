@@ -134,7 +134,7 @@ impl Side {
             if !self.dependencies_valid(target, index) || compose::placement(target, &self.documents).is_none() {
                 return false;
             }
-            return self.config(self.settings.get(index).expect("host settings")).is_some();
+            return self.files_valid(self.settings.get(index).expect("host settings"));
         }
         false
     }

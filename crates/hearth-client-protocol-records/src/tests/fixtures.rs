@@ -376,3 +376,22 @@ pub fn config_mut(spec: &mut Spec) -> &mut Config {
 
 mod secrets;
 pub use secrets::*;
+
+pub fn links_and_directories() -> Box<Spec> {
+    let mut spec = x1_prod();
+    config_mut(&mut spec).tree = Box::new([
+        TreeEntry {
+            path: copy_of(b"/etc/mtab"),
+            node: Node::Link {
+                target: copy_of(b"/proc/self/mounts"),
+                owner: copy_of(b"root"),
+                group: copy_of(b"root"),
+            },
+        },
+        TreeEntry {
+            path: copy_of(b"/var/lib/motd"),
+            node: Node::Directory { mode: 0o750, owner: copy_of(b"root"), group: copy_of(b"adm") },
+        },
+    ]);
+    spec
+}

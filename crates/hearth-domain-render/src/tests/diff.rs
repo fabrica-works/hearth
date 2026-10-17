@@ -85,6 +85,9 @@ fn tree_entries_are_added_removed_or_changed_by_path() {
                 after: Node::File { content_digest: after, .. },
                 ..
             } => (path.as_ref(), Some(*before), Some(*after)),
+            EntryChange::Added { .. } | EntryChange::Removed { .. } | EntryChange::Changed { .. } => {
+                unreachable!("file fixtures")
+            }
         };
         assert_eq!((path, before, after), *expected, "byte path order: {entry:?}");
     }

@@ -251,6 +251,22 @@ impl ConfigChange {
                 EntryChange::Changed { after, .. } => after,
             };
             match node {
+                Node::Link { target, owner, group } => {
+                    lines.put(b"link ");
+                    lines.put(target);
+                    lines.put(b" ");
+                    lines.put(owner);
+                    lines.put(b":");
+                    lines.put(group);
+                }
+                Node::Directory { mode, owner, group } => {
+                    lines.put(b"directory ");
+                    lines.mode(*mode);
+                    lines.put(b" ");
+                    lines.put(owner);
+                    lines.put(b":");
+                    lines.put(group);
+                }
                 Node::File { mode, owner, group, .. } => {
                     lines.mode(*mode);
                     lines.put(b" ");

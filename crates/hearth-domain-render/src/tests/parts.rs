@@ -28,7 +28,7 @@ const MODES: &[(crate::revision::Mode, u16)] =
 fn an_executable_blob_is_0755_and_any_other_file_0644() {
     for &(mode, expected) in MODES {
         let entry = crate::parts::config::file(b"etc/motd", mode, hearth_lib::encode::Digest([0; 32]));
-        let crate::parts::config::Node::File { mode, .. } = entry.node;
+        let crate::parts::config::Node::File { mode, .. } = entry.node else { panic!("file fixture") };
         assert_eq!(mode, expected, "git mode");
     }
 }

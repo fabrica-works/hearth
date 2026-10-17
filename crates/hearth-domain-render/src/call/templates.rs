@@ -1,5 +1,6 @@
 //! One template per resume, retaining each target's validated task context.
 use super::Side;
+use crate::kinds::files::{Make, Plan};
 use crate::{
     errors::{Error, Kind, Place},
     evaluate::{
@@ -19,7 +20,7 @@ use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
 use skein_lib::{List, Map, Queue, Token};
 pub(crate) struct Prepared {
-    pub config: Config,
+    pub plans: Box<[Plan]>,
     pub expansion: crate::entries::Expansion,
     pub secrets: parts::secrets::Secrets,
 }
@@ -37,6 +38,7 @@ pub(crate) struct Target {
     entry: usize,
     roots: Option<Roots>,
     tree: Map<Box<[u8]>, TreeEntry>,
+    plans: Box<[Plan]>,
     outcome: Outcome,
     keeping: Option<TreeEntry>,
     request: Option<Request>,
@@ -51,10 +53,34 @@ impl Target {
         prepared: Prepared,
         capacity: u32,
     ) -> Self {
-        let Prepared { config, expansion, secrets } = prepared;
+        let Prepared { plans, expansion, secrets } = prepared;
         let mut tree = Map::with_capacity(capacity);
-        for file in config.tree {
-            tree.insert(file.path.clone(), file).expect("tree count");
+        for plan in &plans {
+            for install in &plan.installs {
+                let node = match &install.make {
+                    Make::Static { sha256, mode } => parts::config::Node::File {
+                        content_digest: *sha256,
+                        mode: *mode,
+                        owner: install.owner.clone(),
+                        group: install.group.clone(),
+                    },
+                    Make::Link { target } => parts::config::Node::Link {
+                        target: target.clone(),
+                        owner: install.owner.clone(),
+                        group: install.group.clone(),
+                    },
+                    Make::Directory { mode } => parts::config::Node::Directory {
+                        mode: *mode,
+                        owner: install.owner.clone(),
+                        group: install.group.clone(),
+                    },
+                    Make::Rendered { .. } => continue,
+                };
+                if !tree.contains_key(&install.path) {
+                    tree.insert(install.path.clone(), TreeEntry { path: install.path.clone(), node })
+                        .expect("plan capacity");
+                } // transitional: hearth 22
+            }
         }
         Self {
             meta,
@@ -69,6 +95,7 @@ impl Target {
             entry: 0,
             roots: None,
             tree,
+            plans,
             outcome: Outcome::Done,
             keeping: None,
             request: None,
@@ -86,12 +113,21 @@ impl Target {
                     exports: Value::Map(Box::new([])),
                 });
             }
-            for entry in side.entries.get(self.entry..).expect("listing cursor") {
+            let plan = self.plans.get(self.task).expect("task plan");
+            for install in plan.installs.get(self.entry..).expect("plan cursor") {
                 self.entry = self.entry.saturating_add(1);
-                let revision::Class::Tree { task: name, path } = revision::class(&entry.path) else { continue };
-                if name != task.name.as_ref() || !path.ends_with(b".j2") {
-                    continue;
+                let (path, mode) = match &install.make {
+                    Make::Rendered { template, mode } => (template, *mode),
+                    Make::Static { .. } | Make::Link { .. } | Make::Directory { .. } => continue,
+                };
+                let mut listed = None;
+                for entry in &side.entries {
+                    if &entry.path == path {
+                        listed = Some(entry);
+                        break;
+                    }
                 }
+                let entry = listed.expect("planned template listed");
                 let Some(template) = side.templates.get(&entry.oid) else { continue };
                 match template::run(
                     template,
@@ -108,7 +144,15 @@ impl Target {
                         side.sizes
                             .insert(digest, u64::try_from(bytes.len()).expect("file bound"))
                             .expect("listing capacity");
-                        let file = parts::config::rendered(path, entry.mode, digest);
+                        let file = TreeEntry {
+                            path: install.path.clone(),
+                            node: parts::config::Node::File {
+                                content_digest: digest,
+                                mode,
+                                owner: install.owner.clone(),
+                                group: install.group.clone(),
+                            },
+                        };
                         self.keeping = Some(file);
                         self.request = Some(Request::Keep {
                             request: Token::new(4),
@@ -162,7 +206,7 @@ impl Side {
         let target = self.rendering.as_mut().expect("rendered target");
         let file = target.keeping.take().expect("one rendered file waiting");
         if let Some(digest) = digest {
-            let parts::config::Node::File { content_digest, .. } = &file.node;
+            let parts::config::Node::File { content_digest, .. } = &file.node else { unreachable!("rendered file") };
             assert_eq!(digest, *content_digest, "kept rendered digest");
             target.tree.insert(file.path.clone(), file).expect("listing capacity");
         } else {

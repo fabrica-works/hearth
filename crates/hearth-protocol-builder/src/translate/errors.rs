@@ -345,6 +345,10 @@ pub fn schema(schema: target::Schema) -> records::errors::Schema {
         target::Schema::Unlisted { reader, root, task, setting } => {
             records::errors::Schema::Unlisted { reader, root: reference_root(root), task, setting }
         }
+        target::Schema::Source { first, second } => records::errors::Schema::Source {
+            first: skein_lib::bytes::copy_of(first.key()),
+            second: skein_lib::bytes::copy_of(second.key()),
+        },
         target::Schema::Dynamic { root } => records::errors::Schema::Dynamic { root: reference_root(root) },
         target::Schema::Malformed { format } => records::errors::Schema::Malformed { format: self::format(format) },
         target::Schema::Target { name, environment } => records::errors::Schema::Target { name, environment },
@@ -394,6 +398,8 @@ pub fn type_name(name: target::TypeName) -> records::errors::TypeName {
 #[must_use]
 pub fn repository(why: target::Repository) -> records::errors::Repository {
     match why {
+        target::Repository::NoTree => records::errors::Repository::NoTree,
+        target::Repository::LinkTarget => records::errors::Repository::LinkTarget,
         target::Repository::Stray => records::errors::Repository::Stray,
         target::Repository::Name => records::errors::Repository::Name,
         target::Repository::Declaration => records::errors::Repository::Declaration,
@@ -599,6 +605,7 @@ pub fn evaluation(kind: render::evaluate::FaultKind) -> records::errors::Evaluat
 #[must_use]
 pub fn format(format: target::Format) -> records::errors::Format {
     match format {
+        target::Format::Link => records::errors::Format::Link,
         target::Format::Path => records::errors::Format::Path,
         target::Format::Mode => records::errors::Format::Mode,
         target::Format::Duration => records::errors::Format::Duration,

@@ -61,7 +61,9 @@ impl Decode {
                             Err(error) => Err(error),
                         }
                     }
-                    render::vocabulary::As::Template | render::vocabulary::As::Cached => {
+                    render::vocabulary::As::Link
+                    | render::vocabulary::As::Template
+                    | render::vocabulary::As::Cached => {
                         unreachable!("static bytes are never decoded")
                     }
                 },
@@ -148,7 +150,8 @@ impl Read {
         match blob.kind {
             render::vocabulary::As::Document
             | render::vocabulary::As::Declaration
-            | render::vocabulary::As::Template => {
+            | render::vocabulary::As::Template
+            | render::vocabulary::As::Link => {
                 self.body = Some(Writer::new(usize::try_from(blob.size).expect("render checked document bound")));
             }
             render::vocabulary::As::Cached => self.cache = Some(crate::cache::Cache::new(self.root, &mut self.rng)),
@@ -363,6 +366,7 @@ impl Read {
                         let bytes = self.body.take().expect("whole blob").finish();
                         let kind = self.blobs.get(self.index).expect("blob").kind;
                         match kind {
+                            render::vocabulary::As::Link => self.decoded = Some(Decoded::Link(bytes)),
                             render::vocabulary::As::Template => {
                                 self.decoded = Some(compile_template(&bytes, &env.limits));
                             }

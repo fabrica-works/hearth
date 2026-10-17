@@ -406,3 +406,5 @@ fn a_message_holding_a_tag_or_a_comment_is_refused_at_its_string() {
         );
     }
 }
+
+mod links;

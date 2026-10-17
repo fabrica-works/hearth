@@ -1,6 +1,7 @@
-use super::{Encoder, Lines, Schema, field, json_names, names, signed, validation};
+use super::{Box, Encoder, Lines, Schema, field, json_names, names, signed, validation};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Format {
+    Link,
     Path,
     Mode,
     Duration,
@@ -13,6 +14,7 @@ pub enum Format {
 impl Format {
     pub(super) fn name(self) -> &'static [u8] {
         match self {
+            Self::Link => b"link",
             Self::Path => b"path",
             Self::Mode => b"mode",
             Self::Duration => b"duration",
@@ -29,6 +31,12 @@ impl Schema {
         match self {
             Self::Unlisted { reader, root, task, setting } => {
                 unlisted_text(lines, reader, *root, task, setting.as_deref());
+            }
+            Self::Source { first, second } => {
+                lines.put(b"two sources ");
+                lines.put(first);
+                lines.put(b" and ");
+                lines.put(second);
             }
             Self::Dynamic { root } => dynamic_text(lines, *root),
             Self::Malformed { format } => {
@@ -106,27 +114,7 @@ impl Schema {
                 lines.put(task);
                 lines.put(b", which tasks/ lacks");
             }
-            Self::Unread { task, setting, declared } => {
-                lines.put(b"reads ");
-                lines.put(task);
-                lines.put(b".");
-                lines.put(setting);
-                lines.put(b", which ");
-                lines.put(task);
-                lines.put(b" does not declare; ");
-                lines.put(task);
-                if declared.is_empty() {
-                    lines.put(b" declares no settings");
-                } else {
-                    lines.put(b" declares ");
-                    for (index, name) in declared.iter().enumerate() {
-                        if index != 0 {
-                            lines.put(b", ");
-                        }
-                        lines.put(name);
-                    }
-                }
-            }
+            Self::Unread { task, setting, declared } => unread_text(lines, task, setting, declared),
         }
     }
     pub(super) fn json(&self, json: &mut Encoder) {
@@ -134,6 +122,11 @@ impl Schema {
         match self {
             Self::Unlisted { reader, root, task, setting } => {
                 unlisted_json(json, reader, *root, task, setting.as_deref());
+            }
+            Self::Source { first, second } => {
+                field(json, b"first", first);
+                field(json, b"kind", b"source");
+                field(json, b"second", second);
             }
             Self::Dynamic { root } => dynamic_json(json, *root),
             Self::Malformed { format } => {
@@ -275,4 +268,26 @@ fn dynamic_text(lines: &mut Lines, root: super::Root) {
 fn dynamic_json(json: &mut Encoder, root: super::Root) {
     field(json, b"kind", b"dynamic");
     field(json, b"root", root.name());
+}
+
+fn unread_text(lines: &mut Lines, task: &[u8], setting: &[u8], declared: &[Box<[u8]>]) {
+    lines.put(b"reads ");
+    lines.put(task);
+    lines.put(b".");
+    lines.put(setting);
+    lines.put(b", which ");
+    lines.put(task);
+    lines.put(b" does not declare; ");
+    lines.put(task);
+    if declared.is_empty() {
+        lines.put(b" declares no settings");
+    } else {
+        lines.put(b" declares ");
+        for (index, name) in declared.iter().enumerate() {
+            if index != 0 {
+                lines.put(b", ");
+            }
+            lines.put(name);
+        }
+    }
 }

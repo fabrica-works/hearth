@@ -1,5 +1,6 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
 mod debian;
+mod files;
 pub(crate) mod guards;
 mod references;
 mod secrets;
@@ -39,6 +40,7 @@ pub(crate) struct Side {
     pub refused: Map<Oid, ()>,
     pub cached: Map<Oid, hearth_lib::encode::Digest>,
     pub templates: Map<Oid, crate::evaluate::template::Template>,
+    pub links: Map<Oid, Box<[u8]>>,
     pub rendering: Option<templates::Target>,
     pub limits: Limits,
     pub sizes: Sizes,
@@ -73,6 +75,7 @@ impl Side {
             refused: Map::with_capacity(0),
             cached: Map::with_capacity(0),
             templates: Map::with_capacity(0),
+            links: Map::with_capacity(0),
             rendering: None,
             limits: *limits,
             sizes: Map::with_capacity(0),
@@ -218,6 +221,9 @@ impl Side {
         let expected = self.pending.get(self.read).expect("one event per requested blob");
         assert_eq!(&expected.oid, oid, "blobs answer in request order");
         match read {
+            Decoded::Link(target) => {
+                self.links.insert(oid.clone(), target).expect("listing capacity");
+            }
             Decoded::Template(template) => {
                 self.check_template(oid, &template);
                 self.templates.insert(oid.clone(), template).expect("listing capacity");
@@ -293,18 +299,9 @@ impl Side {
             return false;
         }
         self.files = true;
-        let invalid = compose::rules(&self.documents, &mut self.errors);
-        for (document, invalid) in self.documents.entries().iter().zip(invalid) {
-            if invalid {
-                for (entry, invalid) in self.entries.iter().zip(&mut self.invalid) {
-                    if entry.path == document.path {
-                        *invalid = true;
-                    }
-                }
-            }
-        }
-        self.compose();
+        self.compose_files();
         let capacity = u32::try_from(self.entries.len()).expect("listing capacity");
+        self.links = Map::with_capacity(capacity);
         self.cached = Map::with_capacity(capacity);
         self.templates = Map::with_capacity(capacity);
         self.refused = Map::with_capacity(capacity);
@@ -313,6 +310,9 @@ impl Side {
         let mut paths = List::with_capacity(capacity);
         for entry in &self.entries {
             let kind = match revision::class(&entry.path) {
+                revision::Class::Tree { task, path } if entry.mode == Mode::Link && !path.ends_with(b".j2") => {
+                    Some((task, As::Link, 4095))
+                }
                 revision::Class::Tree { task, path }
                     if !path.ends_with(b".j2") && entry.mode != Mode::Link && entry.mode != Mode::Submodule =>
                 {
@@ -341,10 +341,21 @@ impl Side {
             if let Some((task, kind, max)) = kind
                 && self.needs(task)
             {
-                if entry.size > u64::from(max) {
+                if kind == As::Link && entry.size > u64::from(max) {
+                    self.errors.push(errors::Error {
+                        side: None,
+                        kind: errors::Kind::Repository(errors::Repository::LinkTarget),
+                        class: crate::vocabulary::Class::Configuration,
+                        at: Some(errors::Place { path: entry.path.clone(), position: None }),
+                        also: None,
+                        target: None,
+                        task: Some(skein_lib::bytes::copy_of(task)),
+                    });
+                    self.outcome = self.outcome.worst(Outcome::Failed);
+                } else if entry.size > u64::from(max) {
                     let limit = match kind {
                         As::Declaration | As::Document => Limit::Document,
-                        As::Cached => Limit::Static,
+                        As::Cached | As::Link => Limit::Static,
                         As::Template => Limit::Template,
                     };
                     errors::push(
@@ -401,58 +412,6 @@ impl Side {
         self.outcome = self.outcome.worst(outcome);
         self.ready = true;
     }
-    fn config(&self, settings: &compose::Settings) -> Option<parts::config::Config> {
-        let mut valid = true;
-        let mut tree = Map::with_capacity(u32::try_from(self.entries.len()).expect("listing capacity"));
-        for task in &settings.tasks {
-            let task = &task.name;
-            let mut declared = false;
-            for entry in &self.entries {
-                match revision::class(&entry.path) {
-                    revision::Class::Declaration { task: name } if name == task.as_ref() => {
-                        declared = match self.documents.declaration(name) {
-                            Some((_, declaration)) => declaration.is_some() && self.defaults.sound(name),
-                            None => false,
-                        };
-                    }
-                    revision::Class::Tree { task: name, path } if name == task.as_ref() => {
-                        if entry.mode == Mode::Submodule
-                            || self.refused.contains_key(&entry.oid)
-                            || (path.ends_with(b".j2") && !contains(&self.pending, &entry.oid, As::Template))
-                        {
-                            valid = false;
-                        } else if entry.mode != Mode::Link && !path.ends_with(b".j2") {
-                            if let Some(digest) = self.cached.get(&entry.oid) {
-                                let file = parts::config::file(path, entry.mode, *digest);
-                                tree.insert(file.path.clone(), file).expect("listing capacity");
-                            } else {
-                                valid = false;
-                            }
-                        }
-                    }
-                    revision::Class::Fleet
-                    | revision::Class::Environment { .. }
-                    | revision::Class::Host { .. }
-                    | revision::Class::Declaration { .. }
-                    | revision::Class::Tree { .. }
-                    | revision::Class::Template { .. }
-                    | revision::Class::Script { .. }
-                    | revision::Class::Readme { .. }
-                    | revision::Class::Refused { .. }
-                    | revision::Class::Other => {}
-                }
-            }
-            valid &= declared;
-        }
-        if !valid {
-            return None;
-        }
-        let mut files = List::with_capacity(tree.len());
-        for (_, file) in &tree {
-            files.push(file.clone()).expect("tree capacity");
-        }
-        Some(parts::config::Config { tree: files.into_boxed() })
-    }
     fn placement(
         &self,
         target: &Target,
@@ -461,16 +420,17 @@ impl Side {
         let containers = compose::containers(target, &self.targets, &self.documents)?;
         Ok((placement, containers))
     }
+    fn eligible(&self, target: &Target) -> bool {
+        (self.names.is_empty() || self.names.contains(&target.name))
+            && self.dependencies_valid(target, self.next.saturating_sub(1))
+    }
     pub fn answer(&mut self) -> Option<Answer> {
         if self.rendering.is_some() {
             return self.template();
         }
         for target in self.targets.get(self.next..).expect("answer cursor within targets") {
             self.next = self.next.saturating_add(1);
-            if !self.names.is_empty() && !self.names.contains(&target.name) {
-                continue;
-            }
-            if !self.dependencies_valid(target, self.next.saturating_sub(1)) {
+            if !self.eligible(target) {
                 continue;
             }
             let (p, containers) = match self.placement(target) {
@@ -542,19 +502,24 @@ impl Side {
             let Some(secrets) = secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome) else {
                 continue;
             };
-            let Some(config) = self.config(self.settings.get(self.next.saturating_sub(1)).expect("target settings"))
-            else {
+            let mut faults = List::with_capacity(files::fault_capacity(&expansion, self.entries.len()));
+            let plans = self.plans(&meta, &checked, &expansion, &mut faults);
+            for fault in faults.into_boxed() {
+                self.errors.push(fault);
+            }
+            let Some(plans) = plans else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
+            let capacity = files::capacity(&plans);
             self.rendering = Some(templates::Target::new(
                 meta,
                 containers,
                 meta_digest,
                 checked,
                 debian,
-                templates::Prepared { config, expansion, secrets },
-                u32::try_from(self.entries.len()).expect("listing count"),
+                templates::Prepared { plans, expansion, secrets },
+                capacity,
             ));
             return self.template();
         }

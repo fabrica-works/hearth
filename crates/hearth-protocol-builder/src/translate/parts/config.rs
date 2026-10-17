@@ -6,6 +6,8 @@ pub fn config(config: source::Config) -> target::Config {
     let mut translated = skein_lib::List::with_capacity(u32::try_from(tree.len()).expect("bounded tree"));
     for source::TreeEntry { path, node } in tree {
         let node = match node {
+            source::Node::Link { target, owner, group } => target::Node::Link { target, owner, group },
+            source::Node::Directory { mode, owner, group } => target::Node::Directory { mode, owner, group },
             source::Node::File { content_digest, mode, owner, group } => {
                 target::Node::File { content_digest: content_digest.0, mode, owner, group }
             }

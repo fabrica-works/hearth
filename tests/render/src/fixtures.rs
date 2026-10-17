@@ -596,3 +596,15 @@ pub fn config_part(parts: &[hearth_domain_render::parts::Part]) -> &hearth_domai
         })
         .expect("config part")
 }
+
+#[must_use]
+pub fn template_and_link() -> Repository {
+    let mut repository = with_task();
+    repository.entries.push(entry(b"tasks/motd/tree/etc/template.j2", b'5'));
+    repository.blobs.push((oid(b'5'), Box::from(b"ok".as_slice())));
+    let mut link = entry(b"tasks/motd/tree/etc/link", b'6');
+    link.mode = hearth_domain_render::revision::Mode::Link;
+    repository.entries.push(link);
+    repository.blobs.push((oid(b'6'), Box::from(b"/target".as_slice())));
+    repository
+}

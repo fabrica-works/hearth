@@ -184,29 +184,34 @@ fn a_submodule_under_a_present_tasks_tree_fails_its_target() {
 }
 #[test]
 fn a_template_and_a_link_are_left_out_of_the_tree() {
-    let mut repository = fixtures::with_task();
-    repository.entries.push(fixtures::entry(b"tasks/motd/tree/etc/template.j2", b'5'));
-    repository.blobs.push((fixtures::oid(b'5'), Box::from(b"ok".as_slice())));
-    let mut link = fixtures::entry(b"tasks/motd/tree/etc/link", b'6');
-    link.mode = hearth_domain_render::revision::Mode::Link;
-    repository.entries.push(link);
+    let repository = fixtures::template_and_link();
     let run = fixtures::render(&repository);
     let Answer::Spec(spec) = only(&run.answers) else { panic!("one target") };
-    let part = hearth_render_world::fixtures::config_part(&spec.parts);
-    let config = part;
+    let config = fixtures::config_part(&spec.parts);
     assert_eq!(
         config.tree.as_ref(),
-        &[hearth_domain_render::parts::config::TreeEntry {
-            path: b"/etc/template".as_slice().into(),
-            node: hearth_domain_render::parts::config::Node::File {
-                content_digest: fixtures::digest("2689367b205c16ce32ed4200942b8b8b1e262dfc70d9bc9fbc77c49699a4f1df"),
-                mode: 0o644,
-                owner: b"root".as_slice().into(),
-                group: b"root".as_slice().into(),
+        &[
+            hearth_domain_render::parts::config::TreeEntry {
+                path: b"/etc/link".as_slice().into(),
+                node: hearth_domain_render::parts::config::Node::Link {
+                    target: b"/target".as_slice().into(),
+                    owner: b"root".as_slice().into(),
+                    group: b"root".as_slice().into()
+                }
             },
-        }]
+            hearth_domain_render::parts::config::TreeEntry {
+                path: b"/etc/template".as_slice().into(),
+                node: hearth_domain_render::parts::config::Node::File {
+                    content_digest: fixtures::digest(
+                        "2689367b205c16ce32ed4200942b8b8b1e262dfc70d9bc9fbc77c49699a4f1df"
+                    ),
+                    mode: 0o644,
+                    owner: b"root".as_slice().into(),
+                    group: b"root".as_slice().into(),
+                },
+            }
+        ]
     );
-    assert_eq!(run.requests.len(), 4, "the rendered template adds its Keep request");
 }
 
 #[test]
@@ -264,4 +269,13 @@ fn each_template_runs_after_a_fault_and_gives_its_first_fault() {
 fn a_shared_templates_different_outputs_fit_for_each_target() {
     let run = fixtures::render(&fixtures::templates_for_many_targets());
     assert_eq!(run.answers.len(), 9);
+}
+
+#[test]
+fn a_tree_link_shares_the_read_and_a_template_adds_a_keep() {
+    assert_eq!(
+        fixtures::render(&fixtures::template_and_link()).requests.len(),
+        4,
+        "the rendered template adds its Keep request"
+    );
 }

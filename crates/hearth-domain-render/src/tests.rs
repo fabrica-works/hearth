@@ -25,3 +25,5 @@ mod references;
 mod debian;
 
 mod secrets;
+
+mod kinds;

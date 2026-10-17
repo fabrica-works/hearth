@@ -12,6 +12,8 @@ pub struct TreeEntry {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Node {
+    Link { target: Box<[u8]>, owner: Box<[u8]>, group: Box<[u8]> },
+    Directory { mode: u16, owner: Box<[u8]>, group: Box<[u8]> },
     File { content_digest: [u8; 32], mode: u16, owner: Box<[u8]>, group: Box<[u8]> },
 }
 impl Config {
@@ -25,6 +27,22 @@ impl Config {
             lines.put(&entry.path);
             lines.pad_to(column);
             match &entry.node {
+                Node::Link { target, owner, group } => {
+                    lines.put(b"link ");
+                    lines.put(target);
+                    lines.put(b" ");
+                    lines.put(owner);
+                    lines.put(b":");
+                    lines.put(group);
+                }
+                Node::Directory { mode, owner, group } => {
+                    lines.put(b"directory ");
+                    lines.mode(*mode);
+                    lines.put(b" ");
+                    lines.put(owner);
+                    lines.put(b":");
+                    lines.put(group);
+                }
                 Node::File { content_digest, mode, owner, group } => {
                     lines.put(b"file ");
                     lines.mode(*mode);
@@ -59,6 +77,26 @@ impl Node {
     pub(crate) fn json(&self, json: &mut skein_json::writer::Encoder) {
         json.object_start();
         match self {
+            Node::Link { target, owner, group } => {
+                json.key(b"group");
+                json.string(group);
+                json.key(b"kind");
+                json.string(b"link");
+                json.key(b"owner");
+                json.string(owner);
+                json.key(b"target");
+                json.string(target);
+            }
+            Node::Directory { mode, owner, group } => {
+                json.key(b"group");
+                json.string(group);
+                json.key(b"kind");
+                json.string(b"directory");
+                json.key(b"mode");
+                json.string(&octal(*mode));
+                json.key(b"owner");
+                json.string(owner);
+            }
             Node::File { content_digest, mode, owner, group } => {
                 json.key(b"content_digest");
                 crate::form::json::digest(json, content_digest);
@@ -67,15 +105,19 @@ impl Node {
                 json.key(b"kind");
                 json.string(b"file");
                 json.key(b"mode");
-                let mut digits = [b'0'; 4];
-                for (digit, shift) in digits.iter_mut().zip([9_u32, 6, 3, 0]) {
-                    *digit = b'0'.saturating_add(u8::try_from((mode >> shift) & 7).expect("octal digit"));
-                }
-                json.string(&digits);
+                json.string(&octal(*mode));
                 json.key(b"owner");
                 json.string(owner);
             }
         }
         json.object_end();
     }
+}
+
+fn octal(mode: u16) -> [u8; 4] {
+    let mut digits = [b'0'; 4];
+    for (digit, shift) in digits.iter_mut().zip([9_u32, 6, 3, 0]) {
+        *digit = b'0'.saturating_add(u8::try_from((mode >> shift) & 7).expect("octal digit"));
+    }
+    digits
 }

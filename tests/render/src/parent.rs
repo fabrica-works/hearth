@@ -121,6 +121,9 @@ fn blob_event(repository: &Repository, blob: &render::vocabulary::Blob, request:
             size: blob.size,
             sha256: hearth_lib::encode::Digest(hash.finish()),
         }
+    } else if blob.kind == render::vocabulary::As::Link {
+        let body = &repository.blobs.iter().find(|(oid, _)| *oid == blob.oid).expect("scripted link").1;
+        Event::Read { request, oid: blob.oid.clone(), read: render::vocabulary::Decoded::Link(body.clone()) }
     } else if blob.kind == render::vocabulary::As::Template {
         let body = &repository.blobs.iter().find(|(oid, _)| *oid == blob.oid).expect("scripted template").1;
         let read = match hearth_protocol_template::template::compile(body, &hearth_protocol_template::limits::SHIPPED) {

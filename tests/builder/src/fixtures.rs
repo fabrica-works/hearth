@@ -59,8 +59,15 @@ impl Repository {
         for file in files {
             let target = self.work_tree.join(file.path);
             fs::create_dir_all(target.parent().expect("a parent")).expect("fixture directories");
-            fs::write(&target, file.body).expect("fixture file");
-            fs::set_permissions(target, fs::Permissions::from_mode(file.mode)).expect("fixture mode");
+            if file.mode == 0o120_000 {
+                if fs::symlink_metadata(&target).is_ok() {
+                    fs::remove_file(&target).expect("replace link");
+                }
+                std::os::unix::fs::symlink(OsStr::from_bytes(file.body), &target).expect("fixture link");
+            } else {
+                fs::write(&target, file.body).expect("fixture file");
+                fs::set_permissions(target, fs::Permissions::from_mode(file.mode)).expect("fixture mode");
+            }
         }
     }
     #[must_use]
@@ -745,3 +752,11 @@ pub const REFUSED_DEBIAN: File =
 pub const SECRETS: File = File { path: "tasks/motd/task.json", body: br#"{"secrets": {"mail/dkim/example.org.key": {"path": "/etc/dkimkeys/example.org.key", "mode": "0640", "group": "opendkim"}, "mail/tls/mx1.key": {"path": "/etc/ssl/private/mx1.key"}}, "identity": {"ssh-ed25519": {"kind": "ssh-host-key", "algorithm": "ed25519", "path": "/etc/ssh/ssh_host_ed25519_key", "public_path": "/etc/ssh/ssh_host_ed25519_key.pub"}}, "users": {"free": {"uid": 1000, "password": "users/free.passwd"}}}"#, mode: 0o644 };
 pub const SECRET_NO_PATH: File =
     File { path: "tasks/motd/task.json", body: br#"{"secrets": {"mail/tls/mx1.key": {}}}"#, mode: 0o644 };
+
+impl File {
+    #[must_use]
+    pub const fn link(path: &'static str, target: &'static [u8]) -> Self {
+        Self { path, body: target, mode: 0o120_000 }
+    }
+}
+pub mod files;

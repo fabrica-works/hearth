@@ -25,7 +25,9 @@ fn a_mode_prints_as_four_octal_digits() {
     for (mode, expected) in [(0o644, b"0644"), (0o4755, b"4755")] {
         let mut spec = fixtures::x1_prod();
         let config = fixtures::config_mut(&mut spec);
-        let Node::File { mode: value, .. } = &mut fixtures::only_mut(&mut config.tree).node;
+        let Node::File { mode: value, .. } = &mut fixtures::only_mut(&mut config.tree).node else {
+            panic!("file fixture")
+        };
         *value = mode;
         let printed = form::print(Form::Text, &Record::Spec(spec), None, &limits::SHIPPED).expect("valid spec");
         assert!(skein_lib::bytes::find(&printed, expected).is_some(), "four octal digits for {mode:o}");
@@ -105,4 +107,22 @@ fn a_needed_resolution_prints_no_keys_line() {
     );
     let printed = form::print(Form::Text, &Record::Spec(spec), None, &limits::SHIPPED);
     assert_eq!(printed.as_deref(), Ok(fixtures::X1_PROD_TEXT.as_bytes()), "needed resolution adds no keys line");
+}
+
+#[test]
+fn a_link_and_a_directory_print_after_the_files_columns() {
+    assert_eq!(
+        form::print(Form::Text, &Record::Spec(fixtures::links_and_directories()), None, &limits::SHIPPED)
+            .expect("valid spec")
+            .as_ref(),
+        concat!(
+            "target       x1-prod   base x1   environment prod\n",
+            "placement    metal efi 7th-gen\n",
+            "spec         9a0c5e1f2b3d\n",
+            "config       part e7c2a0d95b13\n",
+            "  /etc/mtab                link /proc/self/mounts root:root\n",
+            "  /var/lib/motd            directory 0750 root:adm\n"
+        )
+        .as_bytes()
+    );
 }

@@ -72,6 +72,7 @@ fn schema_back(schema: crate::records::errors::Schema) -> render::errors::Schema
         crate::records::errors::Schema::Unlisted { reader, root, task, setting } => {
             render::errors::Schema::Unlisted { reader, root: reference_root_back(root), task, setting }
         }
+        crate::records::errors::Schema::Source { .. } => unreachable!("file source tested in files"),
         crate::records::errors::Schema::Dynamic { root } => {
             render::errors::Schema::Dynamic { root: reference_root_back(root) }
         }

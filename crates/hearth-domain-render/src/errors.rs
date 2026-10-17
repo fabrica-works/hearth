@@ -278,6 +278,7 @@ pub enum Takes {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Schema {
+    Source { first: revision::declaration::Name, second: revision::declaration::Name },
     Unlisted { reader: Box<[u8]>, root: Root, task: Box<[u8]>, setting: Option<Box<[u8]>> },
     Dynamic { root: Root },
     Task { task: Box<[u8]> },
@@ -303,6 +304,7 @@ pub enum Schema {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Format {
+    Link,
     Path,
     Mode,
     Duration,
@@ -332,6 +334,8 @@ pub enum TypeName {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Repository {
+    NoTree,
+    LinkTarget,
     Stray,
     Environment { env: Box<[u8]> },
     Name,

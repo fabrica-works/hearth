@@ -718,3 +718,6 @@ fn a_secret_without_a_path_exits_with_configuration_failure() {
         Repository::make("secret-no-path-exit", &fixtures::thin_with(core::slice::from_ref(&fixtures::SECRET_NO_PATH)));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
+
+#[path = "real/files.rs"]
+mod files;

@@ -791,3 +791,5 @@ pub use debian::*;
 
 mod secrets;
 pub use secrets::*;
+
+pub mod kinds;

@@ -16,6 +16,8 @@ pub struct TreeEntry {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Node {
+    Link { target: Box<[u8]>, owner: Box<[u8]>, group: Box<[u8]> },
+    Directory { mode: u16, owner: Box<[u8]>, group: Box<[u8]> },
     File { content_digest: Digest, mode: u16, owner: Box<[u8]>, group: Box<[u8]> },
 }
 #[must_use]
@@ -43,6 +45,28 @@ pub fn encode(config: &Config, record: &mut Encoder) {
     for entry in &config.tree {
         record.key(&entry.path);
         match &entry.node {
+            Node::Link { target, owner, group } => {
+                record.map(4);
+                record.key(b"group");
+                record.bytes(group);
+                record.key(b"kind");
+                record.bytes(b"link");
+                record.key(b"owner");
+                record.bytes(owner);
+                record.key(b"target");
+                record.bytes(target);
+            }
+            Node::Directory { mode, owner, group } => {
+                record.map(4);
+                record.key(b"group");
+                record.bytes(group);
+                record.key(b"kind");
+                record.bytes(b"directory");
+                record.key(b"mode");
+                record.uint(u64::from(*mode));
+                record.key(b"owner");
+                record.bytes(owner);
+            }
             Node::File { content_digest, mode, owner, group } => {
                 record.map(5);
                 record.key(b"content_digest");
@@ -147,7 +171,7 @@ impl EntryChange {
                     None
                 }
             }
-            Self::Added { .. } | Self::Removed { .. } => None,
+            Self::Added { .. } | Self::Removed { .. } | Self::Changed { .. } => None,
         }
     }
 }

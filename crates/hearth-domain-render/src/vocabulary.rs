@@ -45,6 +45,7 @@ pub struct Blob {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum As {
+    Link,
     Document,
     Declaration,
     Template,
@@ -52,6 +53,7 @@ pub enum As {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Decoded {
+    Link(Box<[u8]>),
     Template(crate::evaluate::template::Template),
     Document(Document),
     Declaration(crate::revision::declaration::Declaration),

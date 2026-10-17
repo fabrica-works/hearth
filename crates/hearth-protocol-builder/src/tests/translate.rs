@@ -402,6 +402,12 @@ fn change_back(change: client_diff::TargetChange) -> diff::TargetChange {
 }
 fn node_back(node: records::parts::config::Node) -> render::parts::config::Node {
     match node {
+        records::parts::config::Node::Link { target, owner, group } => {
+            render::parts::config::Node::Link { target, owner, group }
+        }
+        records::parts::config::Node::Directory { mode, owner, group } => {
+            render::parts::config::Node::Directory { mode, owner, group }
+        }
         records::parts::config::Node::File { content_digest, mode, owner, group } => {
             render::parts::config::Node::File {
                 content_digest: hearth_lib::encode::Digest(content_digest),
@@ -787,3 +793,5 @@ mod fields;
 
 mod config;
 mod secrets;
+
+mod files;
