@@ -163,6 +163,21 @@ points are in the last section.
 
 None yet.
 
+101. **Memory bounds on debian-8gb-hel1-1: starts held below 3 GB** (process, hearth 01.1's block of 2026-10-17T15:45:10Z).
+     On debian-8gb-hel1-1 (8 GB, 4 threads), for the rest of this run, the
+     coordinator holds new starts below 3 GB of available memory (`free -g`'s
+     "available"), not 6 GB, and widens the build lane back to two tasks at
+     4 GB or more, not above 6 GB. Unchanged: below 3 GB it narrows the build
+     lane to one task (`pueue parallel 1 --group build`); below 1.5 GB it
+     stops the line; the disk bounds (40 GB, 60 GB, 15 GB) and the order of
+     starts stay as development.md 11.4 and the README say. Reason: 11.4's
+     6 GB is three quarters of this machine; with no implementer running it
+     has about 4.5 GB available, so the bound held every start. Builds go
+     through the queue (two build tasks of `HEAVY_BUILD_JOBS=2` cargo jobs,
+     the gate alone), whatever the number of sessions, and the planning's 502
+     `heavy` tasks on this machine all ended with at least 4.0 GB available.
+     The coordinator logs each memory check beside its disk check, as now.
+
 ## For the user
 
 The long-term choices the user may veto:

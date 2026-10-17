@@ -131,7 +131,8 @@ the closing repins (Repin). The increments of each session are in its file.
 - **As many sessions at once as dependencies and the machine allow,**
   no fixed cap below the eight Codex threads (development.md, 7.2),
   held only by development.md 11.4's memory and disk bounds, which the
-  coordinator checks before each start.
+  coordinator checks before each start; on debian-8gb-hel1-1, with
+  ruling 101's memory bounds (decisions.md).
 - **At the start,** the eleven that need nothing: skein 02, 03, 04 and 05,
   hearth 01, 02, 05, 07, 08, 10 and 26;
   the coordinator starts eight, the longest chains' first (below), and
