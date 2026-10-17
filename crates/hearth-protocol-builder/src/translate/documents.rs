@@ -96,7 +96,7 @@ pub fn value(value: config::json::Value) -> target::Value {
                     *next = next.saturating_add(1);
                     pending = Some(take(value));
                 } else {
-                    let Frame::List { at, out, .. } = frame else { unreachable!("list") };
+                    let Frame::List { at, values: _, next: _, out } = frame else { unreachable!("list") };
                     finished = Some(target::Value { at, kind: target::Kind::List(out.into_boxed()) });
                     continue;
                 }
@@ -111,7 +111,7 @@ pub fn value(value: config::json::Value) -> target::Value {
                     *key = Some((pair.key.clone(), position(pair.at)));
                     pending = Some(take(&mut pair.value));
                 } else {
-                    let Frame::Map { at, out, .. } = frame else { unreachable!("map") };
+                    let Frame::Map { at, pairs: _, next: _, key: _, out } = frame else { unreachable!("map") };
                     finished = Some(target::Value { at, kind: target::Kind::Map(out.into_boxed()) });
                     continue;
                 }
