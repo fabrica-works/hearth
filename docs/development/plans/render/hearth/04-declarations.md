@@ -57,8 +57,11 @@ route a task's `task.json` through the thin story's protocol layer.
 - **Every string crosses as `Text`,** its place saying what it is:
   expressions (`Entry::when`, `Entry::for_each`, `Guard::when`) for hearth
   05's `expression::compile`; interpolated (`Entry::key`, `Literal::Text`,
-  `Literal::Typed`, `Export::value`) for hearth 36's; as written (names, a
-  guard's message, bless's units, and a `files` entry's `template`, which
+  `Literal::Typed`, `Export::value`, and each of `Literal::Strings`'s `each`,
+  one by one: format.md 5.2) for hearth 36's; as written (names, a
+  guard's message, which hearth 16 refuses when it holds `{{`, `{%` or `{#`
+  (format.md 5.2; 16-entries.md's
+  `a_message_holding_a_tag_or_a_comment_is_refused_at_its_string`), bless's units, and a `files` entry's `template`, which
   is never interpolated: format.md 5.5). The crate never depends on
   `hearth-protocol-template`.
 - **Entries are uniform:** an `Entry` holds `Field`s named by one `Name`
@@ -72,7 +75,7 @@ route a task's `task.json` through the thin story's protocol layer.
   (code-organization.md, 6).
 - **A read's `exports` and `optional` are booleans,** false when absent
   (6.4).
-- **`users` take `gid`,** which 5.6's table lacks and its text gives ("no
+- **`users` take `gid`,** as 5.6's table (format.md:891) and its text give ("no
   other field but `uid`, `gid`, `if` and `for_each`"; the mail task's
   `"postfix": { "from": "package", "uid": 107, "gid": 113 }`).
 - **`checks` and a download's `artifact` are refused at their key**
@@ -115,7 +118,9 @@ Files: `crates/hearth-protocol-config/src/{lib,declaration,error}.rs`,
 `src/tests.rs`, `src/tests/{fixtures,declaration}.rs`.
 `tests/config/src/{examples,world,fixtures}.rs`,
 `tests/config/examples/tasks/{reads,scripts,bless}.json`,
-`tests/config/tests/declarations.rs`. hearth 11's translation as Rules.
+`tests/config/tests/declarations.rs`; where 03.2's world names every `Fault`
+(`Seen::EVERY_FAULT_AND_ENDING`, `tests/fuzzy_documents.rs`,
+`src/reference.rs`), `Fault::Declaration` joins it. hearth 11's translation as Rules.
 Shape: `declaration::declaration(value, &Limits) -> Result<Declaration,
 Error>`: the root a `Kind::Map` (else 03's `Fault::NotObject` at it); a
 `for` over its entries, each key looked up in a const table of 5.1's 22
@@ -132,8 +137,10 @@ string with no line feed (`Doc`; one line, unbounded), dropped. `reads`: task na
 their source's length, boxed. One error, the first met in the value's
 order (render.md 7.1).
 Test shape: `src/tests/fixtures.rs` gains `declaration(&[u8])` (03's
-`decode`, then `declaration::declaration`, both at `SHIPPED`) and
-`text(Position, &[u8]) -> Text`; under 20 ms each.
+`decode`, then `declaration::declaration`, both at `SHIPPED`),
+`text(Position, &[u8]) -> Text` and `at(offset, line, column) -> Position`
+(03.1's landed `fixtures.rs` has `decode`, `document`, `decode_under` and
+`past_shipped` alone); under 20 ms each.
 ```rust
 #[test]
 fn a_guard_hands_up_its_condition_and_message_as_text() {
@@ -159,7 +166,8 @@ World: `examples::task(name)` reads `examples/tasks/<name>.json`, as
 03.2's `all()` reads its documents; `world::declare(document, &Settings,
 seed) -> Result<Declaration, Error>` runs 03.2's `check`, held to its
 reference, and declares the run's decoded value at the settings' limits
-(`declare` adds `Run::value` if 03.2's `Run` lacks it); `fixtures::{at,
+(03.2's `Run::value`), documented with `# Errors` unless 03.2's
+`tests/config` `[lints]` allows `missing_errors_doc`; `fixtures::{at,
 text}`. Under 0.5 s.
 ```rust
 #[test]
@@ -329,7 +337,7 @@ pub enum Literal {
     Typed(Text),                                  // a field of another type as a string: one `{{ expr }}` of its type (5.2)
     Int(Number),                                  // an integer
     Bool { at: Position, value: bool },           // a boolean
-    Strings { at: Position, each: Box<[Text]> },  // a list of strings, at its `[`
+    Strings { at: Position, each: Box<[Text]> },  // a list of strings, at its `[`; each interpolated (5.2)
     Range { at: Position, fields: Box<[Field]> }, // `subordinate` as an object of `base` and `count`, at its `{`
 }
 /// What a field takes besides a string, `Text` taking only a string.

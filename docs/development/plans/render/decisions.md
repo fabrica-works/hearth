@@ -464,6 +464,16 @@ None yet.
      5. 27.3's root `Cargo.toml` edit is its `[workspace.dependencies]` entry alone: `members` takes the crate by `testing/hearth-*` (`Cargo.toml:5`).
      A further line or sketch these corrections move takes the new value, and the commit body lists it.
 
+124. **hearth 04's Shapes against main** (ready check of hearth-04.1).
+     hearth 04's ready check, against hearth d7e42fe to 4bc26d0 (03.1 landed as 9ec5519) and skein 78dd8fa to 6141021 (clippy over the crate's targets passes with the sketches against the landed 03.1; the two unit sketches fail by design against a stub; fuzzy 0 tests; 03.2's world is not landed, so its world sketch compiled against a stub alone), corrects 04-declarations.md:
+     1. `users` take `gid` as format.md 5.6's table gives it (format.md:891 has the `gid` row): "which 5.6's table lacks" goes.
+     2. Each string of a `Literal::Strings` is interpolated, one by one (format.md 5.2: "and a list's strings one by one"): it joins the interpolated `Text`s, in the Choices and the sketch.
+     3. A guard's `message` crosses as written, and hearth 16 refuses one that holds `{{`, `{%` or `{#` (format.md 5.2; 16-entries.md's `a_message_holding_a_tag_or_a_comment_is_refused_at_its_string`): 04.1 does not look into it.
+     4. 04.1's test fixtures gain `at(offset, line, column) -> Position` beside `text`: 03.1's landed `src/tests/fixtures.rs` has `decode`, `document`, `decode_under` and `past_shipped` alone.
+     5. `world::declare` reads 03.2's `Run::value`, which 03-json.md gives (ruling 121), and is documented with `# Errors` unless 03.2's `tests/config` `[lints]` allows `missing_errors_doc`.
+     6. 04.1's Files add, where 03.2's world names every `Fault` (`Seen::EVERY_FAULT_AND_ENDING`, `tests/fuzzy_documents.rs`, `src/reference.rs`), `Fault::Declaration`.
+     One design question goes to the designer in question.md: the form of a guard's name (format.md 2.4 gives none; 5.9). Interim, until its answer reaches session 04: 04.1 decodes a guard's name as a `Text` at its key and checks no form, no test asserts one, and a 04.1 ready to land before the answer blocks, kind design, naming the question. A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
