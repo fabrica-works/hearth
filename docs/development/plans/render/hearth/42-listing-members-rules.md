@@ -81,14 +81,20 @@ error's tail (8.2, 2.4); the listing's limits as `decode`.
 Needs: nothing beyond hearth 12.
 Files: render `src/{revision, compose, call, errors, vocabulary}.rs`,
 `src/tests/{revision, errors}.rs`; `hearth-protocol-git` `src/{limits,
-lib}.rs`, new `src/tail.rs`, new `src/tests/tail.rs`; protocol `src/{git,
+lib, tests}.rs` (`mod tail;`), new `src/tail.rs`, new `src/tests/tail.rs`; protocol `src/{git,
 read}.rs`, `src/translate/{errors, listing}.rs`, `src/tests/{git,
 translate}.rs`; records `src/errors.rs`, `src/form/{text, json}.rs`,
 `src/tests/errors.rs`; `tests/render/tests/{errors, thin}.rs`;
-`tests/git/{src/fixtures.rs, tests/memory.rs}` (a `Tail` case);
+`tests/git/{src/fixtures.rs, src/world.rs, tests/memory.rs}` (a `Tail` case:
+`world.rs:238` and `:266` match `Decoder` whole, and a `Tail` driver feeds it,
+`Action::Feed`); protocol `src/tests/fixtures.rs` (`:190`'s
+`spawn.pipes.len() == 2` counts standard error's pipe);
 `tests/builder/{src/fixtures.rs, tests/real.rs}`.
 Shape: the sketches. `revision::class` gains `Template`, `Script`,
-`Readme` (accepted for hearth 15 and 18) and `Refused`; an environment
+`Readme` (accepted for hearth 15 and 18) and `Refused`, and drops `Copy`
+(`revision.rs:25`: `Refused` holds a box), so `src/tests/revision.rs:17`
+iterates `PATHS` by reference; each match on it in `call.rs` and `compose.rs`
+names the four, with no wildcard. An environment
 not listed and a task directory without `task.json` are found by
 `compose::targets`' pass over the listing, as are two sources of one
 destination in a task (`tree/etc/foo` and `tree/etc/foo.j2`,
@@ -99,8 +105,9 @@ path, no position, with `task` under `tasks/<task>/`, and fails what its
 path belongs to (render.md 3.1; format.md 2.1: `envs/` holds only `<env>.json`,
 a `.json` directly in `hosts/<base>/` that is neither document is refused,
 deeper it is another file; an absent `fleet.json` or `<base>.json` is an
-empty layer). git: standard error piped, each piece
-`Tail::admit`ted; once `Exited` and both pipes ended, a failure is
+empty layer). git: standard error piped (`Child::spawn`, `git.rs:28`, builds `[stdout,
+stdin]`, and `spawned`, `:61`, takes them by position: once standard error
+joins, each pipe is taken by its role), each piece `Tail::admit`ted; once `Exited` and both pipes ended, a failure is
 `Failed { class:
 Operational, at: None, failure: Tool(..) }`, `ended` `Start` (a refused
 `Spawn`), `Exit`/`Signal` (`invocation::Exit`), `Output` (a decoder's
@@ -177,8 +184,10 @@ Scope: discovery from the bases' `members` (render.md 3.2; format.md
 `composition`'s `Duplicate` and `Long`.
 Needs: nothing beyond 42.1 (hearth 03.4's `Members` is hearth 03's).
 Files: render `src/{revision, compose, call, errors}.rs`,
-`src/parts/meta.rs`, `src/tests/{compose, errors}.rs`; protocol
-`src/translate/{documents, errors}.rs`, `src/tests/translate.rs`; records
+`src/parts/meta.rs`, `src/tests/{compose, errors, fixtures}.rs` (each
+`Document` literal takes `members: None`: `fixtures.rs:240`, `:257`); protocol
+`src/translate/{documents, errors}.rs`, `src/tests/{translate, read}.rs`
+(`read.rs:57`, `:129`); records
 `src/errors.rs`, `src/form/{text, json}.rs`, `src/tests/errors.rs`;
 `tests/render/{src/fixtures.rs, tests/compose.rs}`;
 `tests/builder/{src/fixtures.rs, tests/real.rs}`.

@@ -674,6 +674,15 @@ None yet.
 142. **hearth 23.1's landing meets ruling 141** (process, hearth 23.1's block of 2026-10-17T18:51:12Z).
      Ruling 141 is withdrawn, and no step repairs 23.1: hearth 23.1 landed as d25571e at 18:49:29Z, before it, and meets each of its four points another way. 1. `Files::files` is 8, the four roots and the operations (service `limits.rs:35`); 23.2 raises it to 32, as its Files said before ruling 141. 2. The roots stay adopted until the shell's `drain` closes them: the service's `is_empty` counts `open_files() == 4` (service `lib.rs:130`), so nothing closes them twice. 3. `Service::new` seeds the file layer (`lib.rs:64`). 4. The protocol prints the startup record (protocol `lib.rs:182`), and the shell writes it to standard error (`take_startup`, `crates/hearth/src/lib.rs:115-116`). 23-store.md is ruling 139's text again, with these four as 23.1's "As landed". 23.2 builds on d25571e as it stands.
 
+143. **hearth 42's Shapes against main** (ready check of hearth-42.1).
+     hearth 42's ready check, against hearth 3ba7416 and skein 841f487 (clippy clean with the corrections, and hearth 12's additions stubbed; default 664 of 664, with a `Tail` case in the git world's memory test and three tail tests; fuzzy 17 of 17), corrects 42-listing-members-rules.md, its names grepped again at hearth bec2e47:
+     1. 42.1: `Class` drops `Copy` (render `revision.rs:25`), as `Refused { why }` holds a box (E0204), so `src/tests/revision.rs:17`'s `for &(path, expected) in PATHS` iterates by reference (E0507); each match on `revision::class` in `call.rs` and `compose.rs` names `Template`, `Script`, `Readme` and `Refused`, with no wildcard.
+     2. 42.1's Files gain `hearth-protocol-git` `src/tests.rs` (`mod tail;`), the git world's `src/world.rs` (`:238` and `:266` match `Decoder` whole, E0004 on `Decoder::Tail`; a `Tail` driver feeds it, `Action::Feed`), and protocol `src/tests/fixtures.rs` (`:190`'s `spawn.pipes.len() == 2` counts standard error's pipe).
+     3. 42.1's git pipes: `Child::spawn` (protocol `git.rs:28`) builds `[stdout, stdin]`, and `spawned` (`:61`) takes `pipes.first()` and `pipes.get(1)`; once standard error is piped, each pipe is taken by its role, not its position.
+     4. 42.2's Files gain render `src/tests/fixtures.rs` (the `Document` literals at `:240` and `:257` take `members: None`) and protocol `src/tests/read.rs` (`:57`, `:129`); `translate/documents.rs` (`:13`'s `members: _`), `src/tests/translate.rs` and the world's `src/fixtures.rs` (`:20`, `:112`, `:150`), listed already, change the same way.
+     git 2.47.3 prints `fatal: not a tree object` and exits 128 for a missing tree, as the records' sketch says.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
