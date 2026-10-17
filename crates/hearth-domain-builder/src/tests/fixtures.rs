@@ -42,3 +42,31 @@ pub fn arrival_answer(builder: &mut crate::Builder, last: bool, answer: crate::s
     ));
     builder.store_output.push(crate::store::vocabulary::Output::Answer(answer));
 }
+
+pub const MIN_UID: u32 = 1000;
+pub fn opened_builder() -> crate::Builder {
+    use crate::store::vocabulary::Event;
+    let mut builder = crate::Builder::new(&LIMITS, MIN_UID);
+    let page = Event::Page { entries: Box::new([]), last: true };
+    for event in [
+        Event::Open,
+        Event::Locked,
+        Event::Loaded { record: Some(store_record()) },
+        page.clone(),
+        page.clone(),
+        page.clone(),
+        page,
+        Event::Done,
+    ] {
+        crate::store::step(
+            &mut builder.store,
+            &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS.store },
+            event,
+            &mut builder.store_output,
+        );
+        for _ in 0..crate::store::MAX_OUT {
+            drop(builder.store_output.pop());
+        }
+    }
+    builder
+}

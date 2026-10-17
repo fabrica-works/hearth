@@ -1,5 +1,5 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
-mod templates;
+pub(crate) mod templates;
 mod validation;
 use crate::{
     compose::{self, Target},
@@ -632,7 +632,7 @@ impl Call {
             return false;
         }
         let Some(diff) = &mut self.diff else {
-            let Some(answer) = self.side.answer() else { return false };
+            let Some(answer) = self.side.answer_for(out) else { return false };
             let done = match &answer {
                 Answer::Rendered { .. } => true,
                 Answer::Spec(_) | Answer::Change(_) | Answer::Error(_) => false,
@@ -641,7 +641,7 @@ impl Call {
             return done;
         };
         if diff.tally.is_none() {
-            match self.side.answer() {
+            match self.side.answer_for(out) {
                 None => return false,
                 Some(Answer::Spec(spec)) => {
                     self.side

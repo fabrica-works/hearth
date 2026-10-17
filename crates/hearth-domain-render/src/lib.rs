@@ -61,6 +61,10 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             assert_eq!(request, Token::new(2), "read token");
             render.call.as_mut().expect("active call").side.decoded(&oid, read);
         }
+        Event::Kept { request, sha256 } => {
+            assert_eq!(request, Token::new(4), "keep token");
+            render.call.as_mut().expect("active call").side.kept(Some(sha256));
+        }
         Event::Cached { request, oid, size, sha256 } => {
             assert_eq!(request, Token::new(2), "read token");
             render.call.as_mut().expect("active call").side.cached(&oid, size, sha256);
@@ -79,6 +83,10 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
                 return;
             }
             let side = &mut render.call.as_mut().expect("active call").side;
+            if request == Token::new(4) {
+                side.kept(None);
+                return;
+            }
             let kind = match failure {
                 vocabulary::Failure::Tool(tool) => Some(errors::Kind::Tool(tool)),
                 vocabulary::Failure::TooLarge { limit, max } => {

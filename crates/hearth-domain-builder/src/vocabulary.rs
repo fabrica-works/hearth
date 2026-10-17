@@ -4,6 +4,14 @@ use alloc::boxed::Box;
 use skein_lib::{Duration, ReplyTo, Token};
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    Produced {
+        request: Token,
+        path: Box<[u8]>,
+        arrival: Token,
+        sha256: render::vocabulary::Digest,
+        size: u64,
+        took: Duration,
+    },
     Arrived {
         request: Token,
         oid: render::revision::Oid,

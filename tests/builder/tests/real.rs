@@ -492,3 +492,37 @@ fn missing_file_and_target_references_exit_with_configuration_failure() {
     let repository = Repository::make("references-schema-exit", &fixtures::thin_with(fixtures::REFERENCES));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
+
+#[test]
+fn rendered_files_enter_the_cache_by_sha256() {
+    let repository = Repository::make("template-cache", &fixtures::thin_with(fixtures::TEMPLATED));
+    drop(fixtures::render(&repository, &[], Form::Text));
+    let cache = repository.scratch().path().join("store/cache");
+    for (row, &(name, bytes)) in fixtures::RENDERED_FILES.iter().enumerate() {
+        assert_eq!(std::fs::read(cache.join(name)).expect("cached rendering"), bytes, "row {row}");
+    }
+}
+#[test]
+fn rendered_cache_files_have_mode_0644() {
+    use std::os::unix::fs::PermissionsExt;
+    let repository = Repository::make("template-cache-modes", &fixtures::thin_with(fixtures::TEMPLATED));
+    drop(fixtures::render(&repository, &[], Form::Text));
+    let cache = repository.scratch().path().join("store/cache");
+    for (row, &(name, _)) in fixtures::RENDERED_FILES.iter().enumerate() {
+        assert_eq!(
+            std::fs::metadata(cache.join(name)).expect("cache file").permissions().mode() & 0o7777,
+            0o644,
+            "row {row}"
+        );
+    }
+}
+#[test]
+fn rendered_cache_files_leave_no_temporary() {
+    let repository = Repository::make("template-cache-temporary", &fixtures::thin_with(fixtures::TEMPLATED));
+    drop(fixtures::render(&repository, &[], Form::Text));
+    let cache = repository.scratch().path().join("store/cache");
+    assert_eq!(
+        fixtures::names(&cache).into_iter().filter(|name| name.as_bytes().ends_with(b".tmp")).collect::<Vec<_>>(),
+        Vec::<String>::new()
+    );
+}

@@ -32,7 +32,7 @@ impl Store {
         request: Request,
         roots: &Roots,
         limits: &Limits,
-        read: Option<&mut crate::read::Read>,
+        temporary: Option<Box<[u8]>>,
         below: &mut Queue<Asked>,
     ) {
         assert!(self.pending.is_none(), "one store request");
@@ -57,14 +57,14 @@ impl Store {
                     owner: OWNER,
                     from_root: roots.cache.fd,
                     to_root: roots.cache.fd,
-                    from: read.expect("arrival read").temporary(),
+                    from: temporary.expect("arrival temporary"),
                     to: names::removal(builder::store::vocabulary::Removal::File(record.sha256)),
                 }
             }
             Request::Discard { arrival: _ } => file::Request::Remove {
                 owner: OWNER,
                 root: roots.cache.fd,
-                name: read.expect("arrival read").temporary(),
+                name: temporary.expect("arrival temporary"),
                 directory: false,
             },
             Request::List { directory, max } => {
@@ -184,7 +184,11 @@ impl Store {
         };
         let event = builder::vocabulary::Event::Store(event);
         if let Request::Keep { .. } | Request::Discard { .. } = pending {
-            if let Some(event) = read.expect("arrival read").settle(event) {
+            if let Some(read) = read {
+                if let Some(event) = read.settle(event) {
+                    above.push(event);
+                }
+            } else {
                 above.push(event);
             }
         } else {

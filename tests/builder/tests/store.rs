@@ -357,3 +357,23 @@ fn a_store_recorded_by_another_uid_is_refused_on_standard_error() {
     );
     assert_eq!(rendered.exit, skein_io::kernel::Exit::Code(75));
 }
+
+#[test]
+fn a_rendered_files_cache_record_names_its_templates_path() {
+    let repository = Repository::make("rendered-record", &fixtures::thin_with(fixtures::TEMPLATED));
+    drop(fixtures::render_with(&repository, &hearth::limits()));
+    let path = repository
+        .scratch()
+        .path()
+        .join("store/cache/21c50adeb849aa6df1c779b5464f84f614f2b3775ef6d2ffb2ad0f0a1d650011.record");
+    let record = hearth_protocol_tree::cache_file::read(&fs::read(path).expect("record"), &limits::SHIPPED)
+        .expect("cache record");
+    assert_eq!(
+        record.origin,
+        hearth_protocol_tree::cache_file::Origin::Rendered {
+            path: b"tasks/motd/tree/etc/hostname.j2".as_slice().into()
+        }
+    );
+    assert_eq!(record.size, 8);
+    assert!(record.took > Duration::ZERO);
+}

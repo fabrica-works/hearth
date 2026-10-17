@@ -27,6 +27,7 @@ pub struct Builder {
     reply: Option<ReplyTo>,
     output: Queue<Output>,
     arrival: Option<(Token, render::revision::Oid, u64, bool, render::vocabulary::Digest)>,
+    produced: Option<(Token, render::vocabulary::Digest)>,
     refused: Option<Token>,
     remaining: usize,
     store_error: bool,
@@ -36,6 +37,7 @@ impl Builder {
     pub fn new(limits: &Limits, uid: u32) -> Self {
         Self {
             arrival: None,
+            produced: None,
             refused: None,
             remaining: 0,
             store_error: false,
@@ -83,6 +85,21 @@ impl Builder {
 }
 pub fn step(builder: &mut Builder, env: &Env<Limits>, ev: Event, out: &mut Queue<Request>) {
     let event = match ev {
+        Event::Produced { request, path, arrival, sha256, size, took } => {
+            builder.produced = Some((request, sha256));
+            return store_step(
+                builder,
+                env,
+                store::vocabulary::Event::Arrived {
+                    arrival,
+                    sha256,
+                    size,
+                    origin: store::vocabulary::Origin::Rendered { path },
+                    took,
+                },
+                out,
+            );
+        }
         Event::Arrived { request, oid, size, last, arrival, sha256, took } => {
             let origin = store::vocabulary::Origin::Blob { oid: oid.0.clone() };
             builder.arrival = Some((request, oid, size, last, sha256));
@@ -165,6 +182,25 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
             builder.forward(out);
         }
         Some(Output::Answer(answer @ (Answer::Cached { .. } | Answer::Refused { .. }))) => {
+            if let Some((request, sha256)) = builder.produced.take() {
+                let event = match answer {
+                    Answer::Cached { .. } => RenderEvent::Kept { request, sha256 },
+                    Answer::Refused { .. } => RenderEvent::Failed {
+                        request,
+                        class: render::vocabulary::Class::Operational,
+                        at: None,
+                        failure: render::vocabulary::Failure::Store,
+                    },
+                    Answer::Ready
+                    | Answer::Full { .. }
+                    | Answer::Unusable { .. }
+                    | Answer::Waiting
+                    | Answer::Strays { .. }
+                    | Answer::Unopened { .. } => unreachable!("arrival terminal"),
+                };
+                step(builder, env, Event::Render(event), out);
+                return;
+            }
             let (request, oid, size, last, sha256) = builder.arrival.take().expect("arrival answer");
             if let Answer::Refused { .. } = answer {
                 builder.refused = Some(request);

@@ -13,11 +13,11 @@ use crate::{
         meta::Meta,
     },
     revision, schema,
-    vocabulary::{Answer, Class, Outcome},
+    vocabulary::{Answer, Class, Outcome, Output, Request},
 };
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
-use skein_lib::{List, Map};
+use skein_lib::{List, Map, Queue, Token};
 #[derive(Debug)]
 pub(crate) struct Target {
     meta: Meta,
@@ -27,7 +27,9 @@ pub(crate) struct Target {
     entry: usize,
     roots: Option<Roots>,
     tree: Map<Box<[u8]>, TreeEntry>,
-    valid: bool,
+    outcome: Outcome,
+    keeping: Option<TreeEntry>,
+    request: Option<Request>,
 }
 impl Target {
     pub fn new(meta: Meta, meta_digest: Digest, checked: schema::Validated, config: Config, capacity: u32) -> Self {
@@ -35,7 +37,18 @@ impl Target {
         for file in config.tree {
             tree.insert(file.path.clone(), file).expect("tree count");
         }
-        Self { meta, meta_digest, tasks: checked.tasks, task: 0, entry: 0, roots: None, tree, valid: true }
+        Self {
+            meta,
+            meta_digest,
+            tasks: checked.tasks,
+            task: 0,
+            entry: 0,
+            roots: None,
+            tree,
+            outcome: Outcome::Done,
+            keeping: None,
+            request: None,
+        }
     }
     fn run(&mut self, side: &mut Side) -> bool {
         for _ in 0..=self.tasks.len() {
@@ -68,10 +81,17 @@ impl Target {
                             .insert(digest, u64::try_from(bytes.len()).expect("file bound"))
                             .expect("listing capacity");
                         let file = parts::config::rendered(path, entry.mode, digest);
-                        self.tree.insert(file.path.clone(), file).expect("listing capacity");
+                        self.keeping = Some(file);
+                        self.request = Some(Request::Keep {
+                            request: Token::new(4),
+                            path: entry.path.clone(),
+                            sha256: digest,
+                            bytes,
+                        });
+                        side.ready = false;
                     }
                     Err(fault) => {
-                        self.valid = false;
+                        self.outcome = self.outcome.worst(Outcome::Failed);
                         side.errors.push(Error {
                             side: None,
                             kind: Kind::Evaluation(fault.kind),
@@ -96,6 +116,33 @@ impl Target {
     }
 }
 impl Side {
+    pub(super) fn answer_for(&mut self, out: &mut Queue<Output>) -> Option<Answer> {
+        let answer = self.answer();
+        if answer.is_none() {
+            self.template_request(out);
+        }
+        answer
+    }
+    pub(crate) fn template_request(&mut self, out: &mut Queue<Output>) {
+        if let Some(target) = &mut self.rendering
+            && let Some(request) = target.request.take()
+        {
+            out.push(Output::Request(request));
+        }
+    }
+    pub(crate) fn kept(&mut self, digest: Option<Digest>) {
+        let target = self.rendering.as_mut().expect("rendered target");
+        let file = target.keeping.take().expect("one rendered file waiting");
+        if let Some(digest) = digest {
+            let parts::config::Node::File { content_digest, .. } = &file.node;
+            assert_eq!(digest, *content_digest, "kept rendered digest");
+            target.tree.insert(file.path.clone(), file).expect("listing capacity");
+        } else {
+            target.outcome = target.outcome.worst(Outcome::TryAgain);
+            self.outcome = self.outcome.worst(Outcome::TryAgain);
+        }
+        self.ready = true;
+    }
     pub(super) fn size_capacity(&self) -> u32 {
         let mut capacity = u32::try_from(self.entries.len()).expect("listing count");
         for settings in &self.settings {
@@ -129,8 +176,8 @@ impl Side {
             self.rendering = Some(target);
             return None;
         }
-        if !target.valid {
-            self.outcome = self.outcome.worst(Outcome::Failed);
+        if target.outcome != Outcome::Done {
+            self.outcome = self.outcome.worst(target.outcome);
             return None;
         }
         let mut files = List::with_capacity(target.tree.len());

@@ -14,6 +14,9 @@ pub use records::form::Form;
 mod cache;
 mod client;
 mod git;
+mod keep;
+mod terminal;
+use terminal::{listing_failed, stream_ended};
 pub mod limits;
 mod read;
 mod store;
@@ -107,6 +110,7 @@ pub struct Protocol {
     next: u64,
     child: Option<git::Child>,
     mode: Option<Mode>,
+    keeping: Option<keep::Keep>,
 }
 impl Protocol {
     #[must_use]
@@ -124,6 +128,7 @@ impl Protocol {
             next: 100,
             child: None,
             mode: None,
+            keeping: None,
         }
     }
     #[must_use]
@@ -158,7 +163,8 @@ impl Protocol {
     }
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.mode.is_none()
+        self.keeping.is_none()
+            && self.mode.is_none()
             && self.child.is_none()
             && self.call.is_none()
             && self.client.is_empty()
@@ -168,6 +174,9 @@ impl Protocol {
     pub fn work_pending(&self) -> bool {
         if self.call.is_some() || self.client.work_pending() || self.progress.work_pending() {
             return true;
+        }
+        if let Some(keep) = &self.keeping {
+            return keep.work_pending();
         }
         let Some(child) = &self.child else {
             return false;
@@ -232,7 +241,8 @@ pub fn down(
             &protocol.store_path,
         ),
         Request::Store(request) => {
-            protocol.store.down(request, &protocol.roots, &env.limits, read::current(&mut protocol.mode), below);
+            let temporary = protocol.temporary();
+            protocol.store.down(request, &protocol.roots, &env.limits, temporary, below);
         }
         Request::Unopened { to, why } => {
             assert_eq!(to.into_token(), Token::new(0), "initial call");
@@ -252,7 +262,9 @@ pub fn down(
         }
         Request::Render(request) => {
             assert!(protocol.mode.is_none() && protocol.child.is_none(), "one git request at a time");
+            assert!(protocol.keeping.is_none(), "one cache request at a time");
             match request {
+                request @ render::vocabulary::Request::Keep { .. } => protocol.keep(request, env),
                 render::vocabulary::Request::List { request, repository, revision } => {
                     let Ok(revision) = invocation::revision(&revision) else {
                         above.push(Event::Render(RenderEvent::Unresolved { request }));
@@ -322,6 +334,13 @@ pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, above: &mut Queu
         Told::File(event) => {
             if event.owner() == store::OWNER {
                 protocol.store.up(event, &env.limits, &protocol.roots, read::current(&mut protocol.mode), above, below);
+                if !above.is_empty() {
+                    protocol.keeping = None;
+                }
+                return;
+            }
+            if let Some(keep) = &mut protocol.keeping {
+                keep.up(event);
                 return;
             }
             let Some(Mode::Read(read)) = &mut protocol.mode else { unreachable!("cache read exists") };
@@ -466,6 +485,13 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
     }
     if protocol.client.work_pending() {
         protocol.client.resume(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, below);
+        return;
+    }
+    if let Some(keep) = &mut protocol.keeping {
+        keep.resume(env, above, below);
+        if keep.failed() {
+            protocol.keeping = None;
+        }
         return;
     }
     let Some(child) = &mut protocol.child else {
@@ -709,19 +735,6 @@ fn failure(
 }
 #[cfg(test)]
 mod tests;
-
-fn listing_failed(answer: Option<&Result<Box<[listing::Entry]>, listing::Error>>) -> bool {
-    match answer {
-        Some(Err(_)) => true,
-        Some(Ok(_)) | None => false,
-    }
-}
-fn stream_ended(up: &Up) -> bool {
-    match up {
-        Up::End | Up::Failed(_) => true,
-        Up::Bytes(_) | Up::Room => false,
-    }
-}
 
 fn stream_up(child: &mut git::Child, owner: Token, up: Up) -> Option<Up> {
     if child.closing {

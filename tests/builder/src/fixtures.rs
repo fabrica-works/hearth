@@ -676,3 +676,8 @@ pub const REFERENCES: &[File] = &[
     File { path: "tasks/net/task.json", mode: 0o644, body: br#"{"settings":{"ca":{"type":"file","doc":"The certificate."},"peer":{"type":"target","doc":"The peer."}}}"# },
     File { path: "hosts/x1/x1.json", mode: 0o644, body: br#"{"motd": {}, "net": {"ca": "lab-ca/lab.crt", "peer": "x9-prod"}}"# },
 ];
+
+pub const RENDERED_FILES: &[(&str, &[u8])] = &[
+    ("21c50adeb849aa6df1c779b5464f84f614f2b3775ef6d2ffb2ad0f0a1d650011", b"x1-prod\n"),
+    ("e75f92b4b8419984111db313564627b1ee90ecb312dbffd66a1a42f64e6e2334", b"x1 runs on metal.\n1: one\n2: two\n"),
+];

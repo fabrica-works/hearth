@@ -13,12 +13,14 @@ pub enum Event {
     Listed { request: Token, commit: Oid, entries: Box<[Entry]> },
     Unresolved { request: Token },
     Read { request: Token, oid: Oid, read: Decoded },
+    Kept { request: Token, sha256: Digest },
     Cached { request: Token, oid: Oid, size: u64, sha256: Digest },
     Hunks { request: Token, hunks: crate::diff::Hunks },
     Failed { request: Token, class: Class, at: Option<Box<[u8]>>, failure: Failure },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    Keep { request: Token, path: Box<[u8]>, sha256: Digest, bytes: Box<[u8]> },
     Hunks { request: Token, before: Digest, after: Digest },
     List { request: Token, repository: Box<[u8]>, revision: Box<[u8]> },
     Read { request: Token, repository: Box<[u8]>, commit: Oid, blobs: Box<[Blob]> },

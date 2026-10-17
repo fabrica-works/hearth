@@ -763,6 +763,11 @@ pub fn answer(call: &mut crate::call::Side) -> crate::vocabulary::Answer {
         if let Some(answer) = call.answer() {
             return answer;
         }
+        let mut out = skein_lib::Queue::with_capacity(1);
+        call.template_request(&mut out);
+        if let Some(crate::vocabulary::Output::Request(crate::vocabulary::Request::Keep { sha256, .. })) = out.pop() {
+            call.kept(Some(sha256));
+        }
     }
     panic!("fixture answer bound")
 }

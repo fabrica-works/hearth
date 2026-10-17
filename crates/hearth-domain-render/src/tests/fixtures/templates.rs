@@ -48,3 +48,32 @@ pub fn run_at(roots: &super::Roots, template: &Template, limits: &Limits) -> Res
     let context: Context<'_> = roots.context();
     template::run(template, &context, limits, u64::from(limits.rendered_file))
 }
+
+pub fn keeping_templates() -> (crate::Render, skein_lib::Env<Limits>, skein_lib::Queue<crate::vocabulary::Output>) {
+    let mut side = super::shared_template_call();
+    side.decoded(
+        &crate::revision::Oid(bytes::copy_of(b"template")),
+        crate::vocabulary::Decoded::Template(template(&[0], [text(0, b"abc")])),
+    );
+    side.rendering = Some(crate::call::templates::Target::new(
+        super::meta(),
+        super::digest("0101010101010101010101010101010101010101010101010101010101010101"),
+        crate::schema::Validated {
+            tasks: Box::new([crate::schema::Checked {
+                name: bytes::copy_of(b"motd"),
+                settings: super::Value::Map(Box::new([])),
+                tasks: super::Value::Map(Box::new([])),
+            }]),
+        },
+        crate::parts::config::Config { tree: Box::new([]) },
+        5,
+    ));
+    side.targets = Box::new([]);
+    side.ready = true;
+    let render = crate::Render { call: Some(crate::call::Call { side, diff: None }) };
+    (
+        render,
+        skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: limits::SHIPPED },
+        skein_lib::Queue::with_capacity(1),
+    )
+}

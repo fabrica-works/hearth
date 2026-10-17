@@ -45,11 +45,91 @@ fn a_failed_git_waits_for_the_inflight_cache_open_and_close() {
             request: fixtures::REQUEST,
             class: crate::render::vocabulary::Class::Operational,
             at: None,
-            failure: crate::render::vocabulary::Failure::Tool(crate::render::errors::Tool {
-                command: crate::render::errors::Command::CatFile,
-                ended: crate::render::errors::Ended::Exit(1),
-                tail: Box::new([])
-            })
+            failure: fixtures::cat_file_failure()
         })
+    );
+}
+
+#[test]
+fn a_kept_file_is_written_hashed_synced_then_renamed() {
+    let (mut layer, name) = fixtures::produced_keep();
+    layer.client(crate::builder::vocabulary::Request::Store(crate::builder::store::vocabulary::Request::Keep {
+        arrival: skein_lib::Token::new(10),
+        record: fixtures::cache_record(crate::builder::store::vocabulary::Origin::Rendered {
+            path: bytes::copy_of(b"tasks/motd/tree/etc/issue.j2"),
+        }),
+    }));
+    assert_eq!(
+        layer.asked(),
+        Some(crate::Asked::File(Request::Rename {
+            owner: fixtures::STORE_OWNER,
+            from_root: fixtures::roots().cache.fd,
+            to_root: fixtures::roots().cache.fd,
+            from: name,
+            to: bytes::copy_of(b"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        }))
+    );
+    layer.file_up(Event::Renamed { owner: fixtures::STORE_OWNER });
+    assert_eq!(
+        layer.asked(),
+        Some(crate::Asked::File(Request::SyncDirectory {
+            owner: fixtures::STORE_OWNER,
+            root: fixtures::roots().cache.fd
+        }))
+    );
+    layer.file_up(Event::Synced { owner: fixtures::STORE_OWNER });
+    let Some(crate::Asked::File(Request::Store { path, .. })) = layer.asked() else {
+        panic!("record after durable rename")
+    };
+    assert_eq!(path.as_ref(), b"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad.record");
+    layer.file_up(Event::Stored { owner: fixtures::STORE_OWNER, digest: skein_io::digest::digest(b"record") });
+    assert_eq!(
+        layer.told(),
+        Some(crate::builder::vocabulary::Event::Store(crate::builder::store::vocabulary::Event::Done))
+    );
+}
+#[test]
+fn a_kept_file_already_present_removes_its_temporary() {
+    let (mut layer, name) = fixtures::produced_keep();
+    layer.client(crate::builder::vocabulary::Request::Store(crate::builder::store::vocabulary::Request::Discard {
+        arrival: skein_lib::Token::new(10),
+    }));
+    assert_eq!(
+        layer.asked(),
+        Some(crate::Asked::File(Request::Remove {
+            owner: fixtures::STORE_OWNER,
+            root: fixtures::roots().cache.fd,
+            name,
+            directory: false
+        }))
+    );
+    layer.file_up(Event::Removed { owner: fixtures::STORE_OWNER });
+    assert_eq!(
+        layer.told(),
+        Some(crate::builder::vocabulary::Event::Store(crate::builder::store::vocabulary::Event::Done))
+    );
+}
+#[test]
+fn a_keep_whose_bytes_are_not_its_sha256_fails_and_leaves_no_temporary() {
+    let (mut layer, name) = fixtures::synced_keep(b"wrong");
+    assert_eq!(
+        layer.asked(),
+        Some(crate::Asked::File(Request::Remove {
+            owner: OWNER,
+            root: fixtures::roots().cache.fd,
+            name,
+            directory: false
+        }))
+    );
+    layer.file_up(Event::Removed { owner: OWNER });
+    assert_eq!(layer.asked(), None);
+    assert_eq!(
+        layer.told(),
+        Some(crate::builder::vocabulary::Event::Render(crate::render::vocabulary::Event::Failed {
+            request: fixtures::REQUEST,
+            class: crate::render::vocabulary::Class::Operational,
+            at: None,
+            failure: crate::render::vocabulary::Failure::Store
+        }))
     );
 }

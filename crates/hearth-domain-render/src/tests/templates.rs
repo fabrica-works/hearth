@@ -343,3 +343,48 @@ fn an_empty_loop_skips_its_body() {
     );
     assert_eq!(fixtures::run(&roots, &template), Ok(Box::from(&b"after"[..])));
 }
+
+#[test]
+fn a_rendered_file_is_kept_before_the_next_run_starts() {
+    use crate::vocabulary::{Event, Output, Request};
+    let (mut render, env, mut out) = fixtures::keeping_templates();
+    crate::resume(&mut render, &env, &mut out);
+    let Some(Output::Request(Request::Keep { request, sha256, bytes, path })) = out.pop() else { panic!("first keep") };
+    assert_eq!(path.as_ref(), b"tasks/motd/tree/etc/issue.j2");
+    assert_eq!(bytes.as_ref(), b"abc");
+    assert_eq!(sha256, fixtures::digest("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"));
+    assert!(!render.work_pending());
+    crate::resume(&mut render, &env, &mut out);
+    assert_eq!(out.pop(), None);
+    crate::step(&mut render, &env, Event::Kept { request, sha256 }, &mut out);
+    crate::resume(&mut render, &env, &mut out);
+    assert_eq!(
+        out.pop(),
+        Some(Output::Request(Request::Keep {
+            request: skein_lib::Token::new(4),
+            path: b"tasks/motd/tree/etc/motd.j2".as_slice().into(),
+            sha256: fixtures::digest("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
+            bytes: b"abc".as_slice().into(),
+        }))
+    );
+}
+#[test]
+fn a_failed_keep_leaves_its_target_out_and_the_call_try_again() {
+    use crate::vocabulary::{Answer, Class, Event, Failure, Output, Request};
+    let (mut render, env, mut out) = fixtures::keeping_templates();
+    crate::resume(&mut render, &env, &mut out);
+    let Some(Output::Request(Request::Keep { request, .. })) = out.pop() else { panic!("keep") };
+    crate::step(
+        &mut render,
+        &env,
+        Event::Failed { request, class: Class::Operational, at: None, failure: Failure::Store },
+        &mut out,
+    );
+    crate::resume(&mut render, &env, &mut out);
+    let Some(Output::Request(Request::Keep { request, sha256, .. })) = out.pop() else { panic!("second keep") };
+    crate::step(&mut render, &env, Event::Kept { request, sha256 }, &mut out);
+    assert_eq!(
+        fixtures::finish_render(&mut render, &env, &mut out).as_ref(),
+        &[Answer::Rendered { outcome: crate::vocabulary::Outcome::TryAgain, diff: None, left_out: 0 }]
+    );
+}

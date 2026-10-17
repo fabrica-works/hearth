@@ -213,3 +213,40 @@ fn a_store_error_makes_the_call_operational_even_without_an_arrival() {
         })
     );
 }
+
+const RENDERED_PATHS: &[&[u8]] = &[b"tasks/motd/tree/etc/hostname.j2", b"tasks/motd/tree/etc/issue.j2"];
+#[test]
+fn a_produced_file_enters_the_store_with_its_rendered_origin() {
+    use crate::store::vocabulary::{CacheFile, Origin, Request as StoreRequest};
+    for (row, path) in RENDERED_PATHS.iter().enumerate() {
+        let mut builder = fixtures::opened_builder();
+        let mut out = Queue::with_capacity(2);
+        step(
+            &mut builder,
+            &fixtures::env(),
+            Event::Produced {
+                request: Token::new(4),
+                path: bytes::copy_of(path),
+                arrival: Token::new(10),
+                sha256: hearth_lib::encode::Digest([1; 32]),
+                size: 8,
+                took: skein_lib::Duration::from_millis(1),
+            },
+            &mut out,
+        );
+        assert_eq!(
+            out.pop(),
+            Some(Request::Store(StoreRequest::Keep {
+                arrival: Token::new(10),
+                record: CacheFile {
+                    at: skein_lib::Wall::EPOCH,
+                    origin: Origin::Rendered { path: bytes::copy_of(path) },
+                    sha256: hearth_lib::encode::Digest([1; 32]),
+                    size: 8,
+                    took: skein_lib::Duration::from_millis(1),
+                },
+            })),
+            "row {row}"
+        );
+    }
+}

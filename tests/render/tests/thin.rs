@@ -235,7 +235,7 @@ fn a_template_and_a_link_are_left_out_of_the_tree() {
             },
         }]
     );
-    assert_eq!(run.requests.len(), 3, "the second read includes the template");
+    assert_eq!(run.requests.len(), 4, "the rendered template adds its Keep request");
 }
 
 #[test]
