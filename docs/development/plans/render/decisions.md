@@ -455,6 +455,15 @@ None yet.
      The plan's code-organization.md (:37) and 39-tree-world.md stand
      unchanged. No step of 03 changes.
 
+123. **hearth 27's Shapes against main** (re-check of hearth-27.1).
+     hearth 27's re-check after hearth 26, against hearth eb6b8e4 and skein 78dd8fa (fmt and clippy pass with the corrections; nextest 42 passed, 3 skipped; fuzzy 0 tests), corrects 27-fake-mmdebstrap.md for 27.2 and 27.3; 27.1 landed meanwhile (4bc26d0) with the same fixes in its own code (no `#[expect]` on `Machine`, `#[should_panic(expected = "one package a name")]` at `tests/universe.rs:127`), so its Files, its test and its line at :131 stay as written:
+     1. The interface sketch's `Machine` takes no `#[expect(clippy::zero_sized_map_values)]`: `Tool` is `#[repr(u8)]` (`hearth.rs:9-13`), so the lint does not fire and the `expect` is unfulfilled; 27.2 adds `served` without it.
+     2. The must-use rule is "Every `pub fn` that returns a value other than a `Result` and takes no `&mut` carries `#[must_use]`": a `Result` is must-use already (`clippy::double_must_use`, on `Universe::read` and `closure`).
+     3. 27.2's `Suite::new` line and 27.3's `assert_eq!` of the closure's names are wrapped under max_width 120 (`let suite =` then `Suite::new(...)`; each `assert_eq!` argument on its own line).
+     4. Done when 2 names at least 66 tests (hearth 26's 39 in hearth-fake-machine, `git grep -c '#\[test\]' 4bc26d0~1 -- testing/hearth-fake-machine`: files 15, ledger 4, processes 20; this session's 27).
+     5. 27.3's root `Cargo.toml` edit is its `[workspace.dependencies]` entry alone: `members` takes the crate by `testing/hearth-*` (`Cargo.toml:5`).
+     A further line or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

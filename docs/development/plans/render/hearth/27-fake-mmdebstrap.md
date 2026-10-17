@@ -172,7 +172,8 @@ Test shape: `src/tests/mirror.rs`, each under 20 ms:
 #[test]
 fn a_suite_s_inrelease_lists_its_index_by_sha256_and_size() {
     let universe = Universe::read(fixtures::MAWK_KEPT).expect("the kept fields read");
-    let suite = Suite::new(Release::debian(b"testing", b"forky"), b"amd64", Box::new([(Box::from(&b"main"[..]), universe)]));
+    let suite =
+        Suite::new(Release::debian(b"testing", b"forky"), b"amd64", Box::new([(Box::from(&b"main"[..]), universe)]));
     // sha256sum and wc -c of MAWK_KEPT, once on x1.
     let expected: &[u8] = b"Origin: Debian\nLabel: Debian\nSuite: testing\nCodename: forky\nArchitectures: amd64\nComponents: main\nSHA256:\n \
         6e80ba38d7802345c39dc883a60851c8e1c9ddbc9911cffa6861d761f1253ed2 306 main/binary-amd64/Packages\n";
@@ -190,7 +191,8 @@ Size: at most 260 lines. Removes: nothing.
 Scope: the closure of a variant and a request over a snapshot's
 universes, and its failures (decisions.md, 14; Choices).
 Needs: nothing beyond 27.2.
-Files: root `Cargo.toml` (shared: `hearth-fake-mmdebstrap`), `Cargo.lock`
+Files: root `Cargo.toml` (shared: `hearth-fake-mmdebstrap` in
+`[workspace.dependencies]`; `members` takes it by `testing/hearth-*`), `Cargo.lock`
 (shared); new `testing/hearth-fake-mmdebstrap/`: `Cargo.toml`
 (`hearth-fake-machine`; dev `skein-lib`), `clippy.toml`, `src/lib.rs`
 (`#![forbid(unsafe_code)]`, `extern crate alloc`), `src/resolve.rs`;
@@ -238,7 +240,10 @@ fn the_apt_variant_takes_the_essential_set_apt_and_their_dependencies() {
     let closed = resolve::closure(&request).expect("the fixture resolves");
     // Essential: base-files, base-passwd, dpkg; then apt. awk is mawk's (required over gawk's optional);
     // base-passwd meets apt's `base-passwd (>= 3.6.1) | adduser`; debconf is its group's first alternative.
-    assert_eq!(fixtures::names(&[&universe], &closed), ["apt", "base-files", "base-passwd", "debconf", "dpkg", "libc6", "mawk"]);
+    assert_eq!(
+        fixtures::names(&[&universe], &closed),
+        ["apt", "base-files", "base-passwd", "debconf", "dpkg", "libc6", "mawk"]
+    );
 }
 ```
 Proof: unit, that test: the apt variant's closure on Debian's own
@@ -252,8 +257,9 @@ Size: at most 230 lines. Removes: nothing.
 
 Derives are elided where a line names none (`Clone`, `PartialEq`, `Eq`,
 `Debug`; `Copy` where it holds); elided fields are private. Every `pub fn`
-that returns a value and takes no `&mut` carries `#[must_use]`, elided like
-the derives.
+that returns a value other than a `Result` and takes no `&mut` carries
+`#[must_use]` (a `Result` is must-use already: `clippy::double_must_use`),
+elided like the derives.
 
 ```rust
 // testing/hearth-fake-machine/src/hearth/version.rs (27.1)
@@ -316,7 +322,7 @@ impl Universe { pub fn draw(rng: &mut skein_lib::Rng, draw: &Draw<'_>) -> Univer
 
 
 // testing/hearth-fake-machine/src/hearth.rs (hearth 26's; 27.2 adds `served`; hearth 46.1 adds `Tool::Mmdebstrap`)
-#[derive(Debug)] #[expect(clippy::zero_sized_map_values, reason = "one tool until hearth 46.1")] pub struct Machine { linux: crate::linux::Machine, programs: alloc::collections::BTreeMap<crate::linux::Node, Tool>, served: Option<(Mirror, Option<u16>)> }
+#[derive(Debug)] pub struct Machine { linux: crate::linux::Machine, programs: alloc::collections::BTreeMap<crate::linux::Node, Tool>, served: Option<(Mirror, Option<u16>)> }
 /// `serve`: as snapshot.debian.org on the machine's network, and as a proxy at `127.0.0.1:<port>` if given;
 /// `reach`: the mirror a request reaches, directly with no proxy, through a proxy only at the port served.
 impl Machine { pub fn serve(&mut self, mirror: Mirror, proxy: Option<u16>); pub fn unserve(&mut self) -> Option<Mirror>; }
@@ -352,5 +358,5 @@ None.
    testing/hearth-fake-mmdebstrap | wc -l` prints 1.
 2. In a worktree at `origin/main`, `heavy cargo nextest run -p
    hearth-fake-machine -p hearth-fake-mmdebstrap` passes, its `Summary`
-   naming at least 51 tests (hearth 26's 24 there, this session's 27).
+   naming at least 66 tests (hearth 26's 39 there, this session's 27).
 3. `git -C ~/src/rust/hearth log origin/main --grep='^Plan: render$' --format='%(trailers:key=Step,valueonly)' | sort -u | grep -c -x -E 'hearth-27\.[1-3]'` prints 3.
