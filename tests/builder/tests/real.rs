@@ -216,3 +216,40 @@ fn a_broken_task_json_exits_with_configuration_failure() {
     let repository = Repository::make("broken-task-exit", &fixtures::broken_task());
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
+#[test]
+fn a_store_inside_a_work_tree_diffs_as_outside_any_repository() {
+    let rendered = fixtures::diff_beneath_work_tree("diff-config", false);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["               @@"]),
+        "               @@ -1,5 +1,5 @@\n               @@ -9,7 +9,7 @@ line 8\n"
+    );
+}
+#[test]
+fn a_work_trees_gitattributes_do_not_make_a_file_binary() {
+    let rendered = fixtures::diff_beneath_work_tree("diff-attributes", true);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["               @@"]),
+        "               @@ -1,5 +1,5 @@\n               @@ -9,7 +9,7 @@ line 8\n"
+    );
+}
+#[test]
+fn json_counts_the_hunk_lines_left_out_past_200() {
+    let repository = Repository::make("diff-left-out", fixtures::MOTD);
+    let from = repository.next(&[fixtures::File { body: b"old\n".repeat(300).leak(), ..fixtures::MOTD_KIND }], &[]);
+    let to = repository.next(&[fixtures::File { body: b"new\n".repeat(300).leak(), ..fixtures::MOTD_KIND }], &[]);
+    let asked = fixtures::Asked { form: Form::JsonLines, targets: &[b"x1-prod"], ..fixtures::Asked::new(&from, &to) };
+    let rendered = fixtures::diff(&repository, &asked);
+    let stdout = std::str::from_utf8(&rendered.stdout).expect("JSON");
+    assert_eq!(stdout.matches("\"kind\":\"removed\"").count(), 199);
+    assert!(stdout.contains("\"hunks\":{\"binary\":false,\"left_out\":401,\"lines\":["));
+}
+#[test]
+fn a_binary_file_answers_binary_with_no_hunk_line() {
+    let repository = Repository::make("diff-binary", fixtures::MOTD);
+    let from = repository.next(&[fixtures::File { body: b"old\0\n", ..fixtures::MOTD_KIND }], &[]);
+    let to = repository.next(&[fixtures::File { body: b"new\0\n", ..fixtures::MOTD_KIND }], &[]);
+    let asked = fixtures::Asked { form: Form::JsonLines, targets: &[b"x1-prod"], ..fixtures::Asked::new(&from, &to) };
+    let rendered = fixtures::diff(&repository, &asked);
+    let stdout = std::str::from_utf8(&rendered.stdout).expect("JSON");
+    assert!(stdout.contains("\"hunks\":{\"binary\":true,\"left_out\":0,\"lines\":[]}"));
+}

@@ -66,9 +66,13 @@ pub fn entry_change(entry: config::EntryChange) -> target::EntryChange {
     match entry {
         config::EntryChange::Added { path, node: value } => target::EntryChange::Added { path, node: node(value) },
         config::EntryChange::Removed { path, node: value } => target::EntryChange::Removed { path, node: node(value) },
-        config::EntryChange::Changed { path, before, after } => {
-            target::EntryChange::Changed { path, before: node(before), after: node(after), sizes: None, hunks: None }
-        }
+        config::EntryChange::Changed { path, before, after, sizes, hunks: value } => target::EntryChange::Changed {
+            path,
+            before: node(before),
+            after: node(after),
+            sizes: optional_sizes(sizes),
+            hunks: optional_hunks(value),
+        },
     }
 }
 fn node(node: config::Node) -> crate::records::parts::config::Node {
@@ -92,4 +96,31 @@ pub fn tally(tally: source::Tally) -> target::Tally {
 #[must_use]
 pub fn optional_tally(value: Option<source::Tally>) -> Option<target::Tally> {
     Some(tally(value?))
+}
+
+#[must_use]
+pub fn hunks(hunks: source::Hunks) -> target::Hunks {
+    let mut lines = List::with_capacity(u32::try_from(hunks.lines.len()).expect("bounded lines"));
+    for line in hunks.lines {
+        lines.push(target::HunkLine { kind: line_kind(line.kind), text: line.text }).expect("line capacity");
+    }
+    target::Hunks { lines: lines.into_boxed(), left_out: hunks.left_out, binary: hunks.binary }
+}
+#[must_use]
+pub const fn line_kind(kind: source::LineKind) -> target::LineKind {
+    match kind {
+        source::LineKind::Hunk => target::LineKind::Header,
+        source::LineKind::Context => target::LineKind::Context,
+        source::LineKind::Removed => target::LineKind::Removed,
+        source::LineKind::Added => target::LineKind::Added,
+        source::LineKind::NoNewline => target::LineKind::NoNewline,
+    }
+}
+
+fn optional_sizes(value: Option<config::Sizes>) -> Option<target::Sizes> {
+    let value = value?;
+    Some(target::Sizes { before: value.before, after: value.after })
+}
+fn optional_hunks(value: Option<source::Hunks>) -> Option<target::Hunks> {
+    Some(hunks(value?))
 }

@@ -124,3 +124,36 @@ fn config_part(spec: &Spec) -> Option<(&Digest, &config::Config)> {
     }
     found
 }
+
+/// Git's retained unified lines (render.md, 6.1).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Hunks {
+    pub lines: Box<[Line]>,
+    pub left_out: u32,
+    pub binary: bool,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Line {
+    pub kind: LineKind,
+    pub text: Box<[u8]>,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum LineKind {
+    Hunk,
+    Context,
+    Removed,
+    Added,
+    NoNewline,
+}
+
+pub(crate) fn tree(change: &mut TargetChange) -> &mut [config::EntryChange] {
+    let mut tree: &mut [config::EntryChange] = &mut [];
+    if let TargetChange::Changed { parts, .. } = change {
+        for part in parts {
+            match part {
+                PartChange::Config(config) => tree = &mut config.tree,
+            }
+        }
+    }
+    tree
+}

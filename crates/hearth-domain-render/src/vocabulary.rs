@@ -14,10 +14,12 @@ pub enum Event {
     Unresolved { request: Token },
     Read { request: Token, oid: Oid, read: Decoded },
     Cached { request: Token, oid: Oid, size: u64, sha256: Digest },
+    Hunks { request: Token, hunks: crate::diff::Hunks },
     Failed { request: Token, class: Class },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    Hunks { request: Token, before: Digest, after: Digest },
     List { request: Token, repository: Box<[u8]>, revision: Box<[u8]> },
     Read { request: Token, repository: Box<[u8]>, commit: Oid, blobs: Box<[Blob]> },
 }

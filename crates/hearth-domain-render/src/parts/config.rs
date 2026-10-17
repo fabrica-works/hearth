@@ -76,7 +76,7 @@ pub struct Change {
 pub enum EntryChange {
     Added { path: Box<[u8]>, node: Node },
     Removed { path: Box<[u8]>, node: Node },
-    Changed { path: Box<[u8]>, before: Node, after: Node },
+    Changed { path: Box<[u8]>, before: Node, after: Node, sizes: Option<Sizes>, hunks: Option<crate::diff::Hunks> },
 }
 #[must_use]
 pub fn change(before: Option<&Config>, after: Option<&Config>) -> Change {
@@ -105,13 +105,49 @@ pub fn change(before: Option<&Config>, after: Option<&Config>) -> Change {
         let change = match (old, new) {
             (None, Some(node)) => EntryChange::Added { path: path.clone(), node: (*node).clone() },
             (Some(node), None) => EntryChange::Removed { path: path.clone(), node: (*node).clone() },
-            (Some(old), Some(new)) if old != new => {
-                EntryChange::Changed { path: path.clone(), before: (*old).clone(), after: (*new).clone() }
-            }
+            (Some(old), Some(new)) if old != new => EntryChange::Changed {
+                path: path.clone(),
+                before: (*old).clone(),
+                after: (*new).clone(),
+                sizes: None,
+                hunks: None,
+            },
             (Some(_), Some(_)) => continue,
             (None, None) => unreachable!("union path"),
         };
         tree.push(change).expect("tree capacity");
     }
     Change { tree: tree.into_boxed() }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Sizes {
+    pub before: u64,
+    pub after: u64,
+}
+impl EntryChange {
+    pub(crate) fn pair(
+        &mut self,
+        before_sizes: &crate::call::Sizes,
+        after_sizes: &crate::call::Sizes,
+        max: u32,
+    ) -> Option<(Digest, Digest)> {
+        match self {
+            Self::Changed {
+                before: Node::File { content_digest: before, .. },
+                after: Node::File { content_digest: after, .. },
+                sizes,
+                ..
+            } => {
+                let pair = Sizes { before: *before_sizes.get(before)?, after: *after_sizes.get(after)? };
+                *sizes = Some(pair);
+                if before != after && pair.before < u64::from(max) && pair.after < u64::from(max) {
+                    Some((*before, *after))
+                } else {
+                    None
+                }
+            }
+            Self::Added { .. } | Self::Removed { .. } => None,
+        }
+    }
 }

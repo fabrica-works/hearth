@@ -380,8 +380,8 @@ fn rebuild_back(rebuild: client_diff::Rebuild) -> diff::Rebuild {
         client_diff::Rebuild::Nothing => diff::Rebuild::Nothing,
     }
 }
-fn change_back(change: client_diff::TargetChange) -> Option<diff::TargetChange> {
-    Some(match change {
+fn change_back(change: client_diff::TargetChange) -> diff::TargetChange {
+    match change {
         client_diff::TargetChange::Added { spec_digest } => {
             diff::TargetChange::Added { spec_digest: hearth_lib::encode::Digest(spec_digest) }
         }
@@ -396,7 +396,7 @@ fn change_back(change: client_diff::TargetChange) -> Option<diff::TargetChange> 
                         let mut entries =
                             skein_lib::List::with_capacity(u32::try_from(tree.len()).expect("bounded tree"));
                         for entry in tree {
-                            entries.push(entry_back(entry)?).expect("tree room");
+                            entries.push(entry_back(entry)).expect("tree room");
                         }
                         translated
                             .push(diff::PartChange::Config(render::parts::config::Change {
@@ -408,7 +408,7 @@ fn change_back(change: client_diff::TargetChange) -> Option<diff::TargetChange> 
             }
             diff::TargetChange::Changed { parts: translated.into_boxed(), rebuild: rebuild_back(rebuild) }
         }
-    })
+    }
 }
 fn node_back(node: records::parts::config::Node) -> render::parts::config::Node {
     match node {
@@ -422,24 +422,25 @@ fn node_back(node: records::parts::config::Node) -> render::parts::config::Node 
         }
     }
 }
-fn entry_back(entry: client_diff::EntryChange) -> Option<render::parts::config::EntryChange> {
+fn entry_back(entry: client_diff::EntryChange) -> render::parts::config::EntryChange {
     use render::parts::config::EntryChange;
-    Some(match entry {
+    match entry {
         client_diff::EntryChange::Added { path, node } => EntryChange::Added { path, node: node_back(node) },
         client_diff::EntryChange::Removed { path, node } => EntryChange::Removed { path, node: node_back(node) },
-        client_diff::EntryChange::Changed { path, before, after, sizes, hunks } => {
-            if sizes.is_some() || hunks.is_some() {
-                return None;
-            } // hearth 25.2
-            EntryChange::Changed { path, before: node_back(before), after: node_back(after) }
-        }
-    })
+        client_diff::EntryChange::Changed { path, before, after, sizes, hunks } => EntryChange::Changed {
+            path,
+            before: node_back(before),
+            after: node_back(after),
+            sizes: sizes_back(sizes),
+            hunks: optional_hunks_back(hunks),
+        },
+    }
 }
 #[test]
 fn each_change_rebuild_and_side_translates_to_the_records_and_back() {
     for (source, expected) in CHANGES {
         assert_eq!(changes::target_change(source.clone()), *expected, "change {source:?}");
-        assert_eq!(change_back(expected.clone()), Some(source.clone()), "change {expected:?}");
+        assert_eq!(change_back(expected.clone()), source.clone(), "change {expected:?}");
     }
 }
 const REBUILDS: &[(diff::Rebuild, client_diff::Rebuild)] = &[
@@ -485,13 +486,13 @@ fn the_tally_translates_to_the_records_and_back() {
     );
 }
 #[test]
-fn a_changed_config_entry_translates_without_sizes_or_hunks() {
+fn a_changed_config_entry_translates_its_sizes_and_hunks() {
     let change = super::fixtures::config_change();
     let translated = changes::change(change.clone());
     assert_eq!(translated.target.as_ref(), b"x1-prod");
     assert_eq!(
         change_back(translated.change),
-        Some(diff::TargetChange::Changed {
+        diff::TargetChange::Changed {
             parts: Box::new([diff::PartChange::Config(render::parts::config::Change {
                 tree: Box::new([render::parts::config::EntryChange::Changed {
                     path: skein_lib::bytes::copy_of(b"/etc/motd"),
@@ -507,10 +508,12 @@ fn a_changed_config_entry_translates_without_sizes_or_hunks() {
                         owner: skein_lib::bytes::copy_of(b"root"),
                         group: skein_lib::bytes::copy_of(b"root")
                     },
+                    sizes: Some(render::parts::config::Sizes { before: 9, after: 22 }),
+                    hunks: Some(diff::Hunks { lines: Box::new([]), left_out: 401, binary: false }),
                 }])
             })]),
             rebuild: diff::Rebuild::FromConfig,
-        }),
+        },
         "config node fields and rebuild preserved"
     );
 }
@@ -689,4 +692,86 @@ fn an_expressions_offsets_and_values_cross_unchanged() {
             ]),
         }
     );
+}
+
+fn line_kind_back(kind: client_diff::LineKind) -> diff::LineKind {
+    match kind {
+        client_diff::LineKind::Header => diff::LineKind::Hunk,
+        client_diff::LineKind::Context => diff::LineKind::Context,
+        client_diff::LineKind::Removed => diff::LineKind::Removed,
+        client_diff::LineKind::Added => diff::LineKind::Added,
+        client_diff::LineKind::NoNewline => diff::LineKind::NoNewline,
+    }
+}
+fn git_kind_back(kind: diff::LineKind) -> crate::git_machine::hunks::Kind {
+    use crate::git_machine::hunks::Kind;
+    match kind {
+        diff::LineKind::Hunk => Kind::Hunk,
+        diff::LineKind::Context => Kind::Context,
+        diff::LineKind::Removed => Kind::Removed,
+        diff::LineKind::Added => Kind::Added,
+        diff::LineKind::NoNewline => Kind::NoNewline,
+    }
+}
+fn sizes_back(value: Option<client_diff::Sizes>) -> Option<render::parts::config::Sizes> {
+    let value = value?;
+    Some(render::parts::config::Sizes { before: value.before, after: value.after })
+}
+fn optional_hunks_back(value: Option<client_diff::Hunks>) -> Option<diff::Hunks> {
+    Some(hunks_back(value?))
+}
+fn hunks_back(hunks: client_diff::Hunks) -> diff::Hunks {
+    let mut lines = skein_lib::List::with_capacity(u32::try_from(hunks.lines.len()).expect("bounded lines"));
+    for line in hunks.lines {
+        lines.push(diff::Line { kind: line_kind_back(line.kind), text: line.text }).expect("line room");
+    }
+    diff::Hunks { lines: lines.into_boxed(), left_out: hunks.left_out, binary: hunks.binary }
+}
+const HUNK_KINDS: &[(crate::git_machine::hunks::Kind, diff::LineKind, client_diff::LineKind)] = &[
+    (crate::git_machine::hunks::Kind::Hunk, diff::LineKind::Hunk, client_diff::LineKind::Header),
+    (crate::git_machine::hunks::Kind::Context, diff::LineKind::Context, client_diff::LineKind::Context),
+    (crate::git_machine::hunks::Kind::Removed, diff::LineKind::Removed, client_diff::LineKind::Removed),
+    (crate::git_machine::hunks::Kind::Added, diff::LineKind::Added, client_diff::LineKind::Added),
+    (crate::git_machine::hunks::Kind::NoNewline, diff::LineKind::NoNewline, client_diff::LineKind::NoNewline),
+];
+#[test]
+fn each_hunk_line_kind_translates_and_back() {
+    for (row, (git, render, records)) in HUNK_KINDS.iter().enumerate() {
+        let translated = crate::translate::hunks::kind(*git);
+        assert_eq!(translated, *render, "row {row}: git kind");
+        assert_eq!(git_kind_back(translated), *git, "row {row}: git kind and back");
+        let translated = changes::line_kind(*render);
+        assert_eq!(translated, *records, "row {row}: records kind");
+        assert_eq!(line_kind_back(translated), *render, "row {row}: records kind and back");
+    }
+}
+#[test]
+fn retained_hunk_text_and_counts_translate_from_git() {
+    let hunks = crate::git_machine::hunks::Hunks {
+        lines: Box::new([crate::git_machine::hunks::Line {
+            kind: crate::git_machine::hunks::Kind::NoNewline,
+            text: skein_lib::bytes::copy_of(b" No newline at end of file"),
+        }]),
+        left_out: 401,
+        binary: false,
+    };
+    assert_eq!(
+        crate::translate::hunks::hunks(hunks),
+        diff::Hunks {
+            lines: Box::new([diff::Line {
+                kind: diff::LineKind::NoNewline,
+                text: skein_lib::bytes::copy_of(b" No newline at end of file")
+            }]),
+            left_out: 401,
+            binary: false
+        }
+    );
+}
+
+#[test]
+fn each_retained_hunk_line_translates_to_records_and_back() {
+    for (row, input) in super::fixtures::render_hunks().into_iter().enumerate() {
+        let back = hunks_back(changes::hunks(input.clone()));
+        assert_eq!(back, input, "row {row}: retained text, kinds, counts and binary marker");
+    }
 }

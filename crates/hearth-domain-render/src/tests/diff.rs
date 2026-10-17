@@ -83,6 +83,7 @@ fn tree_entries_are_added_removed_or_changed_by_path() {
                 path,
                 before: Node::File { content_digest: before, .. },
                 after: Node::File { content_digest: after, .. },
+                ..
             } => (path.as_ref(), Some(*before), Some(*after)),
         };
         assert_eq!((path, before, after), *expected, "byte path order: {entry:?}");
@@ -145,4 +146,84 @@ fn the_sides_render_in_turn_from_then_to() {
         })),
         "to follows from's last answer"
     );
+}
+
+struct FilePair {
+    before: u64,
+    after: u64,
+    digest: Digest,
+    expected: Option<(Digest, Digest)>,
+}
+const FILE_PAIRS: &[FilePair] = &[
+    FilePair { before: 9, after: 22, digest: Digest([2; 32]), expected: Some((Digest([1; 32]), Digest([2; 32]))) },
+    FilePair {
+        before: 1_048_575,
+        after: 22,
+        digest: Digest([2; 32]),
+        expected: Some((Digest([1; 32]), Digest([2; 32]))),
+    },
+    FilePair { before: 1_048_576, after: 22, digest: Digest([2; 32]), expected: None },
+    FilePair { before: 9, after: 1_048_576, digest: Digest([2; 32]), expected: None },
+    FilePair { before: 9, after: 9, digest: Digest([1; 32]), expected: None },
+];
+#[test]
+fn hunks_are_asked_only_for_two_files_under_1_mib_whose_digests_differ() {
+    for FilePair { before, after, digest, expected } in FILE_PAIRS {
+        let (mut entry, sizes_before, sizes_after) = fixtures::changed_file(*before, *after, *digest);
+        assert_eq!(
+            entry.pair(&sizes_before, &sizes_after, crate::limits::SHIPPED.hunk_file),
+            *expected,
+            "{before}/{after}/{digest:?}"
+        );
+    }
+}
+#[test]
+fn two_changed_files_keep_their_cached_sizes() {
+    let (mut entry, before, after) = fixtures::changed_file(9, 22, Digest([2; 32]));
+    entry.pair(&before, &after, crate::limits::SHIPPED.hunk_file);
+    let EntryChange::Changed { sizes, .. } = entry else { panic!("changed file") };
+    assert_eq!(sizes, Some(config::Sizes { before: 9, after: 22 }));
+}
+#[test]
+fn added_or_removed_files_never_request_hunks() {
+    let (before, after) = fixtures::diff_trees();
+    let mut change = config::change(Some(&before), Some(&after));
+    let sizes = crate::call::Sizes::with_capacity(0);
+    for entry in &mut change.tree {
+        assert_eq!(entry.pair(&sizes, &sizes, crate::limits::SHIPPED.hunk_file), None, "no pair of cached files");
+    }
+}
+#[test]
+fn a_failed_hunks_request_leaves_the_file_bare_and_the_call_try_again() {
+    use crate::vocabulary::{Answer, Event, Outcome, Output};
+    use skein_lib::Token;
+    let (mut render, env, mut out) = fixtures::hunk_call();
+    crate::step(&mut render, &env, Event::Failed { request: Token::new(3), class: Class::Operational }, &mut out);
+    crate::resume(&mut render, &env, &mut out);
+    let Some(Output::Answer(Answer::Change(change))) = out.pop() else { panic!("change stands") };
+    let mut target_change = change.change;
+    let tree = diff::tree(&mut target_change);
+    assert_eq!(
+        tree,
+        &[EntryChange::Changed {
+            path: bytes::copy_of(b"/etc/motd"),
+            before: Node::File {
+                content_digest: Digest([1; 32]),
+                mode: 0o644,
+                owner: bytes::copy_of(b"root"),
+                group: bytes::copy_of(b"root")
+            },
+            after: Node::File {
+                content_digest: Digest([2; 32]),
+                mode: 0o755,
+                owner: bytes::copy_of(b"root"),
+                group: bytes::copy_of(b"root")
+            },
+            sizes: Some(config::Sizes { before: 9, after: 22 }),
+            hunks: None,
+        }]
+    );
+    crate::resume(&mut render, &env, &mut out);
+    let Some(Output::Answer(Answer::Rendered { outcome, .. })) = out.pop() else { panic!("terminal") };
+    assert_eq!(outcome, Outcome::TryAgain);
 }

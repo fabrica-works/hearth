@@ -8,3 +8,5 @@ pub mod changes;
 pub mod errors;
 pub mod operations;
 pub mod store;
+
+pub mod hunks;

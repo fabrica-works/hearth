@@ -306,6 +306,8 @@ pub fn config_change() -> render::diff::Change {
                     path: bytes::copy_of(b"/etc/motd"),
                     before: config::file(b"etc/motd", Mode::File, hearth_lib::encode::Digest([1; 32])).node,
                     after: config::file(b"etc/motd", Mode::Executable, hearth_lib::encode::Digest([2; 32])).node,
+                    sizes: Some(config::Sizes { before: 9, after: 22 }),
+                    hunks: Some(diff::Hunks { lines: Box::new([]), left_out: 401, binary: false }),
                 }]),
             })]),
             rebuild: diff::Rebuild::FromConfig,
@@ -369,5 +371,34 @@ pub fn every_op() -> [hearth_protocol_template::Op; 26] {
         Op::JumpIfTrueKeeping { over: 13 },
         Op::JumpIfFalse { over: 17 },
         Op::Jump { over: 19 },
+    ]
+}
+
+impl Layer {
+    pub fn hunks(&mut self) {
+        self.down(render::vocabulary::Request::Hunks {
+            request: REQUEST,
+            before: hearth_lib::encode::Digest([1; 32]),
+            after: hearth_lib::encode::Digest([2; 32]),
+        });
+    }
+}
+
+#[must_use]
+pub fn render_hunks() -> [render::diff::Hunks; 2] {
+    use render::diff::{Hunks, Line, LineKind};
+    [
+        Hunks {
+            lines: Box::new([
+                Line { kind: LineKind::Hunk, text: bytes::copy_of(b"@@ -1 +1 @@") },
+                Line { kind: LineKind::Context, text: bytes::copy_of(b"context") },
+                Line { kind: LineKind::Removed, text: bytes::copy_of(b"old") },
+                Line { kind: LineKind::Added, text: bytes::copy_of(b"new") },
+                Line { kind: LineKind::NoNewline, text: bytes::copy_of(b" No newline at end of file") },
+            ]),
+            left_out: 401,
+            binary: false,
+        },
+        Hunks { lines: Box::new([]), left_out: 0, binary: true },
     ]
 }

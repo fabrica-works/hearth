@@ -9,6 +9,7 @@ pub struct Limits {
     pub nesting: u32,
     pub made: u64,
     pub static_file: u32,
+    pub hunk_file: u32,
 }
 pub const SHIPPED: Limits = Limits {
     targets: 1_024,
@@ -19,6 +20,7 @@ pub const SHIPPED: Limits = Limits {
     nesting: 64,
     made: 16_777_216,
     static_file: 67_108_864,
+    hunk_file: 1_048_576,
 };
 
 /// A literal that is five bytes cannot fit, for budget refusal tests.

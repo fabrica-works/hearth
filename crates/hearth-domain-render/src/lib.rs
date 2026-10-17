@@ -67,7 +67,15 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             assert_eq!(request, Token::new(1), "listing token");
             render.call.as_mut().expect("active call").side.fail(Outcome::Usage);
         }
-        Event::Failed { request: _, class } => {
+        Event::Hunks { request, hunks } => {
+            assert_eq!(request, Token::new(3), "hunks token");
+            render.call.as_mut().expect("active call").hunks(Some(hunks));
+        }
+        Event::Failed { request, class } => {
+            if request == Token::new(3) {
+                render.call.as_mut().expect("active call").hunks(None);
+                return;
+            }
             let outcome = match class {
                 Class::Configuration => Outcome::Failed,
                 Class::Operational => Outcome::TryAgain,

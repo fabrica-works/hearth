@@ -443,3 +443,74 @@ pub fn filter(input: Value, filter: evaluate::Filter, arguments: &[Value]) -> Re
     operations.push(op(3, Op::Filter(filter))).expect("room");
     evaluate(&roots, operations.as_slice())
 }
+
+pub fn changed_file(
+    before: u64,
+    after: u64,
+    digest: Digest,
+) -> (crate::parts::config::EntryChange, crate::call::Sizes, crate::call::Sizes) {
+    use crate::{parts::config, revision::Mode};
+    let mut old = crate::call::Sizes::with_capacity(1);
+    old.insert(Digest([1; 32]), before).expect("one cached digest");
+    let mut new = crate::call::Sizes::with_capacity(1);
+    new.insert(digest, after).expect("one cached digest");
+    (
+        config::EntryChange::Changed {
+            path: bytes::copy_of(b"/etc/motd"),
+            before: config::file(b"etc/motd", Mode::File, Digest([1; 32])).node,
+            after: config::file(b"etc/motd", Mode::Executable, digest).node,
+            sizes: None,
+            hunks: None,
+        },
+        old,
+        new,
+    )
+}
+pub fn hunk_call() -> (crate::Render, skein_lib::Env<limits::Limits>, skein_lib::Queue<crate::vocabulary::Output>) {
+    use crate::{
+        call::Call,
+        diff::Made,
+        parts::{
+            Part, PartRecord,
+            config::{Config, EntryChange, TreeEntry},
+        },
+        vocabulary::Output,
+    };
+    use skein_lib::{Env, Queue, Time, Wall};
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits::SHIPPED };
+    let mut out = Queue::with_capacity(1);
+    let mut call = Call::diff(bytes::copy_of(b"/repo"), Box::new([]), bytes::copy_of(b"after"), &env.limits);
+    let (EntryChange::Changed { before, after, .. }, old, new) = changed_file(9, 22, Digest([2; 32])) else {
+        panic!("changed file")
+    };
+    for (node, sizes, digest) in [(before, old, Digest([1; 32])), (after, new, Digest([2; 32]))] {
+        call.side.files = true;
+        call.side.ready = true;
+        call.side.commit = Some(crate::revision::Oid(bytes::copy_of(b"a")));
+        call.side.sizes = sizes;
+        call.side.made = skein_lib::Map::with_capacity(1);
+        let mut made = spec(
+            b"x1-prod",
+            &[Part {
+                digest,
+                record: PartRecord::Config(Config {
+                    tree: Box::new([TreeEntry { path: bytes::copy_of(b"/etc/motd"), node }]),
+                }),
+            }],
+        );
+        made.digest = digest;
+        call.side.made.insert(bytes::copy_of(b"x1-prod"), Made::Spec(Box::new(made))).expect("one target");
+        call.resume(env.limits, &mut out);
+        drop(out.pop());
+    }
+    call.resume(env.limits, &mut out);
+    assert_eq!(
+        out.pop(),
+        Some(Output::Request(crate::vocabulary::Request::Hunks {
+            request: skein_lib::Token::new(3),
+            before: Digest([1; 32]),
+            after: Digest([2; 32])
+        }))
+    );
+    (crate::Render { call: Some(call) }, env, out)
+}

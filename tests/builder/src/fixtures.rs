@@ -246,7 +246,7 @@ pub const MOTD: &[File] = &[
     File { path: "tasks/motd/tree/etc/motd", body: b"Welcome.\n", mode: 0o644 },
 ];
 pub const MOTD_KIND: File = File { path: "tasks/motd/tree/etc/motd", body: b"Welcome, and be kind.\n", mode: 0o644 };
-pub const MOTD_DIFF_TEXT: &str = "ion-prod                                            rebuild from config\n  config   ~ /etc/motd                              0644 root:root\nx1-prod                                             rebuild from config\n  config   ~ /etc/motd                              0644 root:root\n\n2 of 4 targets change; 2 are unchanged.\n";
+pub const MOTD_DIFF_TEXT: &str = "ion-prod                                            rebuild from config\n  config   ~ /etc/motd                              0644 root:root\n               @@ -1 +1 @@\n               -Welcome.\n               +Welcome, and be kind.\nx1-prod                                             rebuild from config\n  config   ~ /etc/motd                              0644 root:root\n               @@ -1 +1 @@\n               -Welcome.\n               +Welcome, and be kind.\n\n2 of 4 targets change; 2 are unchanged.\n";
 pub const BAD_ION_LAB: File = File { path: "hosts/ion/ion-lab.json", body: b"not JSON", mode: 0o644 };
 pub const BAD_X1_LAB: File = File { path: "hosts/x1/x1-lab.json", body: b"not JSON", mode: 0o644 };
 pub const FIXED_X1_LAB: File = File {
@@ -437,4 +437,32 @@ pub fn names(directory: &Path) -> Vec<String> {
         .collect();
     names.sort();
     names
+}
+
+/// A containing work tree whose configuration must not affect diff's cache files.
+pub fn work_tree(at: &Path, config: &[(&str, &str)]) {
+    fs::create_dir(at).expect("containing work tree");
+    let path = std::env::var_os("PATH").expect("git is required on PATH");
+    git(at, &path, &["init", "--quiet", "--initial-branch=main"]);
+    for (name, value) in config {
+        git(at, &path, &["config", name, value]);
+    }
+}
+pub const TWENTY_LINES: File = File { body: b"line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\n", ..MOTD_KIND };
+pub const TWENTY_LINES_TWO_CHANGED: File = File { body: b"line 1\nline two\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline twelve\nline 13\nline 14\nline 15\nline 16\nline 17\nline 18\nline 19\nline 20\n", ..MOTD_KIND };
+#[must_use]
+pub fn diff_beneath_work_tree(label: &str, attributes: bool) -> Rendered {
+    let repository = Repository::make(label, MOTD);
+    let from = repository.next(&[TWENTY_LINES], &[]);
+    let to = repository.next(&[TWENTY_LINES_TWO_CHANGED], &[]);
+    let containing = repository.scratch().path().join("containing");
+    work_tree(&containing, &[("diff.interHunkContext", "10")]);
+    if attributes {
+        fs::write(containing.join(".gitattributes"), b"* -diff\n").expect("attributes");
+        let path = std::env::var_os("PATH").expect("git is required on PATH");
+        git(&containing, &path, &["add", ".gitattributes"]);
+        git(&containing, &path, &["commit", "-q", "-m", "attributes"]);
+    }
+    let store = containing.join("store");
+    diff(&repository, &Asked { store: Some(&store), targets: &[b"x1-prod"], ..Asked::new(&from, &to) })
 }

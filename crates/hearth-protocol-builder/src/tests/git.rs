@@ -130,3 +130,106 @@ fn a_failed_spawn_waits_for_closed_before_answering_operational() {
         "spawn failed"
     );
 }
+
+#[test]
+fn a_hunks_request_spawns_gits_diff_beneath_the_stores_root() {
+    let mut layer = Layer::new();
+    layer.hunks();
+    let Some(Asked::Io(io::Request::Spawn { spawn, .. })) = layer.asked() else { panic!("diff spawn") };
+    assert_eq!(spawn.program.as_ref(), b"/usr/bin/git");
+    assert_eq!(spawn.root, skein_io::kernel::Fd::new(3));
+    assert_eq!(spawn.dir.as_ref(), b"");
+    assert_eq!(
+        spawn.args.as_ref(),
+        &[
+            bytes::copy_of(b"--git-dir=/dev/null"),
+            bytes::copy_of(b"diff"),
+            bytes::copy_of(b"--no-index"),
+            bytes::copy_of(b"--no-color"),
+            bytes::copy_of(b"--no-ext-diff"),
+            bytes::copy_of(b"--no-textconv"),
+            bytes::copy_of(b"--diff-algorithm=myers"),
+            bytes::copy_of(b"--unified=3"),
+            bytes::copy_of(b"--"),
+            bytes::copy_of(b"./cache/0101010101010101010101010101010101010101010101010101010101010101"),
+            bytes::copy_of(b"./cache/0202020202020202020202020202020202020202020202020202020202020202"),
+        ]
+    );
+}
+const DIFF_FAILED_EXITS: &[Exit] = &[Exit::Code(0), Exit::Code(2), Exit::Code(128), Exit::Signal(9)];
+#[test]
+fn diff_exiting_0_or_past_1_fails_the_request_as_operational() {
+    for exit in DIFF_FAILED_EXITS {
+        let mut layer = Layer::new();
+        layer.hunks();
+        assert_eq!(
+            layer.run(b"@@ -1 +1 @@\n-old\n+new\n", *exit),
+            RootEvent::Render(Event::Failed { request: REQUEST, class: crate::render::vocabulary::Class::Operational }),
+            "{exit:?}"
+        );
+    }
+}
+#[test]
+fn diff_exiting_1_answers_its_decoded_hunks() {
+    let mut layer = Layer::new();
+    layer.hunks();
+    assert_eq!(
+        layer.run(b"@@ -1 +1 @@\n-old\n+new\n", Exit::Code(1)),
+        RootEvent::Render(Event::Hunks {
+            request: REQUEST,
+            hunks: crate::render::diff::Hunks {
+                lines: Box::new([
+                    crate::render::diff::Line {
+                        kind: crate::render::diff::LineKind::Hunk,
+                        text: bytes::copy_of(b"@@ -1 +1 @@")
+                    },
+                    crate::render::diff::Line {
+                        kind: crate::render::diff::LineKind::Removed,
+                        text: bytes::copy_of(b"old")
+                    },
+                    crate::render::diff::Line {
+                        kind: crate::render::diff::LineKind::Added,
+                        text: bytes::copy_of(b"new")
+                    },
+                ]),
+                left_out: 0,
+                binary: false,
+            }
+        })
+    );
+}
+#[test]
+fn binary_diff_exiting_1_answers_no_hunk_line() {
+    let mut layer = Layer::new();
+    layer.hunks();
+    assert_eq!(
+        layer.run(b"Binary files a/a and b/b differ\n", Exit::Code(1)),
+        RootEvent::Render(Event::Hunks {
+            request: REQUEST,
+            hunks: crate::render::diff::Hunks { lines: Box::new([]), left_out: 0, binary: true },
+        })
+    );
+}
+
+#[test]
+fn hunks_wait_for_the_childs_exit_after_stdout_ends() {
+    use skein_lib::stream::Held;
+    let mut layer = Layer::new();
+    layer.hunks();
+    let Some(Asked::Io(io::Request::Spawn { owner, .. })) = layer.asked() else { panic!("diff spawn") };
+    layer.spawn_pending(owner, false);
+    let mut held = Held::new(bytes::copy_of(b"Binary files a/a and b/b differ\n"));
+    for _ in 0_u32..64 {
+        let Some(request) = layer.asked() else { break };
+        layer.answer(request, &mut held, Exit::Code(1));
+    }
+    assert_eq!(layer.told(), None, "stdout's result waits for exit");
+    layer.up(io::Event::Exited { owner, exit: Exit::Code(1) });
+    assert_eq!(
+        layer.run(b"", Exit::Code(1)),
+        RootEvent::Render(Event::Hunks {
+            request: REQUEST,
+            hunks: crate::render::diff::Hunks { lines: Box::new([]), left_out: 0, binary: true }
+        })
+    );
+}

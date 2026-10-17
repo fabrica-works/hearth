@@ -20,7 +20,7 @@ mod store;
 use hearth_protocol_tree as tree;
 pub mod translate;
 use alloc::boxed::Box;
-use git_machine::{invocation, listing, oid::Oid, rev_parse};
+use git_machine::{hunks, invocation, listing, oid::Oid, rev_parse};
 use limits::Limits;
 use render::vocabulary::{Class, Event as RenderEvent};
 use skein_io::{self as io, kernel::Fd};
@@ -64,6 +64,13 @@ enum Mode {
         answer: Option<Result<Box<[listing::Entry]>, ()>>,
     },
     Read(Box<read::Read>),
+    Hunks {
+        request: Token,
+        machine: hunks::Diff,
+        above: Queue<hunks::Event>,
+        below: Queue<Down>,
+        answer: Option<Result<hunks::Hunks, ()>>,
+    },
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Root {
@@ -156,6 +163,12 @@ impl Protocol {
                     || *answer == Some(Err(()))
                     || (answer.is_some() && child.exit.is_some())
             }
+            Some(Mode::Hunks { above, below, answer, .. }) => {
+                !above.is_empty()
+                    || (child.output.is_some() && !below.is_empty())
+                    || *answer == Some(Err(()))
+                    || (answer.is_some() && child.exit.is_some())
+            }
             Some(Mode::Read(read)) => {
                 read.failed()
                     || (read.ready() && child.exit.is_some())
@@ -209,6 +222,22 @@ pub fn down(
                         stdout: List::with_capacity(rev_parse::MAX_STDOUT.checked_add(1).expect("bounded stdout")),
                         ended: false,
                     });
+                }
+                render::vocabulary::Request::Hunks { request, before, after } => {
+                    protocol
+                        .spawn(invocation::Command::Diff { store: b".", before: &before.0, after: &after.0 }, below);
+                    let mut machine = hunks::Diff::new(&env.limits.git);
+                    let mut events = Queue::with_capacity(1);
+                    let mut requests = Queue::with_capacity(1);
+                    hunks::down(
+                        &mut machine,
+                        &Env { now: env.now, wall: env.wall, limits: env.limits.git },
+                        hunks::Request::Read,
+                        &mut events,
+                        &mut requests,
+                    );
+                    protocol.mode =
+                        Some(Mode::Hunks { request, machine, above: events, below: requests, answer: None });
                 }
                 render::vocabulary::Request::Read { request, repository, commit: _, blobs } => {
                     protocol.spawn(invocation::Command::CatFile { repository: &repository }, below);
@@ -281,32 +310,22 @@ fn io_up(protocol: &mut Protocol, env: &Env<Limits>, event: io::Event, below: &m
             } else {
                 assert_eq!(child.output, Some(owner), "current stdout");
                 match protocol.mode.as_mut().expect("child mode") {
-                    Mode::Rev { stdout, ended, .. } => match up {
-                        Up::Bytes(bytes) => {
-                            for byte in bytes {
-                                if stdout.room() > 0 {
-                                    stdout.push(byte).expect("stdout room");
-                                }
-                            }
-                            if stdout.room() == 0 {
-                                child.failed = true;
-                            } else {
-                                child.stream(
-                                    Down::Demand { read: StreamRead::Arrived { max: stdout.room() }, room: 0 },
-                                    below,
-                                );
-                            }
-                        }
-                        Up::End => {
-                            *ended = true;
-                            child.stream(Down::Demand { read: StreamRead::Nothing, room: 0 }, below);
-                        }
-                        Up::Failed(_) => child.failed = true,
-                        Up::Room => unreachable!("read-only stdout"),
-                    },
+                    Mode::Rev { stdout, ended, .. } => revision_stdout(stdout, ended, up, child, below),
                     Mode::Listing { machine, above: events, below: requests, .. } => {
                         let env = Env { now: env.now, wall: env.wall, limits: env.limits.git };
                         listing::up(machine, &env, up, events, requests);
+                        if let Some(down) = requests.pop() {
+                            child.stream(down, below);
+                        }
+                    }
+                    Mode::Hunks { machine, above: events, below: requests, .. } => {
+                        hunks::up(
+                            machine,
+                            &Env { now: env.now, wall: env.wall, limits: env.limits.git },
+                            up,
+                            events,
+                            requests,
+                        );
                         if let Some(down) = requests.pop() {
                             child.stream(down, below);
                         }
@@ -341,11 +360,34 @@ fn io_up(protocol: &mut Protocol, env: &Env<Limits>, event: io::Event, below: &m
         | io::Event::Shutdown { .. } => unreachable!("git child events only"),
     }
 }
+fn revision_stdout(stdout: &mut List<u8>, ended: &mut bool, up: Up, child: &mut git::Child, below: &mut Queue<Asked>) {
+    match up {
+        Up::Bytes(bytes) => {
+            for byte in bytes {
+                if stdout.room() > 0 {
+                    stdout.push(byte).expect("stdout room");
+                }
+            }
+            if stdout.room() == 0 {
+                child.failed = true;
+            } else {
+                child.stream(Down::Demand { read: StreamRead::Arrived { max: stdout.room() }, room: 0 }, below);
+            }
+        }
+        Up::End => {
+            *ended = true;
+            child.stream(Down::Demand { read: StreamRead::Nothing, room: 0 }, below);
+        }
+        Up::Failed(_) => child.failed = true,
+        Up::Room => unreachable!("read-only stdout"),
+    }
+}
 fn succeeded(mode: &Mode, exit: invocation::Exit) -> bool {
     let command = match mode {
         Mode::Rev { repository, revision, .. } => invocation::Command::RevParse { repository, revision },
         Mode::Listing { commit, .. } => invocation::Command::LsTree { repository: b"", commit: *commit },
         Mode::Read(_) => invocation::Command::CatFile { repository: b"" },
+        Mode::Hunks { .. } => invocation::Command::Diff { store: b".", before: &[0; 32], after: &[0; 32] },
     };
     invocation::succeeded(command, exit)
 }
@@ -365,6 +407,12 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
     let ready = match mode {
         Mode::Rev { ended, .. } => *ended,
         Mode::Listing { answer, .. } => {
+            if *answer == Some(Err(())) {
+                child.failed = true;
+            }
+            answer.is_some()
+        }
+        Mode::Hunks { answer, .. } => {
             if *answer == Some(Err(())) {
                 child.failed = true;
             }
@@ -404,6 +452,17 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
                     listing::Event::Listed(entries) => Ok(entries),
                     listing::Event::Failed(_) => Err(()),
                     listing::Event::Closed => unreachable!("listing is not closed"),
+                });
+            } else if let Some(down) = requests.pop() {
+                child.stream(down, below);
+            }
+        }
+        Mode::Hunks { above: events, below: requests, answer, .. } => {
+            if let Some(event) = events.pop() {
+                *answer = Some(match event {
+                    hunks::Event::Hunks(hunks) => Ok(hunks),
+                    hunks::Event::Failed(_) => Err(()),
+                    hunks::Event::Closed => unreachable!("hunks are not closed"),
                 });
             } else if let Some(down) = requests.pop() {
                 child.stream(down, below);
@@ -463,6 +522,17 @@ fn finish(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Event>, 
                             entries: translated.into_boxed(),
                         })
                     }
+                    Err(()) => None,
+                }
+            };
+            (request, event)
+        }
+        Mode::Hunks { request, answer, .. } => {
+            let event = if child.failed {
+                None
+            } else {
+                match answer.expect("hunks settled") {
+                    Ok(hunks) => Some(RenderEvent::Hunks { request, hunks: translate::hunks::hunks(hunks) }),
                     Err(()) => None,
                 }
             };

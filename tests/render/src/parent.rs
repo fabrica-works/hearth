@@ -54,12 +54,15 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                             commit: fixtures::oid(b'a'),
                             entries: repository.entries.clone().into_boxed_slice(),
                         }],
+                        Request::Hunks { .. } => unreachable!("render worlds do not diff"),
                         Request::Read { request, blobs, .. } => {
                             blobs.iter().map(|blob| blob_event(repository, blob, *request)).collect()
                         }
                     };
                     let token = match &request {
-                        Request::List { request, .. } | Request::Read { request, .. } => *request,
+                        Request::List { request, .. }
+                        | Request::Read { request, .. }
+                        | Request::Hunks { request, .. } => *request,
                     };
                     ledger.open(token, events.len());
                     for event in events {
@@ -77,6 +80,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
             let event = schedule.next(at).expect("scheduled event");
             let token = match &event {
                 Event::Listed { request, .. }
+                | Event::Hunks { request, .. }
                 | Event::Read { request, .. }
                 | Event::Cached { request, .. }
                 | Event::Unresolved { request }

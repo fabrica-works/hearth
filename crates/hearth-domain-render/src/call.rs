@@ -9,6 +9,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_lib::{List, Map, Queue, Token};
+pub(crate) type Sizes = Map<hearth_lib::encode::Digest, u64>;
 #[derive(Debug)]
 pub(crate) struct Side {
     pub repository: Box<[u8]>,
@@ -25,6 +26,7 @@ pub(crate) struct Side {
     pub pending: Box<[Blob]>,
     pub entries: Box<[Entry]>,
     pub cached: Map<Oid, hearth_lib::encode::Digest>,
+    pub sizes: Sizes,
     pub declarations: Map<Oid, bool>,
     pub files: bool,
     pub read: usize,
@@ -51,6 +53,7 @@ impl Side {
             pending: Box::new([]),
             entries: Box::new([]),
             cached: Map::with_capacity(0),
+            sizes: Map::with_capacity(0),
             declarations: Map::with_capacity(0),
             files: false,
             read: 0,
@@ -169,6 +172,7 @@ impl Side {
         let expected = self.pending.get(self.read).expect("one event per blob");
         assert_eq!((&expected.oid, expected.size, expected.kind), (oid, size, As::Cached), "cached blob");
         self.cached.insert(oid.clone(), digest).expect("listing capacity");
+        self.sizes.insert(digest, size).expect("listing capacity");
         self.read = self.read.saturating_add(1);
         self.ready = self.read == self.pending.len();
     }
@@ -194,6 +198,7 @@ impl Side {
         self.settings = settings.into_boxed();
         let capacity = u32::try_from(self.entries.len()).expect("listing capacity");
         self.cached = Map::with_capacity(capacity);
+        self.sizes = Map::with_capacity(capacity);
         self.declarations = Map::with_capacity(capacity);
         let mut blobs = List::with_capacity(capacity);
         let mut paths = List::with_capacity(capacity);
@@ -403,6 +408,8 @@ pub(crate) struct Comparison {
     next: usize,
     tally: Option<crate::diff::Tally>,
     outcome: Outcome,
+    pending: Option<crate::diff::Change>,
+    entry: usize,
 }
 impl Call {
     pub fn new(repository: Box<[u8]>, names: Box<[Box<[u8]>]>, limits: &Limits) -> Self {
@@ -418,8 +425,26 @@ impl Call {
             next: 0,
             tally: None,
             outcome: Outcome::Done,
+            pending: None,
+            entry: 0,
         });
         call
+    }
+    pub fn hunks(&mut self, hunks: Option<crate::diff::Hunks>) {
+        let diff = self.diff.as_mut().expect("diff hunks");
+        let change = diff.pending.as_mut().expect("pending change");
+        let entry =
+            crate::diff::tree(&mut change.change).get_mut(diff.entry.saturating_sub(1)).expect("requested file");
+        if hunks.is_none() {
+            diff.outcome = diff.outcome.worst(Outcome::TryAgain);
+        }
+        match entry {
+            parts::config::EntryChange::Changed { hunks: kept, .. } => *kept = hunks,
+            parts::config::EntryChange::Added { .. } | parts::config::EntryChange::Removed { .. } => {
+                unreachable!("changed file")
+            }
+        }
+        self.side.ready = true;
     }
     pub fn resume(&mut self, limits: Limits, out: &mut Queue<Output>) -> bool {
         if self.side.files(limits, out) {
@@ -456,7 +481,8 @@ impl Call {
             };
             if let Some(revision) = diff.revision.take() {
                 let made = core::mem::replace(&mut self.side.made, Map::with_capacity(0));
-                diff.from = Some(RenderedSide { commit, made });
+                let sizes = core::mem::replace(&mut self.side.sizes, Map::with_capacity(0));
+                diff.from = Some(RenderedSide { commit, made, sizes });
                 self.side = Side::new(self.side.repository.clone(), self.side.names.clone(), &limits);
                 self.side.diff = true;
                 out.push(Output::Request(Request::List {
@@ -466,7 +492,7 @@ impl Call {
                 }));
                 return false;
             }
-            let RenderedSide { commit: from, made } = diff.from.as_ref().expect("from rendered first");
+            let RenderedSide { commit: from, made, .. } = diff.from.as_ref().expect("from rendered first");
             let mut names = Map::with_capacity(limits.targets.saturating_mul(2));
             for (name, _) in made.into_iter().chain(&self.side.made) {
                 names.insert(name.clone(), ()).expect("two sides' targets");
@@ -489,9 +515,15 @@ impl Call {
                 unchanged: 0,
             });
         }
+        if diff.pending.is_some() {
+            let (output, ready) = diff.resume_hunks(&self.side.sizes, limits.hunk_file);
+            self.side.ready = ready;
+            out.push(output);
+            return false;
+        }
         if let Some(target) = diff.names.get(diff.next) {
             diff.next = diff.next.saturating_add(1);
-            let RenderedSide { commit: _, made: from } = diff.from.as_ref().expect("from side");
+            let RenderedSide { made: from, .. } = diff.from.as_ref().expect("from side");
             let change = crate::diff::compare(from.get(target), self.side.made.get(target), crate::diff::Needs::Needed);
             let tally = diff.tally.as_mut().expect("both sides listed");
             match &change {
@@ -504,7 +536,8 @@ impl Call {
                     diff.outcome = diff.outcome.worst(Outcome::Negative);
                 }
             }
-            out.push(Output::Answer(Answer::Change(crate::diff::Change { target: target.clone(), change })));
+            diff.pending = Some(crate::diff::Change { target: target.clone(), change });
+            diff.entry = 0;
             return false;
         }
         out.push(Output::Answer(Answer::Rendered { outcome: diff.outcome, diff: diff.tally.take() }));
@@ -516,4 +549,19 @@ impl Call {
 struct RenderedSide {
     commit: Oid,
     made: Map<Box<[u8]>, crate::diff::Made>,
+    sizes: Sizes,
+}
+
+impl Comparison {
+    fn resume_hunks(&mut self, sizes: &Sizes, max: u32) -> (Output, bool) {
+        let change = self.pending.as_mut().expect("pending change");
+        let from = self.from.as_ref().expect("from rendered");
+        for entry in crate::diff::tree(&mut change.change).get_mut(self.entry..).expect("entry cursor") {
+            self.entry = self.entry.saturating_add(1);
+            if let Some((before, after)) = entry.pair(&from.sizes, sizes, max) {
+                return (Output::Request(Request::Hunks { request: Token::new(3), before, after }), false);
+            }
+        }
+        (Output::Answer(Answer::Change(self.pending.take().expect("pending change"))), true)
+    }
 }

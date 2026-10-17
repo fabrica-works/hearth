@@ -73,6 +73,7 @@ pub struct HunkLine {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum LineKind {
     Header,
+    NoNewline,
     Context,
     Removed,
     Added,
@@ -309,6 +310,7 @@ impl Hunks {
             lines.put(b"               ");
             lines.put(match line.kind {
                 LineKind::Header => b"",
+                LineKind::NoNewline => b"\\",
                 LineKind::Context => b" ",
                 LineKind::Removed => b"-",
                 LineKind::Added => b"+",
@@ -337,6 +339,7 @@ impl Hunks {
                 b"kind",
                 match line.kind {
                     LineKind::Header => b"header",
+                    LineKind::NoNewline => b"no_newline",
                     LineKind::Context => b"context",
                     LineKind::Removed => b"removed",
                     LineKind::Added => b"added",
