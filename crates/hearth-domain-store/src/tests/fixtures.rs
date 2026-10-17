@@ -30,6 +30,9 @@ impl Harness {
     pub fn page(&mut self, entries: &[Entry], last: bool) -> Box<[Output]> {
         self.step(Time::ZERO, Event::Page { entries: entries.into(), last })
     }
+    pub fn resolved(&self, key: &hearth_lib::encode::Digest) -> bool {
+        self.store.scan.resolved(key)
+    }
     pub fn indexed(&self, digest: &hearth_lib::encode::Digest) -> bool {
         self.store.scan.indexed(digest)
     }
@@ -66,6 +69,7 @@ pub fn scanning(limits: Limits) -> Harness {
         Event::Loaded { record: Some(StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: 1000 }) },
     ));
     drop(store.page(&[], true));
+    drop(store.page(&[], true));
     store
 }
 
@@ -78,6 +82,7 @@ pub fn ready(limits: Limits, digests: &[hearth_lib::encode::Digest]) -> Harness 
     let mut store = scanning(limits);
     drop(store.page(&[], true));
     drop(store.page(&[], true));
+    drop(store.step(Time::ZERO, Event::Done));
     for digest in digests {
         store.store.scan.index.insert(*digest, true).expect("fixture cache bound");
     }
@@ -97,3 +102,49 @@ pub fn full() -> Harness {
     store.store.usable = false;
     store
 }
+
+pub fn resolving(limits: Limits, key: hearth_lib::encode::Digest) -> Harness {
+    let mut store = Harness::new(limits, 1000);
+    drop(store.step(Time::ZERO, Event::Open));
+    drop(store.step(Time::ZERO, Event::Locked));
+    drop(store.step(
+        Time::ZERO,
+        Event::Loaded { record: Some(StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: 1000 }) },
+    ));
+    drop(store.page(&[], true));
+    let entry = entry(b"record", crate::vocabulary::Shape::Record(key));
+    drop(store.page(core::slice::from_ref(&entry), true));
+    store
+}
+pub fn inputs() -> crate::vocabulary::Inputs {
+    use hearth_lib::encode::Item;
+    crate::vocabulary::Inputs {
+        sources: Box::new([Item::Map(0)]),
+        request: Box::new([Item::List(1), Item::Bytes(b"hello".as_slice().into())]),
+        variant: Box::new([Item::Bytes(b"apt".as_slice().into())]),
+        apt: Box::new([Item::Map(0)]),
+    }
+}
+pub fn closure() -> Box<[crate::vocabulary::Closed]> {
+    Box::new([crate::vocabulary::Closed {
+        name: b"apt".as_slice().into(),
+        architecture: b"amd64".as_slice().into(),
+        version: b"3.0.3".as_slice().into(),
+        sha256: D1,
+    }])
+}
+pub fn resolution() -> Event {
+    Event::Resolution { key: KEY, inputs: inputs(), closure: closure(), digest: CLOSURE }
+}
+pub const KEY: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
+    1, 234, 129, 26, 252, 153, 48, 138, 159, 204, 51, 108, 148, 73, 102, 199, 249, 221, 152, 133, 123, 39, 89, 47, 224,
+    10, 31, 184, 75, 212, 157, 0,
+]);
+pub const CLOSURE: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
+    242, 251, 234, 142, 207, 175, 92, 30, 225, 209, 84, 99, 193, 172, 188, 52, 212, 154, 210, 160, 229, 114, 68, 15,
+    124, 191, 52, 95, 192, 174, 126, 227,
+]);
+pub const EMPTY_CLOSURE: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
+    193, 88, 154, 151, 28, 76, 229, 4, 43, 122, 140, 15, 92, 154, 246, 155, 61, 70, 254, 100, 184, 171, 76, 218, 172,
+    88, 93, 176, 234, 58, 213, 48,
+]);

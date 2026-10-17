@@ -57,6 +57,7 @@ fn a_second_call_while_one_is_held_panics() {
 
 #[test]
 fn the_call_reaches_render_only_once_the_store_is_open() {
+    use crate::store::vocabulary::Event as StoreEvent;
     let mut builder = Builder::new(&fixtures::LIMITS, 1000);
     let mut out = Queue::with_capacity(1);
     step(
@@ -68,13 +69,9 @@ fn the_call_reaches_render_only_once_the_store_is_open() {
     assert_eq!(out.pop(), Some(Request::Store(crate::store::vocabulary::Request::Lock)));
     step(&mut builder, &fixtures::env(), Event::Store(crate::store::vocabulary::Event::Locked), &mut out);
     assert_eq!(out.pop(), Some(Request::Store(crate::store::vocabulary::Request::LoadRecord)));
-    step(
-        &mut builder,
-        &fixtures::env(),
-        Event::Store(crate::store::vocabulary::Event::Loaded { record: Some(fixtures::store_record()) }),
-        &mut out,
-    );
-    for _ in 0_u8..3 {
+    let record = Some(fixtures::store_record());
+    step(&mut builder, &fixtures::env(), Event::Store(StoreEvent::Loaded { record }), &mut out);
+    for _ in 0_u8..4 {
         drop(out.pop());
         step(
             &mut builder,
@@ -83,6 +80,8 @@ fn the_call_reaches_render_only_once_the_store_is_open() {
             &mut out,
         );
     }
+    drop(out.pop());
+    step(&mut builder, &fixtures::env(), Event::Store(StoreEvent::Done), &mut out);
     assert_eq!(
         out.pop(),
         Some(Request::Render(crate::render::vocabulary::Request::List {

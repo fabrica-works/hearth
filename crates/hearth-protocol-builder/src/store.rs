@@ -21,10 +21,11 @@ pub(super) struct Store {
     max: u32,
     closing: Option<Event>,
     keeping: u8,
+    walk: Option<crate::walk::Walker>,
 }
 impl Store {
     pub fn new() -> Self {
-        Self { pending: None, cursor: None, directory: Directory::Top, max: 0, closing: None, keeping: 0 }
+        Self { pending: None, cursor: None, directory: Directory::Top, max: 0, closing: None, keeping: 0, walk: None }
     }
     pub fn down(
         &mut self,
@@ -36,7 +37,20 @@ impl Store {
     ) {
         assert!(self.pending.is_none(), "one store request");
         self.pending = Some(request.clone());
+        if request == Request::Empty {
+            self.walk = Some(crate::walk::Walker::new(limits.walk, roots.staging.fd, below));
+            return;
+        }
         below.push(Asked::File(match request {
+            Request::Empty => unreachable!("walk started"),
+            Request::Load { key } => file::Request::Load {
+                owner: OWNER,
+                root: roots.resolutions.token,
+                path: names::removal(builder::store::vocabulary::Removal::Record(key)),
+                max: u32::try_from(tree::frame::largest(tree::frame::Kind::Resolution, &limits.tree))
+                    .expect("resolution fits u32"),
+                no_follow: true,
+            },
             Request::Keep { arrival: _, record } => {
                 self.keeping = 1;
                 file::Request::Rename {
@@ -59,7 +73,11 @@ impl Store {
                 file::Request::OpenDirectory {
                     owner: OWNER,
                     root: roots.store.fd,
-                    name: bytes::copy_of(if directory == Directory::Top { b"." } else { b"cache" }),
+                    name: bytes::copy_of(match directory {
+                        Directory::Top => b".",
+                        Directory::Cache => b"cache",
+                        Directory::Resolutions => b"resolutions",
+                    }),
                     no_follow: true,
                 }
             }
@@ -70,7 +88,11 @@ impl Store {
             Request::Close => file::Request::Close { owner: OWNER, file: self.cursor.take().expect("scan cursor") },
             Request::Remove { directory, name } => file::Request::Remove {
                 owner: OWNER,
-                root: if directory == Directory::Top { roots.store.fd } else { roots.cache.fd },
+                root: match directory {
+                    Directory::Top => roots.store.fd,
+                    Directory::Cache => roots.cache.fd,
+                    Directory::Resolutions => roots.resolutions.fd,
+                },
                 name: names::removal(name),
                 directory: false,
             },
@@ -106,6 +128,14 @@ impl Store {
         above: &mut Queue<builder::vocabulary::Event>,
         below: &mut Queue<Asked>,
     ) {
+        if let Some(walk) = &mut self.walk {
+            if let Some(event) = walk.up(event, limits.walk, below) {
+                self.walk = None;
+                self.pending = None;
+                above.push(builder::vocabulary::Event::Store(event));
+            }
+            return;
+        }
         if let Some(Request::Keep { record, .. }) = &self.pending {
             let request = match (&event, self.keeping) {
                 (file::Event::Renamed { .. }, 1) => {
@@ -149,6 +179,25 @@ impl Store {
             }
         }
         let pending = self.pending.take().expect("store request in flight");
+        let Some(event) = self.terminal(event, limits, &pending, below) else {
+            return;
+        };
+        let event = builder::vocabulary::Event::Store(event);
+        if let Request::Keep { .. } | Request::Discard { .. } = pending {
+            if let Some(event) = read.expect("arrival read").settle(event) {
+                above.push(event);
+            }
+        } else {
+            above.push(event);
+        }
+    }
+    fn terminal(
+        &mut self,
+        event: file::Event,
+        limits: &Limits,
+        pending: &Request,
+        below: &mut Queue<Asked>,
+    ) -> Option<Event> {
         let event = match event {
             file::Event::Listed { entries, .. } => {
                 let last = entries.len() < usize::try_from(self.max).expect("page bound");
@@ -161,27 +210,28 @@ impl Store {
                 let event = Event::Page { entries: shaped.into_boxed(), last };
                 if last {
                     self.closing = Some(event);
-                    self.pending = Some(pending);
+                    self.pending = Some(pending.clone());
                     below.push(Asked::File(file::Request::Close {
                         owner: OWNER,
                         file: self.cursor.take().expect("scan cursor"),
                     }));
-                    return;
+                    return None;
                 }
                 event
             }
             file::Event::Removed { .. } | file::Event::Closed { .. } | file::Event::Stored { .. } => Event::Done,
             file::Event::Locked { .. } => Event::Locked,
             file::Event::Busy { .. } => Event::Busy,
-            file::Event::Loaded { bytes, .. } => Event::Loaded {
-                record: match tree::store::read(&bytes, &limits.tree) {
-                    Ok(record) => Some(translate::store::store_record(record)),
-                    Err(_) => None,
-                },
-            },
-            file::Event::TooLarge { .. } => Event::Loaded { record: None },
-            file::Event::Failed { error: Error::TimedOut, .. } if pending == Request::Lock => Event::Busy,
-            file::Event::Failed { error: Error::NotFound, .. } if pending == Request::LoadRecord => {
+            file::Event::Loaded { bytes, .. } => loaded(&bytes, pending, limits),
+            file::Event::TooLarge { .. } => {
+                if let Request::Load { .. } = pending {
+                    Event::Unreadable
+                } else {
+                    Event::Loaded { record: None }
+                }
+            }
+            file::Event::Failed { error: Error::TimedOut, .. } if *pending == Request::Lock => Event::Busy,
+            file::Event::Failed { error: Error::NotFound, .. } if *pending == Request::LoadRecord => {
                 Event::Loaded { record: None }
             }
             file::Event::Failed { .. } | file::Event::Cancelled { .. } => Event::Failed,
@@ -197,14 +247,7 @@ impl Store {
             | file::Event::Synced { .. }
             | file::Event::Renamed { .. } => unreachable!("store request terminal"),
         };
-        let event = builder::vocabulary::Event::Store(event);
-        if let Request::Keep { .. } | Request::Discard { .. } = pending {
-            if let Some(event) = read.expect("arrival read").settle(event) {
-                above.push(event);
-            }
-        } else {
-            above.push(event);
-        }
+        Some(event)
     }
 }
 pub(super) fn startup(why: Why) -> records::startup::Startup {
@@ -228,4 +271,24 @@ pub(super) fn startup(why: Why) -> records::startup::Startup {
         }
     };
     records::startup::Startup::Unopened { what: records::startup::Opened::Store, path: None, error }
+}
+
+fn loaded(bytes: &[u8], pending: &Request, limits: &Limits) -> Event {
+    if let Request::Load { .. } = pending {
+        return match tree::resolution::read(bytes, &limits.tree) {
+            Ok(record) => Event::Resolution {
+                key: record.key,
+                inputs: translate::store::inputs(record.inputs),
+                closure: translate::store::closed(&record.closure),
+                digest: record.digest,
+            },
+            Err(_) => Event::Unreadable,
+        };
+    }
+    Event::Loaded {
+        record: match tree::store::read(bytes, &limits.tree) {
+            Ok(record) => Some(translate::store::store_record(record)),
+            Err(_) => None,
+        },
+    }
 }

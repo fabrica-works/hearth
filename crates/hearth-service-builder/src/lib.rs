@@ -343,6 +343,17 @@ fn io_down(service: &mut Service) {
         };
         let request = match request {
             Asked::Io(request) => request,
+            Asked::Beneath(request) => {
+                let request = beneath(&service.files, request);
+                file_layer::down(
+                    &mut service.files,
+                    service.io_env.now,
+                    request,
+                    &mut service.file_told,
+                    &mut service.file_submissions,
+                );
+                continue;
+            }
             Asked::File(request) => {
                 file_layer::down(
                     &mut service.files,
@@ -389,3 +400,20 @@ fn tag(mut submit: Submit, file: u64) -> Submit {
 }
 #[cfg(test)]
 mod tests;
+
+fn beneath(files: &FileIo, request: protocol::Beneath) -> file::Request {
+    match request {
+        protocol::Beneath::OpenDirectory { owner, root, name, no_follow } => file::Request::OpenDirectory {
+            owner,
+            root: files.descriptor(root).expect("walk directory token"),
+            name,
+            no_follow,
+        },
+        protocol::Beneath::Remove { owner, root, name, directory } => file::Request::Remove {
+            owner,
+            root: files.descriptor(root).expect("walk directory token"),
+            name,
+            directory,
+        },
+    }
+}

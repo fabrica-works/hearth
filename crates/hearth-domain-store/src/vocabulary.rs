@@ -1,9 +1,11 @@
 //! Typed store requests and terminals (store.md, 6.6, 8.2).
 use alloc::boxed::Box;
-use hearth_lib::encode::Digest;
+use hearth_lib::encode::{Digest, Item};
 use skein_lib::{Duration, Token, Wall};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    Resolution { key: Digest, inputs: Inputs, closure: Box<[Closed]>, digest: Digest },
+    Unreadable,
     Arrived { arrival: Token, sha256: Digest, size: u64, origin: Origin, took: Duration },
     Open,
     Locked,
@@ -15,6 +17,8 @@ pub enum Event {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    Load { key: Digest },
+    Empty,
     Keep { arrival: Token, record: CacheFile },
     Discard { arrival: Token },
     Lock,
@@ -61,6 +65,7 @@ pub struct Range {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Directory {
     Top,
+    Resolutions,
     Cache,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -70,6 +75,8 @@ pub enum Limit {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Step {
+    Load,
+    Empty,
     Keep,
     List,
     Remove,
@@ -114,4 +121,21 @@ pub enum Origin {
     Index { resolution: Digest },
     Blob { oid: Box<[u8]> },
     Rendered { path: Box<[u8]> },
+}
+
+/// The four canonical values of a resolution key (render.md, 5.1).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Inputs {
+    pub apt: Box<[Item]>,
+    pub request: Box<[Item]>,
+    pub sources: Box<[Item]>,
+    pub variant: Box<[Item]>,
+}
+/// The closure digest's package fields, in order (store.md, 6.4).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Closed {
+    pub name: Box<[u8]>,
+    pub architecture: Box<[u8]>,
+    pub version: Box<[u8]>,
+    pub sha256: Digest,
 }

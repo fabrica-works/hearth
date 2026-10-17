@@ -495,3 +495,60 @@ pub const MISTYPED: File = File {
     body: br#"{"settings": {"greeting": {"type": "int", "default": "hi", "doc": "The greeting."}}}"#,
     mode: 0o644,
 };
+
+/// One package and source line accepted by the resolution codec.
+#[must_use]
+pub fn resolution(
+    key: hearth::service::domain::render::vocabulary::Digest,
+    variant: &[u8],
+    digest: hearth::service::domain::render::vocabulary::Digest,
+) -> hearth_protocol_tree::resolution::Resolution {
+    use hearth_lib::encode::Item;
+    use hearth_protocol_tree::resolution::{Costs, Inputs, Line, Made, Package, Resolution};
+    Resolution {
+        key,
+        digest,
+        inputs: Inputs {
+            sources: Box::new([Item::Map(0)]),
+            request: Box::new([Item::List(1), Item::Bytes(b"hello".as_slice().into())]),
+            variant: Box::new([Item::Bytes(variant.into())]),
+            apt: Box::new([Item::Map(0)]),
+        },
+        closure: Box::new([Package {
+            name: b"apt".as_slice().into(),
+            architecture: b"amd64".as_slice().into(),
+            version: b"3.0.3".as_slice().into(),
+            source: 0,
+            filename: b"pool/apt.deb".as_slice().into(),
+            size: 7,
+            sha256: D1,
+        }]),
+        sources: Box::new([Line {
+            uri: b"https://deb.example/debian".as_slice().into(),
+            suite: b"stable".as_slice().into(),
+            components: Box::new([b"main".as_slice().into()]),
+            indices: Box::new([]),
+        }]),
+        made: Made {
+            apt: b"3.0.3".as_slice().into(),
+            at: skein_lib::Wall::EPOCH,
+            costs: Costs { fetched: 0, took: skein_lib::Duration::ZERO },
+            mmdebstrap: b"1.5".as_slice().into(),
+        },
+    }
+}
+pub const RESOLUTION_KEY: hearth::service::domain::render::vocabulary::Digest =
+    hearth::service::domain::render::vocabulary::Digest([
+        1, 234, 129, 26, 252, 153, 48, 138, 159, 204, 51, 108, 148, 73, 102, 199, 249, 221, 152, 133, 123, 39, 89, 47,
+        224, 10, 31, 184, 75, 212, 157, 0,
+    ]);
+pub const MINBASE_KEY: hearth::service::domain::render::vocabulary::Digest =
+    hearth::service::domain::render::vocabulary::Digest([
+        163, 63, 187, 161, 226, 131, 202, 148, 42, 188, 123, 35, 118, 177, 142, 72, 113, 210, 142, 118, 110, 225, 160,
+        241, 233, 4, 112, 215, 184, 46, 33, 187,
+    ]);
+pub const CLOSURE: hearth::service::domain::render::vocabulary::Digest =
+    hearth::service::domain::render::vocabulary::Digest([
+        242, 251, 234, 142, 207, 175, 92, 30, 225, 209, 84, 99, 193, 172, 188, 52, 212, 154, 210, 160, 229, 114, 68,
+        15, 124, 191, 52, 95, 192, 174, 126, 227,
+    ]);

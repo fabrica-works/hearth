@@ -83,6 +83,7 @@ version = "0.0.0"
 dependencies = [
  "hearth",
  "hearth-domain-store",
+ "hearth-lib",
  "hearth-protocol-tree",
  "skein-io",
  "skein-lib",

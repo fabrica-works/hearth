@@ -20,3 +20,17 @@ fn each_cache_file_field_and_origin_translates_and_back() {
         assert_eq!(record, input, "row {row}: cache provenance and cost");
     }
 }
+
+#[test]
+fn each_inputs_value_translates_and_back() {
+    for (row, input) in fixtures::every_inputs().into_iter().enumerate() {
+        let values = translate::store::inputs(input.clone());
+        let back = tree::resolution::Inputs {
+            apt: values.apt,
+            request: values.request,
+            sources: values.sources,
+            variant: values.variant,
+        };
+        assert_eq!(back, input, "row {row}: each canonical value survives");
+    }
+}

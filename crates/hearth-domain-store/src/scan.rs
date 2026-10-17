@@ -2,16 +2,19 @@
 use crate::{
     Phase, Store, index,
     limits::Limits,
+    resolutions,
     vocabulary::{Answer, Directory, Entry, Event, Limit, Output, Removal, Request, Shape, Step, Stray},
 };
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
-use skein_lib::{Env, Queue};
+use skein_lib::{Env, Map, Queue};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Pass {
     Top,
+    Resolutions,
     Records,
     Files,
+    Empty,
     Settle,
     Closing,
 }
@@ -19,6 +22,9 @@ enum Pass {
 pub(super) struct Scan {
     pass: Pass,
     pub(super) index: index::Index,
+    resolutions: Map<Digest, ()>,
+    loading: Option<Digest>,
+    full: Answer,
     entries: Box<[Entry]>,
     at: u32,
     last: bool,
@@ -33,6 +39,9 @@ impl Scan {
         Self {
             pass: Pass::Top,
             index: index::Index::with_capacity(limits.cache_files.saturating_mul(2)),
+            resolutions: Map::with_capacity(limits.resolutions),
+            loading: None,
+            full: full(limits, Limit::CacheFiles),
             entries: Box::new([]),
             at: 0,
             last: true,
@@ -47,8 +56,16 @@ impl Scan {
     pub(super) fn indexed(&self, digest: &Digest) -> bool {
         self.index.get(digest) == Some(&true)
     }
+    #[cfg(test)]
+    pub(super) fn resolved(&self, key: &Digest) -> bool {
+        self.resolutions.get(key).is_some()
+    }
     fn directory(&self) -> Directory {
-        if self.pass == Pass::Top { Directory::Top } else { Directory::Cache }
+        match self.pass {
+            Pass::Top => Directory::Top,
+            Pass::Resolutions => Directory::Resolutions,
+            Pass::Records | Pass::Files | Pass::Empty | Pass::Settle | Pass::Closing => Directory::Cache,
+        }
     }
 }
 pub(super) fn begin(store: &mut Store, limits: Limits, out: &mut Queue<Output>) {
@@ -67,8 +84,11 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
         Event::Done => {
             scan.removing = false;
             if scan.pass == Pass::Closing {
-                finish(store, full(&env.limits), out);
+                finish(store, store.scan.full, out);
                 return;
+            }
+            if scan.pass == Pass::Empty {
+                scan.pass = Pass::Settle;
             }
             if scan.pass == Pass::Settle
                 && let Some(digest) = scan.after
@@ -77,14 +97,44 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
             }
         }
         Event::Failed => {
-            let step = if scan.removing { Step::Remove } else { Step::List };
+            let step = if scan.removing {
+                Step::Remove
+            } else if scan.loading.is_some() {
+                Step::Load
+            } else if scan.pass == Pass::Empty {
+                Step::Empty
+            } else {
+                Step::List
+            };
             finish(store, Answer::Unusable { step }, out);
             return;
+        }
+        Event::Resolution { key, inputs, closure, digest } => {
+            let expected = scan.loading.take().expect("resolution load");
+            if key != expected || resolutions::key(&inputs) != expected || resolutions::digest(&closure) != digest {
+                scan.removing = true;
+                out.push(Output::Request(Request::Remove {
+                    directory: Directory::Resolutions,
+                    name: Removal::Record(expected),
+                }));
+                return;
+            }
+            if scan.resolutions.insert(key, ()).is_err() {
+                stop_full(store, &env.limits, Limit::Resolutions, out);
+                return;
+            }
+        }
+        Event::Unreadable => {
+            scan.loading = None;
         }
         Event::Arrived { .. } | Event::Open | Event::Locked | Event::Busy | Event::Loaded { .. } => {
             unreachable!("scan terminal")
         }
     }
+    advance(store, env, out);
+}
+fn advance(store: &mut Store, env: &Env<Limits>, out: &mut Queue<Output>) {
+    let scan = &mut store.scan;
     if scan.pass == Pass::Settle {
         settle(store, out);
         return;
@@ -93,9 +143,14 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
         scan.at = scan.at.saturating_add(1);
         let removal = match entry.shape {
             Shape::Temporary if scan.pass != Pass::Files => Some(Removal::Named(entry.name.clone())),
+            Shape::Record(key) if scan.pass == Pass::Resolutions => {
+                scan.loading = Some(key);
+                out.push(Output::Request(Request::Load { key }));
+                return;
+            }
             Shape::Record(digest) if scan.pass == Pass::Records => {
                 if scan.index.insert(digest, false).is_err() {
-                    stop_full(store, &env.limits, out);
+                    stop_full(store, &env.limits, Limit::CacheFiles, out);
                     return;
                 }
                 None
@@ -107,7 +162,7 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
                         scan.pairs = scan.pairs.saturating_add(1);
                     }
                     if scan.pairs > env.limits.cache_files {
-                        stop_full(store, &env.limits, out);
+                        stop_full(store, &env.limits, Limit::CacheFiles, out);
                         return;
                     }
                     None
@@ -136,15 +191,20 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
         return;
     }
     match scan.pass {
-        Pass::Top | Pass::Records => {
-            scan.pass = if scan.pass == Pass::Top { Pass::Records } else { Pass::Files };
-            out.push(Output::Request(Request::List { directory: Directory::Cache, max: env.limits.page }));
+        Pass::Top | Pass::Resolutions | Pass::Records => {
+            scan.pass = match scan.pass {
+                Pass::Top => Pass::Resolutions,
+                Pass::Resolutions => Pass::Records,
+                Pass::Records => Pass::Files,
+                Pass::Files | Pass::Empty | Pass::Settle | Pass::Closing => unreachable!("listing pass"),
+            };
+            out.push(Output::Request(Request::List { directory: scan.directory(), max: env.limits.page }));
         }
         Pass::Files => {
-            scan.pass = Pass::Settle;
-            settle(store, out);
+            scan.pass = Pass::Empty;
+            out.push(Output::Request(Request::Empty));
         }
-        Pass::Settle | Pass::Closing => unreachable!("handled above"),
+        Pass::Empty | Pass::Settle | Pass::Closing => unreachable!("handled above"),
     }
 }
 fn settle(store: &mut Store, out: &mut Queue<Output>) {
@@ -157,12 +217,13 @@ fn settle(store: &mut Store, out: &mut Queue<Output>) {
         finish(store, Answer::Ready, out);
     }
 }
-fn full(limits: &Limits) -> Answer {
-    Answer::Full { limit: Limit::CacheFiles, most: limits.cache_files }
+fn full(limits: &Limits, limit: Limit) -> Answer {
+    Answer::Full { limit, most: if limit == Limit::CacheFiles { limits.cache_files } else { limits.resolutions } }
 }
-fn stop_full(store: &mut Store, limits: &Limits, out: &mut Queue<Output>) {
+fn stop_full(store: &mut Store, limits: &Limits, limit: Limit, out: &mut Queue<Output>) {
+    store.scan.full = full(limits, limit);
     if store.scan.last {
-        finish(store, full(limits), out);
+        finish(store, store.scan.full, out);
     } else {
         store.scan.pass = Pass::Closing;
         out.push(Output::Request(Request::Close));
@@ -174,6 +235,7 @@ fn finish(store: &mut Store, answer: Answer, out: &mut Queue<Output>) {
     store.usable = answer == Answer::Ready;
     if answer != Answer::Ready {
         store.scan.index = index::Index::with_capacity(0);
+        store.scan.resolutions = Map::with_capacity(0);
     }
     out.push(Output::Answer(answer));
 }

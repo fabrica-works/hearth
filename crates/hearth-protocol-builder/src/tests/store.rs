@@ -223,3 +223,80 @@ fn the_next_blob_waits_for_the_stores_answer() {
         panic!("next temporary after settlement")
     };
 }
+
+#[test]
+fn the_walk_removes_a_directorys_entries_then_the_directory() {
+    use crate::Beneath;
+    use skein_io::kernel::Kind;
+    let mut layer = fixtures::descending();
+    layer.file_up(file::Event::Listed {
+        owner: STORE_OWNER,
+        entries: Box::new([fixtures::walk_entry(b"link", Kind::Symlink)]),
+    });
+    assert_eq!(
+        layer.asked(),
+        Some(Asked::Beneath(Beneath::Remove {
+            owner: STORE_OWNER,
+            root: Token::new(89),
+            name: b"link".as_slice().into(),
+            directory: false
+        }))
+    );
+    layer.file_up(file::Event::Removed { owner: STORE_OWNER });
+    assert_eq!(layer.asked(), Some(fixtures::CLOSE_CHILD));
+    layer.file_up(file::Event::Closed { owner: STORE_OWNER });
+    assert_eq!(
+        layer.asked(),
+        Some(Asked::Beneath(Beneath::Remove {
+            owner: STORE_OWNER,
+            root: Token::new(88),
+            name: b"root".as_slice().into(),
+            directory: true
+        }))
+    );
+    layer.file_up(file::Event::Removed { owner: STORE_OWNER });
+    assert_eq!(layer.asked(), Some(fixtures::CLOSE_STAGING));
+    layer.file_up(file::Event::Closed { owner: STORE_OWNER });
+    assert_eq!(layer.told(), Some(BuilderEvent::Store(Event::Done)));
+    assert_eq!(layer.asked(), None, "staging itself is kept");
+}
+#[test]
+fn a_staging_tree_past_the_walks_depth_fails_the_walk() {
+    let mut layer = fixtures::walking(crate::limits::Walk { depth: 1, ..crate::limits::SHIPPED.walk });
+    layer.file_up(file::Event::Listed {
+        owner: STORE_OWNER,
+        entries: Box::new([fixtures::walk_entry(b"child", skein_io::kernel::Kind::Directory)]),
+    });
+    assert_eq!(layer.asked(), Some(fixtures::CLOSE_STAGING));
+    layer.file_up(file::Event::Closed { owner: STORE_OWNER });
+    assert_eq!(layer.told(), Some(BuilderEvent::Store(Event::Failed)));
+    assert_eq!(layer.asked(), None);
+}
+#[test]
+fn a_staging_tree_past_the_walks_entry_limit_fails_the_walk() {
+    let mut layer = fixtures::walking(crate::limits::Walk { entries: 4, ..crate::limits::SHIPPED.walk });
+    let entries = [b"a", b"b", b"c", b"d", b"e"].map(|name| fixtures::walk_entry(name, skein_io::kernel::Kind::File));
+    layer.file_up(file::Event::Listed { owner: STORE_OWNER, entries: Box::new(entries) });
+    assert_eq!(layer.asked(), Some(fixtures::CLOSE_STAGING));
+    layer.file_up(file::Event::Closed { owner: STORE_OWNER });
+    assert_eq!(layer.told(), Some(BuilderEvent::Store(Event::Failed)));
+    assert_eq!(layer.asked(), None);
+}
+
+#[test]
+fn a_staging_directory_is_opened_by_token_without_following_links() {
+    let mut layer = fixtures::walking(crate::limits::SHIPPED.walk);
+    layer.file_up(file::Event::Listed {
+        owner: STORE_OWNER,
+        entries: Box::new([fixtures::walk_entry(b"root", skein_io::kernel::Kind::Directory)]),
+    });
+    assert_eq!(
+        layer.asked(),
+        Some(Asked::Beneath(crate::Beneath::OpenDirectory {
+            owner: STORE_OWNER,
+            root: Token::new(88),
+            name: b"root".as_slice().into(),
+            no_follow: true
+        }))
+    );
+}

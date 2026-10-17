@@ -5,6 +5,7 @@ extern crate alloc;
 mod enter;
 mod index;
 pub mod limits;
+pub mod resolutions;
 mod scan;
 mod start;
 pub mod vocabulary;

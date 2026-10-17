@@ -23,9 +23,9 @@ pub(crate) fn shape(directory: Directory, name: &[u8], kind: Kind) -> Shape {
         return Shape::Stray;
     };
     match name.get(64..) {
-        Some(b"") => Shape::File(digest),
+        Some(b"") if directory == Directory::Cache => Shape::File(digest),
         Some(b".record") => Shape::Record(digest),
-        Some(b".tmp") => Shape::Temporary,
+        Some(b".tmp") if directory == Directory::Cache => Shape::Temporary,
         Some(suffix) if temporary(suffix, b".record") => Shape::Temporary,
         Some(_) | None => Shape::Stray,
     }

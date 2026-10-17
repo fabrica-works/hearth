@@ -17,6 +17,7 @@ mod git;
 pub mod limits;
 mod read;
 mod store;
+mod walk;
 use hearth_protocol_tree as tree;
 pub mod translate;
 use alloc::boxed::Box;
@@ -32,6 +33,13 @@ use skein_lib::{
 pub enum Asked {
     Io(io::Request),
     File(io::file::Request),
+    Beneath(Beneath),
+}
+/// File operations whose directory is an io-owned token (io.md, 9).
+#[derive(PartialEq, Eq, Debug)]
+pub enum Beneath {
+    OpenDirectory { owner: Token, root: Token, name: Box<[u8]>, no_follow: bool },
+    Remove { owner: Token, root: Token, name: Box<[u8]>, directory: bool },
 }
 #[derive(PartialEq, Eq, Debug)]
 pub enum Told {

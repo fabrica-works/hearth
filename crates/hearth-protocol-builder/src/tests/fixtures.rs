@@ -285,7 +285,9 @@ pub fn opening_cache() -> (Layer, Token) {
         }
         match request {
             Asked::Io(io::Request::Spawn { owner, .. }) => layer.spawn_pending(owner, true),
-            other @ (Asked::Io(_) | Asked::File(_)) => layer.answer(other, &mut held, Exit::Code(0)),
+            other @ (Asked::Io(_) | Asked::File(_) | Asked::Beneath(_)) => {
+                layer.answer(other, &mut held, Exit::Code(0));
+            }
         }
     }
     panic!("cache create reached");
@@ -556,3 +558,47 @@ pub fn cache_records() -> [builder::store::vocabulary::CacheFile; 4] {
         cache_record(Origin::Rendered { path: bytes::copy_of(b"tasks/core/tree/etc/motd.j2") }),
     ]
 }
+
+pub fn walk_entry(name: &[u8], kind: io::kernel::Kind) -> io::file::Entry {
+    io::file::Entry { name: bytes::copy_of(name), kind }
+}
+pub fn walking(walk: limits::Walk) -> Layer {
+    let mut layer = Layer::with_form(crate::Form::Text, limits::Limits { walk, ..limits::SHIPPED });
+    layer.client(builder::vocabulary::Request::Store(builder::store::vocabulary::Request::Empty));
+    drop(layer.asked());
+    layer.file_up(io::file::Event::Opened { owner: STORE_OWNER, file: Token::new(88), len: 0 });
+    drop(layer.asked());
+    layer
+}
+#[must_use]
+pub fn every_inputs() -> [crate::tree::resolution::Inputs; 2] {
+    use hearth_lib::encode::Item;
+    [
+        crate::tree::resolution::Inputs {
+            sources: Box::new([Item::Map(0)]),
+            request: Box::new([Item::List(1), Item::Bytes(b"hello".as_slice().into())]),
+            variant: Box::new([Item::Bytes(b"apt".as_slice().into())]),
+            apt: Box::new([Item::Map(0)]),
+        },
+        crate::tree::resolution::Inputs {
+            sources: Box::new([Item::List(4), Item::None, Item::True, Item::False, Item::Uint(7)]),
+            request: Box::new([Item::List(2), Item::Digest(ABC), Item::Bytes(b"x".as_slice().into())]),
+            variant: Box::new([Item::Bytes(b"minbase".as_slice().into())]),
+            apt: Box::new([Item::Map(1), Item::Bytes(b"a".as_slice().into()), Item::List(0)]),
+        },
+    ]
+}
+
+pub fn descending() -> Layer {
+    let mut layer = walking(limits::SHIPPED.walk);
+    layer.file_up(io::file::Event::Listed {
+        owner: STORE_OWNER,
+        entries: Box::new([walk_entry(b"root", io::kernel::Kind::Directory)]),
+    });
+    drop(layer.asked());
+    layer.file_up(io::file::Event::Opened { owner: STORE_OWNER, file: Token::new(89), len: 0 });
+    drop(layer.asked());
+    layer
+}
+pub const CLOSE_CHILD: Asked = Asked::File(io::file::Request::Close { owner: STORE_OWNER, file: Token::new(89) });
+pub const CLOSE_STAGING: Asked = Asked::File(io::file::Request::Close { owner: STORE_OWNER, file: Token::new(88) });
