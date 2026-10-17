@@ -87,7 +87,7 @@ pub struct Layer {
 pub struct Task {
     pub name: Box<[u8]>,
     pub at: Position,
-    pub removed: bool,
+    pub value: Value,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Placement {
@@ -113,4 +113,105 @@ pub enum Firmware {
 pub struct On {
     pub target: Box<[u8]>,
     pub at: Position,
+}
+
+/// Decoded configuration values with positions (render.md, 3.1).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Value {
+    pub at: Position,
+    pub kind: Kind,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Kind {
+    Null,
+    Bool(bool),
+    Int(i64),
+    String(Box<[u8]>),
+    List(Box<[Value]>),
+    Map(Box<[Pair]>),
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Pair {
+    pub key: Box<[u8]>,
+    pub at: Position,
+    pub value: Value,
+}
+/// Documents in listing path order, including refused documents.
+#[derive(Debug)]
+pub struct Documents {
+    entries: Box<[Entry]>,
+    decoded: Box<[Option<Document>]>,
+}
+impl Documents {
+    #[must_use]
+    pub fn new(entries: &[Entry]) -> Self {
+        let capacity = u32::try_from(entries.len()).expect("bounded listing");
+        let mut listed = skein_lib::Map::with_capacity(capacity);
+        let mut decoded = skein_lib::List::with_capacity(capacity);
+        for entry in entries {
+            match class(&entry.path) {
+                Class::Fleet | Class::Environment { .. } | Class::Host { .. } => {
+                    listed.insert(entry.path.clone(), entry.clone()).expect("listing capacity");
+                    decoded.push(None).expect("listing capacity");
+                }
+                Class::Declaration { .. } | Class::Tree { .. } | Class::Other => {}
+            }
+        }
+        let mut entries = skein_lib::List::with_capacity(listed.len());
+        for (_, entry) in &listed {
+            entries.push(entry.clone()).expect("listing capacity");
+        }
+        Self { entries: entries.into_boxed(), decoded: decoded.into_boxed() }
+    }
+    #[must_use]
+    pub fn path(&self, document: u32) -> &[u8] {
+        &self.entries.get(usize::try_from(document).expect("u32 fits")).expect("document index").path
+    }
+    #[must_use]
+    pub fn get(&self, document: u32) -> Option<&Document> {
+        self.decoded.get(usize::try_from(document).ok()?)?.as_ref()
+    }
+    pub fn set(&mut self, oid: &Oid, document: Document) {
+        for (entry, decoded) in self.entries.iter().zip(self.decoded.iter_mut()) {
+            if &entry.oid == oid {
+                *decoded = Some(document.clone());
+            }
+        }
+    }
+    #[must_use]
+    pub fn entries(&self) -> &[Entry] {
+        &self.entries
+    }
+    #[must_use]
+    pub fn find(&self, path: &[u8]) -> Option<u32> {
+        for (index, entry) in self.entries.iter().enumerate() {
+            if entry.path.as_ref() == path {
+                return u32::try_from(index).ok();
+            }
+        }
+        None
+    }
+}
+/// Listed bytes admitted before decoding a revision (render.md, 2.3).
+#[derive(Debug)]
+pub struct Budget {
+    held: u64,
+    max: u64,
+}
+impl Budget {
+    #[must_use]
+    pub const fn new(limits: &crate::limits::Limits) -> Self {
+        Self { held: 0, max: limits.decoded }
+    }
+    #[must_use]
+    pub fn take(&mut self, size: u64) -> bool {
+        let Some(held) = self.held.checked_add(size) else {
+            return false;
+        };
+        if held > self.max {
+            return false;
+        }
+        self.held = held;
+        true
+    }
 }

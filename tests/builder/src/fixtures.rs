@@ -122,3 +122,45 @@ pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\n
 
 mod binary;
 pub use binary::{Ended, binary};
+/// Overrides THIN by path and appends the new files.
+#[must_use]
+pub fn thin_with(files: &[File]) -> Vec<File> {
+    let mut combined = THIN.to_vec();
+    for file in files {
+        if let Some(previous) = combined.iter_mut().find(|previous| previous.path == file.path) {
+            *previous = *file;
+        } else {
+            combined.push(*file);
+        }
+    }
+    combined
+}
+pub const LAYERS: &[File] = &[
+    File { path: "fleet.json", body: br#"{"motd":{}}"#, mode: 0o644 },
+    File { path: "envs/prod.json", body: br#"{"issue":{}}"#, mode: 0o644 },
+    File { path: "hosts/x1/x1.json", body: br#"{"motd":{},"issue":{}}"#, mode: 0o644 },
+    File {
+        path: "hosts/x1/x1-prod.json",
+        body: br#"{"issue":null,"placement":{"kind":"metal","firmware":"efi","hardware":"7th-gen"}}"#,
+        mode: 0o644,
+    },
+    File { path: "hosts/x2/x2.json", body: b"{}", mode: 0o644 },
+    File {
+        path: "hosts/x2/x2-prod.json",
+        body: br#"{"placement":{"kind":"vm","firmware":"bios","hardware":"ionos"}}"#,
+        mode: 0o644,
+    },
+    File { path: "tasks/issue/task.json", body: b"{}", mode: 0o644 },
+    File { path: "tasks/issue/tree/etc/issue", body: b"An issue\n", mode: 0o644 },
+];
+#[must_use]
+pub fn lines_starting(stdout: &[u8], prefixes: &[&str]) -> String {
+    let mut lines = String::new();
+    for line in String::from_utf8_lossy(stdout).lines() {
+        if prefixes.iter().any(|prefix| line.starts_with(prefix)) {
+            lines.push_str(line);
+            lines.push('\n');
+        }
+    }
+    lines
+}

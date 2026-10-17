@@ -6,3 +6,5 @@ mod revision;
 mod evaluate;
 
 mod operators;
+
+mod compose;

@@ -215,12 +215,9 @@ pub fn config() -> crate::parts::config::Config {
 }
 
 pub fn removed_task() -> (crate::call::Call, crate::compose::Target) {
-    use crate::{
-        revision::{Document, Layer, Oid, Position, Task},
-        vocabulary::{As, Blob},
-    };
+    use crate::revision::{Document, Layer, Oid, Position, Task};
     let at = Position { line: 1, column: 1 };
-    let mut call = crate::call::Call::new(bytes::copy_of(b"/repo"), Box::new([]));
+    let mut call = crate::call::Call::new(bytes::copy_of(b"/repo"), Box::new([]), &limits::SHIPPED);
     let base = Oid(bytes::copy_of(b"base"));
     let host = Oid(bytes::copy_of(b"host"));
     call.entries = Box::new([
@@ -237,50 +234,80 @@ pub fn removed_task() -> (crate::call::Call, crate::compose::Target) {
             size: 2,
         },
     ]);
-    call.documents = skein_lib::Map::with_capacity(2);
-    call.documents
-        .insert(
-            base.clone(),
-            Some(Document {
-                at,
-                layer: Layer {
-                    placement: Some(crate::revision::Placement {
-                        at,
-                        kind: Runs::Metal,
-                        firmware: Some(Firmware::Efi),
-                        hardware: None,
-                        on: None,
-                        mutable: false,
-                    }),
-                    tasks: Box::new([Task { name: bytes::copy_of(b"motd"), at, removed: false }]),
-                },
-            }),
-        )
-        .expect("base");
-    call.documents
-        .insert(
-            host.clone(),
-            Some(Document {
-                at,
-                layer: Layer {
-                    placement: Some(crate::revision::Placement {
-                        at,
-                        kind: Runs::Metal,
-                        firmware: Some(Firmware::Efi),
-                        hardware: None,
-                        on: None,
-                        mutable: false,
-                    }),
-                    tasks: Box::new([Task { name: bytes::copy_of(b"motd"), at, removed: true }]),
-                },
-            }),
-        )
-        .expect("base-env");
+    call.documents = crate::revision::Documents::new(&call.entries);
+    call.documents.set(
+        &base,
+        Document {
+            at,
+            layer: Layer {
+                placement: Some(crate::revision::Placement {
+                    at,
+                    kind: Runs::Metal,
+                    firmware: Some(Firmware::Efi),
+                    hardware: None,
+                    on: None,
+                    mutable: false,
+                }),
+                tasks: Box::new([Task { name: bytes::copy_of(b"motd"), at, value: composition::map(at, &[]) }]),
+            },
+        },
+    );
+    call.documents.set(
+        &host,
+        Document {
+            at,
+            layer: Layer {
+                placement: Some(crate::revision::Placement {
+                    at,
+                    kind: Runs::Metal,
+                    firmware: Some(Firmware::Efi),
+                    hardware: None,
+                    on: None,
+                    mutable: false,
+                }),
+                tasks: Box::new([Task { name: bytes::copy_of(b"motd"), at, value: composition::null(at) }]),
+            },
+        },
+    );
     let target = crate::compose::Target {
         name: bytes::copy_of(b"x1-prod"),
         base: bytes::copy_of(b"x1"),
         environment: bytes::copy_of(b"prod"),
-        documents: [Blob { oid: base, size: 2, kind: As::Document }, Blob { oid: host, size: 2, kind: As::Document }],
+        member: None,
+        fleet: None,
+        base_document: Some(1),
+        environment_document: 1,
+        base_env: 0,
     };
+    call.settings = Box::new([crate::compose::compose(&target, &call.documents, &mut call.merge)]);
     (call, target)
+}
+
+pub fn only<T>(items: &[T]) -> &T {
+    let [item] = items else { panic!("one item") };
+    item
+}
+pub mod composition {
+    use crate::revision::{Kind, Pair, Position, Value};
+    pub const fn at(line: u32, column: u32) -> Position {
+        Position { line, column }
+    }
+    pub fn int(at: Position, value: i64) -> Value {
+        Value { at, kind: Kind::Int(value) }
+    }
+    pub fn null(at: Position) -> Value {
+        Value { at, kind: Kind::Null }
+    }
+    pub fn string(at: Position, value: &[u8]) -> Value {
+        Value { at, kind: Kind::String(skein_lib::bytes::copy_of(value)) }
+    }
+    pub fn map(at: Position, values: &[(&[u8], Position, Value)]) -> Value {
+        let mut pairs = skein_lib::List::with_capacity(u32::try_from(values.len()).expect("fixture count"));
+        for (key, at, value) in values {
+            pairs
+                .push(Pair { key: skein_lib::bytes::copy_of(key), at: *at, value: value.clone() })
+                .expect("pair count");
+        }
+        Value { at, kind: Kind::Map(pairs.into_boxed()) }
+    }
 }

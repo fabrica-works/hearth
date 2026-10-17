@@ -108,18 +108,60 @@ pub fn assert_fell(fell: &BTreeSet<&str>, kinds: &[&str]) {
 #[must_use]
 pub fn with_task() -> Repository {
     let mut repository = x1_prod();
-    repository.documents[1].1 = Decoded::Document(Document {
-        at: Position { line: 1, column: 1 },
-        layer: Layer {
-            placement: None,
-            tasks: Box::new([hearth_domain_render::revision::Task {
-                name: b"motd".as_slice().into(),
-                at: Position { line: 1, column: 2 },
-                removed: false,
-            }]),
-        },
-    });
+    repository.documents.iter_mut().find(|(id, _)| *id == oid(b'2')).expect("base document").1 =
+        Decoded::Document(Document {
+            at: Position { line: 1, column: 1 },
+            layer: Layer {
+                placement: None,
+                tasks: Box::new([hearth_domain_render::revision::Task {
+                    name: b"motd".as_slice().into(),
+                    at: Position { line: 1, column: 2 },
+                    value: hearth_domain_render::revision::Value {
+                        at: Position { line: 1, column: 9 },
+                        kind: hearth_domain_render::revision::Kind::Map(Box::new([])),
+                    },
+                }]),
+            },
+        });
     repository.entries.push(entry(b"tasks/motd/task.json", b'4'));
     repository.documents.push((oid(b'4'), Decoded::Declaration));
     repository
+}
+
+pub fn only<T>(items: &[T]) -> &T {
+    let [item] = items else { panic!("one item") };
+    item
+}
+#[must_use]
+pub fn two_targets() -> Repository {
+    let mut repository = x1_prod();
+    repository.entries.push(entry(b"hosts/a-b/a-b-prod.json", b'4'));
+    repository.documents.push((oid(b'4'), document(Some(placement()))));
+    repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
+    repository
+}
+pub fn set_document(repository: &mut Repository, byte: u8, document: Decoded) {
+    repository.documents.iter_mut().find(|(id, _)| *id == oid(byte)).expect("fixture document").1 = document;
+}
+
+#[must_use]
+pub fn tasks(names: &[(&[u8], bool)], placement: Option<Placement>) -> Decoded {
+    use hearth_domain_render::revision::{Kind, Task, Value};
+    Decoded::Document(Document {
+        at: Position { line: 1, column: 1 },
+        layer: Layer {
+            placement,
+            tasks: names
+                .iter()
+                .map(|(name, removed)| Task {
+                    name: Box::from(*name),
+                    at: Position { line: 1, column: 2 },
+                    value: Value {
+                        at: Position { line: 1, column: 9 },
+                        kind: if *removed { Kind::Null } else { Kind::Map(Box::new([])) },
+                    },
+                })
+                .collect(),
+        },
+    })
 }

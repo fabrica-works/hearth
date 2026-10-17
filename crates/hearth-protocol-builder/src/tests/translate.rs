@@ -166,9 +166,9 @@ fn spec_back(spec: records::records::Spec) -> Option<render::parts::Spec> {
 }
 #[test]
 fn a_spec_translates_to_the_records_and_back() {
-    let actual = spec_back(answers::spec(super::fixtures::spec()));
+    let spec = spec_back(answers::spec(super::fixtures::spec()));
     assert_eq!(
-        actual,
+        spec,
         Some(render::parts::Spec {
             meta: render::parts::meta::Meta {
                 target: skein_lib::bytes::copy_of(b"x1-prod"),
@@ -278,6 +278,58 @@ fn a_config_part_translates_to_the_records_and_back() {
                     group: skein_lib::bytes::copy_of(b"root")
                 }
             }])
+        }
+    );
+}
+
+const VALUES: &[(crate::config::json::Kind, target::Kind)] = &[
+    (crate::config::json::Kind::Null, target::Kind::Null),
+    (crate::config::json::Kind::Bool(true), target::Kind::Bool(true)),
+    (crate::config::json::Kind::Int(42), target::Kind::Int(42)),
+];
+#[test]
+fn scalar_configuration_values_keep_their_kind_and_position() {
+    for (kind, expected) in VALUES {
+        let value = documents::value(crate::config::json::Value {
+            at: crate::config::Position { offset: 17, line: 3, column: 8 },
+            kind: kind.clone(),
+        });
+        assert_eq!(value.kind, *expected);
+        assert_eq!(value.at, target::Position { line: 3, column: 8 });
+    }
+}
+#[test]
+fn nested_configuration_values_keep_their_keys_lists_and_string_bytes() {
+    let at = crate::config::Position { offset: 0, line: 1, column: 1 };
+    let value = crate::config::json::Value {
+        at,
+        kind: crate::config::json::Kind::Map(Box::new([crate::config::json::Entry {
+            key: skein_lib::bytes::copy_of(b"a"),
+            at,
+            value: crate::config::json::Value {
+                at,
+                kind: crate::config::json::Kind::List(Box::new([crate::config::json::Value {
+                    at,
+                    kind: crate::config::json::Kind::String(skein_lib::bytes::copy_of(b"hello")),
+                }])),
+            },
+        }])),
+    };
+    assert_eq!(
+        documents::value(value),
+        target::Value {
+            at: target::Position { line: 1, column: 1 },
+            kind: target::Kind::Map(Box::new([target::Pair {
+                key: skein_lib::bytes::copy_of(b"a"),
+                at: target::Position { line: 1, column: 1 },
+                value: target::Value {
+                    at: target::Position { line: 1, column: 1 },
+                    kind: target::Kind::List(Box::new([target::Value {
+                        at: target::Position { line: 1, column: 1 },
+                        kind: target::Kind::String(skein_lib::bytes::copy_of(b"hello"))
+                    }]))
+                },
+            }])),
         }
     );
 }

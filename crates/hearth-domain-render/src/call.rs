@@ -3,7 +3,7 @@ use crate::{
     compose::{self, Target},
     limits::Limits,
     parts::{self, Spec, meta},
-    revision::{self, Document, Entry, Mode, Oid},
+    revision::{self, Budget, Documents, Entry, Mode, Oid},
     vocabulary::{Answer, As, Blob, Decoded, Outcome, Output, Request},
 };
 use alloc::boxed::Box;
@@ -14,7 +14,10 @@ pub(crate) struct Call {
     pub names: Box<[Box<[u8]>]>,
     pub commit: Option<Oid>,
     pub targets: Box<[Target]>,
-    pub documents: Map<Oid, Option<Document>>,
+    pub documents: Documents,
+    pub settings: Box<[compose::Settings]>,
+    pub merge: compose::Merge,
+    pub budget: Budget,
     pub pending: Box<[Blob]>,
     pub entries: Box<[Entry]>,
     pub cached: Map<Oid, hearth_lib::encode::Digest>,
@@ -26,13 +29,16 @@ pub(crate) struct Call {
     pub outcome: Outcome,
 }
 impl Call {
-    pub fn new(repository: Box<[u8]>, names: Box<[Box<[u8]>]>) -> Call {
+    pub fn new(repository: Box<[u8]>, names: Box<[Box<[u8]>]>, limits: &Limits) -> Call {
         Call {
             repository,
             names,
             commit: None,
             targets: Box::new([]),
-            documents: Map::with_capacity(0),
+            documents: Documents::new(&[]),
+            settings: Box::new([]),
+            merge: compose::Merge::new(limits),
+            budget: Budget::new(limits),
             pending: Box::new([]),
             entries: Box::new([]),
             cached: Map::with_capacity(0),
@@ -76,34 +82,18 @@ impl Call {
         }
         self.targets = selected.into_boxed();
         self.entries = entries.into();
-        let capacity = limits.targets.saturating_mul(3);
-        self.documents = Map::with_capacity(capacity);
-        let mut blobs = List::with_capacity(capacity);
-        for target in &self.targets {
-            for blob in &target.documents {
-                if self.documents.contains_key(&blob.oid) {
-                    continue;
-                }
-                self.documents.insert(blob.oid.clone(), None).expect("two documents per target");
-                if blob.size <= u64::from(limits.document) {
-                    blobs.push(blob.clone()).expect("two documents per target");
-                } else {
-                    self.outcome = self.outcome.worst(Outcome::Failed);
-                }
-            }
-        }
-        for entry in entries {
-            if let revision::Class::Host { base, name } = revision::class(&entry.path)
-                && base == name
-                && self.has_base(base)
-                && !self.documents.contains_key(&entry.oid)
-            {
-                self.documents.insert(entry.oid.clone(), None).expect("three documents per target");
-                if entry.size <= u64::from(limits.document) {
-                    blobs
-                        .push(Blob { oid: entry.oid.clone(), size: entry.size, kind: As::Document })
-                        .expect("base document room");
-                }
+        self.documents = Documents::new(entries);
+        let mut blobs = List::with_capacity(u32::try_from(entries.len()).expect("listing capacity"));
+        for entry in self.documents.entries() {
+            if entry.size > u64::from(limits.document) {
+                self.outcome = self.outcome.worst(Outcome::Failed);
+            } else if !self.budget.take(entry.size) {
+                self.fail(Outcome::Failed);
+                return;
+            } else {
+                blobs
+                    .push(Blob { oid: entry.oid.clone(), size: entry.size, kind: As::Document })
+                    .expect("document count");
             }
         }
         self.pending = blobs.into_boxed();
@@ -123,7 +113,7 @@ impl Call {
         assert_eq!(&expected.oid, oid, "blobs answer in request order");
         match read {
             Decoded::Document(document) => {
-                *self.documents.get_mut(oid).expect("requested blob") = Some(document);
+                self.documents.set(oid, document);
             }
             Decoded::Declaration => {
                 self.declarations.insert(oid.clone(), true).expect("listed declarations");
@@ -142,35 +132,12 @@ impl Call {
         self.read = self.read.saturating_add(1);
         self.ready = self.read == self.pending.len();
     }
-    fn present(&self, target: &Target) -> Map<Box<[u8]>, bool> {
-        let mut present = Map::with_capacity(u32::try_from(self.entries.len()).expect("listing capacity"));
-        for base in [true, false] {
-            for entry in &self.entries {
-                if let revision::Class::Host { base: name, name: host } = revision::class(&entry.path)
-                    && name == target.base.as_ref()
-                    && ((base && host == name) || (!base && host == target.name.as_ref()))
-                    && let Some(Some(document)) = self.documents.get(&entry.oid)
-                {
-                    for task in &document.layer.tasks {
-                        present.insert(task.name.clone(), !task.removed).expect("task capacity");
-                    }
+    fn needs(&self, name: &[u8]) -> bool {
+        for settings in &self.settings {
+            for task in &settings.tasks {
+                if task.name.as_ref() == name {
+                    return true;
                 }
-            }
-        }
-        present
-    }
-    fn has_base(&self, base: &[u8]) -> bool {
-        for target in &self.targets {
-            if target.base.as_ref() == base {
-                return true;
-            }
-        }
-        false
-    }
-    fn needs(&self, task: &[u8]) -> bool {
-        for target in &self.targets {
-            if self.present(target).get(task) == Some(&true) {
-                return true;
             }
         }
         false
@@ -180,6 +147,11 @@ impl Call {
             return false;
         }
         self.files = true;
+        let mut settings = List::with_capacity(u32::try_from(self.targets.len()).expect("target count"));
+        for target in &self.targets {
+            settings.push(compose::compose(target, &self.documents, &mut self.merge)).expect("target count");
+        }
+        self.settings = settings.into_boxed();
         let capacity = u32::try_from(self.entries.len()).expect("listing capacity");
         self.cached = Map::with_capacity(capacity);
         self.declarations = Map::with_capacity(capacity);
@@ -203,6 +175,10 @@ impl Call {
                 && entry.size <= u64::from(max)
                 && !contains(&blobs, &entry.oid, kind)
             {
+                if kind == As::Declaration && !self.budget.take(entry.size) {
+                    self.fail(Outcome::Failed);
+                    return false;
+                }
                 blobs.push(Blob { oid: entry.oid.clone(), size: entry.size, kind }).expect("listing capacity");
             }
         }
@@ -225,14 +201,11 @@ impl Call {
         self.outcome = self.outcome.worst(outcome);
         self.ready = true;
     }
-    fn config(&self, target: &Target) -> Option<parts::config::Config> {
-        let present = self.present(target);
+    fn config(&self, settings: &compose::Settings) -> Option<parts::config::Config> {
         let mut valid = true;
         let mut tree = Map::with_capacity(u32::try_from(self.entries.len()).expect("listing capacity"));
-        for (task, is_present) in &present {
-            if !is_present {
-                continue;
-            }
+        for task in &settings.tasks {
+            let task = &task.name;
             let mut declared = false;
             for entry in &self.entries {
                 match revision::class(&entry.path) {
@@ -275,8 +248,11 @@ impl Call {
             self.next = self.next.saturating_add(1);
             let mut placement = None;
             let mut valid = true;
-            for blob in &target.documents {
-                match self.documents.get(&blob.oid).expect("target document registered") {
+            for index in [target.fleet, target.base_document, Some(target.environment_document), Some(target.base_env)]
+                .into_iter()
+                .flatten()
+            {
+                match self.documents.get(index) {
                     Some(document) => {
                         if let Some(p) = &document.layer.placement {
                             placement = Some(p.clone());
@@ -285,18 +261,6 @@ impl Call {
                     None => {
                         valid = false;
                     }
-                }
-            }
-            if !valid {
-                continue;
-            }
-            for entry in &self.entries {
-                if let revision::Class::Host { base, name } = revision::class(&entry.path)
-                    && base == name
-                    && base == target.base.as_ref()
-                    && self.documents.get(&entry.oid) == Some(&None)
-                {
-                    valid = false;
                 }
             }
             if !valid {
@@ -318,7 +282,8 @@ impl Call {
                 placement: meta::Placement { kind: p.kind, firmware: p.firmware, hardware: p.hardware, on },
             };
             let meta_digest = meta::digest(&meta);
-            let Some(config) = self.config(target) else {
+            let Some(config) = self.config(self.settings.get(self.next.saturating_sub(1)).expect("target settings"))
+            else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };

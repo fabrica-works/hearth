@@ -40,7 +40,7 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
         Event::Render { repository, revision, targets } => {
             assert!(render.call.is_none(), "one render call at a time");
             let request = Request::List { request: Token::new(1), repository: repository.clone(), revision };
-            render.call = Some(call::Call::new(repository, targets));
+            render.call = Some(call::Call::new(repository, targets, &env.limits));
             out.push(Output::Request(request));
         }
         Event::Listed { request, commit, entries } => {

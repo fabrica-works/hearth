@@ -77,3 +77,18 @@ fn static_files_enter_the_cache_by_sha256_and_no_temporary_stays() {
         assert_eq!(fs::metadata(cache.join(name)).expect("cache file").permissions().mode() & 0o7777, 0o644, "{name}");
     }
 }
+
+#[test]
+fn hearth_render_gives_each_target_the_tasks_its_presence_layers_leave() {
+    let repository = Repository::make("layers", &fixtures::thin_with(fixtures::LAYERS));
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["target ", "  /"]),
+        "target       x1-prod   base x1   environment prod\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ntarget       x2-prod   base x2   environment prod\n"
+    );
+}
+#[test]
+fn presence_layers_render_successfully_through_real_git() {
+    let repository = Repository::make("layers-exit", &fixtures::thin_with(fixtures::LAYERS));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(0));
+}
