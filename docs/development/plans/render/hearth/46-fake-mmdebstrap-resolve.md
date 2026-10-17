@@ -40,7 +40,8 @@ on the fake, against real mmdebstrap's recordings.
 - **The face takes 07.1's vector alone** and asserts on anything else
   (testing.md 4.1: another vector asserts), `APT::Install-Recommends "true"` included: the
   fake asserts `"false"`, naming it (testing.md 3.6, 5.2). Lines, pipes, exits and the lists' fixed names (`lock`,
-  `partial/`) are those 41.1's recordings show for each outcome, filled
+  `partial/`, and `auxfiles` after a failed apt pass, as 46.1's
+  `process.rs` leaves it) are those 41.1's recordings show for each outcome, filled
   from the run (4.1: "Every line it prints has the shape of a recorded
   real run"): a failure of the apt pass prints the essential set's `Inst`
   lines first, as apt's first pass does (56 before the unknown package's
@@ -67,7 +68,8 @@ on the fake, against real mmdebstrap's recordings.
 - **No hand-written recording; no network** (code-organization.md, 6):
   46.2 reads `testing/recordings/mmdebstrap/` and the fetched cache, and
   writes neither; its universe cut is written by the profile alone.
-- **Shared files:** root `Cargo.toml` and `Cargo.lock` (46.2);
+- **Shared files:** `Cargo.lock` (46.2; the root `Cargo.toml` holds
+  both fakes' entries already);
   `testing/hearth-fake-machine/src/hearth.rs` (hearth 26, 27, 28.1, 46.1);
   `tests/conformance/` (hearth 34, 41, 44); `testing/mirror/` (hearth 08).
 - **A fake or a recording changed** (testing.md, 5.5: "It runs when a
@@ -150,7 +152,9 @@ recordings live, and replayed from them in the gate (testing.md, 4.5,
 5.1 to 5.3, 5.5; decisions.md, 14).
 Needs: 46.1; hearth 41 (41.1's world, cases, recordings), hearth 08
 (08.1's `Mirror`), hearth 44 (44.3's pattern), hearth 07.3 (`tail`).
-Files: `tests/conformance/` (shared): `Cargo.toml` (the two fakes),
+Files: `tests/conformance/` (shared): `Cargo.toml`
+(`hearth-fake-mmdebstrap` and `skein-lib`; `hearth-fake-machine` is
+there since hearth 44),
 `src/lib.rs`, `src/fake_mmdebstrap.rs` (new), `src/resolve.rs`
 (`Resolve::version`; `Resolve::simulate`'s body moved to `inputs`, which
 it calls), `tests/conformance_resolve.rs`, `tests/recorded_resolve.rs`
@@ -178,8 +182,11 @@ ends some with ` []`), sorted, one of equal lines (order left out, 5.3;
 66); per pipe, in order, the lines beginning `E: `, `Err:`, `W: `, `Error: `,
 `Warning: `; both sides' 07.3 failure, each pipe's lines
 admitted in order to a `tail::Tail` under `limits::SHIPPED` and the
-stderr one taken unless empty (07.3's `failure` rule): its `cause()`,
-`class()` and `lines()`, so that a fake naming another package fails;
+stderr one taken unless empty (07.3's `failure` rule, which `differ`
+applies itself to the two tails: `tail::failure` takes `Reader`s): its
+`cause()`, the cause's `class()` (`Cause::class`, `tail.rs:30`), and
+`lines()`'s lines compared one by one (`Queue` has no `PartialEq`), so
+that a fake naming another package fails;
 `lists` names and kinds; each `Inst` line's stanza reduced to `KEPT`,
 against the real ones given (cut from the index live, for every case;
 in the gate, the recording's `stanzas` where it has them, test-min's
@@ -216,6 +223,9 @@ it counts the recordings whose `stanzas` it compared, and asserts at
 least 1).
 
 ```rust
+// tests/conformance_resolve.rs: anchored as `Pin::committed` anchors its path, since a test runs in tests/conformance.
+const UNIVERSE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/mirror/universe");
+
 #[test] // tests/conformance_resolve.rs
 fn the_committed_universe_is_what_the_cases_read_of_the_index() {
     let fetched = hearth_test_mirror::Mirror::find(&Pin::committed()).expect("fetched, per 08.2");
@@ -272,7 +282,7 @@ pub struct Source { pub uri: Box<[u8]>, pub archive: Box<[u8]>, pub at: Timestam
 /// One `Inst` line's fields.
 pub struct Inst { pub name: Box<[u8]>, pub version: Box<[u8]>, pub architecture: Box<[u8]>, pub origins: Box<[u8]> }
 /// How a run ended: resolved; the mirror unreachable; a line's `InRelease` not found; the apt pass failed after the essential set's lines.
-pub enum Outcome { Resolved(Box<[Inst]>), Unreachable, NotFound { line: u32 }, Failed { essential: Box<[Inst]>, failure: Failure } }
+pub enum Outcome { Resolved(Box<[Inst]>), Unreachable, NotFound { line: u32 }, Failed { essential: Box<[Inst]>, providers: Box<[Inst]>, failure: Failure } }
 /// What a run prints, and its exit status.
 pub struct Printed { pub stdout: Box<[u8]>, pub stderr: Box<[u8]>, pub exit: u8 }
 /// 07.1's vector and environment, and its `sources.list` lines; anything else asserts.
@@ -319,7 +329,7 @@ pub const PORT: u16 = 3142;
 pub fn differ(case: &Case, real: &Recording, fake: &Recording, stanzas: Option<&[u8]>) -> Option<String>;
 
 // tests/conformance/src/resolve.rs (hearth 41.1's; 46.2 adds)
-impl Resolve { /// The recordings' directory, `<mmdebstrap>-apt<apt>` (x1: `1.5.7-apt3.3.3`; hearth 41).
+impl Resolve { /// The recordings' directory, `<mmdebstrap>-apt<apt>` (`1.5.7-apt3.0.3`, as `testing/recordings/mmdebstrap/` holds it; hearth 41).
     pub fn version(&self) -> &str; }
 /// A case's inputs from the pin, as `Resolve::simulate` made them; no tool or mirror needed.
 pub fn inputs(pin: &Pin, case: &Case) -> Simulate;

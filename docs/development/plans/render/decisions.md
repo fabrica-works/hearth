@@ -559,6 +559,17 @@ None yet.
      - The same block twice becomes a standing rule (development.md, 10.4), in the README's "Rules of this plan": "**An increment past twice its Size** (rulings 113 and 130; it replaces, for this plan, code-organization.md 7's "Past that, it asks before landing" up to three times the Size): it lands at its count without asking when each counted file is in its Files, each file is at most 800 lines, and each test its Test shape names is there. Its report's `Size:` gives the count by file and names this rule. Past three times its Size, or with a counted file outside its Files, it still stops on a question before landing, with the count by file."
      - Unchanged: code-organization.md 7's count and its aims (a file of at most 800 lines, a test function of at most 40); 11.3's Size and Shape.
 
+131. **hearth 46's Shapes against main** (re-check of hearth-46.2).
+     hearth 46's re-check after 46.1, 41.1 and 27.3 landed, against hearth 3cbd5d1 to 3b48d0e (46.1 landed at 266e6b1 meanwhile) and skein 841f487 (clippy clean with the corrections; default 513, fuzzy 13, conformance 16 against real mmdebstrap 1.5.7 and apt 3.0.3; 46.1's Done when 1 at 89 tests; 46.2's two test sketches compile with `fake_mmdebstrap` stubbed), corrects 46-fake-mmdebstrap-resolve.md:
+     1. The recordings' version is `1.5.7-apt3.0.3`, as `testing/recordings/mmdebstrap/` holds it (`Resolve::version`'s comment); 3.3.3 is the pinned index's apt package.
+     2. A failed apt pass leaves `auxfiles` in the lists beside `lock` and `partial/` (`testing/hearth-fake-mmdebstrap/src/process.rs:74`), and `differ` compares the lists' names and kinds with it.
+     3. `tests/conformance/Cargo.toml` gains `hearth-fake-mmdebstrap` and `skein-lib`: `hearth-fake-machine` is there since hearth 44 (`Cargo.toml:12`).
+     4. The root `Cargo.toml` holds `hearth-fake-mmdebstrap`'s entry already (`Cargo.toml:22`): of the shared files, 46.2 changes `Cargo.lock` alone.
+     5. `Outcome::Failed` is `{ essential, providers, failure }`, as landed (`testing/hearth-fake-mmdebstrap/src/face.rs:35`).
+     6. `UNIVERSE` is `concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/mirror/universe")`, anchored as `Pin::committed` anchors its path (`testing/hearth-test-mirror/src/pin.rs:105`): a bare relative path resolves under `tests/conformance`.
+     7. `class()` is `Cause::class` (`crates/hearth-protocol-mmdebstrap/src/tail.rs:30`), not `Tail`'s; `Tail::lines` returns a `Queue`, which has no `PartialEq`, and `tail::failure` takes `Reader`s (`tail.rs:262`): `differ` compares the lines one by one, and applies 07.3's "the stderr one unless empty" to the two tails itself.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
