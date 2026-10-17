@@ -28,3 +28,7 @@ pub fn spec() -> render::parts::Spec {
         parts: Box::new([]),
     }
 }
+
+pub fn store_record() -> crate::store::vocabulary::StoreRecord {
+    crate::store::vocabulary::StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: 1000 }
+}

@@ -56,3 +56,47 @@ fn an_unreadable_store_record_is_written_again() {
     assert_eq!(record.layout, 1);
     assert_eq!(record.range, None);
 }
+
+const CRASH: &[fixtures::Laid] = &[
+    fixtures::Laid::File("cache/0101010101010101010101010101010101010101010101010101010101010101"),
+    fixtures::Laid::Record(
+        "cache/0101010101010101010101010101010101010101010101010101010101010101.record",
+        fixtures::D1,
+    ),
+    fixtures::Laid::File("cache/0202020202020202020202020202020202020202020202020202020202020202"),
+    fixtures::Laid::Record(
+        "cache/0303030303030303030303030303030303030303030303030303030303030303.record",
+        fixtures::D3,
+    ),
+    fixtures::Laid::File("cache/0101010101010101010101010101010101010101010101010101010101010101.tmp"),
+    fixtures::Laid::File(
+        "cache/0101010101010101010101010101010101010101010101010101010101010101.record.skein-0123456789abcdef",
+    ),
+    fixtures::Laid::File("cache/notes"),
+];
+#[test]
+fn the_scan_settles_what_a_crash_left_in_the_cache() {
+    let repository = Repository::make("crash-cache", fixtures::THIN);
+    let store = repository.scratch().path().join("store");
+    fixtures::lay(&store, CRASH);
+    let rendered = fixtures::render_with(&repository, &hearth::limits());
+    assert_eq!(rendered.exit, skein_io::kernel::Exit::Code(0));
+    assert_eq!(
+        fixtures::names(&store.join("cache")),
+        [
+            "0101010101010101010101010101010101010101010101010101010101010101",
+            "0101010101010101010101010101010101010101010101010101010101010101.record",
+            "775324fcea7f2cdcbf11df25550e362669caceb6e69c8370374d2d436bb63123",
+            "f487088ec8b18ff569dfede6f12e5fa91983f9f6dd2f3e0b6cee4349a231e745",
+            "notes",
+        ]
+    );
+}
+#[test]
+fn the_scan_removes_the_store_records_temporary() {
+    let repository = Repository::make("crash-store-record", fixtures::THIN);
+    let store = repository.scratch().path().join("store");
+    fixtures::lay(&store, &[fixtures::Laid::File("store.record.skein-0123456789abcdef")]);
+    drop(fixtures::render_with(&repository, &hearth::limits()));
+    assert_eq!(fixtures::names(&store), ["cache", "resolutions", "staging", "store.record"]);
+}

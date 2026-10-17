@@ -331,3 +331,9 @@ impl Layer {
         self.protocol.take_startup()
     }
 }
+
+pub fn store_cursor(layer: &mut Layer, directory: builder::store::vocabulary::Directory, max: u32) {
+    layer.client(builder::vocabulary::Request::Store(builder::store::vocabulary::Request::List { directory, max }));
+    drop(layer.asked());
+    layer.file_up(io::file::Event::Opened { owner: STORE_OWNER, file: Token::new(88), len: 0 });
+}

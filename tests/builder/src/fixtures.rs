@@ -7,7 +7,10 @@ use std::{
     fs,
     os::{
         fd::IntoRawFd,
-        unix::{ffi::OsStrExt, fs::PermissionsExt},
+        unix::{
+            ffi::OsStrExt,
+            fs::{DirBuilderExt, PermissionsExt},
+        },
     },
     path::{Path, PathBuf},
     process::Command,
@@ -389,3 +392,49 @@ pub const BROKEN_LAB_TEXT: &str = concat!(
     "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         9970fb4d8f97\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\n",
     "\nenvs/lab.json:1:14: duplicate key \"motd\" (envs/lab.json:1:2)\n"
 );
+pub const D1: hearth::service::domain::render::vocabulary::Digest =
+    hearth::service::domain::render::vocabulary::Digest([1; 32]);
+pub const D3: hearth::service::domain::render::vocabulary::Digest =
+    hearth::service::domain::render::vocabulary::Digest([3; 32]);
+#[derive(Clone, Copy, Debug)]
+pub enum Laid {
+    File(&'static str),
+    Record(&'static str, hearth::service::domain::render::vocabulary::Digest),
+}
+pub fn lay(store: &Path, entries: &[Laid]) {
+    use hearth_protocol_tree::{
+        cache_file::{self, CacheFile, Origin},
+        limits,
+    };
+    fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("cache")).expect("cache directory");
+    for entry in entries {
+        let (name, bytes) = match entry {
+            Laid::File(name) => (*name, b"fixture".to_vec()),
+            Laid::Record(name, digest) => (
+                *name,
+                cache_file::write(
+                    &CacheFile {
+                        at: skein_lib::Wall::EPOCH,
+                        origin: Origin::Rendered { path: b"fixture".as_slice().into() },
+                        sha256: *digest,
+                        size: 7,
+                        took: skein_lib::Duration::ZERO,
+                    },
+                    &limits::SHIPPED,
+                )
+                .expect("cache record")
+                .into_vec(),
+            ),
+        };
+        fs::write(store.join(name), bytes).expect("laid file");
+    }
+}
+#[must_use]
+pub fn names(directory: &Path) -> Vec<String> {
+    let mut names: Vec<_> = fs::read_dir(directory)
+        .expect("directory")
+        .map(|entry| entry.expect("entry").file_name().into_string().expect("name"))
+        .collect();
+    names.sort();
+    names
+}

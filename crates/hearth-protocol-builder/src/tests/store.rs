@@ -2,7 +2,7 @@ use super::fixtures::{self, Layer, STORE_OWNER};
 use crate::{
     Asked,
     builder::{
-        store::vocabulary::{Event, Request, Why},
+        store::vocabulary::{Directory, Event, Request, Shape, Why},
         vocabulary::{Event as BuilderEvent, Request as BuilderRequest},
     },
     tree,
@@ -77,4 +77,104 @@ fn an_unopened_store_exits_75() {
     layer.client(BuilderRequest::Unopened { to: ReplyTo::new(Token::new(0)), why: Why::Lock });
     drop(layer.printed());
     assert_eq!(layer.code(), Some(75));
+}
+
+const CACHE_NAMES: &[(&[u8], skein_io::kernel::Kind, Shape)] = &[
+    (
+        b"0101010101010101010101010101010101010101010101010101010101010101",
+        skein_io::kernel::Kind::File,
+        Shape::File(crate::render::vocabulary::Digest([1; 32])),
+    ),
+    (
+        b"0101010101010101010101010101010101010101010101010101010101010101.record",
+        skein_io::kernel::Kind::File,
+        Shape::Record(crate::render::vocabulary::Digest([1; 32])),
+    ),
+    (
+        b"0101010101010101010101010101010101010101010101010101010101010101.tmp",
+        skein_io::kernel::Kind::File,
+        Shape::Temporary,
+    ),
+    (
+        b"0101010101010101010101010101010101010101010101010101010101010101.record.skein-0123456789abcdef",
+        skein_io::kernel::Kind::File,
+        Shape::Temporary,
+    ),
+    (b"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", skein_io::kernel::Kind::File, Shape::Stray),
+    (b"010101010101010101010101010101010101010101010101010101010101010", skein_io::kernel::Kind::File, Shape::Stray),
+    (
+        b"0101010101010101010101010101010101010101010101010101010101010101.tmp",
+        skein_io::kernel::Kind::Directory,
+        Shape::Stray,
+    ),
+    (b"notes.tmp", skein_io::kernel::Kind::File, Shape::Stray),
+];
+#[test]
+fn a_page_of_the_cache_comes_up_as_typed_names() {
+    for &(name, kind, shape) in CACHE_NAMES {
+        let mut layer = Layer::new();
+        fixtures::store_cursor(&mut layer, Directory::Cache, 1);
+        drop(layer.asked());
+        layer.file_up(file::Event::Listed {
+            owner: STORE_OWNER,
+            entries: Box::new([file::Entry { name: bytes::copy_of(name), kind }]),
+        });
+        assert_eq!(
+            layer.told(),
+            Some(BuilderEvent::Store(Event::Page {
+                entries: Box::new([crate::builder::store::vocabulary::Entry { name: bytes::copy_of(name), shape }]),
+                last: false
+            })),
+            "{name:?}"
+        );
+    }
+}
+const TOP_NAMES: &[(&[u8], Shape)] = &[
+    (b"store.record", Shape::Fixed),
+    (b"cache", Shape::Fixed),
+    (b"resolutions", Shape::Fixed),
+    (b"staging", Shape::Fixed),
+    (b"layers", Shape::Fixed),
+    (b"targets", Shape::Fixed),
+    (b"state", Shape::Fixed),
+    (b"artifacts", Shape::Fixed),
+    (b"sources", Shape::Fixed),
+    (b"caches", Shape::Fixed),
+    (b"repo", Shape::Fixed),
+    (b"credentials", Shape::Fixed),
+    (b"store.record.skein-0123456789abcdef", Shape::Temporary),
+    (b"notes.tmp", Shape::Stray),
+    (b"store.record.skein-0123456789abcdeF", Shape::Stray),
+];
+#[test]
+fn the_top_names_store_md_2_1s_fixed_names_and_the_records_temporary() {
+    for &(name, shape) in TOP_NAMES {
+        assert_eq!(crate::store::names::shape(Directory::Top, name, skein_io::kernel::Kind::File), shape, "{name:?}");
+    }
+}
+#[test]
+fn a_cursor_closes_after_its_last_page() {
+    let mut layer = Layer::new();
+    fixtures::store_cursor(&mut layer, Directory::Cache, 1024);
+    assert_eq!(
+        layer.asked(),
+        Some(Asked::File(file::Request::ListPage { owner: Token::new(20), directory: Token::new(88), max: 1024 }))
+    );
+    layer.file_up(file::Event::Listed { owner: STORE_OWNER, entries: Box::new([]) });
+    assert_eq!(layer.told(), None);
+    assert_eq!(layer.asked(), Some(Asked::File(file::Request::Close { owner: Token::new(20), file: Token::new(88) })));
+    layer.file_up(file::Event::Closed { owner: STORE_OWNER });
+    assert_eq!(layer.told(), Some(BuilderEvent::Store(Event::Page { entries: Box::new([]), last: true })));
+}
+#[test]
+fn a_failed_page_closes_its_cursor_without_listing_again() {
+    let mut layer = Layer::new();
+    fixtures::store_cursor(&mut layer, Directory::Cache, 1024);
+    drop(layer.asked());
+    layer.file_up(file::Event::Failed { owner: STORE_OWNER, error: Error::NotFound, committed: false, residue: None });
+    assert_eq!(layer.told(), None);
+    assert_eq!(layer.asked(), Some(Asked::File(file::Request::Close { owner: Token::new(20), file: Token::new(88) })));
+    layer.file_up(file::Event::Closed { owner: STORE_OWNER });
+    assert_eq!(layer.told(), Some(BuilderEvent::Store(Event::Failed)));
+    assert_eq!(layer.asked(), None);
 }

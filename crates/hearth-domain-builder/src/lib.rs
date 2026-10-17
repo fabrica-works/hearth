@@ -94,7 +94,7 @@ fn store_forward(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Reque
     use store::vocabulary::{Answer, Output};
     match builder.store_output.pop() {
         Some(Output::Request(request)) => out.push(Request::Store(request)),
-        Some(Output::Answer(Answer::Ready)) => {
+        Some(Output::Answer(Answer::Ready | Answer::Full { .. } | Answer::Unusable { .. })) => {
             let event = match builder.call.take().expect("opening call") {
                 Call::Diff { repository, from, to, targets } => RenderEvent::Diff { repository, from, to, targets },
                 Call::Render { repository, revision, targets } => RenderEvent::Render { repository, revision, targets },

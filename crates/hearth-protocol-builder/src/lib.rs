@@ -232,7 +232,7 @@ pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, above: &mut Queu
         Told::Io(event) => event,
         Told::File(event) => {
             if event.owner() == store::OWNER {
-                protocol.store.up(event, &env.limits, above);
+                protocol.store.up(event, &env.limits, above, below);
                 return;
             }
             let Some(Mode::Read(read)) = &mut protocol.mode else { unreachable!("cache read exists") };

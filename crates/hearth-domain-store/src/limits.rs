@@ -15,8 +15,11 @@ pub const SHIPPED: Limits = Limits {
     retry: Duration::from_millis(200),
     said: Duration::from_secs(1),
 };
-/// The deadline table; the index and page join with the startup scan.
+/// The index, one page of names, and the retry deadline.
 #[must_use]
-pub fn worst_case(_limits: &Limits) -> Option<u64> {
-    skein_lib::Deadlines::<crate::Timer>::worst_case(1)
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    use crate::vocabulary::Entry;
+    let index = crate::index::Index::worst_case(limits.cache_files.checked_mul(2)?)?;
+    let page = u64::from(limits.page).checked_mul(u64::try_from(size_of::<Entry>()).ok()?.checked_add(255)?)?;
+    index.checked_add(page)?.checked_add(255)?.checked_add(skein_lib::Deadlines::<crate::Timer>::worst_case(1)?)
 }

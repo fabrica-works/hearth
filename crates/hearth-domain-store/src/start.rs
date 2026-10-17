@@ -31,16 +31,17 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Qu
                     store.phase = Phase::Closed;
                     return;
                 }
-                ready(store, out);
+                crate::scan::begin(store, env.limits, out);
                 return;
             }
             store.phase = Phase::Writing;
             Request::WriteRecord { record: StoreRecord { layout: 1, made: env.wall, range: None, uid: store.uid } }
         }
         Event::Done => {
-            ready(store, out);
+            crate::scan::begin(store, env.limits, out);
             return;
         }
+        Event::Page { .. } => unreachable!("scan has not begun"),
         Event::Failed => {
             let why = if store.phase == Phase::Locking { Why::Lock } else { Why::Record };
             store.timers.cancel(Timer::Retry);
@@ -50,8 +51,4 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Qu
         }
     };
     out.push(Output::Request(request));
-}
-fn ready(store: &mut Store, out: &mut Queue<Output>) {
-    store.phase = Phase::Ready;
-    out.push(Output::Answer(Answer::Ready));
 }

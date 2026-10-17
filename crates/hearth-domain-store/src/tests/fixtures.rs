@@ -1,7 +1,7 @@
 use crate::{
     Store,
     limits::Limits,
-    vocabulary::{Event, Output},
+    vocabulary::{Entry, Event, Output, StoreRecord},
 };
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Queue, Time, Wall};
@@ -27,6 +27,12 @@ impl Harness {
         crate::fire(&mut self.store, &Env { now, wall: Wall::EPOCH, limits: self.limits }, &mut output);
         collect(&mut output)
     }
+    pub fn page(&mut self, entries: &[Entry], last: bool) -> Box<[Output]> {
+        self.step(Time::ZERO, Event::Page { entries: entries.into(), last })
+    }
+    pub fn indexed(&self, digest: &hearth_lib::encode::Digest) -> bool {
+        self.store.scan.indexed(digest)
+    }
     pub fn next_deadline(&self) -> Option<Time> {
         crate::next_deadline(&self.store)
     }
@@ -42,5 +48,23 @@ pub fn recording() -> Harness {
     let mut store = Harness::new(crate::limits::SHIPPED, 1000);
     drop(store.step(Time::ZERO, Event::Open));
     drop(store.step(Time::ZERO, Event::Locked));
+    store
+}
+
+pub const D1: hearth_lib::encode::Digest = hearth_lib::encode::Digest([1; 32]);
+pub const D2: hearth_lib::encode::Digest = hearth_lib::encode::Digest([2; 32]);
+pub const D3: hearth_lib::encode::Digest = hearth_lib::encode::Digest([3; 32]);
+pub fn entry(name: &[u8], shape: crate::vocabulary::Shape) -> Entry {
+    Entry { name: name.into(), shape }
+}
+pub fn scanning(limits: Limits) -> Harness {
+    let mut store = Harness::new(limits, 1000);
+    drop(store.step(Time::ZERO, Event::Open));
+    drop(store.step(Time::ZERO, Event::Locked));
+    drop(store.step(
+        Time::ZERO,
+        Event::Loaded { record: Some(StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: 1000 }) },
+    ));
+    drop(store.page(&[], true));
     store
 }

@@ -2,7 +2,9 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+mod index;
 pub mod limits;
+mod scan;
 mod start;
 pub mod vocabulary;
 use limits::Limits;
@@ -19,6 +21,7 @@ enum Phase {
     Locking,
     Recording,
     Writing,
+    Scanning,
     Ready,
 }
 #[derive(Debug)]
@@ -26,15 +29,20 @@ pub struct Store {
     phase: Phase,
     uid: u32,
     timers: Deadlines<Timer>,
+    scan: scan::Scan,
 }
 impl Store {
     #[must_use]
-    pub fn new(_limits: &Limits, uid: u32) -> Self {
-        Self { phase: Phase::Closed, uid, timers: Deadlines::with_capacity(1) }
+    pub fn new(limits: &Limits, uid: u32) -> Self {
+        Self { phase: Phase::Closed, uid, timers: Deadlines::with_capacity(1), scan: scan::Scan::new(limits) }
     }
 }
 pub fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Queue<Output>) {
-    start::step(store, env, ev, out);
+    if store.phase == Phase::Scanning {
+        scan::step(store, env, ev, out);
+    } else {
+        start::step(store, env, ev, out);
+    }
 }
 pub fn fire(store: &mut Store, env: &Env<Limits>, out: &mut Queue<Output>) {
     if let Some(Timer::Retry) = store.timers.expire(env.now) {

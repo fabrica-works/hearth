@@ -1,29 +1,55 @@
 //! Store io, with no waiting in the protocol layer (store.md, 8.2).
+pub(super) mod names;
 use crate::{
     Asked, Roots,
     builder::{
         self,
-        store::vocabulary::{Event, Request, Why},
+        store::vocabulary::{Directory, Entry, Event, Request, Why},
     },
     limits::Limits,
     records, translate, tree,
 };
 use alloc::boxed::Box;
 use skein_io::{file, kernel::Error};
-use skein_lib::{Decimal, Queue, Token, Writer, bytes};
+use skein_lib::{Decimal, List, Queue, Token, Writer, bytes};
 pub(super) const OWNER: Token = Token::new(20);
 #[derive(Debug)]
 pub(super) struct Store {
     pending: Option<Request>,
+    cursor: Option<Token>,
+    directory: Directory,
+    max: u32,
+    closing: Option<Event>,
 }
 impl Store {
     pub fn new() -> Self {
-        Self { pending: None }
+        Self { pending: None, cursor: None, directory: Directory::Top, max: 0, closing: None }
     }
     pub fn down(&mut self, request: Request, roots: &Roots, limits: &Limits, below: &mut Queue<Asked>) {
         assert!(self.pending.is_none(), "one store request");
-        self.pending = Some(request);
+        self.pending = Some(request.clone());
         below.push(Asked::File(match request {
+            Request::List { directory, max } => {
+                self.directory = directory;
+                self.max = max;
+                file::Request::OpenDirectory {
+                    owner: OWNER,
+                    root: roots.store.fd,
+                    name: bytes::copy_of(if directory == Directory::Top { b"." } else { b"cache" }),
+                    no_follow: true,
+                }
+            }
+            Request::Next { max } => {
+                self.max = max;
+                self.list()
+            }
+            Request::Close => file::Request::Close { owner: OWNER, file: self.cursor.take().expect("scan cursor") },
+            Request::Remove { directory, name } => file::Request::Remove {
+                owner: OWNER,
+                root: if directory == Directory::Top { roots.store.fd } else { roots.cache.fd },
+                name: names::removal(name),
+                directory: false,
+            },
             Request::Lock => file::Request::Lock { owner: OWNER, root: roots.store.token },
             Request::LoadRecord => file::Request::Load {
                 owner: OWNER,
@@ -44,9 +70,59 @@ impl Store {
             },
         }));
     }
-    pub fn up(&mut self, event: file::Event, limits: &Limits, above: &mut Queue<builder::vocabulary::Event>) {
+    fn list(&self) -> file::Request {
+        file::Request::ListPage { owner: OWNER, directory: self.cursor.expect("scan cursor"), max: self.max }
+    }
+    pub fn up(
+        &mut self,
+        event: file::Event,
+        limits: &Limits,
+        above: &mut Queue<builder::vocabulary::Event>,
+        below: &mut Queue<Asked>,
+    ) {
+        if let file::Event::Opened { file, .. } = event {
+            self.cursor = Some(file);
+            below.push(Asked::File(self.list()));
+            return;
+        }
+        if let file::Event::Closed { .. } = event
+            && let Some(event) = self.closing.take()
+        {
+            self.pending = None;
+            above.push(builder::vocabulary::Event::Store(event));
+            return;
+        }
+        if let file::Event::Failed { .. } | file::Event::Cancelled { .. } = event {
+            self.closing = None;
+            if let Some(file) = self.cursor.take() {
+                self.closing = Some(Event::Failed);
+                below.push(Asked::File(file::Request::Close { owner: OWNER, file }));
+                return;
+            }
+        }
         let pending = self.pending.take().expect("store request in flight");
         let event = match event {
+            file::Event::Listed { entries, .. } => {
+                let last = entries.len() < usize::try_from(self.max).expect("page bound");
+                let mut shaped = List::with_capacity(self.max);
+                for entry in entries {
+                    shaped
+                        .push(Entry { shape: names::shape(self.directory, &entry.name, entry.kind), name: entry.name })
+                        .expect("page bound");
+                }
+                let event = Event::Page { entries: shaped.into_boxed(), last };
+                if last {
+                    self.closing = Some(event);
+                    self.pending = Some(pending);
+                    below.push(Asked::File(file::Request::Close {
+                        owner: OWNER,
+                        file: self.cursor.take().expect("scan cursor"),
+                    }));
+                    return;
+                }
+                event
+            }
+            file::Event::Removed { .. } | file::Event::Closed { .. } | file::Event::Stored { .. } => Event::Done,
             file::Event::Locked { .. } => Event::Locked,
             file::Event::Busy { .. } => Event::Busy,
             file::Event::Loaded { bytes, .. } => Event::Loaded {
@@ -56,7 +132,6 @@ impl Store {
                 },
             },
             file::Event::TooLarge { .. } => Event::Loaded { record: None },
-            file::Event::Stored { .. } => Event::Done,
             file::Event::Failed { error: Error::TimedOut, .. } if pending == Request::Lock => Event::Busy,
             file::Event::Failed { error: Error::NotFound, .. } if pending == Request::LoadRecord => {
                 Event::Loaded { record: None }
@@ -72,10 +147,7 @@ impl Store {
             | file::Event::Written { .. }
             | file::Event::Cut { .. }
             | file::Event::Synced { .. }
-            | file::Event::Closed { .. }
-            | file::Event::Renamed { .. }
-            | file::Event::Removed { .. }
-            | file::Event::Listed { .. } => unreachable!("store request terminal"),
+            | file::Event::Renamed { .. } => unreachable!("store request terminal"),
         };
         above.push(builder::vocabulary::Event::Store(event));
     }

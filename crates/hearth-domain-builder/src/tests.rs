@@ -71,16 +71,18 @@ fn the_call_reaches_render_only_once_the_store_is_open() {
     step(
         &mut builder,
         &fixtures::env(),
-        Event::Store(crate::store::vocabulary::Event::Loaded {
-            record: Some(crate::store::vocabulary::StoreRecord {
-                layout: 1,
-                made: skein_lib::Wall::EPOCH,
-                range: None,
-                uid: 1000,
-            }),
-        }),
+        Event::Store(crate::store::vocabulary::Event::Loaded { record: Some(fixtures::store_record()) }),
         &mut out,
     );
+    for _ in 0_u8..3 {
+        drop(out.pop());
+        step(
+            &mut builder,
+            &fixtures::env(),
+            Event::Store(crate::store::vocabulary::Event::Page { entries: Box::new([]), last: true }),
+            &mut out,
+        );
+    }
     assert_eq!(
         out.pop(),
         Some(Request::Render(crate::render::vocabulary::Request::List {

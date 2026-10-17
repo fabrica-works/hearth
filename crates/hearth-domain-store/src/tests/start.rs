@@ -1,7 +1,7 @@
 use super::fixtures::{self, Harness};
 use crate::{
     limits,
-    vocabulary::{Answer, Event, Output, Range, Request, StoreRecord, Why},
+    vocabulary::{Answer, Directory, Event, Output, Range, Request, StoreRecord, Why},
 };
 use skein_lib::{Time, Wall};
 #[test]
@@ -30,7 +30,10 @@ fn an_absent_or_unreadable_record_is_written_as_layout_1_by_its_user() {
             record: StoreRecord { layout: 1, made: Wall::from_nanos(77), range: None, uid: 1000 }
         })]
     );
-    assert_eq!(&*store.step(Time::ZERO, Event::Done), &[Output::Answer(Answer::Ready)]);
+    assert_eq!(
+        &*store.step(Time::ZERO, Event::Done),
+        &[Output::Request(Request::List { directory: Directory::Top, max: 1_024 })]
+    );
 }
 #[test]
 fn a_readable_record_of_layout_2_is_written_again_as_layout_1() {
@@ -52,7 +55,10 @@ fn a_readable_record_is_kept_with_its_range_and_the_store_is_ready() {
         range: Some(Range { base: 100_000, count: 65_536 }),
         uid: 1000,
     };
-    assert_eq!(&*store.step(Time::ZERO, Event::Loaded { record: Some(record) }), &[Output::Answer(Answer::Ready)]);
+    assert_eq!(
+        &*store.step(Time::ZERO, Event::Loaded { record: Some(record) }),
+        &[Output::Request(Request::List { directory: Directory::Top, max: 1_024 })]
+    );
 }
 const FAILURES: &[(bool, bool, Why)] =
     &[(false, false, Why::Lock), (true, false, Why::Record), (true, true, Why::Record)];
