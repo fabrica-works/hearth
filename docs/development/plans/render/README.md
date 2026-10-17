@@ -271,7 +271,9 @@ the closing repins (Repin). The increments of each session are in its file.
   for this plan, code-organization.md 7's "Past that, it asks before
   landing" up to three times the Size): it lands at its count without
   asking when each counted file is in its Files, each file is at most 800
-  lines, and each test its Test shape names is there. Its report's
+  lines, and each test its Test shape names is there. A new child module
+  that takes code out of a file in its Files, so that file stays at most
+  800 lines, counts as in its Files (ruling 154). Its report's
   `Size:` gives the count by file and names this rule. Past three times
   its Size, or with a counted file outside its Files, it still stops on a
   question before landing, with the count by file.
