@@ -2,3 +2,7 @@
 pub mod fixtures;
 pub mod generate;
 pub mod world;
+
+pub mod expect;
+pub mod mutate;
+mod replay;

@@ -1,0 +1,8 @@
+/usr/bin/git
+--git-dir=/scratch/empty
+ls-tree
+-r
+-l
+-z
+--full-tree
+e3eea17b777f2bbd0123ac253abd0301e017dab1

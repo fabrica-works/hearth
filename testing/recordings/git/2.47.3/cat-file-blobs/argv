@@ -1,0 +1,4 @@
+/usr/bin/git
+--git-dir=/scratch/modes
+cat-file
+--batch

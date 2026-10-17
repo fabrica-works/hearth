@@ -7,6 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+hearth-recordings.workspace = true
 skein-lib.workspace = true
 skein-world.workspace = true
 hearth-protocol-git.workspace = true

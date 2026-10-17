@@ -13,7 +13,7 @@
 # it otherwise (workflow.md, section 1).
 
 [profile.default]
-default-filter = "not binary(/^fuzzy_/)"
+default-filter = "not binary(/^fuzzy_/) and not binary(/^conformance_/)"
 global-timeout = "15s"
 slow-timeout = { period = "500ms" }
 
@@ -24,7 +24,7 @@ filter = "kind(test)"
 priority = 10
 
 [profile.fuzzy]
-default-filter = "binary(/^fuzzy_/)"
+default-filter = "binary(/^fuzzy_/) and not binary(/^conformance_/)"
 global-timeout = "60s"
 slow-timeout = { period = "5s" }
 
@@ -32,5 +32,14 @@ slow-timeout = { period = "5s" }
 #   cargo nextest run --workspace --profile measure -j 1
 #   cargo nextest run --workspace --profile measure -j 1 --ignore-default-filter -E 'binary(/^fuzzy_/)'
 [profile.measure]
+default-filter = "not binary(/^conformance_/)"
 global-timeout = "1h"
 slow-timeout = { period = "60s" }
+
+# heavy cargo nextest run --workspace --profile conformance; HEARTH_RECORD=1 captures.
+[profile.conformance]
+default-filter = "binary(/^conformance_/)"
+global-timeout = "2m"
+slow-timeout = { period = "30s", terminate-after = 2 }
+retries = 0
+fail-fast = false

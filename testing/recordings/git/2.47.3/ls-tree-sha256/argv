@@ -1,0 +1,8 @@
+/usr/bin/git
+--git-dir=/scratch/sha256
+ls-tree
+-r
+-l
+-z
+--full-tree
+2fd13bb82d4b73f3a68aab8cea04aa6dda377c64fa776927e9a2c14cac3b890e

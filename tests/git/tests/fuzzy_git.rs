@@ -66,3 +66,27 @@ fn random_batches_cut_ended_failed_and_closed_settle() {
         );
     }
 }
+
+#[test]
+fn random_recordings_cut_mutated_ended_and_failed_settle() {
+    use hearth_git_world::{expect, mutate};
+    let recordings = hearth_recordings::all("git");
+    for seed in 0..256 {
+        let mut rng = Rng::new(seed);
+        let (_case, recording) = &recordings[usize::try_from(rng.below(recordings.len() as u64)).expect("case index")];
+        let expected = expect::decode(recording.expect.as_ref().expect("expectation"));
+        let mut damaged = recording.clone();
+        let mutations = mutate::all(&damaged.stdout);
+        if !mutations.is_empty() {
+            damaged.stdout =
+                mutations[usize::try_from(rng.below(mutations.len() as u64)).expect("mutation index")].clone();
+        }
+        let settings = Settings {
+            end: Some(usize::try_from(rng.between(0, damaged.stdout.len() as u64)).expect("end")),
+            fail: rng.chance(250),
+            close: Some(u32::try_from(rng.below(32)).expect("close step")),
+            ..Settings::cut(seed)
+        };
+        drop(world::replay(&damaged, &expected, &fixtures::SHIPPED, &settings));
+    }
+}

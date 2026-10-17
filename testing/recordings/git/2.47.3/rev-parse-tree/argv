@@ -1,0 +1,6 @@
+/usr/bin/git
+--git-dir=/scratch/modes
+rev-parse
+--verify
+--quiet
+db5b3e4d45e221a850c294925f9ffca157ba0c95^{commit}

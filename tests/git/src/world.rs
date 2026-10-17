@@ -10,14 +10,19 @@ use skein_world::stream::Wire;
 #[derive(Clone, Copy, Debug)]
 pub struct Settings {
     pub seed: u64,
+    pub whole: bool,
     pub end: Option<usize>,
     pub fail: bool,
     pub close: Option<u32>,
 }
 impl Settings {
     #[must_use]
+    pub fn whole() -> Self {
+        Self { whole: true, ..Self::cut(0) }
+    }
+    #[must_use]
     pub fn cut(seed: u64) -> Self {
-        Self { seed, end: None, fail: false, close: None }
+        Self { seed, whole: false, end: None, fail: false, close: None }
     }
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -31,9 +36,7 @@ pub enum Outcome {
 pub fn list(stdout: &[u8], limits: &Limits, settings: &Settings) -> Outcome {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
     let mut machine = Listing::new(limits);
-    let mut wire = Wire::new(settings.seed);
-    wire.write(&stdout[..settings.end.unwrap_or(stdout.len()).min(stdout.len())]);
-    wire.eof = true;
+    let mut wire = Source::new(stdout, settings);
     let mut above = Queue::with_capacity(1);
     let mut below = Queue::with_capacity(1);
     if settings.close == Some(0) {
@@ -70,7 +73,7 @@ pub fn list(stdout: &[u8], limits: &Limits, settings: &Settings) -> Outcome {
     }
     panic!("listing did not settle for {settings:?}")
 }
-fn assert_closed(machine: &mut Listing, env: &Env<Limits>, wire: &mut Wire) {
+fn assert_closed(machine: &mut Listing, env: &Env<Limits>, wire: &mut Source) {
     let mut above = Queue::with_capacity(1);
     let mut below = Queue::with_capacity(1);
     listing::down(machine, env, Request::Close, &mut above, &mut below);
@@ -104,9 +107,7 @@ pub fn read(
     use hearth_protocol_git::batch::{self, Batch, Event, Request};
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
     let mut machine = Batch::START;
-    let mut wire = Wire::new(settings.seed);
-    wire.write(&stdout[..settings.end.unwrap_or(stdout.len()).min(stdout.len())]);
-    wire.eof = true;
+    let mut wire = Source::new(stdout, settings);
     let mut above = Queue::with_capacity(1);
     let mut below = Queue::with_capacity(1);
     let mut requests = requests.iter();
@@ -172,7 +173,7 @@ pub fn read(
     }
     panic!("batch did not settle for {settings:?}")
 }
-fn batch_closed(machine: &mut hearth_protocol_git::batch::Batch, env: &Env<Limits>, wire: &mut Wire) {
+fn batch_closed(machine: &mut hearth_protocol_git::batch::Batch, env: &Env<Limits>, wire: &mut Source) {
     use hearth_protocol_git::batch::{self, Event, Request};
     let mut above = Queue::with_capacity(1);
     let mut below = Queue::with_capacity(1);
@@ -313,6 +314,45 @@ impl Stepped {
                 | skein_lib::stream::Down::Send(_)
                 | skein_lib::stream::Down::Finish => unreachable!("read only"),
             }
+        }
+    }
+}
+
+pub use crate::replay::replay;
+
+#[derive(Debug)]
+enum Source {
+    Cut(Wire),
+    Whole { held: skein_lib::stream::Held, demand: Option<Read> },
+}
+impl Source {
+    fn new(stdout: &[u8], settings: &Settings) -> Self {
+        let bytes = &stdout[..settings.end.unwrap_or(stdout.len()).min(stdout.len())];
+        if settings.whole {
+            Self::Whole { held: skein_lib::stream::Held::new(bytes.into()), demand: None }
+        } else {
+            let mut wire = Wire::new(settings.seed);
+            wire.write(bytes);
+            wire.eof = true;
+            Self::Cut(wire)
+        }
+    }
+    fn take(&mut self, down: skein_lib::stream::Down) {
+        match self {
+            Self::Cut(wire) => wire.take(down),
+            Self::Whole { demand, .. } => match down {
+                skein_lib::stream::Down::Demand { read: Read::Nothing, room: 0 } => *demand = None,
+                skein_lib::stream::Down::Demand { read, room: 0 } => *demand = Some(read),
+                skein_lib::stream::Down::Demand { .. }
+                | skein_lib::stream::Down::Send(_)
+                | skein_lib::stream::Down::Finish => unreachable!("read-only source"),
+            },
+        }
+    }
+    fn answer(&mut self) -> Option<Up> {
+        match self {
+            Self::Cut(wire) => wire.answer(),
+            Self::Whole { held, demand } => demand.take().and_then(|read| held.answer(read)),
         }
     }
 }

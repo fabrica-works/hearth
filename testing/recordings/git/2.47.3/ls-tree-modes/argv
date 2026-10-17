@@ -1,0 +1,8 @@
+/usr/bin/git
+--git-dir=/scratch/modes
+ls-tree
+-r
+-l
+-z
+--full-tree
+5a68fca3f2212a72a0e055da4f1c88f5a2ae64b9

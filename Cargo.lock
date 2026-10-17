@@ -23,6 +23,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-conformance-world"
+version = "0.0.0"
+dependencies = [
+ "hearth-git-world",
+ "hearth-protocol-git",
+ "hearth-recordings",
+ "skein-scratch",
+]
+
+[[package]]
 name = "hearth-domain-render"
 version = "0.0.0"
 dependencies = [
@@ -42,6 +52,7 @@ name = "hearth-git-world"
 version = "0.0.0"
 dependencies = [
  "hearth-protocol-git",
+ "hearth-recordings",
  "skein-heap",
  "skein-lib",
  "skein-world",
@@ -91,6 +102,13 @@ version = "0.0.0"
 dependencies = [
  "hearth-lib",
  "skein-lib",
+]
+
+[[package]]
+name = "hearth-recordings"
+version = "0.0.0"
+dependencies = [
+ "skein-scratch",
 ]
 
 [[package]]
