@@ -109,7 +109,16 @@ pub fn build(
     if let Some(initramfs) = &mut initramfs {
         initramfs.modules = modules;
     }
-    Ok(Packages { initramfs_file: None, sources, request: request.into_boxed(), variant, preseeds, initramfs, apt })
+    Ok(Packages {
+        initramfs_file: None,
+        sources,
+        request: request.into_boxed(),
+        variant,
+        preseeds,
+        initramfs,
+        apt,
+        seeds: super::Seeds { users: Box::new([]), groups: Box::new([]) },
+    })
 }
 pub(in crate::parts) fn error(
     schema: Schema,

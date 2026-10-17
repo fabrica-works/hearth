@@ -219,7 +219,8 @@ fn has(settings: &compose::Settings, task: &[u8]) -> bool {
 fn broken(kind: &Kind) -> bool {
     match kind {
         Kind::Decode(_) | Kind::Repository(_) | Kind::Composition(_) => true,
-        Kind::Resolution(_)
+        Kind::Ids(_)
+        | Kind::Resolution(_)
         | Kind::Exported(_)
         | Kind::Tool(_)
         | Kind::Guard(_)
@@ -270,7 +271,8 @@ fn exported(error: &Error, exporter: &[u8], task: &[u8]) -> Option<Error> {
         Kind::Composition(value) => Cause::Composition(value.clone()),
         Kind::Schema(value) => Cause::Schema(value.clone()),
         Kind::Evaluation(value) => Cause::Evaluation(*value),
-        Kind::Resolution(_)
+        Kind::Ids(_)
+        | Kind::Resolution(_)
         | Kind::Exported(_)
         | Kind::Tool(_)
         | Kind::Guard(_)

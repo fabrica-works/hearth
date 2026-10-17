@@ -224,7 +224,8 @@ pub fn expand(tree: &Tree, roots: &Roots, limits: &Limits) -> Expansion {
             Kind::Evaluation(kind) => crate::fixtures::kind(kind),
             Kind::Schema(_) => "wrong",
             Kind::Collision(_) => "collision",
-            Kind::Store(_)
+            Kind::Ids(_)
+            | Kind::Store(_)
             | Kind::Decode(_)
             | Kind::Repository(_)
             | Kind::Resolution(_)

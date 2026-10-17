@@ -75,7 +75,7 @@ fn the_initramfs_file_digest_is_beside_the_packages_part_not_in_its_digest() {
     for (row, &file) in FILES.iter().enumerate() {
         assert_eq!(
             crate::parts::packages::digest(&inputs::packages_with_file(file)),
-            fixtures::digest("de38a7ed6276e7c90818dd41185f34731cad522522bb65e8ba08bb626b1fe35d"),
+            fixtures::THIN_PACKAGES_DIGEST,
             "row {row}"
         );
     }

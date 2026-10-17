@@ -12,6 +12,7 @@ pub fn packages(packages: source::Packages) -> target::Packages {
         initramfs,
         initramfs_file,
         apt: options,
+        seeds: fixed,
     } = packages;
     target::Packages {
         initramfs_file: file(initramfs_file),
@@ -21,6 +22,7 @@ pub fn packages(packages: source::Packages) -> target::Packages {
         preseeds: preseeds(answers),
         initramfs: optional_initramfs(initramfs),
         apt: apt(options),
+        seeds: seeds(fixed),
     }
 }
 fn sources(sources: source::Sources) -> target::Sources {
@@ -115,4 +117,17 @@ fn apt_pair(value: Option<source::AptPair>) -> Option<target::AptPair> {
 
 fn file(digest: Option<crate::render::vocabulary::Digest>) -> Option<[u8; 32]> {
     Some(digest?.0)
+}
+
+fn seeds(value: source::Seeds) -> target::Seeds {
+    let source::Seeds { users, groups } = value;
+    let mut fixed_users = List::with_capacity(u32::try_from(users.len()).expect("bounded users"));
+    for source::SeedUser { name, uid, gid } in users {
+        fixed_users.push(target::SeedUser { name, uid, gid }).expect("user count");
+    }
+    let mut fixed_groups = List::with_capacity(u32::try_from(groups.len()).expect("bounded groups"));
+    for source::SeedGroup { name, gid } in groups {
+        fixed_groups.push(target::SeedGroup { name, gid }).expect("group count");
+    }
+    target::Seeds { users: fixed_users.into_boxed(), groups: fixed_groups.into_boxed() }
 }

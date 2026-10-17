@@ -6,6 +6,7 @@ use skein_lib::bytes::copy_of;
 pub fn packages_record() -> Packages {
     Packages {
         initramfs_file: None,
+        seeds: Seeds { users: Box::new([]), groups: Box::new([]) },
         sources: Sources {
             suite: copy_of(b"forky"),
             architecture: copy_of(b"amd64"),
@@ -131,4 +132,20 @@ pub fn unchanged_packages_change() -> crate::diff::PartChange {
 pub fn packages_json(spec: Box<Spec>) -> Box<[u8]> {
     crate::form::print(crate::form::Form::JsonLines, &crate::records::Record::Spec(spec), None, &crate::limits::SHIPPED)
         .expect("packages json")
+}
+
+pub fn seeded_spec() -> Box<Spec> {
+    let mut spec = packages_spec();
+    for part in &mut spec.parts {
+        if let PartRecord::Packages(packages) = &mut part.record {
+            packages.seeds = Seeds {
+                users: Box::new([
+                    SeedUser { name: copy_of(b"mail"), uid: 120, gid: Some(121) },
+                    SeedUser { name: copy_of(b"postfix"), uid: 122, gid: None },
+                ]),
+                groups: Box::new([SeedGroup { name: copy_of(b"mail"), gid: 121 }]),
+            };
+        }
+    }
+    spec
 }

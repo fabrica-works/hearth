@@ -2,6 +2,7 @@
 use crate::form::text::Lines;
 use alloc::boxed::Box;
 mod change;
+mod seeds;
 pub(crate) use change::value_text;
 pub use change::*;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -13,6 +14,23 @@ pub struct Packages {
     pub preseeds: Box<[Preseed]>,
     pub initramfs: Option<Initramfs>,
     pub apt: Apt,
+    pub seeds: Seeds,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Seeds {
+    pub users: Box<[SeedUser]>,
+    pub groups: Box<[SeedGroup]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct SeedUser {
+    pub name: Box<[u8]>,
+    pub uid: u32,
+    pub gid: Option<u32>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct SeedGroup {
+    pub name: Box<[u8]>,
+    pub gid: u32,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Sources {
@@ -165,6 +183,7 @@ impl Packages {
         lines.put(b"  apt        install_recommends ");
         lines.put(if self.apt.install_recommends { b"true" } else { b"false" });
         lines.put(b"\n");
+        self.seeds.text(lines);
     }
     pub(crate) fn json(&self, json: &mut skein_json::writer::Encoder) {
         json.object_start();
@@ -178,6 +197,8 @@ impl Packages {
         preseeds(json, &self.preseeds);
         json.key(b"request");
         names(json, &self.request);
+        json.key(b"seeds");
+        self.seeds.json(json);
         json.key(b"sources");
         sources(json, &self.sources);
         json.key(b"variant");

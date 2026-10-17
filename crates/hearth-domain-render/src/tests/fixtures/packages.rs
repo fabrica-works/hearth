@@ -6,9 +6,14 @@ use crate::{
 use skein_lib::{List, bytes::copy_of};
 pub const MIN_PACKAGE_NAME: usize = 2;
 pub const MAX_PACKAGE_NAME: usize = 256;
+pub const THIN_PACKAGES_DIGEST: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
+    0x64, 0xb1, 0xb9, 0x9b, 0x81, 0x3a, 0x1e, 0x54, 0xab, 0xd0, 0xf1, 0x19, 0x80, 0x31, 0x73, 0xae, 0x1b, 0x4f, 0xac,
+    0x14, 0x5e, 0x73, 0xe6, 0xb9, 0x60, 0x41, 0x27, 0x6b, 0xa5, 0x47, 0x91, 0xa7,
+]);
 pub fn thin_packages() -> Packages {
     Packages {
         initramfs_file: None,
+        seeds: Seeds { users: Box::new([]), groups: Box::new([]) },
         sources: Sources {
             suite: copy_of(b"forky"),
             architecture: copy_of(b"amd64"),
@@ -169,4 +174,37 @@ pub fn parts_changed(before: crate::parts::PartRecord, after: crate::parts::Part
     let mut after = super::spec(b"x1-prod", &[Part { digest: hearth_lib::encode::Digest([2; 32]), record: after }]);
     after.digest = hearth_lib::encode::Digest([3; 32]);
     diff::compare(Some(&Made::Spec(Box::new(before))), Some(&Made::Spec(Box::new(after))), Needs::Known)
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ResolutionField {
+    Suite,
+    Architecture,
+    Components,
+    Archive,
+    Updates,
+    Security,
+    Request,
+    Variant,
+    Recommends,
+}
+pub fn changed_resolution_field(field: ResolutionField) -> Packages {
+    let mut packages = thin_packages();
+    match field {
+        ResolutionField::Suite => packages.sources.suite = copy_of(b"trixie"),
+        ResolutionField::Architecture => packages.sources.architecture = copy_of(b"arm64"),
+        ResolutionField::Components => packages.sources.components = Box::new([Component::Main, Component::Contrib]),
+        ResolutionField::Archive => packages.sources.archive = copy_of(b"20261101T030405Z"),
+        ResolutionField::Updates => packages.sources.updates = true,
+        ResolutionField::Security => packages.sources.security = Some(copy_of(b"20261101T030405Z")),
+        ResolutionField::Request => packages.request = Box::new([copy_of(b"curl")]),
+        ResolutionField::Variant => packages.variant = Variant::Container,
+        ResolutionField::Recommends => packages.apt.install_recommends = true,
+    }
+    packages
+}
+pub fn seeded_packages() -> Packages {
+    let mut packages = thin_packages();
+    packages.seeds.groups = Box::new([SeedGroup { name: copy_of(b"opendkim"), gid: 120 }]);
+    packages
 }

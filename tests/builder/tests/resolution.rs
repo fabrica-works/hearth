@@ -8,7 +8,7 @@ fn a_recorded_resolution_prints_known_and_the_layer_keys() {
     let printed = fixtures::lines_starting(&out.stdout, &["packages ", "keys "]);
     assert_eq!(
         printed,
-        "packages     part bc297e38f7e3   resolution 21e9a02feb65 known\nkeys         packages 46a0bdef5234   software 2dcc0e90ef26   config f077e017be06\n"
+        "packages     part 78ec4b1fb53a   resolution 21e9a02feb65 known\nkeys         packages d018a0eea488   software f60610453970   config 8c9bf06f6262\n"
     );
 }
 #[test]
@@ -22,7 +22,7 @@ fn an_unrecorded_resolution_prints_needed_and_no_keys_line() {
     let out = fixtures::render(&repository, &[b"test-min"], Form::Text);
     assert_eq!(
         fixtures::lines_starting(&out.stdout, &["packages ", "keys "]),
-        "packages     part bc297e38f7e3   resolution 21e9a02feb65 needed\n"
+        "packages     part 78ec4b1fb53a   resolution 21e9a02feb65 needed\n"
     );
 }
 #[test]
@@ -43,7 +43,7 @@ fn the_json_spec_gives_the_resolution_and_its_keys_whole() {
     let repository = fixtures::recorded_test_min("json-known");
     let out = fixtures::render(&repository, &[b"test-min"], Form::JsonLines);
     let text = String::from_utf8_lossy(&out.stdout);
-    assert!(text.contains("\"resolution\":{\"key\":\"21e9a02feb654883ef051d247cb14db878e04c03c2f7675c784a679ea0956d5d\",\"keys\":{\"config\":\"f077e017be069766cd08730e3cfff38d015ec68860d4a87f258c6fcb006c53f8\",\"packages\":\"46a0bdef5234b595f1095d5abd8f8bfc4f87527310a915430a44d5bab394f1ae\",\"software\":\"2dcc0e90ef26625638bfbdf0ab35ca3af6ff0799502b0b3f44f88ad7d9674672\"},\"kind\":\"known\"}"), "{text}");
+    assert!(text.contains("\"resolution\":{\"key\":\"21e9a02feb654883ef051d247cb14db878e04c03c2f7675c784a679ea0956d5d\",\"keys\":{\"config\":\"8c9bf06f62629795e2ee99885a9faf9ad94bd7a066f5a40f39739824ecb3bde6\",\"packages\":\"d018a0eea48807bb1966946d32e001cc2a2a6378bb257e8786e4961427de36a1\",\"software\":\"f6061045397016408cb4dcc2c3145f790f1ff970564964c7f9cbfd5c4c206b5c\"},\"kind\":\"known\"}"), "{text}");
 }
 #[test]
 fn the_test_repositorys_targets_render_the_pins_resolution_inputs() {

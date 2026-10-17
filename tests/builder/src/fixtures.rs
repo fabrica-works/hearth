@@ -157,7 +157,7 @@ fn run(repository: &Repository, call: Call, form: Form, store: Option<&Path>) ->
         .rendered
 }
 
-pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         1fc3f0605df6\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nsoftware     part 656d135b92c3\nconfig       part 369415fd653c\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ndata         part 2d4765200bab\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
+pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         23656fdf46b7\nboot         part bc6cab417252\n  mutable    false\npackages     part 64b1b99b813a   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nsoftware     part 656d135b92c3\nconfig       part 369415fd653c\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ndata         part 2d4765200bab\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
 
 mod binary;
 pub use binary::{Ended, binary};
@@ -432,7 +432,7 @@ pub fn broken_task() -> Vec<File> {
     files
 }
 pub const BROKEN_LAB_TEXT: &str = concat!(
-    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         1fc3f0605df6\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nsoftware     part 656d135b92c3\nconfig       part 369415fd653c\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ndata         part 2d4765200bab\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n",
+    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         23656fdf46b7\nboot         part bc6cab417252\n  mutable    false\npackages     part 64b1b99b813a   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nsoftware     part 656d135b92c3\nconfig       part 369415fd653c\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ndata         part 2d4765200bab\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n",
     "\nenvs/lab.json:1:14: duplicate key \"motd\" (envs/lab.json:1:2)\n"
 );
 pub const D1: hearth::service::domain::render::vocabulary::Digest =
@@ -755,7 +755,7 @@ pub const REFUSED_DEBIAN: File =
 /// Secrets, identity and a password travel through the real declaration decoder.
 pub const LIVE: File = File { path: "tasks/motd/task.json", body: br#"{"live":{"postfix":{"unit":"postfix.service","action":"reload","paths":["/etc/postfix/","/etc/mailname"]},"ripgrep":{"action":"none","paths":["/opt/ripgrep/"]}}}"#, mode: 0o644 };
 
-pub const SECRETS: File = File { path: "tasks/motd/task.json", body: br#"{"secrets": {"mail/dkim/example.org.key": {"path": "/etc/dkimkeys/example.org.key", "mode": "0640", "group": "opendkim"}, "mail/tls/mx1.key": {"path": "/etc/ssl/private/mx1.key"}}, "identity": {"ssh-ed25519": {"kind": "ssh-host-key", "algorithm": "ed25519", "path": "/etc/ssh/ssh_host_ed25519_key", "public_path": "/etc/ssh/ssh_host_ed25519_key.pub"}}, "users": {"free": {"uid": 1000, "password": "users/free.passwd"}}}"#, mode: 0o644 };
+pub const SECRETS: File = ids::SECRETS_FIXED;
 pub const SECRET_NO_PATH: File =
     File { path: "tasks/motd/task.json", body: br#"{"secrets": {"mail/tls/mx1.key": {}}}"#, mode: 0o644 };
 
@@ -779,7 +779,7 @@ mod vpn;
 pub use vpn::*;
 pub mod accounts;
 
-pub const DISTINCT_TEAMS_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         880ff6e893e0\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nsoftware     part 656d135b92c3\nconfig       part d8c246718666\n  groups     dev -\n  groups     ops -\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ndata         part 2d4765200bab\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
+pub const DISTINCT_TEAMS_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         44c412f39f88\nboot         part bc6cab417252\n  mutable    false\npackages     part 64b1b99b813a   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nsoftware     part 656d135b92c3\nconfig       part d8c246718666\n  groups     dev -\n  groups     ops -\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ndata         part 2d4765200bab\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
 
 pub mod additions;
 pub mod data;
@@ -788,3 +788,4 @@ pub mod software;
 
 mod diff_resolution;
 pub use diff_resolution::*;
+pub mod ids;

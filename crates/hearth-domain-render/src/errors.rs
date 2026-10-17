@@ -20,6 +20,7 @@ pub struct Place {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
     Exported(Exported),
+    Ids(Ids),
 
     Resolution(Resolution),
     Guard(Guard),
@@ -508,4 +509,31 @@ pub enum Resolution {
     Unmatched { name: Box<[u8]>, version: Box<[u8]>, architecture: Box<[u8]> },
     Disagree { name: Box<[u8]>, version: Box<[u8]>, architecture: Box<[u8]> },
     TooMany { max: u32 },
+}
+
+/// A fixed id is missing for an entry's owner (render.md, 7.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Ids {
+    pub owner: Box<[u8]>,
+    pub of: Owns,
+    pub entry: Box<[u8]>,
+    pub why: Why,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Owns {
+    Data,
+    Secret,
+    Identity,
+    Download,
+    User,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Why {
+    NoUser,
+    NoGroup,
+    NoUid,
+    NoGid,
+    OneId,
+    NotPackageUser,
+    NotPackageGroup,
 }

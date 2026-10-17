@@ -643,7 +643,7 @@ fn a_target_prints_its_packages_part_from_debian_and_its_tasks() {
             &["packages ", "  sources", "  request", "  variant", "  microcode", "  apt"]
         ),
         concat!(
-            "packages     part 51cab42f8d2b   resolution 059882763340 needed\n",
+            "packages     part bb94f2003485   resolution 059882763340 needed\n",
             "  sources    forky amd64 main non-free-firmware 20261001T030405Z\n",
             "  request    curl firmware-linux tzdata\n",
             "  variant    apt\n",
@@ -673,7 +673,7 @@ fn preseeds_and_modules_reach_the_packages_part() {
             &["packages ", "  sources", "  request", "  variant", "  preseed", "  initramfs", "  microcode", "  apt"]
         ),
         concat!(
-            "packages     part 552be03a9eec   resolution 3b244f24d10d needed\n",
+            "packages     part 078c2a1460c5   resolution 3b244f24d10d needed\n",
             "  sources    forky amd64 main 20261001T030405Z\n",
             "  request    curl tzdata\n",
             "  variant    apt\n",
@@ -722,3 +722,6 @@ mod scripts;
 mod diff_resolution;
 #[path = "real/software.rs"]
 mod software;
+
+#[path = "real/ids.rs"]
+mod ids;

@@ -32,10 +32,7 @@ fn the_resolution_inputs_are_the_four_values_as_the_record_encodes_them() {
 }
 #[test]
 fn the_packages_digest_is_h_of_part_packages_over_its_record() {
-    assert_eq!(
-        packages::digest(&fixtures::thin_packages()),
-        fixtures::digest("de38a7ed6276e7c90818dd41185f34731cad522522bb65e8ba08bb626b1fe35d")
-    );
+    assert_eq!(packages::digest(&fixtures::thin_packages()), fixtures::THIN_PACKAGES_DIGEST);
 }
 #[test]
 fn a_request_is_the_union_of_the_tasks_names_sorted_once() {
@@ -130,68 +127,23 @@ fn a_security_timestamp_with_its_pocket_off_changes_nothing() {
     let after = fixtures::packages_root(&[], false, b"20261101T030405Z");
     assert_eq!(packages::read(&before), packages::read(&after));
 }
+const RESOLUTION_FIELDS: &[(&str, fixtures::ResolutionField)] = &[
+    ("suite", fixtures::ResolutionField::Suite),
+    ("architecture", fixtures::ResolutionField::Architecture),
+    ("components", fixtures::ResolutionField::Components),
+    ("archive", fixtures::ResolutionField::Archive),
+    ("updates", fixtures::ResolutionField::Updates),
+    ("security", fixtures::ResolutionField::Security),
+    ("request", fixtures::ResolutionField::Request),
+    ("variant", fixtures::ResolutionField::Variant),
+    ("install_recommends", fixtures::ResolutionField::Recommends),
+];
 #[test]
-fn the_suite_changes_the_resolution_inputs() {
+fn each_resolution_field_changes_the_resolution_inputs() {
     let input = fixtures::thin_packages();
-    let mut edited = input.clone();
-    edited.sources.suite = copy_of(b"trixie");
-    assert_ne!(packages::inputs(&input), packages::inputs(&edited));
-}
-#[test]
-fn the_architecture_changes_the_resolution_inputs() {
-    let input = fixtures::thin_packages();
-    let mut edited = input.clone();
-    edited.sources.architecture = copy_of(b"arm64");
-    assert_ne!(packages::inputs(&input), packages::inputs(&edited));
-}
-#[test]
-fn the_components_changes_the_resolution_inputs() {
-    let input = fixtures::thin_packages();
-    let mut edited = input.clone();
-    edited.sources.components = Box::new([Component::Main, Component::Contrib]);
-    assert_ne!(packages::inputs(&input), packages::inputs(&edited));
-}
-#[test]
-fn the_archive_changes_the_resolution_inputs() {
-    let input = fixtures::thin_packages();
-    let mut edited = input.clone();
-    edited.sources.archive = copy_of(b"20261101T030405Z");
-    assert_ne!(packages::inputs(&input), packages::inputs(&edited));
-}
-#[test]
-fn the_updates_changes_the_resolution_inputs() {
-    let input = fixtures::thin_packages();
-    let mut edited = input.clone();
-    edited.sources.updates = true;
-    assert_ne!(packages::inputs(&input), packages::inputs(&edited));
-}
-#[test]
-fn the_security_changes_the_resolution_inputs() {
-    let input = fixtures::thin_packages();
-    let mut edited = input.clone();
-    edited.sources.security = Some(copy_of(b"20261101T030405Z"));
-    assert_ne!(packages::inputs(&input), packages::inputs(&edited));
-}
-#[test]
-fn the_request_changes_the_resolution_inputs() {
-    let input = fixtures::thin_packages();
-    let mut edited = input.clone();
-    edited.request = Box::new([copy_of(b"curl")]);
-    assert_ne!(packages::inputs(&input), packages::inputs(&edited));
-}
-#[test]
-fn the_variant_changes_the_resolution_inputs() {
-    let input = fixtures::thin_packages();
-    let mut edited = input.clone();
-    edited.variant = Variant::Container;
-    assert_ne!(packages::inputs(&input), packages::inputs(&edited));
-}
-#[test]
-fn the_install_recommends_changes_the_resolution_inputs() {
-    let input = fixtures::thin_packages();
-    let mut edited = input.clone();
-    edited.apt.install_recommends = true;
-    assert_ne!(packages::inputs(&input), packages::inputs(&edited));
+    for &(name, field) in RESOLUTION_FIELDS {
+        assert_ne!(packages::inputs(&input), packages::inputs(&fixtures::changed_resolution_field(field)), "{name}");
+    }
 }
 
 #[test]
@@ -222,3 +174,15 @@ fn a_component_the_target_does_not_enable_keeps_its_setting_place() {
 
 #[path = "packages/preseeds.rs"]
 mod preseeds;
+
+#[test]
+fn the_seeds_leave_the_resolution_inputs_alone() {
+    assert_eq!(packages::inputs(&fixtures::seeded_packages()), packages::inputs(&fixtures::thin_packages()));
+}
+#[test]
+fn non_empty_seeds_move_the_packages_digest() {
+    assert_eq!(
+        packages::digest(&fixtures::seeded_packages()),
+        fixtures::digest("2585c6ca3c14c9a7c53dd50e7f17fa64327c6de60aef197cd9fecb81b72566ab")
+    );
+}

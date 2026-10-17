@@ -10,6 +10,7 @@ pub mod diff;
 pub mod entries;
 pub mod errors;
 pub mod evaluate;
+pub mod ids;
 pub mod keys;
 pub mod kinds;
 pub mod limits;

@@ -1,8 +1,10 @@
 //! Errors in the answer (render.md, 7.1 to 7.3).
+mod ids;
 mod validation;
 use crate::form::{json::field, text::Lines};
 pub use crate::progress::{Step, StoreError, StoreFault, StoreLimit};
 use alloc::boxed::Box;
+pub use ids::{Ids, Owns, Why};
 use skein_json::writer::Encoder;
 pub use validation::Evaluation;
 use validation::{json_names, names, signed};
@@ -19,6 +21,7 @@ pub struct Error {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
     Exported(Exported),
+    Ids(Ids),
 
     Resolution(Resolution),
     Store(StoreError),
@@ -73,6 +76,7 @@ impl Error {
         }
         match &self.kind {
             Kind::Exported(exported) => exported.text(lines),
+            Kind::Ids(ids) => ids.text(lines),
             Kind::Collision(Collision::Key { key }) => {
                 lines.put(b"the key ");
                 lines.quote(key);
@@ -113,6 +117,11 @@ impl Error {
             field(json, b"side", side.name());
         }
         match &self.kind {
+            Kind::Ids(ids) => {
+                field(json, b"kind", b"ids");
+                json.key(b"ids");
+                ids.json(json);
+            }
             Kind::Exported(exported) => {
                 field(json, b"kind", b"exported");
                 json.key(b"exported");

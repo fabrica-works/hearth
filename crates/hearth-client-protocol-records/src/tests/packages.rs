@@ -47,7 +47,7 @@ fn json_gives_the_packages_record_in_key_order() {
     let json = fixtures::packages_json(fixtures::packages_spec());
     let start = skein_lib::bytes::find(&json, br#"{"record":"part","target":"x1-prod","name":"packages""#)
         .expect("packages part");
-    assert_eq!(json.get(start..).expect("part suffix"), concat!(r#"{"record":"part","target":"x1-prod","name":"packages","digest":"4be1c0d2a7f10000000000000000000000000000000000000000000000000000","packages":{"apt":{"install_recommends":false},"initramfs":{"microcode":"generic","modules":[]},"preseeds":{},"request":["curl","tzdata"],"sources":{"architecture":"amd64","archive":"20261001T030405Z","components":["main","contrib","non-free","non-free-firmware"],"security":"20261002T030405Z","suite":"forky","updates":true},"variant":"apt"}}"#, "\n").as_bytes());
+    assert_eq!(json.get(start..).expect("part suffix"), concat!(r#"{"record":"part","target":"x1-prod","name":"packages","digest":"4be1c0d2a7f10000000000000000000000000000000000000000000000000000","packages":{"apt":{"install_recommends":false},"initramfs":{"microcode":"generic","modules":[]},"preseeds":{},"request":["curl","tzdata"],"seeds":{"groups":{},"users":{}},"sources":{"architecture":"amd64","archive":"20261001T030405Z","components":["main","contrib","non-free","non-free-firmware"],"security":"20261002T030405Z","suite":"forky","updates":true},"variant":"apt"}}"#, "\n").as_bytes());
 }
 #[test]
 fn a_component_error_names_the_package_and_the_component() {
@@ -75,4 +75,19 @@ fn json_gives_the_initramfs_file_beside_the_packages_digest() {
     }
     let json = fixtures::packages_json(spec);
     assert!(skein_lib::bytes::find(&json, br#""digest":"4be1c0d2a7f10000000000000000000000000000000000000000000000000000","initramfs_file":"0707070707070707070707070707070707070707070707070707070707070707","packages":{"#).is_some());
+}
+#[test]
+fn seeds_print_as_choices_7_shows() {
+    assert!(
+        skein_lib::bytes::find(
+            &fixtures::packages_text(fixtures::seeded_spec()),
+            b"  seed       user mail 120 121\n  seed       user postfix 122 -\n  seed       group mail 121\n"
+        )
+        .is_some()
+    );
+}
+#[test]
+fn json_nests_the_seed_ids_under_seeds() {
+    let json = fixtures::packages_json(fixtures::seeded_spec());
+    assert!(skein_lib::bytes::find(&json, br#""seeds":{"groups":{"mail":{"gid":121}},"users":{"mail":{"gid":121,"uid":120},"postfix":{"gid":null,"uid":122}}}"#).is_some());
 }

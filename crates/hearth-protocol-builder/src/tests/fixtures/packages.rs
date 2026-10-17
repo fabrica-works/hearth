@@ -11,6 +11,7 @@ pub fn packages_back(packages: source::Packages) -> target::Packages {
         initramfs,
         initramfs_file,
         apt: options,
+        seeds: fixed,
     } = packages;
     target::Packages {
         initramfs_file: file(initramfs_file),
@@ -20,6 +21,7 @@ pub fn packages_back(packages: source::Packages) -> target::Packages {
         preseeds: preseeds(answers),
         initramfs: optional_initramfs(initramfs),
         apt: apt(options),
+        seeds: seeds(fixed),
     }
 }
 fn sources(sources: source::Sources) -> target::Sources {
@@ -153,6 +155,10 @@ pub fn package_records() -> [target::Packages; 2] {
             target::Variant::Container => None,
         },
         apt: target::Apt { install_recommends: true },
+        seeds: target::Seeds {
+            users: Box::new([target::SeedUser { name: copy_of(b"mail"), uid: 120, gid: Some(121) }]),
+            groups: Box::new([target::SeedGroup { name: copy_of(b"mail"), gid: 121 }]),
+        },
     })
 }
 
@@ -194,4 +200,17 @@ pub fn boot_change_back(value: crate::records::parts::boot::Change) -> crate::re
 
 fn file(digest: Option<[u8; 32]>) -> Option<hearth_lib::encode::Digest> {
     Some(hearth_lib::encode::Digest(digest?))
+}
+
+fn seeds(value: source::Seeds) -> target::Seeds {
+    let source::Seeds { users, groups } = value;
+    let mut fixed_users = List::with_capacity(u32::try_from(users.len()).expect("bounded users"));
+    for source::SeedUser { name, uid, gid } in users {
+        fixed_users.push(target::SeedUser { name, uid, gid }).expect("user count");
+    }
+    let mut fixed_groups = List::with_capacity(u32::try_from(groups.len()).expect("bounded groups"));
+    for source::SeedGroup { name, gid } in groups {
+        fixed_groups.push(target::SeedGroup { name, gid }).expect("group count");
+    }
+    target::Seeds { users: fixed_users.into_boxed(), groups: fixed_groups.into_boxed() }
 }

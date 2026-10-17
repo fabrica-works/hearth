@@ -475,13 +475,13 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
-            let Some((packages, boot)) =
+            let Some((mut packages, boot)) =
                 packages::build(&debian, &p, &expansion, set.as_ref(), &meta, &mut self.errors)
             else {
                 continue;
             };
             let Some((secrets, live, software, accounts)) =
-                secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome)
+                secrets::build(&expansion, &mut packages, &meta, &mut self.errors, &mut self.outcome)
             else {
                 continue;
             };

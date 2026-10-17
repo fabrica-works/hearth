@@ -623,3 +623,24 @@ fn a_resolution_error_names_its_package() {
         Some(Type::Error), &limits::SHIPPED).as_deref(),
         Ok(b"{\"record\":\"error\",\"kind\":\"resolution\",\"resolution\":{\"kind\":\"missing\",\"package\":\"apt\"},\"class\":\"configuration\"}\n".as_slice()));
 }
+
+#[test]
+fn an_ids_error_names_the_owned_entry_and_its_missing_id() {
+    assert_eq!(fixtures::print_error(Form::Text, fixtures::ids_error(crate::errors::Owns::Secret, crate::errors::Why::NoUser)).expect("ids error").as_ref(),
+        b"tasks/boot/task.json:22:7: carbon-lab: boot: mail owns mail/tls.key and has no fixed id: no user mail is declared\n");
+}
+#[test]
+fn json_gives_the_ids_errors_typed_fields() {
+    let json = fixtures::print_error(
+        Form::JsonLines,
+        fixtures::ids_error(crate::errors::Owns::User, crate::errors::Why::OneId),
+    )
+    .expect("ids json");
+    assert!(
+        skein_lib::bytes::find(
+            &json,
+            br#""kind":"ids","ids":{"entry":"mail","of":"user","owner":"mail","why":"one_id"}"#
+        )
+        .is_some()
+    );
+}

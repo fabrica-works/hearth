@@ -19,6 +19,23 @@ pub struct Packages {
     pub preseeds: Box<[Preseed]>,
     pub initramfs: Option<Initramfs>,
     pub apt: Apt,
+    pub seeds: Seeds,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Seeds {
+    pub users: Box<[SeedUser]>,
+    pub groups: Box<[SeedGroup]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct SeedUser {
+    pub name: Box<[u8]>,
+    pub uid: u32,
+    pub gid: Option<u32>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct SeedGroup {
+    pub name: Box<[u8]>,
+    pub gid: u32,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Sources {
@@ -167,7 +184,7 @@ pub fn digest(packages: &Packages) -> Digest {
     let inputs = inputs(packages);
     let mut hash = H::new(b"part:packages", 1);
     let record = hash.values();
-    record.map(5_u64.saturating_add(u64::from(packages.initramfs.is_some())));
+    record.map(6_u64.saturating_add(u64::from(packages.initramfs.is_some())));
     record.key(b"apt");
     for item in &inputs.apt {
         record.item(item);
@@ -195,9 +212,34 @@ pub fn digest(packages: &Packages) -> Digest {
         record.key(b"value");
         record.bytes(&preseed.value);
     }
-    for (name, items) in
-        [(b"request".as_slice(), &inputs.request), (b"sources", &inputs.sources), (b"variant", &inputs.variant)]
-    {
+    record.key(b"request");
+    for item in &inputs.request {
+        record.item(item);
+    }
+    record.key(b"seeds");
+    record.map(2);
+    record.key(b"groups");
+    record.map(count(packages.seeds.groups.len()));
+    for group in &packages.seeds.groups {
+        record.key(&group.name);
+        record.map(1);
+        record.key(b"gid");
+        record.uint(u64::from(group.gid));
+    }
+    record.key(b"users");
+    record.map(count(packages.seeds.users.len()));
+    for user in &packages.seeds.users {
+        record.key(&user.name);
+        record.map(2);
+        record.key(b"gid");
+        match user.gid {
+            Some(gid) => record.uint(u64::from(gid)),
+            None => record.none(),
+        }
+        record.key(b"uid");
+        record.uint(u64::from(user.uid));
+    }
+    for (name, items) in [(b"sources".as_slice(), &inputs.sources), (b"variant", &inputs.variant)] {
         record.key(name);
         for item in items {
             record.item(item);
