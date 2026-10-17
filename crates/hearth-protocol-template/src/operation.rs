@@ -1,3 +1,4 @@
+use crate::Filter;
 use alloc::boxed::Box;
 /// Postfix operations and their maximum value stack (render.md, 8.3).
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -18,4 +19,8 @@ pub enum Op {
     Integer(i64),
     Boolean(bool),
     Name { name: Box<[u8]> },
+    Key { name: Box<[u8]> },
+    Item,
+    List { length: u32 },
+    Filter(Filter),
 }

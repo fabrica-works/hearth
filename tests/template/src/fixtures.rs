@@ -31,9 +31,14 @@ pub fn kind(kind: &ErrorKind) -> &'static str {
         ErrorKind::Escape => "escape",
         ErrorKind::Integer => "integer",
         ErrorKind::Expected(_) => "expected",
+        ErrorKind::TooDeep => "deep",
+        ErrorKind::Misplaced => "misplaced",
+        ErrorKind::UnknownFilter => "filter",
+        ErrorKind::Arity { .. } => "arity",
     }
 }
-pub const EVERY_KIND: &[&str] = &["long", "character", "unterminated", "escape", "integer", "expected"];
+pub const EVERY_KIND: &[&str] =
+    &["long", "character", "unterminated", "escape", "integer", "expected", "deep", "misplaced", "filter", "arity"];
 pub fn assert_fell(fell: &BTreeSet<&str>) {
     for kind in EVERY_KIND {
         assert!(fell.contains(kind), "missing {kind}");

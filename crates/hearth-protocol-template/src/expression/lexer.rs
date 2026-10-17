@@ -15,6 +15,7 @@ pub(crate) struct Lexed {
 pub(crate) enum Token {
     Value(Op),
     Word,
+    Symbol(u8),
     End,
 }
 impl Lexer {
@@ -30,6 +31,10 @@ impl Lexer {
         let token = match self.text.get(start).copied() {
             None => Token::End,
             Some(b'\'' | b'"') => Token::Value(Op::String(self.string()?)),
+            Some(byte @ (b'.' | b'|' | b'[' | b']' | b'(' | b')' | b',')) => {
+                self.at = self.at.saturating_add(1);
+                Token::Symbol(byte)
+            }
             Some(b'0'..=b'9') => Token::Value(Op::Integer(self.integer()?)),
             Some(b'-') if operand && digit(self.text.get(start.saturating_add(1))) => {
                 Token::Value(Op::Integer(self.integer()?))
@@ -38,6 +43,9 @@ impl Lexer {
             Some(_) => return Err(Error { at, kind: ErrorKind::Character }),
         };
         Ok(Lexed { token, at })
+    }
+    pub(super) fn spelling(&self, at: u32) -> Box<[u8]> {
+        copy_of(self.text.get(usize::try_from(at).expect("offset fits")..self.at).expect("name span"))
     }
     fn name(&mut self) -> Token {
         let start = self.at;

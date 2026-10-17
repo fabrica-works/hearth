@@ -1,7 +1,8 @@
+use crate::fixtures;
 use crate::fixtures::Shape;
 use skein_lib::Rng;
 #[must_use]
-pub fn text(rng: &mut Rng, shape: Shape) -> Vec<u8> {
+fn literal(rng: &mut Rng, shape: Shape) -> Vec<u8> {
     let value = match rng.below(6) {
         0 => format!("{}", rng.next_u64()),
         1 => String::from("false"),
@@ -55,6 +56,55 @@ pub fn mutate(rng: &mut Rng, text: &[u8]) -> Vec<u8> {
             let span = out[at..end].to_vec();
             out.splice(at..at, span);
         }
+    }
+    out
+}
+
+/// Generates nested grammar forms, including filter arguments and lookups.
+#[must_use]
+pub fn text(rng: &mut Rng, shape: Shape) -> Vec<u8> {
+    expression(rng, shape, if shape.width == fixtures::SMALL.width { 3 } else { 7 })
+}
+fn expression(rng: &mut Rng, shape: Shape, depth: u32) -> Vec<u8> {
+    if depth == 0 {
+        return literal(rng, shape);
+    }
+    let mut out = match rng.below(4) {
+        0 => {
+            let inner = expression(rng, shape, depth - 1);
+            [b"(".as_slice(), &inner, b")"].concat()
+        }
+        1 => {
+            let mut list = Vec::from(b"[".as_slice());
+            for i in 0..rng.below(4) {
+                if i != 0 {
+                    list.push(b',');
+                }
+                list.extend(expression(rng, shape, depth - 1));
+            }
+            list.push(b']');
+            list
+        }
+        _ => literal(rng, shape),
+    };
+    for _ in 0..rng.below(3) {
+        if rng.below(2) == 0 {
+            out.extend_from_slice(b".and");
+        } else {
+            out.push(b'[');
+            out.extend(expression(rng, shape, depth - 1));
+            out.push(b']');
+        }
+    }
+    match rng.below(5) {
+        0 => out.extend_from_slice(b" | first"),
+        1 => {
+            out.extend_from_slice(b" | default(");
+            out.extend(expression(rng, shape, depth - 1));
+            out.push(b')');
+        }
+        2 => out.extend_from_slice(b" | replace('a', 'b') | length()"),
+        _ => {}
     }
     out
 }

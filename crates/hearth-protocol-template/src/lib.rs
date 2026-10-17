@@ -4,9 +4,11 @@
 extern crate alloc;
 pub mod error;
 pub mod expression;
+pub mod filter;
 pub mod limits;
 pub mod operation;
 pub use error::{Error, ErrorKind, Expected};
+pub use filter::Filter;
 pub use operation::{Expression, Op, Operation};
 #[cfg(test)]
 mod tests;
