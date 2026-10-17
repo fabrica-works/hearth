@@ -13,5 +13,8 @@ hearth-protocol-git.workspace = true
 hearth-protocol-config.workspace = true
 hearth-client-protocol-records.workspace = true
 
+[dev-dependencies]
+hearth-lib.workspace = true
+
 [lints]
 workspace = true

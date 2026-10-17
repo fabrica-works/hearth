@@ -9,10 +9,11 @@ use skein_io::{
     kernel::{Exit, Fd},
 };
 use skein_lib::{
-    Env, Queue, Time, Token, Wall, bytes,
+    Env, List, Queue, Time, Token, Wall, bytes,
     stream::{Down, Held, Read, Up},
 };
 
+pub const CLIENT: Token = Token::new(90);
 pub const REQUEST: Token = Token::new(1);
 pub const OUTPUT: Token = Token::new(201);
 pub const INPUT: Token = Token::new(202);
@@ -62,13 +63,61 @@ pub struct Layer {
 }
 impl Layer {
     pub fn new() -> Self {
-        Self {
-            protocol: Protocol::new(&limits::SHIPPED, call(), crate::records::form::Form::Text, Fd::new(3)),
-            env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits::SHIPPED },
+        Self::with_form(crate::Form::Text, limits::SHIPPED)
+    }
+    pub fn with_form(form: crate::Form, limits: limits::Limits) -> Self {
+        let mut layer = Self {
+            protocol: Protocol::new(&limits, call(), form, Fd::new(3)),
+            env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             above: Queue::with_capacity(1),
             below: Queue::with_capacity(1),
             owner: None,
+        };
+        resume(&mut layer.protocol, &layer.env, &mut layer.above, &mut layer.below);
+        drop(layer.above.pop());
+        layer
+    }
+    pub fn client(&mut self, request: builder::vocabulary::Request) {
+        down(&mut self.protocol, &self.env, request, &mut self.above, &mut self.below);
+    }
+    pub fn bind_output(&mut self) {
+        self.protocol.bind_output(CLIENT);
+    }
+    pub fn code(&self) -> Option<u8> {
+        self.protocol.code()
+    }
+    pub fn printed(&mut self) -> Box<[Down]> {
+        let mut requests = List::with_capacity(16);
+        for _ in 0_u32..64 {
+            let Some(Asked::Io(request)) = self.asked() else {
+                return requests.into_boxed();
+            };
+            match request {
+                io::Request::Stream { stream, down } => {
+                    let room = match &down {
+                        Down::Demand { read: Read::Nothing, room } => *room > 0,
+                        Down::Send(_) | Down::Finish => false,
+                        Down::Demand { .. } => panic!("output reads nothing"),
+                    };
+                    requests.push(down).expect("bounded printed record");
+                    if room {
+                        self.up(io::Event::Stream { owner: stream, up: Up::Room });
+                    }
+                }
+                io::Request::Close { entity } => self.up(io::Event::Closed { owner: entity }),
+                io::Request::Spawn { .. }
+                | io::Request::Listen { .. }
+                | io::Request::Connect { .. }
+                | io::Request::Bind { .. }
+                | io::Request::Reject { .. }
+                | io::Request::Output { .. }
+                | io::Request::Signal { .. }
+                | io::Request::Usage { .. }
+                | io::Request::Window { .. }
+                | io::Request::Abort { .. } => panic!("client output operations"),
+            }
         }
+        panic!("bounded print settles");
     }
     pub fn down(&mut self, request: render::vocabulary::Request) {
         down(
@@ -177,5 +226,26 @@ impl Layer {
             }
         }
         panic!("bounded child settles");
+    }
+}
+
+pub fn spec() -> render::parts::Spec {
+    render::parts::Spec {
+        meta: render::parts::meta::Meta {
+            target: bytes::copy_of(b"x1-prod"),
+            base: bytes::copy_of(b"x1"),
+            member: None,
+            environment: bytes::copy_of(b"prod"),
+            placement: render::parts::meta::Placement {
+                kind: render::revision::Runs::Metal,
+                firmware: Some(render::revision::Firmware::Efi),
+                hardware: Some(bytes::copy_of(b"7th-gen")),
+                on: None,
+            },
+        },
+        meta_digest: hearth_lib::encode::Digest([1; 32]),
+        commit: oid(),
+        digest: hearth_lib::encode::Digest([2; 32]),
+        parts: Box::new([]),
     }
 }

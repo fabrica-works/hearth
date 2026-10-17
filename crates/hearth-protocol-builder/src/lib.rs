@@ -10,6 +10,8 @@ use hearth_client_protocol_records as records;
 pub use hearth_domain_builder as builder;
 use hearth_protocol_config as config;
 use hearth_protocol_git as git_machine;
+pub use records::form::Form;
+mod client;
 mod git;
 pub mod limits;
 mod read;
@@ -61,25 +63,48 @@ enum Mode {
 #[derive(Debug)]
 pub struct Protocol {
     root: Fd,
+    call: Option<Call>,
+    client: client::Client,
     next: u64,
     child: Option<git::Child>,
     mode: Option<Mode>,
 }
 impl Protocol {
     #[must_use]
-    pub fn new(_limits: &Limits, _call: Call, _form: records::form::Form, root: Fd) -> Self {
-        Self { root, next: 100, child: None, mode: None }
+    pub fn new(limits: &Limits, call: Call, form: Form, root: Fd) -> Self {
+        Self {
+            root,
+            call: Some(call),
+            client: client::Client::new(form, limits.printer),
+            next: 100,
+            child: None,
+            mode: None,
+        }
     }
     #[must_use]
-    pub const fn code(&self) -> Option<u8> {
-        None
+    pub fn code(&self) -> Option<u8> {
+        self.client.code()
+    }
+    #[must_use]
+    pub fn output_bound(&self) -> bool {
+        self.client.bound()
+    }
+    pub fn bind_output(&mut self, output: Token) {
+        self.client.bind(output);
+    }
+    #[must_use]
+    pub fn takes(&self) -> bool {
+        self.client.takes()
     }
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.mode.is_none() && self.child.is_none()
+        self.mode.is_none() && self.child.is_none() && self.call.is_none() && self.client.is_empty()
     }
     #[must_use]
     pub fn work_pending(&self) -> bool {
+        if self.call.is_some() || self.client.work_pending() {
+            return true;
+        }
         let Some(child) = &self.child else {
             return false;
         };
@@ -120,7 +145,7 @@ pub fn down(
 ) {
     match rq {
         Request::Render(request) => {
-            assert!(protocol.is_empty(), "one git request at a time");
+            assert!(protocol.mode.is_none() && protocol.child.is_none(), "one git request at a time");
             match request {
                 render::vocabulary::Request::List { request, repository, revision } => {
                     let Ok(revision) = invocation::revision(&revision) else {
@@ -143,11 +168,17 @@ pub fn down(
                 }
             }
         }
-        Request::Answer(_) | Request::Reply { .. } => unreachable!("printer joins in 11.3"),
+        request @ (Request::Answer(_) | Request::Reply { .. }) => {
+            protocol.client.down(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, request);
+        }
     }
 }
 pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, _above: &mut Queue<Event>, below: &mut Queue<Asked>) {
     let Told::Io(event) = ev;
+    if protocol.client.owns(&event) {
+        protocol.client.up(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, event);
+        return;
+    }
     let child = protocol.child.as_mut().expect("git event for a child");
     match event {
         io::Event::Spawned { owner, child: token, pipes } => {
@@ -205,32 +236,26 @@ pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, _above: &mut Que
                         Up::Failed(_) => child.failed = true,
                         Up::Room => unreachable!("read-only stdout"),
                     },
-                    Mode::Listing { machine, above, below, .. } => {
+                    Mode::Listing { machine, above: events, below: requests, .. } => {
                         let env = Env { now: env.now, wall: env.wall, limits: env.limits.git };
-                        listing::up(machine, &env, up, above, below);
+                        listing::up(machine, &env, up, events, requests);
+                        if let Some(down) = requests.pop() {
+                            child.stream(down, below);
+                        }
                     }
-                    Mode::Read(read) => read.up(env, up),
+                    Mode::Read(read) => {
+                        read.up(env, up);
+                        if let Some(down) = read.take_request() {
+                            child.stream(down, below);
+                        }
+                    }
                 }
             }
         }
         io::Event::Exited { owner, exit } => {
             assert_eq!(owner, child.owner, "current child exit");
             child.exited(exit);
-            let valid = match &protocol.mode {
-                Some(Mode::Rev { repository, revision, .. }) => invocation::succeeded(
-                    invocation::Command::RevParse { repository, revision },
-                    child.exit.expect("exit recorded"),
-                ),
-                Some(Mode::Listing { commit, .. }) => invocation::succeeded(
-                    invocation::Command::LsTree { repository: b"", commit: *commit },
-                    child.exit.expect("exit recorded"),
-                ),
-                Some(Mode::Read(_)) => invocation::succeeded(
-                    invocation::Command::CatFile { repository: b"" },
-                    child.exit.expect("exit recorded"),
-                ),
-                None => false,
-            };
+            let valid = succeeded(protocol.mode.as_ref().expect("child mode"), child.exit.expect("exit recorded"));
             if !valid {
                 child.failed = true;
             }
@@ -248,7 +273,23 @@ pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, _above: &mut Que
         | io::Event::Shutdown { .. } => unreachable!("git child events only"),
     }
 }
+fn succeeded(mode: &Mode, exit: invocation::Exit) -> bool {
+    let command = match mode {
+        Mode::Rev { repository, revision, .. } => invocation::Command::RevParse { repository, revision },
+        Mode::Listing { commit, .. } => invocation::Command::LsTree { repository: b"", commit: *commit },
+        Mode::Read(_) => invocation::Command::CatFile { repository: b"" },
+    };
+    invocation::succeeded(command, exit)
+}
 pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Event>, below: &mut Queue<Asked>) {
+    if let Some(call) = protocol.call.take() {
+        above.push(Event::Call { reply_to: skein_lib::ReplyTo::new(Token::new(0)), call });
+        return;
+    }
+    if protocol.client.work_pending() {
+        protocol.client.resume(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, below);
+        return;
+    }
     let Some(child) = &mut protocol.child else {
         return;
     };

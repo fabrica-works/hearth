@@ -1,3 +1,4 @@
+mod client;
 mod fixtures;
 mod git;
 mod read;
