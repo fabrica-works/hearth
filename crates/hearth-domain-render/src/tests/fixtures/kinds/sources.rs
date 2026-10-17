@@ -32,6 +32,7 @@ pub fn sources_checked() -> crate::schema::Validated {
 }
 pub fn source_side(declared: &Declaration, listing: &[Entry]) -> crate::call::Side {
     let mut side = crate::call::Side::new(copy_of(b"repository"), Box::new([]), &SHIPPED);
+    side.made = skein_lib::Map::with_capacity(SHIPPED.targets);
     side.entries = listing.into();
     side.commit = Some(Oid(copy_of(b"commit")));
     side.documents = super::super::declarations(&[(b"motd", Some(declared.clone()))]);
@@ -111,9 +112,15 @@ pub fn source_keeps(declared: &Declaration, template: Template) -> Box<[Kept]> {
             break;
         }
         crate::resume(&mut render, &env, &mut out);
-        if let Some(Output::Request(Request::Keep { request, sha256, path, bytes })) = out.pop() {
-            keeps.push((path, bytes)).expect("expansion bound");
-            crate::step(&mut render, &env, Event::Kept { request, sha256 }, &mut out);
+        match out.pop() {
+            Some(Output::Request(Request::Keep { request, sha256, path, bytes })) => {
+                keeps.push((path, bytes)).expect("expansion bound");
+                crate::step(&mut render, &env, Event::Kept { request, sha256 }, &mut out);
+            }
+            Some(Output::Request(Request::Find { request, .. })) => {
+                crate::step(&mut render, &env, Event::Absent { request }, &mut out);
+            }
+            Some(Output::Answer(_) | Output::Request(_)) | None => {}
         }
     }
     keeps.into_boxed()

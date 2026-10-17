@@ -24,3 +24,36 @@ pub fn digest(closure: &[Closed]) -> Digest {
     }
     hash.finish()
 }
+
+/// A find leaves unreadable records absent; startup alone validates their hashes.
+pub(super) fn find(
+    store: &mut crate::Store,
+    event: crate::vocabulary::Event,
+    out: &mut skein_lib::Queue<crate::vocabulary::Output>,
+) {
+    use crate::vocabulary::{Answer, Event, Output, Request};
+    let answer = match event {
+        Event::Find { key } => {
+            if !store.usable {
+                Answer::Declined { why: store.decline }
+            } else if store.scan.resolutions.contains_key(&key) {
+                store.finding = true;
+                out.push(Output::Request(Request::Load { key }));
+                return;
+            } else {
+                Answer::Absent
+            }
+        }
+        Event::Resolution { record } => Answer::Found { resolution: record },
+        Event::Unreadable | Event::Failed => Answer::Absent,
+        Event::Open
+        | Event::Locked
+        | Event::Busy
+        | Event::Loaded { .. }
+        | Event::Page { .. }
+        | Event::Done
+        | Event::Arrived { .. } => unreachable!("find terminal"),
+    };
+    store.finding = false;
+    out.push(Output::Answer(answer));
+}

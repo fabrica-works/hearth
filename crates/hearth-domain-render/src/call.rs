@@ -5,6 +5,7 @@ mod files;
 pub(crate) mod guards;
 mod packages;
 mod references;
+mod resolution;
 mod secrets;
 pub(crate) mod templates;
 mod validation;
@@ -52,6 +53,7 @@ pub(crate) struct Side {
     pub outcome: Outcome,
     pub made: Map<Box<[u8]>, crate::diff::Made>,
     pub diff: bool,
+    pub finding: resolution::Finding,
 }
 impl Side {
     pub fn new(repository: Box<[u8]>, names: Box<[Box<[u8]>]>, limits: &Limits) -> Side {
@@ -87,6 +89,7 @@ impl Side {
             outcome: Outcome::Done,
             made: Map::with_capacity(0),
             diff: false,
+            finding: resolution::Finding::new(limits.targets),
         }
     }
     pub fn listed(&mut self, limits: Limits, commit: Oid, entries: &[Entry], out: &mut Queue<Output>) {
@@ -627,7 +630,7 @@ impl Call {
             return false;
         }
         let Some(diff) = &mut self.diff else {
-            let Some(answer) = self.side.answer_for(out) else { return false };
+            let Some(answer) = self.side.resolved_answer(out) else { return false };
             let done = match &answer {
                 Answer::Rendered { .. } => true,
                 Answer::Spec(_) | Answer::Change(_) | Answer::Error(_) => false,
@@ -636,7 +639,7 @@ impl Call {
             return done;
         };
         if diff.tally.is_none() {
-            match self.side.answer_for(out) {
+            match self.side.resolved_answer(out) {
                 None => return false,
                 Some(Answer::Spec(spec)) => {
                     self.side

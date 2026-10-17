@@ -264,6 +264,7 @@ pub fn down(
             assert!(protocol.mode.is_none() && protocol.child.is_none(), "one git request at a time");
             assert!(protocol.keeping.is_none(), "one cache request at a time");
             match request {
+                render::vocabulary::Request::Find { .. } => unreachable!("root routes finds to store"),
                 request @ render::vocabulary::Request::Keep { .. } => protocol.keep(request, env),
                 render::vocabulary::Request::List { request, repository, revision } => {
                     let Ok(revision) = invocation::revision(&revision) else {

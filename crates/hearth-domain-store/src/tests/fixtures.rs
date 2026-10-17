@@ -129,6 +129,9 @@ pub fn inputs() -> crate::vocabulary::Inputs {
 }
 pub fn closure() -> Box<[crate::vocabulary::Closed]> {
     Box::new([crate::vocabulary::Closed {
+        source: 0,
+        filename: b"pool/apt.deb".as_slice().into(),
+        size: 7,
         name: b"apt".as_slice().into(),
         architecture: b"amd64".as_slice().into(),
         version: b"3.0.3".as_slice().into(),
@@ -136,7 +139,7 @@ pub fn closure() -> Box<[crate::vocabulary::Closed]> {
     }])
 }
 pub fn resolution() -> Event {
-    Event::Resolution { key: KEY, inputs: inputs(), closure: closure(), digest: CLOSURE }
+    Event::Resolution { record: resolution_record() }
 }
 pub const KEY: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
     1, 234, 129, 26, 252, 153, 48, 138, 159, 204, 51, 108, 148, 73, 102, 199, 249, 221, 152, 133, 123, 39, 89, 47, 224,
@@ -155,5 +158,33 @@ pub fn waiting() -> Harness {
     let mut store = Harness::new(Limits { retry: skein_lib::Duration::from_secs(2), ..crate::limits::SHIPPED }, 1000);
     drop(store.step(Time::ZERO, Event::Open));
     drop(store.step(Time::ZERO, Event::Busy));
+    store
+}
+
+pub fn resolution_record() -> crate::vocabulary::Resolution {
+    use crate::vocabulary::{Costs, Line, Made, Resolution};
+    Resolution {
+        key: KEY,
+        inputs: inputs(),
+        closure: closure(),
+        digest: CLOSURE,
+        sources: Box::new([Line {
+            uri: b"https://deb.example/debian".as_slice().into(),
+            suite: b"stable".as_slice().into(),
+            components: Box::new([b"main".as_slice().into()]),
+            indices: Box::new([]),
+        }]),
+        made: Made {
+            at: Wall::EPOCH,
+            apt: b"3.0.3".as_slice().into(),
+            mmdebstrap: b"1.5".as_slice().into(),
+            costs: Costs { fetched: 0, took: skein_lib::Duration::ZERO },
+        },
+    }
+}
+
+pub fn resolved_ready() -> Harness {
+    let mut store = ready(crate::limits::SHIPPED, &[]);
+    store.store.scan.resolutions.insert(KEY, ()).expect("fixture resolution");
     store
 }

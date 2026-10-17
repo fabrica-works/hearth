@@ -12,6 +12,7 @@ pub mod secrets;
 pub use meta::Meta;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Spec {
+    pub resolution: Option<Box<crate::keys::Resolution>>,
     pub meta: Meta,
     pub meta_digest: Digest,
     pub commit: Oid,

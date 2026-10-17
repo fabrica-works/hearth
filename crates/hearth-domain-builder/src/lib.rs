@@ -5,6 +5,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 pub use hearth_domain_render as render;
 pub use hearth_domain_store as store;
+mod resolution;
 pub mod vocabulary;
 use render::vocabulary::{Answer as RenderAnswer, Event as RenderEvent, Output};
 use skein_lib::{Env, Queue, ReplyTo, Time, Token};
@@ -31,6 +32,7 @@ pub struct Builder {
     refused: Option<Token>,
     remaining: usize,
     store_error: bool,
+    finding: Option<Token>,
 }
 impl Builder {
     #[must_use]
@@ -41,6 +43,7 @@ impl Builder {
             refused: None,
             remaining: 0,
             store_error: false,
+            finding: None,
             render: render::Render::new(&limits.render),
             store: store::Store::new(&limits.store, uid),
             call: None,
@@ -57,8 +60,13 @@ impl Builder {
     pub fn is_empty(&self) -> bool {
         self.reply.is_none()
     }
-    fn forward(&mut self, out: &mut Queue<Request>) {
+    fn forward(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) {
         if let Some(output) = self.output.pop() {
+            if let Output::Request(render::vocabulary::Request::Find { request, key }) = output {
+                self.finding = Some(request);
+                store_step(self, env, store::vocabulary::Event::Find { key }, out);
+                return;
+            }
             out.push(match output {
                 Output::Request(request) => {
                     if let render::vocabulary::Request::Read { blobs, .. } = &request {
@@ -140,12 +148,12 @@ pub fn step(builder: &mut Builder, env: &Env<Limits>, ev: Event, out: &mut Queue
     };
     let render_env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
     render::step(&mut builder.render, &render_env, event, &mut builder.output);
-    builder.forward(out);
+    builder.forward(env, out);
 }
 pub fn resume(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>) {
     let render_env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
     render::resume(&mut builder.render, &render_env, &mut builder.output);
-    builder.forward(out);
+    builder.forward(env, out);
 }
 #[cfg(test)]
 mod tests;
@@ -177,9 +185,9 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
                 Call::Diff { repository, from, to, targets } => RenderEvent::Diff { repository, from, to, targets },
                 Call::Render { repository, revision, targets } => RenderEvent::Render { repository, revision, targets },
             };
-            let env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
-            render::step(&mut builder.render, &env, event, &mut builder.output);
-            builder.forward(out);
+            let render_env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
+            render::step(&mut builder.render, &render_env, event, &mut builder.output);
+            builder.forward(env, out);
         }
         Some(Output::Answer(answer @ (Answer::Cached { .. } | Answer::Refused { .. }))) => {
             if let Some((request, sha256)) = builder.produced.take() {
@@ -191,7 +199,10 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
                         at: None,
                         failure: render::vocabulary::Failure::Store,
                     },
-                    Answer::Ready
+                    Answer::Found { .. }
+                    | Answer::Absent
+                    | Answer::Declined { .. }
+                    | Answer::Ready
                     | Answer::Full { .. }
                     | Answer::Unusable { .. }
                     | Answer::Waiting
@@ -223,6 +234,11 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
             } else {
                 step(builder, env, Event::Render(RenderEvent::Cached { request, oid, size, sha256 }), out);
             }
+        }
+        Some(Output::Answer(answer @ (Answer::Found { .. } | Answer::Absent | Answer::Declined { .. }))) => {
+            let request = builder.finding.take().expect("find answer");
+            let event = resolution::answer(request, answer);
+            step(builder, env, Event::Render(event), out);
         }
         Some(Output::Answer(Answer::Waiting)) => out.push(Request::Progress(vocabulary::Progress::Waiting)),
         Some(Output::Answer(Answer::Strays { count, first })) => {
@@ -271,7 +287,10 @@ fn store_error(builder: &mut Builder, answer: &store::vocabulary::Answer, out: &
                 StoreStep::Keep => Step::Keep,
             },
         },
-        Answer::Ready
+        Answer::Found { .. }
+        | Answer::Absent
+        | Answer::Declined { .. }
+        | Answer::Ready
         | Answer::Cached { .. }
         | Answer::Refused { .. }
         | Answer::Unopened { .. }

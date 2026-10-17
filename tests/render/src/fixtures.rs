@@ -614,3 +614,6 @@ pub fn template_and_link() -> Repository {
     repository.blobs.push((oid(b'6'), Box::from(b"/target".as_slice())));
     repository
 }
+
+mod resolution;
+pub use resolution::configuration_requests;

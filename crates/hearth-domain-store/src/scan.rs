@@ -22,7 +22,7 @@ enum Pass {
 pub(super) struct Scan {
     pass: Pass,
     pub(super) index: index::Index,
-    resolutions: Map<Digest, ()>,
+    pub(super) resolutions: Map<Digest, ()>,
     loading: Option<Digest>,
     full: Answer,
     entries: Box<[Entry]>,
@@ -109,7 +109,8 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
             finish(store, Answer::Unusable { step }, out);
             return;
         }
-        Event::Resolution { key, inputs, closure, digest } => {
+        Event::Resolution { record } => {
+            let crate::vocabulary::Resolution { key, inputs, closure, digest, .. } = record;
             let expected = scan.loading.take().expect("resolution load");
             if key != expected || resolutions::key(&inputs) != expected || resolutions::digest(&closure) != digest {
                 scan.removing = true;
@@ -127,7 +128,12 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
         Event::Unreadable => {
             scan.loading = None;
         }
-        Event::Arrived { .. } | Event::Open | Event::Locked | Event::Busy | Event::Loaded { .. } => {
+        Event::Find { .. }
+        | Event::Arrived { .. }
+        | Event::Open
+        | Event::Locked
+        | Event::Busy
+        | Event::Loaded { .. } => {
             unreachable!("scan terminal")
         }
     }
@@ -233,6 +239,19 @@ fn finish(store: &mut Store, answer: Answer, out: &mut Queue<Output>) {
     store.phase = Phase::Ready;
     store.scan.entries = Box::new([]);
     store.usable = answer == Answer::Ready;
+    match &answer {
+        Answer::Full { limit, most } => store.decline = crate::vocabulary::Decline::Full { limit: *limit, most: *most },
+        Answer::Unusable { step } => store.decline = crate::vocabulary::Decline::Unusable { step: *step },
+        Answer::Found { .. }
+        | Answer::Absent
+        | Answer::Declined { .. }
+        | Answer::Waiting
+        | Answer::Strays { .. }
+        | Answer::Cached { .. }
+        | Answer::Refused { .. }
+        | Answer::Ready
+        | Answer::Unopened { .. } => {}
+    }
     if answer != Answer::Ready {
         store.scan.index = index::Index::with_capacity(0);
         store.scan.resolutions = Map::with_capacity(0);

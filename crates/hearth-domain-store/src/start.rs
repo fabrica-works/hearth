@@ -47,7 +47,11 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Qu
             crate::scan::begin(store, env.limits, out);
             return;
         }
-        Event::Resolution { .. } | Event::Unreadable | Event::Arrived { .. } | Event::Page { .. } => {
+        Event::Find { .. }
+        | Event::Resolution { .. }
+        | Event::Unreadable
+        | Event::Arrived { .. }
+        | Event::Page { .. } => {
             unreachable!("scan has not begun")
         }
         Event::Failed => {

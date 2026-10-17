@@ -52,7 +52,8 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
             };
             out.push(Output::Answer(answer));
         }
-        Event::Resolution { .. }
+        Event::Find { .. }
+        | Event::Resolution { .. }
         | Event::Unreadable
         | Event::Open
         | Event::Locked

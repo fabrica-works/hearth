@@ -8,6 +8,8 @@ pub use hearth_lib::encode::Digest;
 use skein_lib::Token;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    Found { request: Token, digest: Digest },
+    Absent { request: Token },
     Diff { repository: Box<[u8]>, from: Box<[u8]>, to: Box<[u8]>, targets: Box<[Box<[u8]>]> },
     Render { repository: Box<[u8]>, revision: Box<[u8]>, targets: Box<[Box<[u8]>]> },
     Listed { request: Token, commit: Oid, entries: Box<[Entry]> },
@@ -20,6 +22,7 @@ pub enum Event {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    Find { request: Token, key: Digest },
     Keep { request: Token, path: Box<[u8]>, sha256: Digest, bytes: Box<[u8]> },
     Hunks { request: Token, before: Digest, after: Digest },
     List { request: Token, repository: Box<[u8]>, revision: Box<[u8]> },

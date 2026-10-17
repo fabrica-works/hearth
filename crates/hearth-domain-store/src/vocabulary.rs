@@ -4,7 +4,8 @@ use hearth_lib::encode::{Digest, Item};
 use skein_lib::{Duration, Token, Wall};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
-    Resolution { key: Digest, inputs: Inputs, closure: Box<[Closed]>, digest: Digest },
+    Find { key: Digest },
+    Resolution { record: Resolution },
     Unreadable,
     Arrived { arrival: Token, sha256: Digest, size: u64, origin: Origin, took: Duration },
     Open,
@@ -31,6 +32,9 @@ pub enum Request {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    Found { resolution: Resolution },
+    Absent,
+    Declined { why: Decline },
     Waiting,
     Strays { count: u64, first: Stray },
     Cached { arrival: Token },
@@ -133,11 +137,55 @@ pub struct Inputs {
     pub sources: Box<[Item]>,
     pub variant: Box<[Item]>,
 }
-/// The closure digest's package fields, in order (store.md, 6.4).
+/// A closure package with its source and archive metadata (store.md, 6.4).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Closed {
+    pub source: u32,
+    pub filename: Box<[u8]>,
+    pub size: u64,
     pub name: Box<[u8]>,
     pub architecture: Box<[u8]>,
     pub version: Box<[u8]>,
     pub sha256: Digest,
+}
+
+/// A complete resolution record, loaded only when requested (store.md, 6.4).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Resolution {
+    pub key: Digest,
+    pub inputs: Inputs,
+    pub closure: Box<[Closed]>,
+    pub digest: Digest,
+    pub sources: Box<[Line]>,
+    pub made: Made,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Line {
+    pub uri: Box<[u8]>,
+    pub suite: Box<[u8]>,
+    pub components: Box<[Box<[u8]>]>,
+    pub indices: Box<[Index]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Index {
+    pub path: Box<[u8]>,
+    pub size: u64,
+    pub sha256: Digest,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Made {
+    pub at: Wall,
+    pub apt: Box<[u8]>,
+    pub mmdebstrap: Box<[u8]>,
+    pub costs: Costs,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Costs {
+    pub fetched: u64,
+    pub took: Duration,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Decline {
+    Full { limit: Limit, most: u32 },
+    Unusable { step: Step },
 }

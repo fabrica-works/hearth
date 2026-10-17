@@ -14,7 +14,8 @@ fn render_lists_once_then_reads_every_configuration_document_once() {
         repository.documents.push((fixtures::oid(b'5'), fixtures::document(None)));
         repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
         let run = parent::run(&repository, &[b"x1-prod"], seed);
-        let [Request::List { .. }, Request::Read { blobs, .. }] = run.requests.as_slice() else {
+        let requests = fixtures::configuration_requests(&run.requests);
+        let [Request::List { .. }, Request::Read { blobs, .. }] = requests.as_slice() else {
             panic!("list then documents")
         };
         assert_eq!(
@@ -43,7 +44,8 @@ fn fleet_and_environment_keys_never_add_a_task() {
         let Answer::Spec(spec) = only(&run.answers) else { panic!("spec") };
         let config = hearth_render_world::fixtures::config_part(&spec.parts);
         assert_eq!(config.tree.as_ref(), [], "seed {seed}");
-        assert_eq!(run.requests.len(), 2, "absent tasks are never read, seed {seed}");
+        let requests = fixtures::configuration_requests(&run.requests);
+        assert_eq!(requests.len(), 2, "absent tasks are never read, seed {seed}");
     }
 }
 #[test]

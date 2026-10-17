@@ -24,7 +24,7 @@ fn each_cache_file_field_and_origin_translates_and_back() {
 #[test]
 fn each_inputs_value_translates_and_back() {
     for (row, input) in fixtures::every_inputs().into_iter().enumerate() {
-        let values = translate::store::inputs(input.clone());
+        let values = translate::store::resolution(fixtures::resolution_record(input.clone())).inputs;
         let back = tree::resolution::Inputs {
             apt: values.apt,
             request: values.request,

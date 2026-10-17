@@ -305,6 +305,7 @@ pub fn spec(target: &[u8], parts: &[crate::parts::Part]) -> crate::parts::Spec {
     let mut meta = meta();
     meta.target = bytes::copy_of(target);
     crate::parts::Spec {
+        resolution: None,
         meta,
         meta_digest: Digest([1; 32]),
         digest: Digest([2; 32]),
@@ -489,6 +490,7 @@ pub fn hunk_call() -> (crate::Render, skein_lib::Env<limits::Limits>, skein_lib:
         );
         made.digest = digest;
         call.side.made.insert(bytes::copy_of(b"x1-prod"), Made::Spec(Box::new(made))).expect("one target");
+        call.resume(env.limits, &mut out);
         call.resume(env.limits, &mut out);
         drop(out.pop());
     }
@@ -678,6 +680,7 @@ pub fn template_call(path: &[u8], mode: crate::revision::Mode, size: u64, limits
     let (mut call, target) = removed_task();
     retain_task(&mut call);
     call.targets = Box::new([target]);
+    call.made = skein_lib::Map::with_capacity(limits.targets);
     call.commit = Some(crate::revision::Oid(bytes::copy_of(b"commit")));
     let mut entries = skein_lib::List::with_capacity(4);
     for entry in call.entries {
@@ -715,23 +718,6 @@ pub fn shared_template_call() -> crate::call::Side {
     call
 }
 
-pub fn finish_render(
-    render: &mut crate::Render,
-    env: &skein_lib::Env<limits::Limits>,
-    out: &mut skein_lib::Queue<crate::vocabulary::Output>,
-) -> Box<[crate::vocabulary::Answer]> {
-    let mut answers = skein_lib::List::with_capacity(env.limits.errors.saturating_add(10));
-    for _ in 0..env.limits.errors.saturating_add(20) {
-        if !render.work_pending() {
-            break;
-        }
-        crate::resume(render, env, out);
-        if let Some(crate::vocabulary::Output::Answer(answer)) = out.pop() {
-            answers.push(answer).expect("answer capacity");
-        }
-    }
-    answers.into_boxed()
-}
 pub fn failed_diff(bound: u32, count: u32) -> Box<[crate::vocabulary::Answer]> {
     use crate::{
         call::Call,
@@ -787,3 +773,5 @@ pub use packages::*;
 
 mod exports;
 pub use exports::*;
+mod resolution;
+pub use resolution::*;

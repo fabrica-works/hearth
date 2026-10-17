@@ -160,7 +160,7 @@ fn run(repository: &Repository, call: Call, form: Form, store: Option<&Path>) ->
     run_holding(repository, call, form, store, &hearth::limits(), Release::After(skein_lib::Duration::ZERO)).rendered
 }
 
-pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         6bc0dd7fe1dd\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
+pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         6bc0dd7fe1dd\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
 
 mod binary;
 pub use binary::{Ended, binary};
@@ -437,15 +437,16 @@ pub fn broken_task() -> Vec<File> {
     files
 }
 pub const BROKEN_LAB_TEXT: &str = concat!(
-    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         6bc0dd7fe1dd\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n",
+    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         6bc0dd7fe1dd\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n",
     "\nenvs/lab.json:1:14: duplicate key \"motd\" (envs/lab.json:1:2)\n"
 );
 pub const D1: hearth::service::domain::render::vocabulary::Digest =
     hearth::service::domain::render::vocabulary::Digest([1; 32]);
 pub const D3: hearth::service::domain::render::vocabulary::Digest =
     hearth::service::domain::render::vocabulary::Digest([3; 32]);
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Laid {
+    Resolution(hearth_protocol_tree::resolution::Resolution),
     File(&'static str),
     Record(&'static str, hearth::service::domain::render::vocabulary::Digest),
 }
@@ -455,8 +456,20 @@ pub fn lay(store: &Path, entries: &[Laid]) {
         limits,
     };
     fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("cache")).expect("cache directory");
+    fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("resolutions")).expect("resolutions directory");
     for entry in entries {
+        if let Laid::Resolution(record) = entry {
+            use std::fmt::Write;
+            let mut name = String::new();
+            for byte in record.key.0 {
+                write!(&mut name, "{byte:02x}").expect("hex name");
+            }
+            let bytes = hearth_protocol_tree::resolution::write(record, &limits::SHIPPED).expect("resolution record");
+            fs::write(store.join("resolutions").join(format!("{name}.record")), bytes).expect("laid resolution");
+            continue;
+        }
         let (name, bytes) = match entry {
+            Laid::Resolution(_) => unreachable!("written above"),
             Laid::File(name) => (*name, b"fixture".to_vec()),
             Laid::Record(name, digest) => (
                 *name,
@@ -769,3 +782,5 @@ pub use packages::*;
 
 /// Version, spec, meta, boot, packages, config, secrets, live, exports and outcome.
 pub const THIN_RECORDS: usize = 10;
+mod resolution;
+pub use resolution::*;

@@ -9,6 +9,7 @@ hearth.workspace = true
 hearth-lib.workspace = true
 hearth-protocol-tree.workspace = true
 hearth-domain-store.workspace = true
+hearth-test-mirror.workspace = true
 skein-shell.workspace = true
 skein-scratch.workspace = true
 skein-io.workspace = true
@@ -29,3 +30,4 @@ unwrap_used = "deny"
 allow_attributes = "deny"
 disallowed_types = "deny"
 disallowed_methods = "deny"
+

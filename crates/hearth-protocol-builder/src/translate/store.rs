@@ -3,7 +3,6 @@ use crate::{
     builder::store::vocabulary::{Range, StoreRecord},
     tree,
 };
-use alloc::boxed::Box;
 #[must_use]
 pub fn store_record(record: tree::store::Store) -> StoreRecord {
     StoreRecord { layout: record.layout, made: record.made, range: store_range(record.range), uid: record.uid }
@@ -36,28 +35,50 @@ pub fn cache_file(record: crate::builder::store::vocabulary::CacheFile) -> tree:
 }
 
 #[must_use]
-pub fn inputs(inputs: tree::resolution::Inputs) -> crate::builder::store::vocabulary::Inputs {
-    crate::builder::store::vocabulary::Inputs {
-        apt: inputs.apt,
-        request: inputs.request,
-        sources: inputs.sources,
-        variant: inputs.variant,
-    }
-}
-#[must_use]
-pub fn closed(closure: &[tree::resolution::Package]) -> Box<[crate::builder::store::vocabulary::Closed]> {
-    let mut packages = skein_lib::List::with_capacity(u32::try_from(closure.len()).expect("bounded closure"));
-    for package in closure {
-        packages
-            .push(crate::builder::store::vocabulary::Closed {
-                name: package.name.clone(),
-                architecture: package.architecture.clone(),
-                version: package.version.clone(),
+pub fn resolution(record: tree::resolution::Resolution) -> crate::builder::store::vocabulary::Resolution {
+    use crate::builder::store::vocabulary::{Closed, Costs, Index, Inputs, Line, Made, Resolution};
+    let mut closure = skein_lib::List::with_capacity(u32::try_from(record.closure.len()).expect("closure bound"));
+    for package in record.closure {
+        closure
+            .push(Closed {
+                name: package.name,
+                architecture: package.architecture,
+                version: package.version,
+                source: package.source,
+                filename: package.filename,
+                size: package.size,
                 sha256: package.sha256,
             })
-            .expect("closure capacity");
+            .expect("closure bound");
     }
-    packages.into_boxed()
+    let mut sources = skein_lib::List::with_capacity(u32::try_from(record.sources.len()).expect("sources bound"));
+    for line in record.sources {
+        let mut indices = skein_lib::List::with_capacity(u32::try_from(line.indices.len()).expect("indices bound"));
+        for index in line.indices {
+            indices.push(Index { path: index.path, size: index.size, sha256: index.sha256 }).expect("indices bound");
+        }
+        sources
+            .push(Line { uri: line.uri, suite: line.suite, components: line.components, indices: indices.into_boxed() })
+            .expect("sources bound");
+    }
+    Resolution {
+        key: record.key,
+        digest: record.digest,
+        inputs: Inputs {
+            apt: record.inputs.apt,
+            request: record.inputs.request,
+            sources: record.inputs.sources,
+            variant: record.inputs.variant,
+        },
+        closure: closure.into_boxed(),
+        sources: sources.into_boxed(),
+        made: Made {
+            at: record.made.at,
+            apt: record.made.apt,
+            mmdebstrap: record.made.mmdebstrap,
+            costs: Costs { fetched: record.made.costs.fetched, took: record.made.costs.took },
+        },
+    }
 }
 
 #[must_use]

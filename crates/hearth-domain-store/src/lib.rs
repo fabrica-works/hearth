@@ -37,6 +37,8 @@ pub struct Store {
     entering: Option<enter::Entering>,
     usable: bool,
     said: bool,
+    finding: bool,
+    decline: vocabulary::Decline,
 }
 impl Store {
     #[must_use]
@@ -49,11 +51,17 @@ impl Store {
             entering: None,
             usable: false,
             said: false,
+            finding: false,
+            decline: vocabulary::Decline::Unusable { step: vocabulary::Step::List },
         }
     }
 }
 pub fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Queue<Output>) {
-    if store.entering.is_some() {
+    if let Event::Find { .. } = ev {
+        resolutions::find(store, ev, out);
+    } else if store.finding {
+        resolutions::find(store, ev, out);
+    } else if store.entering.is_some() {
         enter::step(store, env, ev, out);
     } else if let Event::Arrived { .. } = ev {
         enter::step(store, env, ev, out);

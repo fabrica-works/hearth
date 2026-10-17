@@ -51,6 +51,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                 Output::Request(request) => {
                     let mut at = env.now;
                     let events = match &request {
+                        Request::Find { request, .. } => vec![Event::Absent { request: *request }],
                         Request::Keep { request, sha256, .. } => {
                             vec![Event::Kept { request: *request, sha256: *sha256 }]
                         }
@@ -65,7 +66,8 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                         }
                     };
                     let token = match &request {
-                        Request::Keep { request, .. }
+                        Request::Find { request, .. }
+                        | Request::Keep { request, .. }
                         | Request::List { request, .. }
                         | Request::Read { request, .. }
                         | Request::Hunks { request, .. } => *request,
@@ -85,7 +87,9 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
             env.now = at;
             let event = schedule.next(at).expect("scheduled event");
             let token = match &event {
-                Event::Kept { request, .. }
+                Event::Found { request, .. }
+                | Event::Absent { request }
+                | Event::Kept { request, .. }
                 | Event::Listed { request, .. }
                 | Event::Hunks { request, .. }
                 | Event::Read { request, .. }

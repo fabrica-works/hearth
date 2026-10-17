@@ -284,6 +284,7 @@ impl Side {
         ]);
         drop(target.expansion);
         Some(Answer::Spec(parts::Spec {
+            resolution: None,
             digest: parts::spec_digest(&target.meta_digest, parts.as_ref()),
             meta: target.meta,
             meta_digest: target.meta_digest,

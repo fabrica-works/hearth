@@ -284,12 +284,7 @@ pub(super) fn startup(why: Why, store: &[u8]) -> records::startup::Startup {
 fn loaded(bytes: &[u8], pending: &Request, limits: &Limits) -> Event {
     if let Request::Load { .. } = pending {
         return match tree::resolution::read(bytes, &limits.tree) {
-            Ok(record) => Event::Resolution {
-                key: record.key,
-                inputs: translate::store::inputs(record.inputs),
-                closure: translate::store::closed(&record.closure),
-                digest: record.digest,
-            },
+            Ok(record) => Event::Resolution { record: translate::store::resolution(record) },
             Err(_) => Event::Unreadable,
         };
     }

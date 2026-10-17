@@ -28,7 +28,7 @@ fn renders_spec_reaches_the_client() {
     let mut builder = Builder::new(&fixtures::LIMITS, 1000);
     let mut out = Queue::with_capacity(1);
     builder.output.push(Output::Answer(RenderAnswer::Spec(fixtures::spec())));
-    builder.forward(&mut out);
+    builder.forward(&fixtures::env(), &mut out);
     let Some(Request::Answer(Answer::Spec(spec))) = out.pop() else {
         panic!("client spec");
     };
@@ -202,7 +202,7 @@ fn a_store_error_makes_the_call_operational_even_without_an_arrival() {
         left_out: 0,
     }));
     let mut out = Queue::with_capacity(2);
-    builder.forward(&mut out);
+    builder.forward(&fixtures::env(), &mut out);
     assert_eq!(
         out.pop(),
         Some(Request::Reply {
@@ -249,4 +249,32 @@ fn a_produced_file_enters_the_store_with_its_rendered_origin() {
             "row {row}"
         );
     }
+}
+
+#[test]
+fn a_find_reaches_the_store_and_its_answer_render() {
+    let mut builder = fixtures::indexed_builder();
+    let mut out = Queue::with_capacity(1);
+    builder.output.push(Output::Request(crate::render::vocabulary::Request::Find {
+        request: Token::new(5),
+        key: fixtures::FIND_KEY,
+    }));
+    builder.forward(&fixtures::env(), &mut out);
+    assert_eq!(out.pop(), Some(Request::Store(crate::store::vocabulary::Request::Load { key: fixtures::FIND_KEY })));
+}
+#[test]
+fn a_found_resolution_answers_render_with_the_stored_digest() {
+    assert_eq!(
+        crate::resolution::answer(
+            Token::new(5),
+            crate::store::vocabulary::Answer::Found { resolution: fixtures::store_resolution() }
+        ),
+        crate::render::vocabulary::Event::Found {
+            request: Token::new(5),
+            digest: hearth_lib::encode::Digest([
+                193, 88, 154, 151, 28, 76, 229, 4, 43, 122, 140, 15, 92, 154, 246, 155, 61, 70, 254, 100, 184, 171, 76,
+                218, 172, 88, 93, 176, 234, 58, 213, 48
+            ])
+        }
+    );
 }

@@ -9,6 +9,7 @@ pub mod diff;
 pub mod entries;
 pub mod errors;
 pub mod evaluate;
+pub mod keys;
 pub mod kinds;
 pub mod limits;
 pub mod parts;
@@ -75,6 +76,14 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             assert_eq!(request, Token::new(1), "listing token");
             render.call.as_mut().expect("active call").side.fail(Outcome::Usage);
         }
+        Event::Found { request, digest } => {
+            assert_eq!(request, Token::new(5), "find token");
+            render.call.as_mut().expect("active call").side.found(Some(digest), false);
+        }
+        Event::Absent { request } => {
+            assert_eq!(request, Token::new(5), "find token");
+            render.call.as_mut().expect("active call").side.found(None, false);
+        }
         Event::Hunks { request, hunks } => {
             assert_eq!(request, Token::new(3), "hunks token");
             render.call.as_mut().expect("active call").hunks(Some(hunks));
@@ -85,6 +94,10 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
                 return;
             }
             let side = &mut render.call.as_mut().expect("active call").side;
+            if request == Token::new(5) {
+                side.found(None, true);
+                return;
+            }
             if request == Token::new(4) {
                 side.kept(None);
                 return;

@@ -249,6 +249,7 @@ impl Layer {
 
 pub fn spec() -> render::parts::Spec {
     render::parts::Spec {
+        resolution: None,
         meta: render::parts::meta::Meta {
             target: bytes::copy_of(b"x1-prod"),
             base: bytes::copy_of(b"x1"),
@@ -771,3 +772,6 @@ pub mod files;
 mod packages;
 pub use exports::*;
 pub use packages::*;
+
+mod resolution;
+pub use resolution::*;

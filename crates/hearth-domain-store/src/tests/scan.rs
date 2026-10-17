@@ -214,19 +214,20 @@ fn a_resolution_whose_key_and_digest_recompute_is_indexed() {
 #[test]
 fn a_resolution_whose_key_does_not_recompute_is_removed() {
     let mut store = fixtures::resolving(limits::SHIPPED, fixtures::KEY);
-    let Event::Resolution { key, mut inputs, closure, digest } = fixtures::resolution() else { panic!("resolution") };
-    inputs.variant = Box::new([hearth_lib::encode::Item::Bytes(b"minbase".as_slice().into())]);
+    let mut record = fixtures::resolution_record();
+    record.inputs.variant = Box::new([hearth_lib::encode::Item::Bytes(b"minbase".as_slice().into())]);
     assert_eq!(
-        &*store.step(Time::ZERO, Event::Resolution { key, inputs, closure, digest }),
+        &*store.step(Time::ZERO, Event::Resolution { record }),
         &[Output::Request(Request::Remove { directory: Directory::Resolutions, name: Removal::Record(fixtures::KEY) })]
     );
 }
 #[test]
 fn a_resolution_whose_digest_does_not_recompute_from_its_closure_is_removed() {
     let mut store = fixtures::resolving(limits::SHIPPED, fixtures::KEY);
-    let Event::Resolution { key, inputs, closure, .. } = fixtures::resolution() else { panic!("resolution") };
+    let mut record = fixtures::resolution_record();
+    record.digest = D1;
     assert_eq!(
-        &*store.step(Time::ZERO, Event::Resolution { key, inputs, closure, digest: D1 }),
+        &*store.step(Time::ZERO, Event::Resolution { record }),
         &[Output::Request(Request::Remove { directory: Directory::Resolutions, name: Removal::Record(fixtures::KEY) })]
     );
 }

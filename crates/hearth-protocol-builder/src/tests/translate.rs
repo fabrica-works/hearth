@@ -129,14 +129,6 @@ fn client_firmware_back(firmware: client_meta::Firmware) -> target::Firmware {
 fn optional_client_firmware_back(firmware: Option<client_meta::Firmware>) -> Option<target::Firmware> {
     Some(client_firmware_back(firmware?))
 }
-#[test]
-fn a_spec_translates_to_the_records_and_back() {
-    for (row, input) in super::fixtures::live_specs().into_iter().chain(super::fixtures::export_specs()).enumerate() {
-        let back = spec_back(answers::spec(input.clone())).expect("spec");
-        assert_eq!(back, input, "row {row}: spec");
-    }
-}
-
 const CLIENT_KINDS: &[(target::Runs, client_meta::PlacementKind)] = &[
     (target::Runs::Metal, client_meta::PlacementKind::Metal),
     (target::Runs::Vm, client_meta::PlacementKind::Vm),
@@ -742,5 +734,5 @@ mod boot;
 mod exports;
 mod files;
 mod packages;
+mod resolution;
 mod specs;
-use specs::spec_back;
