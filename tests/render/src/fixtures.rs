@@ -489,3 +489,60 @@ pub fn entries_at_the_limits() -> [(hearth_domain_render::revision::declaration:
         ),
     ]
 }
+
+#[must_use]
+pub fn render(repository: &Repository) -> crate::parent::Run {
+    render_seeded(repository, 0)
+}
+#[must_use]
+pub fn render_seeded(repository: &Repository, seed: u64) -> crate::parent::Run {
+    render_targets(repository, &[], seed)
+}
+#[must_use]
+pub fn configuration_error(
+    kind: hearth_domain_render::errors::Kind,
+    path: &[u8],
+    task: Option<&[u8]>,
+) -> hearth_domain_render::errors::Error {
+    let mut name = None;
+    if let Some(task) = task {
+        name = Some(Box::from(task));
+    }
+    hearth_domain_render::errors::Error {
+        side: None,
+        kind,
+        class: hearth_domain_render::vocabulary::Class::Configuration,
+        at: Some(hearth_domain_render::errors::Place { path: Box::from(path), position: None }),
+        also: None,
+        target: None,
+        task: name,
+    }
+}
+pub struct Survivor<'a> {
+    pub spec: &'a hearth_domain_render::parts::Spec,
+    pub error: &'a hearth_domain_render::errors::Error,
+}
+#[must_use]
+pub fn survivor(answers: &[hearth_domain_render::vocabulary::Answer]) -> Survivor<'_> {
+    use hearth_domain_render::vocabulary::Answer;
+    let mut answers = answers.iter();
+    let Some(Answer::Spec(spec)) = answers.next() else { panic!("one surviving spec") };
+    let Some(Answer::Error(error)) = answers.next() else { panic!("one error after the spec") };
+    assert_eq!(answers.next(), None, "only the spec and its error");
+    Survivor { spec, error }
+}
+#[must_use]
+pub fn read_blobs(requests: &[hearth_domain_render::vocabulary::Request]) -> &[hearth_domain_render::vocabulary::Blob] {
+    use hearth_domain_render::vocabulary::Request;
+    let Request::Read { blobs, .. } =
+        requests.iter().find(|rq| matches!(rq, Request::Read { .. })).expect("read request")
+    else {
+        panic!("read follows list")
+    };
+    blobs
+}
+
+#[must_use]
+pub fn render_targets(repository: &Repository, targets: &[&[u8]], seed: u64) -> crate::parent::Run {
+    crate::parent::run(repository, targets, seed)
+}

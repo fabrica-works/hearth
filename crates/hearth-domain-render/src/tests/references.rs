@@ -9,11 +9,10 @@ use alloc::boxed::Box;
 const SETTINGS: &[(Missing, &[u8])] = &[(Missing::Error, b"greting"), (Missing::Undefined, b"greting")];
 #[test]
 fn a_settings_reference_must_be_a_declared_setting() {
-    let declaration = fixtures::declared_for_references();
     for (row, &(missing, setting)) in SETTINGS.iter().enumerate() {
         let expression = fixtures::expression([name(0, b"settings", missing), key(9, setting, missing)]);
         assert_eq!(
-            references::check(&expression, &declaration),
+            fixtures::check_reference(&expression),
             Some((
                 Schema::Undeclared {
                     setting: Box::from(&b"greting"[..]),
@@ -31,9 +30,8 @@ const LISTED: &[Reference] = &[
 ];
 #[test]
 fn tasks_and_exports_references_in_reads_pass() {
-    let declaration = fixtures::declared_for_references();
     for (row, &reference) in LISTED.iter().enumerate() {
-        assert_eq!(references::check(&fixtures::reference_expression(reference), &declaration), None, "row {row}");
+        assert_eq!(fixtures::check_reference(&fixtures::reference_expression(reference)), None, "row {row}");
     }
 }
 const UNLISTED: &[(Reference, ReferenceFields<'static>)] = &[
@@ -45,9 +43,8 @@ const UNLISTED: &[(Reference, ReferenceFields<'static>)] = &[
 ];
 #[test]
 fn tasks_and_exports_references_must_be_in_reads() {
-    let declaration = fixtures::declared_for_references();
     for (row, &(reference, expected)) in UNLISTED.iter().enumerate() {
-        let fault = references::check(&fixtures::reference_expression(reference), &declaration).expect("unlisted read");
+        let fault = fixtures::check_reference(&fixtures::reference_expression(reference)).expect("unlisted read");
         let Schema::Unlisted { reader, root, task, setting } = &fault.0 else { panic!("unlisted read: {fault:?}") };
         assert_eq!((reader.as_ref(), *root, task.as_ref(), setting.as_deref(), fault.1), expected, "row {row}");
     }
@@ -58,20 +55,18 @@ const DYNAMIC: &[(&[u8], fixtures::ReferenceFault)] = &[
 ];
 #[test]
 fn tasks_and_exports_take_only_literal_names() {
-    let declaration = fixtures::declared_for_references();
     for (row, (root, expected)) in DYNAMIC.iter().enumerate() {
         let expression = fixtures::expression([
             name(0, root, Missing::Error),
             name(6, b"key", Missing::Error),
             op(5, Op::Item { missing: Missing::Error }),
         ]);
-        assert_eq!(references::check(&expression, &declaration), *expected, "row {row}");
+        assert_eq!(fixtures::check_reference(&expression), *expected, "row {row}");
     }
 }
 const DEFINED: &[bool] = &[false, true];
 #[test]
 fn a_tasks_name_under_is_defined_passes_for_an_optional_read_only() {
-    let declaration = fixtures::declared_for_references();
     for (row, &negated) in DEFINED.iter().enumerate() {
         let test = if negated { Op::NotDefined } else { Op::Defined };
         let expression = fixtures::expression([
@@ -79,21 +74,20 @@ fn a_tasks_name_under_is_defined_passes_for_an_optional_read_only() {
             key(6, b"wifi", Missing::Undefined),
             op(11, test),
         ]);
-        assert_eq!(references::check(&expression, &declaration), None, "row {row}");
+        assert_eq!(fixtures::check_reference(&expression), None, "row {row}");
     }
 }
 const REQUIRED_READS: &[(&[u8], ReferenceFields<'static>)] =
     &[(b"core", (b"", Root::Tasks, b"core", None, 0)), (b"nope", (b"", Root::Tasks, b"nope", None, 0))];
 #[test]
 fn a_required_or_unknown_read_under_is_defined_is_unlisted() {
-    let declaration = fixtures::declared_for_references();
     for (row, &(task, expected)) in REQUIRED_READS.iter().enumerate() {
         let expression = fixtures::expression([
             name(0, b"tasks", Missing::Undefined),
             key(6, task, Missing::Undefined),
             op(11, Op::Defined),
         ]);
-        let fault = references::check(&expression, &declaration).expect("unlisted read");
+        let fault = fixtures::check_reference(&expression).expect("unlisted read");
         let Schema::Unlisted { reader, root, task: read, setting } = &fault.0 else {
             panic!("unlisted read: {fault:?}")
         };
@@ -107,14 +101,14 @@ fn a_dynamic_settings_key_is_not_checked() {
         name(9, b"key", Missing::Error),
         op(8, Op::Item { missing: Missing::Error }),
     ]);
-    assert_eq!(references::check(&expression, &fixtures::declared_for_references()), None);
+    assert_eq!(fixtures::check_reference(&expression), None);
 }
 #[test]
 fn every_instructions_expression_of_a_template_is_checked() {
     let expression = fixtures::reference_typo();
     for (row, does) in fixtures::reference_instructions(expression).into_iter().enumerate() {
         let template = fixtures::template(&[0], [Instruction { at: 0, does }]);
-        let (_, offset) = references::template(&template, &fixtures::declared_for_references()).expect("schema fault");
+        let (_, offset) = fixtures::template_references(&template).expect("schema fault");
         assert_eq!(offset, fixtures::REFERENCE_OFFSET, "row {row}");
     }
 }
@@ -153,7 +147,7 @@ fn a_typo_in_an_untaken_branch_of_a_template_is_found_at_its_offset() {
             fixtures::output(12, fixtures::reference_typo()),
         ],
     );
-    let (_, offset) = references::template(&template, &fixtures::declared_for_references()).expect("schema fault");
+    let (_, offset) = fixtures::template_references(&template).expect("schema fault");
     assert_eq!(offset, fixtures::REFERENCE_OFFSET);
 }
 const LITERAL_SETTINGS: &[&[u8]] = &[b"greeting", b"port"];
@@ -165,7 +159,7 @@ fn a_literal_settings_item_is_a_declared_setting() {
             op(9, Op::String(skein_lib::bytes::copy_of(setting))),
             op(8, Op::Item { missing: Missing::Error }),
         ]);
-        assert_eq!(references::check(&expression, &fixtures::declared_for_references()), None, "row {row}");
+        assert_eq!(fixtures::check_reference(&expression), None, "row {row}");
     }
 }
 const TASK_VALUES: &[Op] = &[Op::Filter(crate::evaluate::Filter::Tojson), Op::Item { missing: Missing::Error }];
@@ -178,7 +172,7 @@ fn a_tasks_value_without_a_literal_setting_is_dynamic() {
             op(11, suffix.clone()),
         ]);
         assert_eq!(
-            references::check(&expression, &fixtures::declared_for_references()),
+            fixtures::check_reference(&expression),
             Some((Schema::Dynamic { root: Root::Tasks }, 0)),
             "row {row}"
         );
@@ -191,6 +185,6 @@ fn a_reference_under_is_defined_is_checked_too() {
         key(fixtures::REFERENCE_OFFSET, b"greting", Missing::Undefined),
         op(29, Op::Defined),
     ]);
-    let (_, offset) = references::check(&expression, &fixtures::declared_for_references()).expect("schema fault");
+    let (_, offset) = fixtures::check_reference(&expression).expect("schema fault");
     assert_eq!(offset, fixtures::REFERENCE_OFFSET);
 }

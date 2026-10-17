@@ -343,3 +343,19 @@ pub fn reference_error(input: SchemaInput) -> crate::errors::Error {
     error.also = None;
     error
 }
+
+#[must_use]
+pub fn evaluation_error(kind: crate::errors::Evaluation) -> crate::errors::Error {
+    let mut error = duplicate();
+    error.kind = crate::errors::Kind::Evaluation(kind);
+    error.at = None;
+    error.also = None;
+    error
+}
+pub fn print_error(form: crate::form::Form, error: crate::errors::Error) -> Result<Box<[u8]>, crate::form::Refusal> {
+    let after = match form {
+        crate::form::Form::Text => None,
+        crate::form::Form::JsonLines => Some(crate::records::Type::Error),
+    };
+    crate::form::print(form, &crate::records::Record::Error(error), after, &crate::limits::SHIPPED)
+}

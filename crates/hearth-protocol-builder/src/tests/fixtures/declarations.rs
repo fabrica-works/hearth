@@ -134,3 +134,26 @@ pub fn every_literal() -> [config::entries::Literal; 7] {
         },
     ]
 }
+use crate::render::revision::declaration as target;
+pub struct ParameterTypes<'a> {
+    pub map: &'a target::Type,
+    pub int: &'a target::Type,
+    pub string: &'a target::Type,
+    pub order: &'a target::Spec,
+    pub param: &'a target::Spec,
+}
+#[must_use]
+pub fn parameter_types(declaration: &target::Declaration) -> ParameterTypes<'_> {
+    let mut types = declaration.types.iter();
+    let map = types.next().expect("map type");
+    let object = types.next().expect("object type");
+    let int = types.next().expect("integer type");
+    let string = types.next().expect("string type");
+    assert_eq!(types.next(), None, "four parameter types");
+    let target::Form::Object(fields) = &object.form else { panic!("object fields") };
+    let mut fields = fields.iter();
+    let order = fields.next().expect("order field");
+    let param = fields.next().expect("parameter field");
+    assert_eq!(fields.next(), None, "two parameter fields");
+    ParameterTypes { map, int, string, order, param }
+}

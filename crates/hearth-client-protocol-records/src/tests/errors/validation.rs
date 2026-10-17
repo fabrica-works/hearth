@@ -1,8 +1,6 @@
 use crate::{
     errors::{Evaluation, Kind, Place, Position},
-    form::{self, Form},
-    limits,
-    records::Record,
+    form::Form,
     tests::fixtures::{self, SchemaInput},
 };
 use skein_lib::bytes::copy_of;
@@ -61,23 +59,16 @@ const EVALUATIONS: &[(Evaluation, &str, &str)] = &[
 #[test]
 fn each_evaluation_kind_prints_its_message() {
     for (row, (kind, expected, _)) in EVALUATIONS.iter().enumerate() {
-        let mut error = fixtures::duplicate();
-        error.kind = Kind::Evaluation(*kind);
-        error.at = None;
-        error.also = None;
-        let printed = form::print(Form::Text, &Record::Error(error), None, &limits::SHIPPED);
+        let error = fixtures::evaluation_error(*kind);
+        let printed = fixtures::print_error(Form::Text, error);
         assert_eq!(printed.as_deref(), Ok(expected.as_bytes()), "row {row}");
     }
 }
 #[test]
 fn each_evaluation_kind_prints_its_json() {
     for (row, (kind, _, expected)) in EVALUATIONS.iter().enumerate() {
-        let mut error = fixtures::duplicate();
-        error.kind = Kind::Evaluation(*kind);
-        error.at = None;
-        error.also = None;
-        let printed =
-            form::print(Form::JsonLines, &Record::Error(error), Some(crate::records::Type::Error), &limits::SHIPPED);
+        let error = fixtures::evaluation_error(*kind);
+        let printed = fixtures::print_error(Form::JsonLines, error);
         assert_eq!(printed.as_deref(), Ok(expected.as_bytes()), "row {row}");
     }
 }
@@ -106,14 +97,12 @@ const SETTINGS: &[(SchemaInput, &str)] = &[
 #[test]
 fn target_schema_faults_print_their_setting_or_read() {
     for (row, &(input, expected)) in SETTINGS.iter().enumerate() {
-        let mut error = fixtures::duplicate();
-        error.kind = Kind::Schema(fixtures::schema_fault(input));
-        error.also = None;
+        let mut error = fixtures::reference_error(input);
         error.at =
             Some(Place { path: copy_of(b"hosts/ion/ion-prod.json"), position: Some(Position { line: 4, column: 5 }) });
         error.target = Some(copy_of(b"ion-prod"));
         error.task = Some(copy_of(b"vpn"));
-        let printed = form::print(Form::Text, &Record::Error(error), None, &limits::SHIPPED);
+        let printed = fixtures::print_error(Form::Text, error);
         assert_eq!(printed.as_deref(), Ok(expected.as_bytes()), "row {row}");
     }
 }
@@ -144,12 +133,8 @@ const SETTINGS_JSON: &[(SchemaInput, &str)] = &[
 #[test]
 fn target_schema_faults_print_their_json_fields() {
     for (row, &(input, expected)) in SETTINGS_JSON.iter().enumerate() {
-        let mut error = fixtures::duplicate();
-        error.kind = Kind::Schema(fixtures::schema_fault(input));
-        error.at = None;
-        error.also = None;
-        let printed =
-            form::print(Form::JsonLines, &Record::Error(error), Some(crate::records::Type::Error), &limits::SHIPPED);
+        let error = fixtures::reference_error(input);
+        let printed = fixtures::print_error(Form::JsonLines, error);
         assert_eq!(printed.as_deref(), Ok(expected.as_bytes()), "row {row}");
     }
 }
@@ -166,7 +151,7 @@ fn an_evaluation_error_prints_its_target_task_and_message() {
     error.target = Some(copy_of(b"x1-prod"));
     error.task = Some(copy_of(b"motd"));
     assert_eq!(
-        form::print(Form::Text, &Record::Error(error), None, &limits::SHIPPED).as_deref(),
+        fixtures::print_error(Form::Text, error).as_deref(),
         Ok(b"tasks/motd/tree/etc/issue.j2:1:11: x1-prod: motd: a missing key\n".as_slice())
     );
 }
@@ -195,8 +180,7 @@ const REFERENCES: &[(SchemaInput, &str)] = &[
 fn an_unlisted_read_prints_the_reader_and_the_reference() {
     for (row, &(input, expected)) in REFERENCES.iter().enumerate() {
         assert_eq!(
-            form::print(Form::Text, &Record::Error(fixtures::reference_error(input)), None, &limits::SHIPPED)
-                .as_deref(),
+            fixtures::print_error(Form::Text, fixtures::reference_error(input)).as_deref(),
             Ok(expected.as_bytes()),
             "row {row}"
         );
@@ -241,13 +225,7 @@ const REFERENCES_JSON: &[(SchemaInput, &str)] = &[
 fn a_reference_fault_prints_its_json_fields() {
     for (row, &(input, expected)) in REFERENCES_JSON.iter().enumerate() {
         assert_eq!(
-            form::print(
-                Form::JsonLines,
-                &Record::Error(fixtures::reference_error(input)),
-                Some(crate::records::Type::Error),
-                &limits::SHIPPED
-            )
-            .as_deref(),
+            fixtures::print_error(Form::JsonLines, fixtures::reference_error(input)).as_deref(),
             Ok(expected.as_bytes()),
             "row {row}"
         );

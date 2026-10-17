@@ -127,23 +127,29 @@ fn a_declaration_s_types_settings_and_reads_cross_unchanged() {
 #[test]
 fn a_declaration_s_nested_types_keep_their_forms_positions_and_indexes() {
     let declaration = fixtures::read_declaration(fixtures::PARAMS);
-    let [map, object, int, string] = declaration.types.as_ref() else { panic!("four types") };
-    assert_eq!((&map.form, map.at), (&target::Form::Map(1), render::revision::Position { line: 2, column: 11 }));
-    assert_eq!((&int.form, int.at), (&target::Form::Int, render::revision::Position { line: 4, column: 23 }));
-    assert_eq!((&string.form, string.at), (&target::Form::String, render::revision::Position { line: 3, column: 23 }));
-    let target::Form::Object(fields) = &object.form else { panic!("object fields") };
-    let [order, param] = fields.as_ref() else { panic!("two fields") };
+    let types = fixtures::parameter_types(&declaration);
     assert_eq!(
-        (&*order.name.text, order.ty, &*param.name.text, param.ty),
+        (&types.map.form, types.map.at),
+        (&target::Form::Map(1), render::revision::Position { line: 2, column: 11 })
+    );
+    assert_eq!(
+        (&types.int.form, types.int.at),
+        (&target::Form::Int, render::revision::Position { line: 4, column: 23 })
+    );
+    assert_eq!(
+        (&types.string.form, types.string.at),
+        (&target::Form::String, render::revision::Position { line: 3, column: 23 })
+    );
+    assert_eq!(
+        (&*types.order.name.text, types.order.ty, &*types.param.name.text, types.param.ty),
         (b"order".as_slice(), 2, b"param".as_slice(), 3)
     );
 }
 #[test]
 fn a_declaration_s_bounds_keep_their_numbers_and_positions() {
     let declaration = fixtures::read_declaration(fixtures::PARAMS);
-    let [_, object, _, _] = declaration.types.as_ref() else { panic!("four types") };
-    let target::Form::Object(fields) = &object.form else { panic!("object fields") };
-    let [order, _] = fields.as_ref() else { panic!("two fields") };
+    let types = fixtures::parameter_types(&declaration);
+    let order = types.order;
     assert_eq!(
         (&order.min, &order.max),
         (
@@ -155,9 +161,8 @@ fn a_declaration_s_bounds_keep_their_numbers_and_positions() {
 #[test]
 fn a_declaration_s_defaults_keep_their_values_and_positions() {
     let declaration = fixtures::read_declaration(fixtures::PARAMS);
-    let [_, object, _, _] = declaration.types.as_ref() else { panic!("four types") };
-    let target::Form::Object(fields) = &object.form else { panic!("object fields") };
-    let [order, _] = fields.as_ref() else { panic!("two fields") };
+    let types = fixtures::parameter_types(&declaration);
+    let order = types.order;
     assert_eq!(
         &order.default,
         &Some(render::revision::Value {

@@ -88,3 +88,12 @@ pub fn reference_expression(reference: Reference) -> Expression {
     }
 }
 pub type ReferenceFault = Option<(crate::errors::Schema, u32)>;
+
+#[must_use]
+pub fn check_reference(expression: &Expression) -> ReferenceFault {
+    crate::schema::references::check(expression, &declared_for_references())
+}
+#[must_use]
+pub fn template_references(template: &crate::evaluate::template::Template) -> ReferenceFault {
+    crate::schema::references::template(template, &declared_for_references())
+}
