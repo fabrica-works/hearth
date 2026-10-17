@@ -50,7 +50,7 @@ pub enum As {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Decoded {
     Document(Document),
-    Declaration,
+    Declaration(crate::revision::declaration::Declaration),
     Refused { at: Position, fault: crate::errors::Decode, also: Option<Position> },
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

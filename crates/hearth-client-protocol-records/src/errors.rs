@@ -13,6 +13,7 @@ pub struct Error {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
+    Schema(Schema),
     Guard(Guard),
     Decode(Decode),
 }
@@ -52,6 +53,7 @@ impl Error {
         }
         match &self.kind {
             Kind::Decode(decode) => decode.text(lines),
+            Kind::Schema(schema) => schema.text(lines),
             Kind::Guard(guard) => {
                 lines.put(b"requires ");
                 lines.put(&guard.name);
@@ -69,6 +71,11 @@ impl Error {
     pub(crate) fn json(&self, json: &mut Encoder) {
         field(json, b"record", b"error");
         match &self.kind {
+            Kind::Schema(schema) => {
+                field(json, b"kind", b"schema");
+                json.key(b"schema");
+                schema.json(json);
+            }
             Kind::Decode(decode) => {
                 field(json, b"kind", b"decode");
                 json.key(b"decode");
@@ -541,5 +548,65 @@ impl Required {
             Self::Doc => b"doc",
             Self::Value => b"value",
         }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Schema {
+    Task { task: Box<[u8]> },
+    Unread { task: Box<[u8]>, setting: Box<[u8]>, declared: Box<[Box<[u8]>]> },
+}
+
+impl Schema {
+    fn text(&self, lines: &mut Lines) {
+        match self {
+            Self::Task { task } => {
+                lines.put(b"reads ");
+                lines.put(task);
+                lines.put(b", which tasks/ lacks");
+            }
+            Self::Unread { task, setting, declared } => {
+                lines.put(b"reads ");
+                lines.put(task);
+                lines.put(b".");
+                lines.put(setting);
+                lines.put(b", which ");
+                lines.put(task);
+                lines.put(b" does not declare; ");
+                lines.put(task);
+                if declared.is_empty() {
+                    lines.put(b" declares no settings");
+                } else {
+                    lines.put(b" declares ");
+                    for (index, name) in declared.iter().enumerate() {
+                        if index != 0 {
+                            lines.put(b", ");
+                        }
+                        lines.put(name);
+                    }
+                }
+            }
+        }
+    }
+    fn json(&self, json: &mut Encoder) {
+        json.object_start();
+        match self {
+            Self::Task { task } => {
+                field(json, b"kind", b"task");
+                field(json, b"task", task);
+            }
+            Self::Unread { task, setting, declared } => {
+                json.key(b"declared");
+                json.array_start();
+                for name in declared {
+                    json.string(name);
+                }
+                json.array_end();
+                field(json, b"kind", b"unread");
+                field(json, b"setting", setting);
+                field(json, b"task", task);
+            }
+        }
+        json.object_end();
     }
 }

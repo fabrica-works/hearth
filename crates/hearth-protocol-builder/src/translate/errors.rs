@@ -66,6 +66,7 @@ fn config_field(field: config::Field) -> target::Field {
 pub fn error(error: target::Error) -> records::errors::Error {
     let target::Error { kind, class, at, also, target, task } = error;
     let kind = match kind {
+        target::Kind::Schema(fault) => records::errors::Kind::Schema(schema(fault)),
         target::Kind::Decode(fault) => records::errors::Kind::Decode(decode(fault)),
     };
     let class = match class {
@@ -317,5 +318,15 @@ pub fn declaration_map_to_records(value: render::revision::declaration::Map) -> 
         render::revision::declaration::Map::Identity => records::errors::Map::Identity,
         render::revision::declaration::Map::Cmdline => records::errors::Map::Cmdline,
         render::revision::declaration::Map::Live => records::errors::Map::Live,
+    }
+}
+
+#[must_use]
+pub fn schema(schema: target::Schema) -> records::errors::Schema {
+    match schema {
+        target::Schema::Task { task } => records::errors::Schema::Task { task },
+        target::Schema::Unread { task, setting, declared } => {
+            records::errors::Schema::Unread { task, setting, declared }
+        }
     }
 }

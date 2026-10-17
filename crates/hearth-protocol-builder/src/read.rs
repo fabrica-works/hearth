@@ -52,7 +52,9 @@ impl Decode {
                     },
                     render::vocabulary::As::Declaration => {
                         match config::declaration::declaration(value, &env.limits.config) {
-                            Ok(_) => Ok(Decoded::Declaration),
+                            Ok(declaration) => {
+                                Ok(Decoded::Declaration(translate::declarations::declaration(declaration, &env.limits)))
+                            }
                             Err(error) => Err(error),
                         }
                     }

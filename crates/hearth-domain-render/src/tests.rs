@@ -12,3 +12,5 @@ mod diff;
 
 mod errors;
 mod filters;
+
+mod schema;

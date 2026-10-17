@@ -467,8 +467,6 @@ pub fn diff_beneath_work_tree(label: &str, attributes: bool) -> Rendered {
     diff(&repository, &Asked { store: Some(&store), targets: &[b"x1-prod"], ..Asked::new(&from, &to) })
 }
 
-pub const MISKEYED: &[File] = &[File { path: "tasks/motd/task.json", body: b"{\"setting\": {}}", mode: 0o644 }];
-
 /// THIN and independently broken environments, including environments with no target.
 #[must_use]
 pub fn broken_envs(count: u32) -> Repository {
@@ -480,3 +478,14 @@ pub fn broken_envs(count: u32) -> Repository {
     drop(repository.next(&[], &[]));
     repository
 }
+
+pub const MISKEYED: File = File { path: "tasks/motd/task.json", body: b"{\"setting\": {}}", mode: 0o644 };
+
+pub const MISREAD: &[File] = &[
+    File { path: "tasks/motd/task.json", body: br#"{"reads": {"core": {"settings": ["domian"]}}}"#, mode: 0o644 },
+    File {
+        path: "tasks/core/task.json",
+        body: br#"{"settings":{"domain":{"type":"string","doc":"Domain."}}}"#,
+        mode: 0o644,
+    },
+];

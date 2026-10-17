@@ -10,6 +10,7 @@ pub mod evaluate;
 pub mod limits;
 pub mod parts;
 pub mod revision;
+pub mod schema;
 pub mod vocabulary;
 use limits::Limits;
 use skein_lib::{Env, Queue, Token};

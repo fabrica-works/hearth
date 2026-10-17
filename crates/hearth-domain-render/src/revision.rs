@@ -142,7 +142,7 @@ pub struct Pair {
 pub struct Documents {
     entries: Box<[Entry]>,
     decoded: Box<[Option<Document>]>,
-    declared: Box<[bool]>,
+    declared: Box<[Option<declaration::Declaration>]>,
 }
 impl Documents {
     #[must_use]
@@ -165,7 +165,7 @@ impl Documents {
         }
         let mut declared = skein_lib::List::with_capacity(listed.len());
         for _ in 0..listed.len() {
-            declared.push(false).expect("listing capacity");
+            declared.push(None).expect("listing capacity");
         }
         Self { entries: entries.into_boxed(), decoded: decoded.into_boxed(), declared: declared.into_boxed() }
     }
@@ -177,18 +177,18 @@ impl Documents {
     pub fn get(&self, document: u32) -> Option<&Document> {
         self.decoded.get(usize::try_from(document).ok()?)?.as_ref()
     }
-    pub fn set_declaration(&mut self, oid: &Oid) {
+    pub fn set_declaration(&mut self, oid: &Oid, declaration: declaration::Declaration) {
         for (entry, declared) in self.entries.iter().zip(self.declared.iter_mut()) {
             if &entry.oid == oid {
-                *declared = true;
+                *declared = Some(declaration.clone());
             }
         }
     }
     #[must_use]
-    pub fn declaration(&self, task: &[u8]) -> Option<(u32, bool)> {
+    pub fn declaration(&self, task: &[u8]) -> Option<(u32, Option<&declaration::Declaration>)> {
         for (index, (entry, declared)) in self.entries.iter().zip(self.declared.iter()).enumerate() {
             if class(&entry.path) == (Class::Declaration { task }) {
-                return Some((u32::try_from(index).expect("bounded listing"), *declared));
+                return Some((u32::try_from(index).expect("bounded listing"), declared.as_ref()));
             }
         }
         None

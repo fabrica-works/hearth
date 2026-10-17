@@ -10,3 +10,5 @@ pub mod operations;
 pub mod store;
 
 pub mod hunks;
+
+pub mod declarations;

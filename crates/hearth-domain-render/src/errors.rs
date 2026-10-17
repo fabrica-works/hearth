@@ -18,6 +18,7 @@ pub struct Place {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
+    Schema(Schema),
     Decode(Decode),
 }
 
@@ -247,4 +248,10 @@ pub enum Takes {
     Bool,
     Strings,
     Range,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Schema {
+    Task { task: Box<[u8]> },
+    Unread { task: Box<[u8]>, setting: Box<[u8]>, declared: Box<[Box<[u8]>]> },
 }

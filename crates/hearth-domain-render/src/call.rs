@@ -22,6 +22,7 @@ pub(crate) struct Side {
     pub paths: Box<[Box<[u8]>]>,
     pub settings: Box<[compose::Settings]>,
     pub merge: compose::Merge,
+    pub defaults: crate::schema::Defaults,
     pub budget: Budget,
     pub pending: Box<[Blob]>,
     pub entries: Box<[Entry]>,
@@ -48,6 +49,7 @@ impl Side {
             paths: Box::new([]),
             settings: Box::new([]),
             merge: compose::Merge::new(limits),
+            defaults: crate::schema::Defaults::new(),
             budget: Budget::new(limits),
             pending: Box::new([]),
             entries: Box::new([]),
@@ -165,8 +167,8 @@ impl Side {
             Decoded::Document(document) => {
                 self.documents.set(oid, document);
             }
-            Decoded::Declaration => {
-                self.documents.set_declaration(oid);
+            Decoded::Declaration(declaration) => {
+                self.documents.set_declaration(oid, declaration);
             }
             Decoded::Refused { at, fault, also } => {
                 let path = self.paths.get(self.read).expect("requested path");
@@ -200,6 +202,24 @@ impl Side {
             return false;
         }
         self.files = true;
+        let mut faults = List::with_capacity(16);
+        self.defaults = crate::schema::declarations(&self.documents, &mut faults);
+        for (task, fault) in &faults {
+            errors::push(
+                &mut self.errors,
+                errors::Error {
+                    kind: errors::Kind::Schema(fault.schema.clone()),
+                    class: crate::vocabulary::Class::Configuration,
+                    at: Some(errors::Place {
+                        path: skein_lib::bytes::copy_of(self.documents.path(fault.document)),
+                        position: Some(fault.at),
+                    }),
+                    also: None,
+                    target: None,
+                    task: Some(task.clone()),
+                },
+            );
+        }
         let mut settings = List::with_capacity(u32::try_from(self.targets.len()).expect("target count"));
         for target in &self.targets {
             settings.push(compose::compose(target, &self.documents, &mut self.merge)).expect("target count");
@@ -284,7 +304,7 @@ impl Side {
                 match revision::class(&entry.path) {
                     revision::Class::Declaration { task: name } if name == task.as_ref() => {
                         declared = match self.documents.declaration(name) {
-                            Some((_, sound)) => sound,
+                            Some((_, declaration)) => declaration.is_some() && self.defaults.sound(name),
                             None => false,
                         };
                     }

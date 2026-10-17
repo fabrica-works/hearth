@@ -256,7 +256,7 @@ fn a_binary_file_answers_binary_with_no_hunk_line() {
 
 #[test]
 fn a_task_json_out_of_shape_prints_its_fault_and_fails_its_targets() {
-    let repository = Repository::make("miskeyed", &fixtures::thin_with(fixtures::MISKEYED));
+    let repository = Repository::make("miskeyed", &fixtures::thin_with(&[fixtures::MISKEYED]));
     assert_eq!(
         String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout),
         "tasks/motd/task.json:1:2: motd: no such key in a declaration\n"
@@ -264,7 +264,21 @@ fn a_task_json_out_of_shape_prints_its_fault_and_fails_its_targets() {
 }
 #[test]
 fn a_task_json_out_of_shape_exits_with_configuration_failure() {
-    let repository = Repository::make("miskeyed-exit", &fixtures::thin_with(fixtures::MISKEYED));
+    let repository = Repository::make("miskeyed-exit", &fixtures::thin_with(&[fixtures::MISKEYED]));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
+
+#[test]
+fn a_read_of_a_setting_its_task_lacks_prints_and_fails_its_targets() {
+    let repository = Repository::make("misread", &fixtures::thin_with(fixtures::MISREAD));
+    assert_eq!(
+        String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout),
+        "tasks/motd/task.json:1:34: motd: reads core.domian, which core does not declare; core declares domain\n"
+    );
+}
+#[test]
+fn a_read_of_a_setting_its_task_lacks_exits_with_configuration_failure() {
+    let repository = Repository::make("misread-exit", &fixtures::thin_with(fixtures::MISREAD));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
 

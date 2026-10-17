@@ -255,3 +255,58 @@ fn a_declaration_fault_prints_its_json_fields() {
     });
     assert_eq!(form::print(Form::JsonLines, &record, Some(Type::Error), &limits::SHIPPED).as_deref(), Ok(b"{\"record\":\"error\",\"kind\":\"decode\",\"decode\":{\"declared\":{\"kind\":\"unknown\",\"of\":\"declaration\"},\"kind\":\"declaration\"},\"class\":\"configuration\"}\n".as_slice()));
 }
+
+const SCHEMA_LINES: &[(fixtures::SchemaInput, &str)] = &[
+    (fixtures::SchemaInput::Task(b"mail"), "envs/lab.json:1:14: reads mail, which tasks/ lacks\n"),
+    (
+        fixtures::SchemaInput::Unread { task: b"core", setting: b"domian", declared: &[b"domain"] },
+        "envs/lab.json:1:14: reads core.domian, which core does not declare; core declares domain\n",
+    ),
+    (
+        fixtures::SchemaInput::Unread { task: b"core", setting: b"domian", declared: &[] },
+        "envs/lab.json:1:14: reads core.domian, which core does not declare; core declares no settings\n",
+    ),
+];
+#[test]
+fn each_schema_fault_prints_its_message() {
+    for (row, &(input, line)) in SCHEMA_LINES.iter().enumerate() {
+        let mut error = fixtures::duplicate();
+        error.kind = crate::errors::Kind::Schema(fixtures::schema_fault(input));
+        error.also = None;
+        assert_eq!(print(&Record::Error(error)).as_deref(), Ok(line.as_bytes()), "row {row}");
+    }
+}
+const SCHEMA_JSON: &[(fixtures::SchemaInput, &str)] = &[
+    (
+        fixtures::SchemaInput::Task(b"mail"),
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"kind":"task","task":"mail"},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+    (
+        fixtures::SchemaInput::Unread { task: b"core", setting: b"domian", declared: &[b"domain"] },
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"declared":["domain"],"kind":"unread","setting":"domian","task":"core"},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+];
+#[test]
+fn each_schema_fault_prints_its_json_fields() {
+    for (row, &(input, line)) in SCHEMA_JSON.iter().enumerate() {
+        let record = Record::Error(crate::errors::Error {
+            kind: crate::errors::Kind::Schema(fixtures::schema_fault(input)),
+            class: crate::errors::Class::Configuration,
+            at: None,
+            also: None,
+            target: None,
+            task: None,
+        });
+        assert_eq!(
+            form::print(Form::JsonLines, &record, Some(Type::Error), &limits::SHIPPED).as_deref(),
+            Ok(line.as_bytes()),
+            "row {row}"
+        );
+    }
+}

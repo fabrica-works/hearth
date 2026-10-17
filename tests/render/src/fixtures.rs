@@ -124,7 +124,15 @@ pub fn with_task() -> Repository {
             },
         });
     repository.entries.push(entry(b"tasks/motd/task.json", b'4'));
-    repository.documents.push((oid(b'4'), Decoded::Declaration));
+    repository.documents.push((
+        oid(b'4'),
+        Decoded::Declaration(hearth_domain_render::revision::declaration::Declaration {
+            at: Position { line: 1, column: 1 },
+            types: Box::new([]),
+            settings: Box::new([]),
+            reads: Box::new([]),
+        }),
+    ));
     repository
 }
 

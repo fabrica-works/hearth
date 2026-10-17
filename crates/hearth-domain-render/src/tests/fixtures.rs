@@ -577,3 +577,66 @@ pub fn places(errors: &[crate::errors::Error]) -> Box<[Spot<'_>]> {
     }
     places.into_boxed()
 }
+
+pub fn declaration(
+    settings: &[crate::revision::declaration::Spec],
+    reads: &[crate::revision::declaration::Read],
+) -> crate::revision::declaration::Declaration {
+    crate::revision::declaration::Declaration {
+        at: composition::at(1, 1),
+        types: Box::new([]),
+        settings: settings.into(),
+        reads: reads.into(),
+    }
+}
+
+pub fn declared_spec(name: &[u8]) -> crate::revision::declaration::Spec {
+    use crate::revision::declaration::{Spec, Text};
+    Spec {
+        name: Text { at: composition::at(1, 2), text: bytes::copy_of(name) },
+        at: composition::at(1, 12),
+        ty: 0,
+        default: None,
+        optional: false,
+        min: None,
+        max: None,
+        max_length: None,
+    }
+}
+pub fn read(task: &[u8], settings: &[crate::revision::declaration::Text]) -> crate::revision::declaration::Read {
+    use crate::revision::declaration::{Read, Text};
+    Read {
+        task: Text { at: composition::at(1, 12), text: bytes::copy_of(task) },
+        at: composition::at(1, 20),
+        settings: settings.into(),
+        optional: false,
+        exports: false,
+    }
+}
+pub fn declarations(
+    entries: &[(&[u8], Option<crate::revision::declaration::Declaration>)],
+) -> crate::revision::Documents {
+    use crate::revision::{Documents, Entry, Mode, Oid};
+    let mut listed = skein_lib::List::with_capacity(u32::try_from(entries.len()).expect("fixture count"));
+    for (task, _) in entries {
+        let mut path = skein_lib::Writer::new(task.len().saturating_add(16));
+        path.put(b"tasks/").expect("room");
+        path.put(task).expect("room");
+        path.put(b"/task.json").expect("room");
+        listed
+            .push(Entry { path: path.finish(), oid: Oid(bytes::copy_of(task)), mode: Mode::File, size: 2 })
+            .expect("room");
+    }
+    let mut documents = Documents::new(listed.as_slice());
+    for (task, declaration) in entries {
+        if let Some(declaration) = declaration {
+            documents.set_declaration(&Oid(bytes::copy_of(task)), declaration.clone());
+        }
+    }
+    documents
+}
+pub fn check_declarations(documents: &crate::revision::Documents) -> Box<[(Box<[u8]>, crate::schema::Fault)]> {
+    let mut faults = skein_lib::List::with_capacity(4);
+    drop(crate::schema::declarations(documents, &mut faults));
+    faults.into_boxed()
+}

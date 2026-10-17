@@ -161,7 +161,16 @@ fn a_task_json_reaches_render_through_declaration() {
     layer.read(Box::new([blob]));
     assert_eq!(
         layer.run(&fixtures::batch(b"{}"), Exit::Code(0)),
-        RootEvent::Render(Event::Read { request: REQUEST, oid: fixtures::oid(), read: Decoded::Declaration })
+        RootEvent::Render(Event::Read {
+            request: REQUEST,
+            oid: fixtures::oid(),
+            read: Decoded::Declaration(crate::render::revision::declaration::Declaration {
+                at: Position { line: 1, column: 1 },
+                types: Box::new([]),
+                settings: Box::new([]),
+                reads: Box::new([])
+            })
+        })
     );
 }
 #[test]

@@ -402,3 +402,70 @@ pub fn render_hunks() -> [render::diff::Hunks; 2] {
         Hunks { lines: Box::new([]), left_out: 0, binary: true },
     ]
 }
+
+#[must_use]
+pub fn every_form() -> [crate::config::schema::Form; 13] {
+    use crate::config::{
+        Position,
+        declaration::Text,
+        schema::{Form, Spec},
+    };
+    let at = Position { offset: 0, line: 3, column: 7 };
+    [
+        Form::Bool,
+        Form::Int,
+        Form::String,
+        Form::Path,
+        Form::Mode,
+        Form::Duration,
+        Form::Secret,
+        Form::Target,
+        Form::File,
+        Form::Enum(Box::new([Text { at, text: bytes::copy_of(b"main") }])),
+        Form::List(17),
+        Form::Map(23),
+        Form::Object(Box::new([Spec {
+            name: Text { at, text: bytes::copy_of(b"field") },
+            at,
+            ty: 29,
+            default: None,
+            optional: true,
+            min: None,
+            max: None,
+            max_length: None,
+        }])),
+    ]
+}
+#[must_use]
+pub fn schema_faults() -> [render::errors::Schema; 2] {
+    use render::errors::Schema;
+    [
+        Schema::Task { task: bytes::copy_of(b"mail") },
+        Schema::Unread {
+            task: bytes::copy_of(b"core"),
+            setting: bytes::copy_of(b"domian"),
+            declared: Box::new([bytes::copy_of(b"domain")]),
+        },
+    ]
+}
+#[must_use]
+pub fn read_declaration(body: &[u8]) -> render::revision::declaration::Declaration {
+    let mut layer = Layer::new();
+    layer.read(Box::new([render::vocabulary::Blob { kind: render::vocabulary::As::Declaration, ..blob(body) }]));
+    let builder::vocabulary::Event::Render(render::vocabulary::Event::Read {
+        read: render::vocabulary::Decoded::Declaration(declaration),
+        ..
+    }) = layer.run(&batch(body), Exit::Code(0))
+    else {
+        panic!("decoded declaration")
+    };
+    declaration
+}
+
+pub const PARAMS: &[u8] = b"{\"settings\": {\"params\": {\n  \"type\": {\"map\": {\"object\": {\n    \"param\": {\"type\": \"string\", \"doc\": \"One parameter.\"},\n    \"order\": {\"type\": \"int\", \"min\": 0, \"max\": 999, \"default\": 500, \"doc\": \"Its place.\"}}}},\n  \"default\": {}, \"doc\": \"Parameters, by name.\"}}}";
+pub const READS: &[u8] = br#"{"reads":{"core":{"settings":["domain"],"optional":true,"exports":true}}}"#;
+
+pub fn only<T>(items: &[T]) -> &T {
+    let [item] = items else { panic!("one item") };
+    item
+}

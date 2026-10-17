@@ -140,3 +140,22 @@ pub fn duplicate() -> crate::errors::Error {
         task: None,
     }
 }
+
+#[derive(Clone, Copy, Debug)]
+pub enum SchemaInput {
+    Task(&'static [u8]),
+    Unread { task: &'static [u8], setting: &'static [u8], declared: &'static [&'static [u8]] },
+}
+pub fn schema_fault(input: SchemaInput) -> crate::errors::Schema {
+    use crate::errors::Schema;
+    match input {
+        SchemaInput::Task(task) => Schema::Task { task: copy_of(task) },
+        SchemaInput::Unread { task, setting, declared } => {
+            let mut names = skein_lib::List::with_capacity(u32::try_from(declared.len()).expect("fixture count"));
+            for name in declared {
+                names.push(copy_of(name)).expect("room");
+            }
+            Schema::Unread { task: copy_of(task), setting: copy_of(setting), declared: names.into_boxed() }
+        }
+    }
+}

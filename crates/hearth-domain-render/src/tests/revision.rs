@@ -42,7 +42,10 @@ fn the_first_read_asks_every_listed_task_json_once() {
 fn the_second_read_never_asks_a_task_json_again() {
     let mut call = super::fixtures::declaration_call();
     for name in [b"core".as_slice(), b"motd"] {
-        call.decoded(&crate::revision::Oid(skein_lib::bytes::copy_of(name)), crate::vocabulary::Decoded::Declaration);
+        call.decoded(
+            &crate::revision::Oid(skein_lib::bytes::copy_of(name)),
+            crate::vocabulary::Decoded::Declaration(super::fixtures::declaration(&[], &[])),
+        );
     }
     let mut out = skein_lib::Queue::with_capacity(1);
     assert!(!call.files(crate::limits::SHIPPED, &mut out));
