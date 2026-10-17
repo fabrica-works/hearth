@@ -44,3 +44,19 @@ fn running_templates_at_the_limits_holds_no_more_than_the_worst_case() {
         meter.check(step, bound, &what);
     }
 }
+
+#[test]
+fn expanding_at_the_limits_holds_no_more_than_the_worst_case() {
+    let limits = fixtures::EXPANSION_LIMITS;
+    let bound = hearth_domain_render::entries::worst_case(&limits).expect("expansion bound");
+    let roots = fixtures::wide_roots();
+    for (declaration, what) in fixtures::entries_at_the_limits() {
+        let meter = Meter::new();
+        meter.start();
+        let expanded =
+            hearth_domain_render::entries::expand(&declaration, &roots.context(), &limits, &mut { limits.expanded });
+        drop(expanded);
+        let step = meter.end();
+        meter.check(step, bound, &what);
+    }
+}

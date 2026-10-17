@@ -79,7 +79,7 @@ pub fn plain(text: &[u8]) -> Interpolated {
     Interpolated::Plain { at: at(3, 5), text: copy_of(text) }
 }
 pub fn entry(key: Interpolated, for_each: Option<Condition>, when: Option<Condition>) -> Entry {
-    Entry { key, at: at(3, 15), when, for_each }
+    Entry { key, at: at(3, 15), when, for_each, fields: Box::new([]) }
 }
 pub fn entry_maps<const N: usize>(maps: [Entries; N]) -> Declaration {
     let mut declaration = declaration(&[], &[]);
@@ -142,4 +142,72 @@ pub fn peers_with_absent() -> super::Roots {
         ])),
     )]);
     roots
+}
+
+use crate::revision::declaration::{Field, Literal, Name};
+pub const FIELD_AT: Position = Position { line: 3, column: 21 };
+pub const EXPANDED_TEXT: crate::limits::Limits = crate::limits::Limits { expanded: 64, ..crate::limits::SHIPPED };
+pub fn field(name: Name, value: Literal) -> Field {
+    Field { name, at: FIELD_AT, value }
+}
+pub fn fields<const N: usize>(fields: [Field; N]) -> Declaration {
+    let mut entry = entry(plain(b"ops"), None, None);
+    entry.fields = Box::new(fields);
+    entries([entry])
+}
+pub fn setting_tag(name: &[u8]) -> Interpolated {
+    Interpolated::Parts { at: FIELD_AT, parts: Box::new([super::output(0, setting(name).expression)]) }
+}
+#[derive(Clone, Copy, Debug)]
+pub enum StringPlace {
+    Key,
+    Field,
+    Mixed,
+    List,
+}
+pub fn boolean_string(place: StringPlace) -> Declaration {
+    let tag = parts([entry_output([op(0, Op::Boolean(true))])]);
+    match place {
+        StringPlace::Key => entries([entry(tag, None, None)]),
+        StringPlace::Field => fields([field(Name::From, Literal::Text(tag))]),
+        StringPlace::Mixed => fields([field(
+            Name::From,
+            Literal::Text(parts([Does::Text(copy_of(b"x")), entry_output([op(0, Op::Boolean(true))])])),
+        )]),
+        StringPlace::List => fields([field(Name::Groups, Literal::Strings { at: FIELD_AT, each: Box::new([tag]) })]),
+    }
+}
+pub fn mixed_optional() -> Interpolated {
+    let Interpolated::Parts { at: _, parts: tagged } = setting_tag(b"wifi") else { panic!("tag") };
+    let output = super::only(&tagged).clone();
+    Interpolated::Parts { at: FIELD_AT, parts: Box::new([super::text(0, b"prefix"), output]) }
+}
+
+pub fn budget_text() -> Interpolated {
+    let mut text = skein_lib::bytes::zeroed(usize::try_from(EXPANDED_TEXT.expanded).expect("small limit"));
+    text.fill(b'x');
+    Interpolated::Plain { at: FIELD_AT, text }
+}
+pub fn range_roots() -> super::Roots {
+    let mut roots = super::Roots::x1_prod();
+    roots.settings = super::map(&[(
+        b"range",
+        Some(super::map(&[
+            (b"base", Some(crate::evaluate::Value::Int(42))),
+            (b"count", Some(crate::evaluate::Value::Int(2))),
+        ])),
+    )]);
+    roots
+}
+pub fn range_field(count: Literal) -> Field {
+    field(
+        Name::Subordinate,
+        Literal::Range {
+            at: FIELD_AT,
+            fields: Box::new([
+                field(Name::Base, Literal::Int(crate::revision::declaration::Number { at: FIELD_AT, value: 42 })),
+                field(Name::Count, count),
+            ]),
+        },
+    )
 }

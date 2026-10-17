@@ -9,6 +9,7 @@ pub mod diff;
 pub mod entries;
 pub mod errors;
 pub mod evaluate;
+pub mod kinds;
 pub mod limits;
 pub mod parts;
 pub mod revision;

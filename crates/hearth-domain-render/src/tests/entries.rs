@@ -247,3 +247,206 @@ fn a_concrete_entry_keeps_its_element_index() {
     }
     assert_eq!(elements.as_slice(), &[Some(0), Some(1)]);
 }
+
+use crate::{
+    errors::{Schema, TypeName},
+    revision::declaration::{Literal, Name},
+};
+use fixtures::{EXPANDED_TEXT, FIELD_AT, field, fields, setting_tag};
+#[test]
+fn a_key_and_a_field_interpolate_text_and_integers_in_order() {
+    let mut entry = list_entry();
+    entry.fields = Box::new([field(
+        Name::From,
+        Literal::Text(parts([
+            crate::evaluate::template::Does::Text(copy_of(b"x")),
+            entry_output([op(0, Op::Integer(-42))]),
+            crate::evaluate::template::Does::Text(copy_of(b"y")),
+            entry_output([name(0, b"value", Missing::Error)]),
+        ])),
+    )]);
+    let expanded =
+        entries::expand(&declared_entries([entry]), &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded })
+            .expect("expand");
+    let group = only(&expanded.groups);
+    let [sudo, wheel] = group.entries.as_ref() else { panic!("two elements") };
+    assert_eq!(
+        (sudo.text(Name::From), wheel.text(Name::From)),
+        (Some(b"x-42ysudo".as_slice()), Some(b"x-42ywheel".as_slice()))
+    );
+}
+const BOOLEAN_STRINGS: &[fixtures::StringPlace] = &[
+    fixtures::StringPlace::Key,
+    fixtures::StringPlace::Field,
+    fixtures::StringPlace::Mixed,
+    fixtures::StringPlace::List,
+];
+#[test]
+fn a_boolean_in_a_string_fails_with_type_wherever_it_stands() {
+    for (row, &place) in BOOLEAN_STRINGS.iter().enumerate() {
+        assert_eq!(
+            entries::expand(&fixtures::boolean_string(place), &Roots::x1_prod().context(), &SHIPPED, &mut {
+                SHIPPED.expanded
+            }),
+            Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Type), at: at(3, 5), also: None }),
+            "row {row}"
+        );
+    }
+}
+const COLLECTIONS: &[&[u8]] = &[b"tags", b"peers"];
+#[test]
+fn a_list_or_map_in_a_string_fails_with_output() {
+    for (row, name) in COLLECTIONS.iter().enumerate() {
+        let declared = fields([field(Name::From, Literal::Text(setting_tag(name)))]);
+        assert_eq!(
+            entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+            Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Output), at: FIELD_AT, also: None }),
+            "row {row}"
+        );
+    }
+}
+#[test]
+fn a_field_written_as_one_tag_is_absent_when_undefined() {
+    let declared = fields([
+        field(Name::From, Literal::Text(setting_tag(b"wifi"))),
+        field(Name::Uid, Literal::Typed(setting_tag(b"wifi"))),
+    ]);
+    let expanded =
+        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }).expect("expand");
+    assert_eq!(only(&only(&expanded.groups).entries).fields.as_ref(), &[]);
+}
+#[test]
+fn an_undefined_key_is_an_error() {
+    let declared = declared_entries([entry(setting_tag(b"wifi"), None, None)]);
+    assert_eq!(
+        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+        Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Undefined), at: FIELD_AT, also: None })
+    );
+}
+#[test]
+fn an_undefined_value_beside_text_is_an_error() {
+    let declared = fields([field(Name::From, Literal::Text(fixtures::mixed_optional()))]);
+    assert_eq!(
+        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+        Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Undefined), at: FIELD_AT, also: None })
+    );
+}
+const WRONG_TYPED: &[(Name, TypeName)] = &[
+    (Name::Uid, TypeName::Int),
+    (Name::Directory, TypeName::Bool),
+    (Name::Groups, TypeName::List),
+    (Name::Subordinate, TypeName::Object),
+];
+#[test]
+fn a_typed_field_must_have_its_fields_type() {
+    for (row, (name, expected)) in WRONG_TYPED.iter().enumerate() {
+        let declared = fields([field(*name, Literal::Typed(setting_tag(b"name")))]);
+        assert_eq!(
+            entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+            Err(entries::Fault {
+                kind: Kind::Schema(Schema::Wrong { expected: expected.clone() }),
+                at: FIELD_AT,
+                also: None
+            }),
+            "row {row}"
+        );
+    }
+}
+#[test]
+fn a_typed_field_requires_one_output_tag() {
+    let declared = fields([field(Name::Uid, Literal::Typed(plain(b"42")))]);
+    assert_eq!(
+        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+        Err(entries::Fault { kind: Kind::Schema(Schema::Wrong { expected: TypeName::Int }), at: at(3, 5), also: None })
+    );
+}
+#[test]
+fn a_typed_fields_accessor_keeps_its_value() {
+    let declared = fields([
+        field(Name::Uid, Literal::Typed(setting_tag(b"port"))),
+        field(Name::Directory, Literal::Typed(setting_tag(b"enabled"))),
+    ]);
+    let expanded =
+        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }).expect("expand");
+    let entry = only(&only(&expanded.groups).entries);
+    assert_eq!((entry.int(Name::Uid), entry.bool(Name::Directory)), (Some(2222), Some(true)));
+}
+#[test]
+fn a_list_fields_elements_interpolate_one_by_one() {
+    let declared = fields([field(
+        Name::Groups,
+        Literal::Strings { at: FIELD_AT, each: Box::new([setting_tag(b"name"), plain(b"wheel")]) },
+    )]);
+    let expanded =
+        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }).expect("expand");
+    assert_eq!(
+        only(&only(&expanded.groups).entries).strings(Name::Groups),
+        Some([copy_of(b"x1"), copy_of(b"wheel")].as_slice())
+    );
+}
+#[test]
+fn a_typed_list_keeps_every_string() {
+    let declared = fields([field(Name::Groups, Literal::Typed(setting_tag(b"tags")))]);
+    let expanded =
+        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }).expect("expand");
+    assert_eq!(
+        only(&only(&expanded.groups).entries).strings(Name::Groups),
+        Some([copy_of(b"sudo"), copy_of(b"wheel")].as_slice())
+    );
+}
+#[test]
+fn an_undefined_value_in_a_list_is_an_error() {
+    let declared =
+        fields([field(Name::Groups, Literal::Strings { at: FIELD_AT, each: Box::new([setting_tag(b"wifi")]) })]);
+    assert_eq!(
+        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+        Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Undefined), at: FIELD_AT, also: None })
+    );
+}
+#[test]
+fn key_and_value_in_a_plain_entrys_string_field_are_unknown() {
+    for (row, name) in UNBOUND.iter().enumerate() {
+        let declared = fields([field(
+            Name::From,
+            Literal::Text(parts([entry_output([fixtures::name(0, name, Missing::Error)])])),
+        )]);
+        assert_eq!(
+            entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+            Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Unknown), at: at(3, 5), also: None }),
+            "row {row}"
+        );
+    }
+}
+#[test]
+fn a_required_field_the_entry_lacks_is_a_missing_field_at_the_entry() {
+    let expanded =
+        entries::expand(&fields([]), &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }).expect("expand");
+    assert_eq!(
+        crate::kinds::required(only(&only(&expanded.groups).entries), Name::Uid),
+        Err(Schema::MissingField { field: copy_of(b"uid") })
+    );
+}
+#[test]
+fn expanded_text_past_the_targets_budget_fails_at_the_field() {
+    let declared = fields([field(Name::From, Literal::Text(fixtures::budget_text()))]);
+    assert_eq!(
+        entries::expand(&declared, &Roots::x1_prod().context(), &EXPANDED_TEXT, &mut { EXPANDED_TEXT.expanded }),
+        Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Limit), at: FIELD_AT, also: None })
+    );
+}
+#[test]
+fn a_typed_range_keeps_its_base_and_count() {
+    let declaration = fields([field(Name::Subordinate, Literal::Typed(setting_tag(b"range")))]);
+    let expanded =
+        entries::expand(&declaration, &fixtures::range_roots().context(), &SHIPPED, &mut { SHIPPED.expanded })
+            .expect("expand");
+    assert_eq!(only(&only(&expanded.groups).entries).range(Name::Subordinate), Some((42, 2)));
+}
+#[test]
+fn a_range_member_is_never_absent() {
+    let declaration = fields([fixtures::range_field(Literal::Typed(setting_tag(b"wifi")))]);
+    assert_eq!(
+        entries::expand(&declaration, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+        Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Undefined), at: FIELD_AT, also: None })
+    );
+}

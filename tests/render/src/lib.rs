@@ -7,3 +7,5 @@ pub mod reference;
 pub mod schemas;
 
 pub mod templates;
+
+pub mod declarations;

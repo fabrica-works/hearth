@@ -276,6 +276,7 @@ dependencies = [
  "hearth-domain-render",
  "hearth-lib",
  "hearth-protocol-builder",
+ "hearth-protocol-config",
  "hearth-protocol-template",
  "skein-heap",
  "skein-lib",

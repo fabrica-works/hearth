@@ -162,7 +162,7 @@ pub fn entry(
     written: config::entries::Entry,
     limits: &hearth_protocol_template::limits::Limits,
 ) -> Result<target::Entry, Refusal> {
-    let config::entries::Entry { key, at, when, for_each, fields: _ } = written;
+    let config::entries::Entry { key, at, when, for_each, fields } = written;
     let when = match when {
         Some(written) => Some(condition(written, limits)?),
         None => None,
@@ -171,7 +171,13 @@ pub fn entry(
         Some(written) => Some(condition(written, limits)?),
         None => None,
     };
-    Ok(target::Entry { key: interpolated(key, limits)?, at: position(at), when, for_each })
+    Ok(target::Entry {
+        key: interpolated(key, limits)?,
+        at: position(at),
+        when,
+        for_each,
+        fields: self::fields(fields, limits)?,
+    })
 }
 pub fn interpolated(
     written: config::declaration::Text,
@@ -192,5 +198,89 @@ pub fn interpolated(
         Err(error) => {
             Err(Refusal { at, fault: crate::render::errors::Decode::Syntax(super::errors::syntax(error.kind)) })
         }
+    }
+}
+
+fn fields(
+    written: Box<[config::entries::Field]>,
+    limits: &hearth_protocol_template::limits::Limits,
+) -> Result<Box<[target::Field]>, Refusal> {
+    let mut fields = List::with_capacity(u32::try_from(written.len()).expect("field count"));
+    for written in written {
+        fields.push(field(written, limits)?).expect("field count");
+    }
+    Ok(fields.into_boxed())
+}
+pub fn field(
+    written: config::entries::Field,
+    limits: &hearth_protocol_template::limits::Limits,
+) -> Result<target::Field, Refusal> {
+    let config::entries::Field { name, at, value } = written;
+    Ok(target::Field { name: self::name(name), at: position(at), value: literal(value, limits)? })
+}
+pub fn literal(
+    written: config::entries::Literal,
+    limits: &hearth_protocol_template::limits::Limits,
+) -> Result<target::Literal, Refusal> {
+    match written {
+        config::entries::Literal::Text(text) => Ok(target::Literal::Text(interpolated(text, limits)?)),
+        config::entries::Literal::Plain(text) => Ok(target::Literal::Plain { at: position(text.at), text: text.text }),
+        config::entries::Literal::Typed(text) => Ok(target::Literal::Typed(interpolated(text, limits)?)),
+        config::entries::Literal::Int(config::declaration::Number { at, value }) => {
+            Ok(target::Literal::Int(target::Number { at: position(at), value }))
+        }
+        config::entries::Literal::Bool { at, value } => Ok(target::Literal::Bool { at: position(at), value }),
+        config::entries::Literal::Strings { at, each } => {
+            let mut strings = List::with_capacity(u32::try_from(each.len()).expect("string count"));
+            for text in each {
+                strings.push(interpolated(text, limits)?).expect("string count");
+            }
+            Ok(target::Literal::Strings { at: position(at), each: strings.into_boxed() })
+        }
+        config::entries::Literal::Range { at, fields: written } => {
+            Ok(target::Literal::Range { at: position(at), fields: fields(written, limits)? })
+        }
+    }
+}
+#[must_use]
+pub fn name(name: config::entries::Name) -> target::Name {
+    match name {
+        config::entries::Name::Action => target::Name::Action,
+        config::entries::Name::Age => target::Name::Age,
+        config::entries::Name::Algorithm => target::Name::Algorithm,
+        config::entries::Name::Argument => target::Name::Argument,
+        config::entries::Name::Base => target::Name::Base,
+        config::entries::Name::Class => target::Name::Class,
+        config::entries::Name::Component => target::Name::Component,
+        config::entries::Name::Copy => target::Name::Copy,
+        config::entries::Name::Count => target::Name::Count,
+        config::entries::Name::Directory => target::Name::Directory,
+        config::entries::Name::From => target::Name::From,
+        config::entries::Name::Gecos => target::Name::Gecos,
+        config::entries::Name::Gid => target::Name::Gid,
+        config::entries::Name::Group => target::Name::Group,
+        config::entries::Name::Groups => target::Name::Groups,
+        config::entries::Name::Home => target::Name::Home,
+        config::entries::Name::Kind => target::Name::Kind,
+        config::entries::Name::Link => target::Name::Link,
+        config::entries::Name::Mode => target::Name::Mode,
+        config::entries::Name::Order => target::Name::Order,
+        config::entries::Name::Owner => target::Name::Owner,
+        config::entries::Name::Param => target::Name::Param,
+        config::entries::Name::Password => target::Name::Password,
+        config::entries::Name::Path => target::Name::Path,
+        config::entries::Name::Paths => target::Name::Paths,
+        config::entries::Name::PublicPath => target::Name::PublicPath,
+        config::entries::Name::Sha256 => target::Name::Sha256,
+        config::entries::Name::Shell => target::Name::Shell,
+        config::entries::Name::Strip => target::Name::Strip,
+        config::entries::Name::Subordinate => target::Name::Subordinate,
+        config::entries::Name::Template => target::Name::Template,
+        config::entries::Name::Type => target::Name::Type,
+        config::entries::Name::Uid => target::Name::Uid,
+        config::entries::Name::Unit => target::Name::Unit,
+        config::entries::Name::Unpack => target::Name::Unpack,
+        config::entries::Name::Url => target::Name::Url,
+        config::entries::Name::Value => target::Name::Value,
     }
 }

@@ -593,3 +593,27 @@ fn distinct_for_each_keys_leave_the_call_successful() {
         Repository::make("distinct-keys-exit", &fixtures::thin_with(&[fixtures::TWICE, fixtures::DISTINCT_TEAMS]));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(0));
 }
+
+#[test]
+fn an_undefined_value_beside_text_fails_while_a_lone_tag_leaves_the_field_absent() {
+    let repository = Repository::make("unset-field", &fixtures::thin_with(core::slice::from_ref(&fixtures::UNSET)));
+    assert_eq!(
+        fixtures::render(&repository, &[], Form::Text).stdout,
+        b"tasks/motd/task.json:4:21: x1-prod: motd: an undefined value used\n"
+    );
+}
+#[test]
+fn an_undefined_value_beside_text_exits_with_configuration_failure() {
+    let repository =
+        Repository::make("unset-field-exit", &fixtures::thin_with(core::slice::from_ref(&fixtures::UNSET)));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
+#[test]
+fn a_boolean_in_a_string_field_prints_an_evaluation_error_at_the_field() {
+    let repository =
+        Repository::make("boolean-field", &fixtures::thin_with(core::slice::from_ref(&fixtures::BOOLEAN_FIELD)));
+    assert_eq!(
+        fixtures::render(&repository, &[], Form::Text).stdout,
+        b"tasks/motd/task.json:3:21: x1-prod: motd: a value of the wrong type\n"
+    );
+}

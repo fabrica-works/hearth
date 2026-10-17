@@ -698,3 +698,6 @@ pub const WRONG_GREETING: File = File { path: "hosts/x1/x1.json", mode: 0o644, b
 pub const TWICE: File = File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"teams\": {\"type\": {\"list\": \"string\"}, \"default\": [\"ops\", \"dev\", \"ops\"], \"doc\": \"Teams.\"}},\n\"groups\": {\n    \"{{ value }}\": {\"for_each\": \"settings.teams\"}}}" };
 pub const DISTINCT_TEAMS: File =
     File { path: "hosts/x1/x1.json", mode: 0o644, body: br#"{"motd":{"teams":["ops","dev"]}}"# };
+
+pub const UNSET: File = File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"origin\": {\"type\": \"string\", \"optional\": true, \"doc\": \"Where from.\"}},\n\"groups\": {\n    \"ops\": {\"from\": \"{{ settings.origin }}\"},\n    \"dev\": {\"from\": \"x{{ settings.origin }}\"}}}" };
+pub const BOOLEAN_FIELD: File = File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"enabled\": {\"type\": \"bool\", \"default\": true, \"doc\": \"Enabled.\"}},\n\"groups\": {\n    \"ops\": {\"from\": \"{{ settings.enabled }}\"}}}" };

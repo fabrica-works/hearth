@@ -7,6 +7,7 @@ publish.workspace = true
 
 [dependencies]
 hearth-protocol-template.workspace = true
+hearth-protocol-config.workspace = true
 hearth-protocol-builder.workspace = true
 skein-lib.workspace = true
 hearth-domain-render.workspace = true

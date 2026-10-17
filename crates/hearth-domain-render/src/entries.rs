@@ -65,6 +65,7 @@ pub struct Concrete {
     pub key: Box<[u8]>,
     pub at: Position,
     pub element: Option<u32>,
+    pub fields: Box<[Made]>,
 }
 fn failure(kind: FaultKind, at: Position) -> Fault {
     Fault { kind: Kind::Evaluation(kind), at, also: None }
@@ -131,7 +132,12 @@ pub fn expand(
                     return Err(Fault { kind: Kind::Collision(Collision::Key { key }), at, also: Some(*first) });
                 }
                 keys.insert(key.clone(), at).expect("entry limit checked");
-                ordered.insert(key.clone(), Concrete { key, at, element }).expect("entry limit checked");
+                ordered
+                    .insert(
+                        key.clone(),
+                        Concrete { key, at, element, fields: fields(entry, context, &bindings, limits, left)? },
+                    )
+                    .expect("entry limit checked");
             }
         }
         let mut entries = List::with_capacity(ordered.len());
@@ -310,4 +316,362 @@ pub fn interpolate<'c>(
             Ok(writer.finish())
         }
     }
+}
+
+use crate::{
+    errors::{Schema, Takes, TypeName},
+    revision::declaration::{Field, Literal, Name},
+};
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Made {
+    pub name: Name,
+    pub at: Position,
+    pub value: Fielded,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Fielded {
+    Text(Box<[u8]>),
+    Int(i64),
+    Bool(bool),
+    Strings(Box<[Box<[u8]>]>),
+    Range { base: i64, count: i64 },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Expansion {
+    pub tasks: Box<[Expanded]>,
+}
+#[derive(Clone, Copy, Debug)]
+pub struct Located<'a> {
+    pub task: &'a [u8],
+    pub entry: &'a Concrete,
+}
+impl Expansion {
+    #[must_use]
+    pub fn of(&self, map: Map) -> Box<[Located<'_>]> {
+        let mut count = 0_u32;
+        for task in &self.tasks {
+            for group in &task.groups {
+                if group.map == map {
+                    count = count.saturating_add(u32::try_from(group.entries.len()).expect("entry count"));
+                }
+            }
+        }
+        let mut entries = List::with_capacity(count);
+        for task in &self.tasks {
+            for group in &task.groups {
+                if group.map == map {
+                    for entry in &group.entries {
+                        entries.push(Located { task: &task.task, entry }).expect("entry count");
+                    }
+                }
+            }
+        }
+        entries.into_boxed()
+    }
+}
+impl Concrete {
+    fn field(&self, name: Name) -> Option<&Fielded> {
+        for field in &self.fields {
+            if field.name == name {
+                return Some(&field.value);
+            }
+        }
+        None
+    }
+    #[must_use]
+    pub fn text(&self, name: Name) -> Option<&[u8]> {
+        match self.field(name)? {
+            Fielded::Text(text) => Some(text),
+            Fielded::Int(_) | Fielded::Bool(_) | Fielded::Strings(_) | Fielded::Range { .. } => None,
+        }
+    }
+    #[must_use]
+    pub fn int(&self, name: Name) -> Option<i64> {
+        match self.field(name)? {
+            Fielded::Int(value) => Some(*value),
+            Fielded::Text(_) | Fielded::Bool(_) | Fielded::Strings(_) | Fielded::Range { .. } => None,
+        }
+    }
+    #[must_use]
+    pub fn bool(&self, name: Name) -> Option<bool> {
+        match self.field(name)? {
+            Fielded::Bool(value) => Some(*value),
+            Fielded::Text(_) | Fielded::Int(_) | Fielded::Strings(_) | Fielded::Range { .. } => None,
+        }
+    }
+    #[must_use]
+    pub fn strings(&self, name: Name) -> Option<&[Box<[u8]>]> {
+        match self.field(name)? {
+            Fielded::Strings(each) => Some(each),
+            Fielded::Text(_) | Fielded::Int(_) | Fielded::Bool(_) | Fielded::Range { .. } => None,
+        }
+    }
+    #[must_use]
+    pub fn range(&self, name: Name) -> Option<(i64, i64)> {
+        match self.field(name)? {
+            Fielded::Range { base, count } => Some((*base, *count)),
+            Fielded::Text(_) | Fielded::Int(_) | Fielded::Bool(_) | Fielded::Strings(_) => None,
+        }
+    }
+}
+fn wrong(takes: Takes, at: Position) -> Fault {
+    let expected = match takes {
+        Takes::Text => TypeName::String,
+        Takes::Int => TypeName::Int,
+        Takes::Bool => TypeName::Bool,
+        Takes::Strings => TypeName::List,
+        Takes::Range => TypeName::Object,
+    };
+    Fault { kind: Kind::Schema(Schema::Wrong { expected }), at, also: None }
+}
+fn single(text: &Interpolated) -> Option<&evaluate::Expression> {
+    match text {
+        Interpolated::Plain { at: _, text: _ } => None,
+        Interpolated::Parts { at: _, parts } => {
+            if let [evaluate::template::Instruction { at: _, does: Does::Output(expression) }] = parts.as_ref() {
+                Some(expression)
+            } else {
+                None
+            }
+        }
+    }
+}
+fn fields<'c>(
+    entry: &Entry,
+    context: &Context<'c>,
+    bindings: &Bindings<'c>,
+    limits: &Limits,
+    left: &mut u64,
+) -> Result<Box<[Made]>, Fault> {
+    let mut fields = List::with_capacity(u32::try_from(entry.fields.len()).expect("field count"));
+    for field in &entry.fields {
+        if let Some(value) = literal(&field.value, field.name.takes(), context, bindings, limits, left)? {
+            fields.push(Made { name: field.name, at: field.at, value }).expect("field count");
+        }
+    }
+    Ok(fields.into_boxed())
+}
+fn literal<'c>(
+    literal: &Literal,
+    takes: Takes,
+    context: &Context<'c>,
+    bindings: &Bindings<'c>,
+    limits: &Limits,
+    left: &mut u64,
+) -> Result<Option<Fielded>, Fault> {
+    Ok(Some(match literal {
+        Literal::Text(text) => {
+            if let Some(expression) = single(text) {
+                let value = located(
+                    evaluate::expression(
+                        &mut Evaluator::new(limits),
+                        expression,
+                        context,
+                        bindings,
+                        &mut Budget::new(limits),
+                    ),
+                    text.at(),
+                )?;
+                if value.undefined() {
+                    return Ok(None);
+                }
+            }
+            Fielded::Text(interpolate(text, context, bindings, limits, left)?)
+        }
+        Literal::Plain { at, text } => Fielded::Text(charged(text, *at, left)?),
+        Literal::Typed(text) => {
+            let expression = single(text).ok_or(wrong(takes, text.at()))?;
+            let value = located(
+                evaluate::expression(
+                    &mut Evaluator::new(limits),
+                    expression,
+                    context,
+                    bindings,
+                    &mut Budget::new(limits),
+                ),
+                text.at(),
+            )?;
+            if value.undefined() {
+                return Ok(None);
+            }
+            typed(value, takes, text.at(), left)?
+        }
+        Literal::Int(number) => Fielded::Int(number.value),
+        Literal::Bool { at: _, value } => Fielded::Bool(*value),
+        Literal::Strings { at: _, each } => {
+            let mut strings = List::with_capacity(u32::try_from(each.len()).expect("string count"));
+            for text in each {
+                strings.push(interpolate(text, context, bindings, limits, left)?).expect("string count");
+            }
+            Fielded::Strings(strings.into_boxed())
+        }
+        Literal::Range { at, fields } => range(fields, *at, context, bindings, limits, left)?,
+    }))
+}
+fn typed(value: Operand<'_>, takes: Takes, at: Position, left: &mut u64) -> Result<Fielded, Fault> {
+    match (takes, value) {
+        (Takes::Int, Operand::Int(value)) => Ok(Fielded::Int(value)),
+        (Takes::Int, Operand::Value(Value::Int(value))) => Ok(Fielded::Int(*value)),
+        (Takes::Bool, Operand::Bool(value)) => Ok(Fielded::Bool(value)),
+        (Takes::Bool, Operand::Value(Value::Bool(value))) => Ok(Fielded::Bool(*value)),
+        (Takes::Strings, Operand::Value(Value::List(each))) => {
+            let mut strings = List::with_capacity(u32::try_from(each.len()).expect("string count"));
+            for item in each {
+                let Value::String(text) = item else {
+                    return Err(wrong(takes, at));
+                };
+                strings.push(charged(text, at, left)?).expect("string count");
+            }
+            Ok(Fielded::Strings(strings.into_boxed()))
+        }
+        (Takes::Strings, Operand::List { items, depth: _ }) => {
+            let mut strings = List::with_capacity(u32::try_from(items.len()).expect("string count"));
+            for item in items {
+                let text = match &item {
+                    Operand::String(text) | Operand::Value(Value::String(text)) => text,
+                    Operand::Undefined => return Err(failure(FaultKind::Undefined, at)),
+                    Operand::Loop { .. }
+                    | Operand::Bool(_)
+                    | Operand::Int(_)
+                    | Operand::List { .. }
+                    | Operand::Value(Value::Bool(_) | Value::Int(_) | Value::List(_) | Value::Map(_)) => {
+                        return Err(wrong(takes, at));
+                    }
+                };
+                strings.push(charged(text, at, left)?).expect("string count");
+            }
+            Ok(Fielded::Strings(strings.into_boxed()))
+        }
+        (Takes::Range, Operand::Value(Value::Map(fields))) => {
+            let mut base = None;
+            let mut count = None;
+            for field in fields {
+                let Some(Value::Int(value)) = &field.value else {
+                    return Err(wrong(takes, at));
+                };
+                if field.key.as_ref() == b"base" {
+                    base = Some(*value);
+                } else if field.key.as_ref() == b"count" {
+                    count = Some(*value);
+                } else {
+                    return Err(wrong(takes, at));
+                }
+            }
+            Ok(Fielded::Range { base: base.ok_or(wrong(takes, at))?, count: count.ok_or(wrong(takes, at))? })
+        }
+        (
+            Takes::Text | Takes::Int | Takes::Bool | Takes::Strings | Takes::Range,
+            Operand::Undefined
+            | Operand::Loop { .. }
+            | Operand::Bool(_)
+            | Operand::Int(_)
+            | Operand::String(_)
+            | Operand::List { .. }
+            | Operand::Value(_),
+        ) => Err(wrong(takes, at)),
+    }
+}
+fn charged(text: &[u8], at: Position, left: &mut u64) -> Result<Box<[u8]>, Fault> {
+    *left = left.checked_sub(u64::try_from(text.len()).expect("bounded text")).ok_or(failure(FaultKind::Limit, at))?;
+    Ok(bytes::copy_of(text))
+}
+fn range<'c>(
+    fields: &[Field],
+    at: Position,
+    context: &Context<'c>,
+    bindings: &Bindings<'c>,
+    limits: &Limits,
+    left: &mut u64,
+) -> Result<Fielded, Fault> {
+    let mut base = None;
+    let mut count = None;
+    for field in fields {
+        let value = match &field.value {
+            Literal::Int(number) => number.value,
+            Literal::Typed(text) => {
+                let expression = single(text).ok_or(wrong(Takes::Int, text.at()))?;
+                let value = located(
+                    evaluate::expression(
+                        &mut Evaluator::new(limits),
+                        expression,
+                        context,
+                        bindings,
+                        &mut Budget::new(limits),
+                    ),
+                    text.at(),
+                )?;
+                if value.undefined() {
+                    return Err(failure(FaultKind::Undefined, text.at()));
+                }
+                let Fielded::Int(value) = typed(value, Takes::Int, text.at(), left)? else {
+                    unreachable!("integer type");
+                };
+                value
+            }
+            Literal::Text(_)
+            | Literal::Plain { .. }
+            | Literal::Bool { .. }
+            | Literal::Strings { .. }
+            | Literal::Range { .. } => return Err(wrong(Takes::Int, field.at)),
+        };
+        match field.name {
+            Name::Base => base = Some(value),
+            Name::Count => count = Some(value),
+            Name::Action
+            | Name::Age
+            | Name::Algorithm
+            | Name::Argument
+            | Name::Class
+            | Name::Component
+            | Name::Copy
+            | Name::Directory
+            | Name::From
+            | Name::Gecos
+            | Name::Gid
+            | Name::Group
+            | Name::Groups
+            | Name::Home
+            | Name::Kind
+            | Name::Link
+            | Name::Mode
+            | Name::Order
+            | Name::Owner
+            | Name::Param
+            | Name::Password
+            | Name::Path
+            | Name::Paths
+            | Name::PublicPath
+            | Name::Sha256
+            | Name::Shell
+            | Name::Strip
+            | Name::Subordinate
+            | Name::Template
+            | Name::Type
+            | Name::Uid
+            | Name::Unit
+            | Name::Unpack
+            | Name::Url
+            | Name::Value => unreachable!("compiled range names"),
+        }
+    }
+    Ok(Fielded::Range { base: base.ok_or(wrong(Takes::Range, at))?, count: count.ok_or(wrong(Takes::Range, at))? })
+}
+
+/// The evaluator, bindings, collision index and expanded task at these bounds.
+/// Empty strings still need list slots; their source is bounded by decoded or made input.
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    let count = u64::from(limits.expansion);
+    let fields = count.checked_mul(37)?;
+    let input = limits.validated.checked_add(limits.made)?.checked_add(u64::from(limits.document))?;
+    evaluate::worst_case(limits)?
+        .checked_add(List::<Binding<'_>>::worst_case(2)?)?
+        .checked_add(Keys::<Box<[u8]>, Position>::worst_case(limits.expansion)?)?
+        .checked_add(Keys::<Box<[u8]>, Concrete>::worst_case(limits.expansion)?)?
+        .checked_add(List::<Concrete>::worst_case(limits.expansion)?)?
+        .checked_add(List::<Group>::worst_case(14)?)?
+        .checked_add(fields.checked_mul(u64::try_from(size_of::<Made>()).ok()?)?)?
+        .checked_add(fields.checked_mul(input)?)?
+        .checked_add(limits.expanded.checked_mul(4)?)?
+        .checked_add(List::<Operand<'_>>::worst_case(limits.document)?)
 }

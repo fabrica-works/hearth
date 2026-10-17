@@ -554,3 +554,6 @@ fn path(value: &Value, filter: Filter) -> Result<Vec<u8>, &'static str> {
 
 mod templates;
 pub use templates::run;
+
+mod entries;
+pub use entries::expand;

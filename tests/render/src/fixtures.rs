@@ -85,7 +85,13 @@ pub fn limits(rng: &mut Rng) -> Limits {
     if rng.below(4) != 0 {
         SHIPPED
     } else {
-        Limits { made: rng.between(16, 4096), nesting: u32::try_from(rng.between(1, 8)).expect("small"), ..SHIPPED }
+        Limits {
+            made: rng.between(16, 4096),
+            nesting: u32::try_from(rng.between(1, 8)).expect("small"),
+            expansion: u32::try_from(rng.between(1, 16)).expect("small"),
+            expanded: rng.between(16, 4096),
+            ..SHIPPED
+        }
     }
 }
 #[must_use]
@@ -465,4 +471,21 @@ pub fn templates_at_the_limits() -> [(hearth_domain_render::evaluate::template::
             (hearth_protocol_builder::translate::instructions::template(compiled), what)
         },
     )
+}
+
+pub const EXPANSION_LIMITS: Limits = Limits { expansion: 4096, ..SHIPPED };
+#[must_use]
+pub fn entries_at_the_limits() -> [(hearth_domain_render::revision::declaration::Declaration, &'static str); 2] {
+    [
+        (
+            crate::declarations::decode(br#"{"groups":{"{{ key }}":{"for_each":"settings.large","from":"x"}}}"#),
+            "entry count",
+        ),
+        (
+            crate::declarations::decode(
+                br#"{"groups":{"{{ key }}":{"for_each":"settings.large","from":"{{ settings.text }}"}}}"#,
+            ),
+            "expanded bytes",
+        ),
+    ]
 }
