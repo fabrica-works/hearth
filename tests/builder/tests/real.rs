@@ -361,3 +361,22 @@ fn a_template_that_does_not_compile_leaves_its_target_out() {
     );
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
+
+#[test]
+fn the_diffs_errors_follow_its_changes_and_precede_the_outcome() {
+    let repository = Repository::make("diff-error-order", fixtures::MOTD);
+    let from = repository.head();
+    let to = repository.next(&[fixtures::MOTD_KIND, fixtures::BAD_ION_LAB], &[]);
+    let asked = fixtures::Asked { form: Form::JsonLines, ..fixtures::Asked::new(&from, &to) };
+    let rendered = fixtures::diff(&repository, &asked);
+    let stdout = std::str::from_utf8(&rendered.stdout).expect("JSON text");
+    let mut lines = stdout.lines();
+    assert_eq!(lines.next_back().and_then(|line| line.split(',').next()), Some("{\"record\":\"outcome\""));
+    assert_eq!(
+        lines.next_back(),
+        Some(
+            "{\"record\":\"error\",\"side\":\"to\",\"kind\":\"decode\",\"decode\":\"unexpected\",\"class\":\"configuration\",\"at\":{\"column\":2,\"line\":1,\"path\":\"hosts/ion/ion-lab.json\"}}"
+        )
+    );
+    assert_eq!(lines.filter(|line| line.starts_with("{\"record\":\"change\"")).count(), 4);
+}

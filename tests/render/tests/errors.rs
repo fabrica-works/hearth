@@ -25,6 +25,7 @@ fn a_broken_document_answers_one_error_and_spares_other_targets() {
         assert_eq!(
             error,
             &Error {
+                side: None,
                 kind: Kind::Decode(Decode::Unexpected),
                 class: Class::Configuration,
                 at: Some(Place {
@@ -63,6 +64,7 @@ fn a_broken_task_json_no_target_has_prints_once_and_fails_nothing() {
         assert_eq!(
             error,
             &Error {
+                side: None,
                 kind: Kind::Decode(Decode::Declaration(hearth_domain_render::errors::Declared::Unknown {
                     of: hearth_domain_render::errors::Object::Declaration
                 })),

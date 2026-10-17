@@ -5,6 +5,7 @@ use alloc::boxed::Box;
 use skein_json::writer::Encoder;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Error {
+    pub side: Option<crate::diff::Side>,
     pub kind: Kind,
     pub class: Class,
     pub at: Option<Place>,
@@ -43,6 +44,10 @@ pub struct Position {
 }
 impl Error {
     pub(crate) fn text(&self, lines: &mut Lines) {
+        if let Some(side) = self.side {
+            lines.put(side.name());
+            lines.put(b": ");
+        }
         if let Some(at) = &self.at {
             at.text(lines);
             lines.put(b": ");
@@ -84,6 +89,9 @@ impl Error {
     }
     pub(crate) fn json(&self, json: &mut Encoder) {
         field(json, b"record", b"error");
+        if let Some(side) = self.side {
+            field(json, b"side", side.name());
+        }
         match &self.kind {
             Kind::Store(error) => {
                 field(json, b"kind", b"store");

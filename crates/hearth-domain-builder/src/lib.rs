@@ -244,6 +244,7 @@ fn store_error(builder: &mut Builder, answer: &store::vocabulary::Answer, out: &
     };
     builder.store_error = true;
     out.push(Request::Answer(vocabulary::Answer::Error(Error {
+        side: None,
         kind: Kind::Store(StoreError { store: Box::new([]), fault }),
         class: render::vocabulary::Class::Operational,
         at: None,

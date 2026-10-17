@@ -75,7 +75,7 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
         }
         Event::Failed { request, class, at, failure } => {
             if request == Token::new(3) {
-                render.call.as_mut().expect("active call").hunks(None);
+                render.call.as_mut().expect("active call").hunk_failure(class, failure);
                 return;
             }
             let side = &mut render.call.as_mut().expect("active call").side;
@@ -88,7 +88,10 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             };
             if let Some(kind) = kind {
                 let at = failure_place(at);
-                errors::push(&mut side.errors, errors::Error { kind, class, at, also: None, target: None, task: None });
+                errors::push(
+                    &mut side.errors,
+                    errors::Error { side: None, kind, class, at, also: None, target: None, task: None },
+                );
             }
             let outcome = match class {
                 Class::Configuration => Outcome::Failed,

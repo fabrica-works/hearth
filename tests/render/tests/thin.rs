@@ -32,6 +32,7 @@ fn a_base_env_without_its_environment_is_a_repository_error() {
         assert_eq!(
             only(&run.answers),
             &Answer::Error(hearth_domain_render::errors::Error {
+                side: None,
                 kind: hearth_domain_render::errors::Kind::Repository(
                     hearth_domain_render::errors::Repository::Environment { env: Box::from(b"prod".as_slice()) }
                 ),
@@ -184,6 +185,7 @@ fn a_submodule_under_a_present_tasks_tree_fails_its_target() {
     assert_eq!(
         only(&run.answers),
         &Answer::Error(hearth_domain_render::errors::Error {
+            side: None,
             kind: hearth_domain_render::errors::Kind::Repository(hearth_domain_render::errors::Repository::Submodule),
             class: hearth_domain_render::vocabulary::Class::Configuration,
             at: Some(hearth_domain_render::errors::Place {

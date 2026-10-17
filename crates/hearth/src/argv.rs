@@ -21,9 +21,21 @@ pub fn invocation(
 ) -> Result<Invocation, Startup> {
     let mut words = args.iter();
     let command = words.next().map_or(OsStr::new(""), OsString::as_os_str);
-    if command != "render" {
+    if command != "render" && command != "diff" {
         return Err(usage(Misuse::Command, command));
     }
+    let diff = command == "diff";
+    let pair = if diff {
+        let from = words.next().ok_or_else(|| usage(Misuse::Value, command))?;
+        let to = words.next().ok_or_else(|| usage(Misuse::Value, command))?;
+        for revision in [from, to] {
+            hearth_protocol_git::invocation::revision(revision.as_bytes())
+                .map_err(|_| usage(Misuse::Revision, revision))?;
+        }
+        Some((from, to))
+    } else {
+        None
+    };
     let mut revision = OsStr::new("HEAD");
     let mut repository = None;
     let mut store = None;
@@ -31,16 +43,25 @@ pub fn invocation(
     while let Some(word) = words.next() {
         match word.as_bytes() {
             b"--json" => {}
-            b"--at" | b"--repo" | b"--store" => {
+            b"--at" | b"--repo" | b"--store" | b"--target" => {
+                if (diff && word == "--at") || (!diff && word == "--target") {
+                    return Err(usage(Misuse::Option, word));
+                }
                 let value = words.next().ok_or_else(|| usage(Misuse::Value, word))?;
                 match word.as_bytes() {
                     b"--at" => revision = value,
                     b"--repo" => repository = Some(Path::new(value)),
+                    b"--target" => targets.push(Box::<[u8]>::from(value.as_bytes())),
                     _ => store = Some(PathBuf::from(value)),
                 }
             }
             bytes if bytes.starts_with(b"-") => return Err(usage(Misuse::Option, word)),
-            bytes => targets.push(Box::<[u8]>::from(bytes)),
+            bytes => {
+                if diff {
+                    return Err(usage(Misuse::Option, word));
+                }
+                targets.push(Box::<[u8]>::from(bytes));
+            }
         }
     }
     hearth_protocol_git::invocation::revision(revision.as_bytes()).map_err(|_| usage(Misuse::Revision, revision))?;
@@ -49,10 +70,19 @@ pub fn invocation(
         .ok_or_else(|| unopened(Opened::Store, None, "neither XDG_CACHE_HOME nor HOME is absolute"))?;
     let repository = repository_path(repository, cwd)?;
     Ok(Invocation {
-        call: Call::Render {
-            repository: repository.as_os_str().as_bytes().into(),
-            revision: revision.as_bytes().into(),
-            targets: targets.into_boxed_slice(),
+        call: if let Some((from, to)) = pair {
+            Call::Diff {
+                repository: repository.as_os_str().as_bytes().into(),
+                from: from.as_bytes().into(),
+                to: to.as_bytes().into(),
+                targets: targets.into_boxed_slice(),
+            }
+        } else {
+            Call::Render {
+                repository: repository.as_os_str().as_bytes().into(),
+                revision: revision.as_bytes().into(),
+                targets: targets.into_boxed_slice(),
+            }
         },
         form: form(args),
         store: cwd.join(store),

@@ -21,3 +21,20 @@ fn end_to_end_render() {
         assert_eq!(fs::metadata(xdg.join(made)).expect("made").permissions().mode() & 0o7777, 0o700, "3.5: {made}");
     }
 }
+
+#[test]
+fn end_to_end_diff() {
+    let repository = Repository::make("end-to-end-diff", fixtures::MOTD);
+    let from = repository.head();
+    let to = repository.next(&[fixtures::MOTD_KIND], &[]);
+    let xdg = repository.scratch().path().join("xdg");
+    let environment = [("XDG_CACHE_HOME", xdg.as_os_str()), ("HOME", repository.scratch().path().as_os_str())];
+    let ended = fixtures::binary(
+        env!("CARGO_BIN_EXE_hearth").as_ref(),
+        &["diff".as_ref(), std::ffi::OsStr::new(&from), std::ffi::OsStr::new(&to)],
+        &environment,
+        repository.work_tree(),
+    );
+    assert_eq!(String::from_utf8_lossy(&ended.stdout), fixtures::MOTD_DIFF_TEXT);
+    assert_eq!(ended.exit, Some(Exit::Code(1)), "stderr: {}", String::from_utf8_lossy(&ended.stderr));
+}

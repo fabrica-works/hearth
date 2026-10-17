@@ -29,7 +29,7 @@ fn render_s_options_become_the_call_and_its_form() {
 }
 const MISUSES: &[(&[&str], Misuse, &[u8])] = &[
     (&["bogus"], Misuse::Command, b"bogus"),
-    (&["diff"], Misuse::Command, b"diff"),
+    (&["diff"], Misuse::Value, b"diff"),
     (&["render", "--resolve"], Misuse::Option, b"--resolve"),
     (&["render", "--bogus"], Misuse::Option, b"--bogus"),
     (&["render", "--at"], Misuse::Value, b"--at"),
@@ -130,4 +130,38 @@ fn the_revision_defaults_to_head() {
             .expect("invocation");
     let Call::Render { revision, .. } = invocation.call else { panic!("render call") };
     assert_eq!(&*revision, b"HEAD", "default revision");
+}
+
+#[test]
+fn diffs_revisions_and_each_target_become_the_call() {
+    let invocation = argv::invocation(
+        &words(&[
+            "diff", "main", "HEAD", "--target", "x1-prod", "--target", "x2-prod", "--repo", "/", "--store", "/store",
+        ]),
+        None,
+        None,
+        Path::new("/"),
+    )
+    .expect("diff");
+    assert_eq!(
+        invocation.call,
+        Call::Diff {
+            repository: b"/".as_slice().into(),
+            from: b"main".as_slice().into(),
+            to: b"HEAD".as_slice().into(),
+            targets: Box::new([b"x1-prod".as_slice().into(), b"x2-prod".as_slice().into()]),
+        }
+    );
+}
+const BAD_DIFF_REVISIONS: &[(&[&str], &[u8])] =
+    &[(&["diff", "-bad", "HEAD"], b"-bad"), (&["diff", "HEAD", "bad ref"], b"bad ref")];
+#[test]
+fn a_malformed_from_or_to_is_usage_before_the_loop() {
+    for &(args, revision) in BAD_DIFF_REVISIONS {
+        assert_eq!(
+            argv::invocation(&words(args), None, None, Path::new("/")),
+            Err(Startup::Usage { misuse: Misuse::Revision, word: revision.into() }),
+            "{args:?}"
+        );
+    }
 }

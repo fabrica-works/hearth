@@ -117,6 +117,7 @@ pub fn tally(targets: u32, changed: u32, unchanged: u32) -> crate::diff::Tally {
 pub fn modules_guard() -> crate::errors::Error {
     use crate::errors::{Class, Error, Guard, Kind, Place, Position};
     Error {
+        side: None,
         kind: Kind::Guard(Guard {
             name: copy_of(b"modules"),
             message: copy_of(b"no initramfs modules for this hardware"),
@@ -132,6 +133,7 @@ pub fn modules_guard() -> crate::errors::Error {
 pub fn duplicate() -> crate::errors::Error {
     use crate::errors::{Class, Decode, Error, Kind, Place, Position};
     Error {
+        side: None,
         kind: Kind::Decode(Decode::Duplicate { key: copy_of(b"motd") }),
         class: Class::Configuration,
         at: Some(Place { path: copy_of(b"envs/lab.json"), position: Some(Position { line: 1, column: 14 }) }),
@@ -189,6 +191,7 @@ fn schema_names(names: &[&[u8]]) -> Box<[Box<[u8]>]> {
 pub fn git_failure(command: crate::errors::Command, code: u8) -> crate::errors::Error {
     use crate::errors::{Class, Ended, Error, Kind, Tool};
     Error {
+        side: None,
         kind: Kind::Tool(Tool {
             command,
             ended: Ended::Exit(code),
@@ -237,4 +240,38 @@ pub fn syntax_error(syntax: crate::errors::Syntax) -> crate::errors::Error {
         position: Some(crate::errors::Position { line: 2, column: 1 }),
     });
     error
+}
+#[must_use]
+pub fn meta_changes() -> [crate::diff::MetaChange; 2] {
+    use crate::{
+        diff::{MetaChange, Pair},
+        parts::meta::{Firmware, Placement, PlacementKind},
+    };
+    [
+        MetaChange {
+            base: Some(Pair { before: b"x1".as_slice().into(), after: b"x2".as_slice().into() }),
+            member: Some(Pair { before: None, after: Some(b"a".as_slice().into()) }),
+            environment: Some(Pair { before: b"prod".as_slice().into(), after: b"lab".as_slice().into() }),
+            placement: Some(Pair {
+                before: Placement {
+                    kind: PlacementKind::Metal,
+                    firmware: Some(Firmware::Efi),
+                    hardware: None,
+                    on: None,
+                },
+                after: Placement {
+                    kind: PlacementKind::Container,
+                    firmware: None,
+                    hardware: None,
+                    on: Some(b"host-prod".as_slice().into()),
+                },
+            }),
+        },
+        MetaChange {
+            base: None,
+            member: Some(Pair { before: Some(b"a".as_slice().into()), after: None }),
+            environment: None,
+            placement: None,
+        },
+    ]
 }

@@ -254,23 +254,11 @@ fn each_decode_limit_translates_and_back() {
 }
 #[test]
 fn a_decode_error_translates_each_place_and_scope() {
-    let error = render_errors::Error {
-        kind: render_errors::Kind::Decode(render_errors::Decode::Duplicate { key: skein_lib::bytes::copy_of(b"a") }),
-        class: render::vocabulary::Class::Configuration,
-        at: Some(render_errors::Place {
-            path: skein_lib::bytes::copy_of(b"tasks/motd/task.json"),
-            position: Some(target::Position { line: 1, column: 10 }),
-        }),
-        also: Some(render_errors::Place {
-            path: skein_lib::bytes::copy_of(b"tasks/motd/task.json"),
-            position: Some(target::Position { line: 1, column: 2 }),
-        }),
-        target: None,
-        task: Some(skein_lib::bytes::copy_of(b"motd")),
-    };
+    let error = crate::tests::fixtures::decode_error();
     assert_eq!(
         crate::translate::errors::error(error),
         record_errors::Error {
+            side: None,
             kind: record_errors::Kind::Decode(record_errors::Decode::Duplicate {
                 key: skein_lib::bytes::copy_of(b"a")
             }),

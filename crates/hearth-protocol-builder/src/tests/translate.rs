@@ -392,6 +392,9 @@ fn change_back(change: client_diff::TargetChange) -> diff::TargetChange {
             let mut translated = skein_lib::List::with_capacity(u32::try_from(parts.len()).expect("bounded parts"));
             for part in parts {
                 match part {
+                    client_diff::PartChange::Meta(meta) => {
+                        translated.push(diff::PartChange::Meta(meta::back(meta))).expect("parts");
+                    }
                     client_diff::PartChange::Config(client_diff::ConfigChange { tree }) => {
                         let mut entries =
                             skein_lib::List::with_capacity(u32::try_from(tree.len()).expect("bounded tree"));
@@ -782,3 +785,4 @@ mod repository;
 mod store_arrivals;
 
 mod instructions;
+mod meta;

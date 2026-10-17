@@ -231,6 +231,7 @@ const DECLARATION_LINES: &[(crate::errors::Declared, &str)] = &[
 fn a_declaration_fault_prints_its_object_after_its_place() {
     for (row, (declared, line)) in DECLARATION_LINES.iter().enumerate() {
         let record = Record::Error(crate::errors::Error {
+            side: None,
             kind: crate::errors::Kind::Decode(crate::errors::Decode::Declaration(*declared)),
             class: crate::errors::Class::Configuration,
             at: Some(Place { path: copy_of(b"tasks/motd/task.json"), position: Some(Position { line: 1, column: 2 }) }),
@@ -244,6 +245,7 @@ fn a_declaration_fault_prints_its_object_after_its_place() {
 #[test]
 fn a_declaration_fault_prints_its_json_fields() {
     let record = Record::Error(crate::errors::Error {
+        side: None,
         kind: crate::errors::Kind::Decode(crate::errors::Decode::Declaration(crate::errors::Declared::Unknown {
             of: crate::errors::Object::Declaration,
         })),
@@ -378,6 +380,7 @@ const SCHEMA_JSON: &[(fixtures::SchemaInput, &str)] = &[
 fn each_schema_fault_prints_its_json_fields() {
     for (row, &(input, line)) in SCHEMA_JSON.iter().enumerate() {
         let record = Record::Error(crate::errors::Error {
+            side: None,
             kind: crate::errors::Kind::Schema(fixtures::schema_fault(input)),
             class: crate::errors::Class::Configuration,
             at: None,
@@ -461,4 +464,16 @@ fn a_syntax_error_prints_its_path_task_and_message() {
 #[test]
 fn a_syntax_error_prints_its_json_kind_and_fault() {
     assert_eq!(form::print(Form::JsonLines, &Record::Error(fixtures::syntax_error(crate::errors::Syntax::Unclosed)), Some(Type::Spec), &limits::SHIPPED).as_deref(), Ok(b"{\"record\":\"error\",\"kind\":\"decode\",\"decode\":{\"kind\":\"syntax\",\"fault\":\"unclosed\"},\"class\":\"configuration\",\"at\":{\"column\":1,\"line\":2,\"path\":\"tasks/motd/tree/etc/issue.j2\"},\"task\":\"motd\"}\n".as_slice()));
+}
+const DIFF_ERROR_TEXT: &[(crate::diff::Side, &str)] = &[
+    (crate::diff::Side::From, "from: envs/lab.json:1:14: duplicate key \"motd\" (envs/lab.json:1:2)\n"),
+    (crate::diff::Side::To, "to: envs/lab.json:1:14: duplicate key \"motd\" (envs/lab.json:1:2)\n"),
+];
+#[test]
+fn a_diff_error_leads_its_line_with_the_revision_side() {
+    for (row, &(side, expected)) in DIFF_ERROR_TEXT.iter().enumerate() {
+        let mut error = fixtures::duplicate();
+        error.side = Some(side);
+        assert_eq!(print(&Record::Error(error)).as_deref(), Ok(expected.as_bytes()), "row {row}: error prefix");
+    }
 }

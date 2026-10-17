@@ -16,6 +16,7 @@ fn a_refused_document_s_error_names_its_path_and_position() {
     assert_eq!(
         fixtures::kept(&call).as_ref(),
         &[Error {
+            side: None,
             kind: Kind::Decode(Decode::Unexpected),
             class: Class::Configuration,
             at: Some(Place { path: copy_of(b"envs/prod.json"), position: Some(Position { line: 2, column: 3 }) }),
@@ -59,6 +60,7 @@ fn errors_follow_the_last_spec_and_precede_rendered() {
     assert_eq!(
         call.answer(),
         Answer::Error(Error {
+            side: None,
             kind: Kind::Decode(Decode::Unexpected),
             class: Class::Configuration,
             at: Some(Place { path: copy_of(b"envs/lab.json"), position: None }),
@@ -77,6 +79,7 @@ fn a_document_past_its_limit_errs_at_its_path_and_fails_its_targets() {
     assert_eq!(
         call.answer(),
         Answer::Error(Error {
+            side: None,
             kind: Kind::Decode(Decode::TooLarge { limit: Limit::Document, max: 16 }),
             class: Class::Configuration,
             at: Some(Place { path: copy_of(b"envs/prod.json"), position: None }),
@@ -93,6 +96,7 @@ fn the_budget_s_error_names_the_path_that_passed_it() {
     assert_eq!(
         fixtures::kept(&call).as_ref(),
         &[Error {
+            side: None,
             kind: Kind::Decode(Decode::TooLarge { limit: Limit::Decoded, max: 64 }),
             class: Class::Configuration,
             at: Some(Place { path: copy_of(b"hosts/x1/x1.json"), position: None }),
@@ -127,6 +131,7 @@ fn a_static_file_past_its_limit_errs_and_no_read_asks_it() {
     assert_eq!(
         call.answer(),
         Answer::Error(Error {
+            side: None,
             kind: Kind::Decode(Decode::TooLarge { limit: Limit::Static, max: 8 }),
             class: Class::Configuration,
             at: Some(Place { path: copy_of(b"tasks/motd/tree/etc/motd"), position: None }),

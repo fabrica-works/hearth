@@ -32,6 +32,7 @@ pub enum Made {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PartChange {
+    Meta(crate::parts::meta::Change),
     Config(config::Change),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -93,7 +94,10 @@ pub fn compare(from: Option<&Made>, to: Option<&Made>, resolution: Needs) -> Tar
             }
             let from = config_part(before);
             let to = config_part(after);
-            let mut parts = skein_lib::List::with_capacity(1);
+            let mut parts = skein_lib::List::with_capacity(2);
+            if let Some(meta) = crate::parts::meta::change(&before.meta, &after.meta) {
+                parts.push(PartChange::Meta(meta)).expect("one meta change");
+            }
             let mut layers = skein_lib::List::with_capacity(1);
             let changed = match (from, to) {
                 (Some((old, _)), Some((new, _))) => old != new,
@@ -152,6 +156,7 @@ pub(crate) fn tree(change: &mut TargetChange) -> &mut [config::EntryChange] {
         for part in parts {
             match part {
                 PartChange::Config(config) => tree = &mut config.tree,
+                PartChange::Meta(_) => {}
             }
         }
     }

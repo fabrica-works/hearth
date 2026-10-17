@@ -166,6 +166,7 @@ fn a_full_store_is_answered_once_before_renders_answers() {
     assert_eq!(
         out.pop(),
         Some(Request::Answer(Answer::Error(Error {
+            side: None,
             kind: Kind::Store(StoreError {
                 store: Box::new([]),
                 fault: StoreFault::Full { limit: StoreLimit::CacheFiles, most: 2 }

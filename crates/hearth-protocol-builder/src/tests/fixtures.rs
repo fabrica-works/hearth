@@ -680,3 +680,54 @@ pub fn every_syntax() -> [hearth_protocol_template::error::ErrorKind; 19] {
         E::Arity { filter: hearth_protocol_template::Filter::Join, given: 2 },
     ]
 }
+
+#[must_use]
+pub fn meta_changes() -> [render::parts::meta::Change; 2] {
+    use crate::render::{
+        parts::meta::{Change, Pair, Placement},
+        revision::{Firmware, Runs},
+    };
+    [
+        Change {
+            base: Some(Pair { before: b"x1".as_slice().into(), after: b"x2".as_slice().into() }),
+            member: Some(Pair { before: None, after: Some(b"a".as_slice().into()) }),
+            environment: Some(Pair { before: b"lab".as_slice().into(), after: b"prod".as_slice().into() }),
+            placement: Some(Pair {
+                before: Placement { kind: Runs::Metal, firmware: Some(Firmware::Efi), hardware: None, on: None },
+                after: Placement {
+                    kind: Runs::Container,
+                    firmware: None,
+                    hardware: None,
+                    on: Some(b"x1-prod".as_slice().into()),
+                },
+            }),
+        },
+        Change {
+            base: None,
+            member: Some(Pair { before: Some(b"a".as_slice().into()), after: None }),
+            environment: None,
+            placement: None,
+        },
+    ]
+}
+
+#[must_use]
+pub fn decode_error() -> render::errors::Error {
+    use render::errors as render_errors;
+    use render::revision as target;
+    render_errors::Error {
+        side: None,
+        kind: render_errors::Kind::Decode(render_errors::Decode::Duplicate { key: bytes::copy_of(b"a") }),
+        class: render::vocabulary::Class::Configuration,
+        at: Some(render_errors::Place {
+            path: bytes::copy_of(b"tasks/motd/task.json"),
+            position: Some(target::Position { line: 1, column: 10 }),
+        }),
+        also: Some(render_errors::Place {
+            path: bytes::copy_of(b"tasks/motd/task.json"),
+            position: Some(target::Position { line: 1, column: 2 }),
+        }),
+        target: None,
+        task: Some(bytes::copy_of(b"motd")),
+    }
+}

@@ -153,6 +153,7 @@ fn terminal(targets: u32, changed: u32, unchanged: u32) -> Record {
 fn hunks(value: &mut Change) -> &mut Hunks {
     match &mut value.change {
         TargetChange::Changed { parts, .. } => match parts.first_mut().expect("config part") {
+            PartChange::Meta(_) => panic!("config change"),
             PartChange::Config(config) => match config.tree.first_mut().expect("file change") {
                 EntryChange::Changed { hunks, .. } => hunks.as_mut().expect("fixture hunks"),
                 EntryChange::Added { .. } | EntryChange::Removed { .. } => unreachable!("changed file fixture"),
@@ -187,6 +188,45 @@ fn a_line_without_a_final_newline_prints_as_text_and_as_no_newline_json() {
             form::print(*format, &Record::Change(change), Some(Type::Change), &limits::SHIPPED).as_deref(),
             Ok(expected.as_bytes()),
             "{format:?}"
+        );
+    }
+}
+
+const META_TEXT: &[&str] = &[
+    "ion-prod                                            nothing to build\n  meta     ~ base  x1 → x2\n  meta     ~ member  none → a\n  meta     ~ environment  prod → lab\n  meta     ~ placement  metal efi → container on host-prod\n",
+    "ion-prod                                            nothing to build\n  meta     ~ member  a → none\n",
+];
+#[test]
+fn a_meta_change_prints_each_moved_field_before_and_after() {
+    for (row, (meta, expected)) in fixtures::meta_changes().into_iter().zip(META_TEXT).enumerate() {
+        let record = change(
+            b"ion-prod",
+            TargetChange::Changed { parts: Box::new([PartChange::Meta(meta)]), rebuild: Rebuild::Nothing },
+        );
+        assert_eq!(text(&record).as_deref(), Ok(expected.as_bytes()), "row {row}: meta text");
+    }
+}
+const META_JSON: &[&str] = &[
+    concat!(
+        r#"{"record":"change","target":"ion-prod","kind":"changed","changed":{"parts":[{"kind":"meta","base":{"before":"x1","after":"x2"},"member":{"before":null,"after":"a"},"environment":{"before":"prod","after":"lab"},"placement":{"before":{"firmware":"efi","kind":"metal"},"after":{"kind":"container","on":"host-prod"}}}],"rebuild":{"kind":"nothing"}}}"#,
+        "\n"
+    ),
+    concat!(
+        r#"{"record":"change","target":"ion-prod","kind":"changed","changed":{"parts":[{"kind":"meta","member":{"before":"a","after":null}}],"rebuild":{"kind":"nothing"}}}"#,
+        "\n"
+    ),
+];
+#[test]
+fn meta_json_keeps_each_before_and_after_and_omits_unchanged_fields() {
+    for (row, (meta, expected)) in fixtures::meta_changes().into_iter().zip(META_JSON).enumerate() {
+        let record = change(
+            b"ion-prod",
+            TargetChange::Changed { parts: Box::new([PartChange::Meta(meta)]), rebuild: Rebuild::Nothing },
+        );
+        assert_eq!(
+            form::print(Form::JsonLines, &record, Some(Type::Change), &limits::SHIPPED).as_deref(),
+            Ok(expected.as_bytes()),
+            "row {row}: meta JSON"
         );
     }
 }

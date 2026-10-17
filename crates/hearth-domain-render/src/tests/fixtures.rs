@@ -725,3 +725,45 @@ pub fn shared_template_call() -> crate::call::Side {
     call.entries = entries.into_boxed();
     call
 }
+
+pub fn finish_render(
+    render: &mut crate::Render,
+    env: &skein_lib::Env<limits::Limits>,
+    out: &mut skein_lib::Queue<crate::vocabulary::Output>,
+) -> Box<[crate::vocabulary::Answer]> {
+    let mut answers = skein_lib::List::with_capacity(env.limits.errors.saturating_add(10));
+    for _ in 0..env.limits.errors.saturating_add(20) {
+        if !render.work_pending() {
+            break;
+        }
+        crate::resume(render, env, out);
+        if let Some(crate::vocabulary::Output::Answer(answer)) = out.pop() {
+            answers.push(answer).expect("answer capacity");
+        }
+    }
+    answers.into_boxed()
+}
+pub fn failed_diff(bound: u32, count: u32) -> Box<[crate::vocabulary::Answer]> {
+    use crate::{
+        call::Call,
+        diff::Made,
+        vocabulary::{Class, Output},
+    };
+    let limits = limits_with_errors(bound);
+    let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits };
+    let mut call = Call::diff(bytes::copy_of(b"/repo"), Box::new([]), bytes::copy_of(b"after"), &limits);
+    let mut out = skein_lib::Queue::<Output>::with_capacity(1);
+    for commit in [b"a", b"b"] {
+        call.side.files = true;
+        call.side.ready = true;
+        call.side.commit = Some(crate::revision::Oid(bytes::copy_of(commit)));
+        call.side.made = skein_lib::Map::with_capacity(1);
+        call.side.made.insert(bytes::copy_of(b"x1-prod"), Made::Failed(Class::Configuration)).expect("target");
+        for _ in 0..count {
+            call.side.errors.push(error_at(b"fleet.json", 1, 1, b"x1-prod"));
+        }
+        call.resume(limits, &mut out);
+        drop(out.pop());
+    }
+    finish_render(&mut crate::Render { call: Some(call) }, &env, &mut out)
+}

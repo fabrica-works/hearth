@@ -252,6 +252,7 @@ impl Side {
             errors::push(
                 &mut self.errors,
                 errors::Error {
+                    side: None,
                     kind: errors::Kind::Schema(fault.schema.clone()),
                     class: crate::vocabulary::Class::Configuration,
                     at: Some(errors::Place {
@@ -510,7 +511,9 @@ impl Side {
                 parts,
             });
         }
-        if let Some(error) = self.errors.get(self.error_next) {
+        if !self.diff
+            && let Some(error) = self.errors.get(self.error_next)
+        {
             self.error_next = self.error_next.saturating_add(1);
             return Answer::Error(error.clone());
         }
@@ -556,6 +559,7 @@ impl Call {
     pub fn diff(repository: Box<[u8]>, names: Box<[Box<[u8]>]>, to: Box<[u8]>, limits: &Limits) -> Self {
         let mut call = Self::new(repository, names, limits);
         call.side.diff = true;
+        call.side.errors.side(crate::diff::Side::From);
         call.diff = Some(Comparison {
             revision: Some(to),
             from: None,
@@ -568,6 +572,21 @@ impl Call {
             left_out: call.side.errors.left_out(),
         });
         call
+    }
+    pub fn hunk_failure(&mut self, class: crate::vocabulary::Class, failure: crate::vocabulary::Failure) {
+        let target = self.diff.as_ref().expect("diff").pending.as_ref().expect("change").target.clone();
+        if let crate::vocabulary::Failure::Tool(tool) = failure {
+            self.side.errors.push(errors::Error {
+                side: None,
+                kind: errors::Kind::Tool(tool),
+                class,
+                at: None,
+                also: None,
+                target: Some(target),
+                task: None,
+            });
+        }
+        self.hunks(None);
     }
     pub fn hunks(&mut self, hunks: Option<crate::diff::Hunks>) {
         let diff = self.diff.as_mut().expect("diff hunks");
@@ -609,7 +628,7 @@ impl Call {
                 }
                 Answer::Rendered { outcome, diff: _, left_out } => {
                     diff.outcome = diff.outcome.worst(outcome);
-                    diff.left_out = diff.left_out.saturating_add(left_out);
+                    diff.left_out = left_out;
                 }
                 Answer::Error(error) => {
                     out.push(Output::Answer(Answer::Error(error)));
@@ -618,14 +637,16 @@ impl Call {
                 Answer::Change(_) => unreachable!("a side renders specs"),
             }
             let Some(commit) = self.side.commit.clone() else {
-                out.push(Output::Answer(diff.terminal()));
-                return true;
+                return diff.finish(&mut self.side, out);
             };
             if let Some(revision) = diff.revision.take() {
                 let made = core::mem::replace(&mut self.side.made, Map::with_capacity(0));
                 let sizes = core::mem::replace(&mut self.side.sizes, Map::with_capacity(0));
                 diff.from = Some(RenderedSide { commit, made, sizes });
+                let errors = core::mem::replace(&mut self.side.errors, errors::Collector::new(&limits));
                 self.side = Side::new(self.side.repository.clone(), self.side.names.clone(), &limits);
+                self.side.errors = errors;
+                self.side.errors.side(crate::diff::Side::To);
                 self.side.diff = true;
                 out.push(Output::Request(Request::List {
                     request: Token::new(1),
@@ -657,33 +678,7 @@ impl Call {
                 unchanged: 0,
             });
         }
-        if diff.pending.is_some() {
-            let (output, ready) = diff.resume_hunks(&self.side.sizes, limits.hunk_file);
-            self.side.ready = ready;
-            out.push(output);
-            return false;
-        }
-        if let Some(target) = diff.names.get(diff.next) {
-            diff.next = diff.next.saturating_add(1);
-            let RenderedSide { made: from, .. } = diff.from.as_ref().expect("from side");
-            let change = crate::diff::compare(from.get(target), self.side.made.get(target), crate::diff::Needs::Needed);
-            let tally = diff.tally.as_mut().expect("both sides listed");
-            match &change {
-                crate::diff::TargetChange::Same => tally.unchanged = tally.unchanged.saturating_add(1),
-                crate::diff::TargetChange::Failed { .. } => {}
-                crate::diff::TargetChange::Added { .. }
-                | crate::diff::TargetChange::Removed
-                | crate::diff::TargetChange::Changed { .. } => {
-                    tally.changed = tally.changed.saturating_add(1);
-                    diff.outcome = diff.outcome.worst(Outcome::Negative);
-                }
-            }
-            diff.pending = Some(crate::diff::Change { target: target.clone(), change });
-            diff.entry = 0;
-            return false;
-        }
-        out.push(Output::Answer(diff.terminal()));
-        true
+        diff.answer(&mut self.side, limits, out)
     }
 }
 
@@ -695,6 +690,46 @@ struct RenderedSide {
 }
 
 impl Comparison {
+    fn answer(&mut self, side: &mut Side, limits: Limits, out: &mut Queue<Output>) -> bool {
+        if self.pending.is_some() {
+            let (output, ready) = self.resume_hunks(&side.sizes, limits.hunk_file);
+            side.ready = ready;
+            out.push(output);
+            return false;
+        }
+        if let Some(target) = self.names.get(self.next) {
+            self.next = self.next.saturating_add(1);
+            let RenderedSide { made: from, .. } = self.from.as_ref().expect("from side");
+            let change = crate::diff::compare(from.get(target), side.made.get(target), crate::diff::Needs::Needed);
+            let tally = self.tally.as_mut().expect("both sides listed");
+            match &change {
+                crate::diff::TargetChange::Same => tally.unchanged = tally.unchanged.saturating_add(1),
+                crate::diff::TargetChange::Failed { .. } => {}
+                crate::diff::TargetChange::Added { .. }
+                | crate::diff::TargetChange::Removed
+                | crate::diff::TargetChange::Changed { .. } => {
+                    tally.changed = tally.changed.saturating_add(1);
+                    self.outcome = self.outcome.worst(Outcome::Negative);
+                }
+            }
+            self.pending = Some(crate::diff::Change { target: target.clone(), change });
+            self.entry = 0;
+            return false;
+        }
+        self.finish(side, out)
+    }
+    fn finish(&mut self, side: &mut Side, out: &mut Queue<Output>) -> bool {
+        if let Some(error) = side.errors.get(side.error_next) {
+            side.error_next = side.error_next.saturating_add(1);
+            out.push(Output::Answer(Answer::Error(error.clone())));
+            return false;
+        }
+        self.left_out = side.errors.left_out();
+        self.outcome = self.outcome.worst(side.errors.outcome());
+        out.push(Output::Answer(self.terminal()));
+        true
+    }
+
     fn terminal(&mut self) -> Answer {
         Answer::Rendered { outcome: self.outcome, diff: self.tally.take(), left_out: self.left_out }
     }

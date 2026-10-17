@@ -37,6 +37,7 @@ const ERRORS: &[(Form, StoreFault, &[u8])] = &[
 fn the_store_error_names_the_store_and_the_limit() {
     for &(form, fault, expected) in ERRORS {
         let record = Record::Error(Error {
+            side: None,
             kind: Kind::Store(StoreError { store: b"/store".as_slice().into(), fault }),
             class: Class::Operational,
             at: None,

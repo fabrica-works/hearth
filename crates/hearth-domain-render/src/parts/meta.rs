@@ -20,6 +20,36 @@ pub struct Placement {
     pub hardware: Option<Box<[u8]>>,
     pub on: Option<Box<[u8]>>,
 }
+/// Each changed meta field, before and after (render.md, 6.1).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Change {
+    pub base: Option<Pair<Box<[u8]>>>,
+    pub member: Option<Pair<Option<Box<[u8]>>>>,
+    pub environment: Option<Pair<Box<[u8]>>>,
+    pub placement: Option<Pair<Placement>>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Pair<T> {
+    pub before: T,
+    pub after: T,
+}
+#[must_use]
+pub fn change(before: &Meta, after: &Meta) -> Option<Change> {
+    let change = Change {
+        base: pair(&before.base, &after.base),
+        member: pair(&before.member, &after.member),
+        environment: pair(&before.environment, &after.environment),
+        placement: pair(&before.placement, &after.placement),
+    };
+    if change.base.is_none() && change.member.is_none() && change.environment.is_none() && change.placement.is_none() {
+        None
+    } else {
+        Some(change)
+    }
+}
+fn pair<T: Clone + Eq>(before: &T, after: &T) -> Option<Pair<T>> {
+    if before == after { None } else { Some(Pair { before: before.clone(), after: after.clone() }) }
+}
 #[must_use]
 pub fn digest(meta: &Meta) -> Digest {
     let mut hash = H::new(b"part:meta", 1);

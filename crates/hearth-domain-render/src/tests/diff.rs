@@ -231,6 +231,154 @@ fn a_failed_hunks_request_ends_the_call_try_again() {
     crate::resume(&mut render, &env, &mut out);
     drop(out.pop());
     crate::resume(&mut render, &env, &mut out);
+    drop(out.pop());
+    crate::resume(&mut render, &env, &mut out);
     let Some(Output::Answer(Answer::Rendered { outcome, .. })) = out.pop() else { panic!("terminal") };
     assert_eq!(outcome, Outcome::TryAgain);
+}
+
+#[test]
+fn a_meta_change_holds_each_moved_field_before_and_after_and_no_other() {
+    use crate::parts::meta::{self, Pair};
+    let before = fixtures::meta();
+    let mut after = before.clone();
+    after.base = bytes::copy_of(b"x2");
+    after.environment = bytes::copy_of(b"lab");
+    assert_eq!(
+        meta::change(&before, &after),
+        Some(meta::Change {
+            base: Some(Pair { before: bytes::copy_of(b"x1"), after: bytes::copy_of(b"x2") }),
+            member: None,
+            environment: Some(Pair { before: bytes::copy_of(b"prod"), after: bytes::copy_of(b"lab") }),
+            placement: None,
+        })
+    );
+}
+#[test]
+fn a_member_changed_alone_is_a_meta_change_rebuilding_nothing() {
+    use crate::parts::meta::{Change, Pair};
+    let before = fixtures::spec(b"x1-prod", &[]);
+    let mut after = before.clone();
+    after.digest = Digest([3; 32]);
+    after.meta.member = Some(bytes::copy_of(b"a"));
+    assert_eq!(
+        diff::compare(Some(&Made::Spec(Box::new(before))), Some(&Made::Spec(Box::new(after))), Needs::Needed),
+        TargetChange::Changed {
+            parts: Box::new([diff::PartChange::Meta(Change {
+                base: None,
+                member: Some(Pair { before: None, after: Some(bytes::copy_of(b"a")) }),
+                environment: None,
+                placement: None,
+            })]),
+            rebuild: Rebuild::Nothing
+        }
+    );
+}
+#[test]
+fn each_error_of_a_diff_names_its_side() {
+    use crate::vocabulary::Answer;
+    let answers = fixtures::failed_diff(256, 1);
+    let mut sides = skein_lib::List::with_capacity(2);
+    for answer in &answers {
+        if let Answer::Error(error) = answer {
+            sides.push(error.side).expect("two sides");
+        }
+    }
+    assert_eq!(sides.as_slice(), &[Some(Side::From), Some(Side::To)]);
+}
+#[test]
+fn the_diffs_errors_are_bounded_once_over_both_sides() {
+    use crate::vocabulary::Answer;
+    let answers = fixtures::failed_diff(256, 130);
+    let mut errors = 0_u32;
+    for answer in &answers {
+        if let Answer::Error(_) = answer {
+            errors += 1;
+        }
+    }
+    assert_eq!(errors, 256);
+    let Some(Answer::Rendered { left_out, .. }) = answers.last() else { panic!("terminal") };
+    assert_eq!(*left_out, 4);
+}
+
+#[test]
+fn a_target_failing_on_both_sides_has_each_sides_errors_with_its_side() {
+    use crate::vocabulary::Answer;
+    let answers = fixtures::failed_diff(256, 1);
+    assert_eq!(
+        answers.first(),
+        Some(&Answer::Change(diff::Change {
+            target: bytes::copy_of(b"x1-prod"),
+            change: TargetChange::Failed { side: Side::Both },
+        }))
+    );
+}
+#[test]
+fn a_failed_hunks_request_leaves_its_file_bare_then_a_tool_error() {
+    use crate::{
+        errors::{Command, Ended, Error, Kind, Tool},
+        vocabulary::{Answer, Class},
+    };
+    let (mut render, env, mut out) = fixtures::hunk_call();
+    crate::step(&mut render, &env, fixtures::hunk_failure(), &mut out);
+    let answers = fixtures::finish_render(&mut render, &env, &mut out);
+    let mut error = None;
+    for answer in &answers {
+        if let Answer::Error(_) = answer {
+            error = Some(answer);
+        }
+    }
+    assert_eq!(
+        error,
+        Some(&Answer::Error(Error {
+            side: Some(Side::To),
+            kind: Kind::Tool(Tool { command: Command::Diff, ended: Ended::Exit(2), tail: Box::new([]) }),
+            class: Class::Operational,
+            at: None,
+            also: None,
+            target: Some(bytes::copy_of(b"x1-prod")),
+            task: None,
+        }))
+    );
+}
+
+#[test]
+fn omitted_diff_errors_still_decide_its_outcome() {
+    use crate::vocabulary::{Answer, Outcome};
+    let answers = fixtures::failed_diff(0, 1);
+    let Some(Answer::Rendered { outcome, .. }) = answers.last() else { panic!("terminal") };
+    assert_eq!(*outcome, Outcome::Failed);
+}
+#[test]
+fn a_diff_whose_listing_fails_keeps_its_error() {
+    use crate::{
+        errors::{Command, Ended, Error, Kind, Tool},
+        vocabulary::{Answer, Class, Event, Failure},
+    };
+    let (mut render, env, mut out) = fixtures::diff_call();
+    drop(out.pop());
+    crate::step(
+        &mut render,
+        &env,
+        Event::Failed {
+            request: skein_lib::Token::new(1),
+            class: Class::Operational,
+            at: None,
+            failure: Failure::Tool(Tool { command: Command::RevParse, ended: Ended::Start, tail: Box::new([]) }),
+        },
+        &mut out,
+    );
+    let answers = fixtures::finish_render(&mut render, &env, &mut out);
+    assert_eq!(
+        answers.first(),
+        Some(&Answer::Error(Error {
+            side: Some(Side::From),
+            kind: Kind::Tool(Tool { command: Command::RevParse, ended: Ended::Start, tail: Box::new([]) }),
+            class: Class::Operational,
+            at: None,
+            also: None,
+            target: None,
+            task: None,
+        }))
+    );
 }

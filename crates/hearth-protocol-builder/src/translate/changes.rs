@@ -52,6 +52,12 @@ pub const fn needs(needs: source::Needs) -> target::Needs {
 #[must_use]
 pub fn part_change(part: source::PartChange) -> target::PartChange {
     match part {
+        source::PartChange::Meta(meta) => target::PartChange::Meta(target::MetaChange {
+            base: optional_pair(meta.base),
+            member: optional_pair(meta.member),
+            environment: optional_pair(meta.environment),
+            placement: optional_placement_pair(meta.placement),
+        }),
         source::PartChange::Config(config::Change { tree }) => {
             let mut translated = List::with_capacity(u32::try_from(tree.len()).expect("bounded tree"));
             for entry in tree {
@@ -123,4 +129,29 @@ fn optional_sizes(value: Option<config::Sizes>) -> Option<target::Sizes> {
 }
 fn optional_hunks(value: Option<source::Hunks>) -> Option<target::Hunks> {
     Some(hunks(value?))
+}
+
+fn optional_pair<T>(pair: Option<crate::render::parts::meta::Pair<T>>) -> Option<target::Pair<T>> {
+    let pair = pair?;
+    Some(target::Pair { before: pair.before, after: pair.after })
+}
+fn optional_placement_pair(
+    pair: Option<crate::render::parts::meta::Pair<crate::render::parts::meta::Placement>>,
+) -> Option<target::Pair<crate::records::parts::meta::Placement>> {
+    let pair = pair?;
+    Some(target::Pair { before: placement(pair.before), after: placement(pair.after) })
+}
+fn optional_firmware(
+    firmware: Option<crate::render::revision::Firmware>,
+) -> Option<crate::records::parts::meta::Firmware> {
+    Some(super::answers::boot(firmware?))
+}
+fn placement(placement: crate::render::parts::meta::Placement) -> crate::records::parts::meta::Placement {
+    use super::answers;
+    crate::records::parts::meta::Placement {
+        kind: answers::runs(placement.kind),
+        firmware: optional_firmware(placement.firmware),
+        hardware: placement.hardware,
+        on: placement.on,
+    }
 }

@@ -57,6 +57,7 @@ fn documents_past_the_revision_s_budget_fail_the_call() {
         assert_eq!(
             run.answers,
             [Answer::Error(hearth_domain_render::errors::Error {
+                side: None,
                 kind: hearth_domain_render::errors::Kind::Decode(hearth_domain_render::errors::Decode::TooLarge {
                     limit: hearth_domain_render::errors::Limit::Decoded,
                     max: 64

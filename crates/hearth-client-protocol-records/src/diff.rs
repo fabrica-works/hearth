@@ -42,7 +42,20 @@ pub enum Needs {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PartChange {
+    Meta(MetaChange),
     Config(ConfigChange),
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct MetaChange {
+    pub base: Option<Pair<Box<[u8]>>>,
+    pub member: Option<Pair<Option<Box<[u8]>>>>,
+    pub environment: Option<Pair<Box<[u8]>>>,
+    pub placement: Option<Pair<crate::parts::meta::Placement>>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Pair<T> {
+    pub before: T,
+    pub after: T,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ConfigChange {
@@ -113,6 +126,7 @@ impl Change {
                 for part in &**parts {
                     match part {
                         PartChange::Config(config) => config.text(lines),
+                        PartChange::Meta(meta) => meta.text(lines),
                     }
                 }
             }
@@ -149,6 +163,7 @@ impl Change {
                 for part in &**parts {
                     match part {
                         PartChange::Config(config) => config.json(json),
+                        PartChange::Meta(meta) => meta.json(json),
                     }
                 }
                 json.array_end();

@@ -4,6 +4,7 @@ pub use crate::vocabulary::Class;
 use alloc::boxed::Box;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Error {
+    pub side: Option<crate::diff::Side>,
     pub kind: Kind,
     pub class: Class,
     pub at: Option<Place>,
@@ -94,6 +95,7 @@ pub(crate) fn refused(path: &[u8], position: Option<Position>, fault: Decode, al
         | revision::Class::Other => None,
     };
     Error {
+        side: None,
         kind: Kind::Decode(fault),
         class: Class::Configuration,
         at: Some(Place { path: skein_lib::bytes::copy_of(path), position }),
@@ -121,6 +123,7 @@ pub struct Collector {
     left_out: u32,
     arrival: u64,
     outcome: crate::vocabulary::Outcome,
+    side: Option<crate::diff::Side>,
 }
 impl Collector {
     #[must_use]
@@ -131,11 +134,16 @@ impl Collector {
             left_out,
             arrival: 0,
             outcome: crate::vocabulary::Outcome::Done,
+            side: None,
         }
     }
     /// Counts every error's class, including errors beyond the bound.
-    pub fn push(&mut self, error: Error) {
+    pub(crate) fn side(&mut self, side: crate::diff::Side) {
+        self.side = Some(side);
+    }
+    pub fn push(&mut self, mut error: Error) {
         use crate::vocabulary::Outcome;
+        error.side = self.side;
         self.outcome = self.outcome.worst(match error.class {
             Class::Configuration => Outcome::Failed,
             Class::Operational => Outcome::TryAgain,
@@ -330,6 +338,7 @@ pub enum Ended {
 
 pub(crate) fn repository(path: &[u8], task: Option<&[u8]>, why: Repository) -> Error {
     Error {
+        side: None,
         kind: Kind::Repository(why),
         class: Class::Configuration,
         at: Some(Place { path: skein_lib::bytes::copy_of(path), position: None }),
