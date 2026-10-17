@@ -553,6 +553,12 @@ None yet.
      - `the_fake_prints_each_mmdebstrap_recording_as_recorded` counts the recordings whose `stanzas` it compared, and asserts at least 1 (test-min's, at the pin), so that the gate's stanza comparison runs at every landing. A recording that gains `stanzas` later is compared with no change to the test.
      - Unchanged: `ALLOWED`'s two rows and its rule, the universe's cut and its test, 46.2's Size.
 
+130. **hearth 11.2's size, 896 against 300** (plan defect, hearth-11.2's block of 17:54).
+     hearth 11.2's size, 896 against 300 (a plan defect, in 11.2's "Size: at most 300 lines"). 11.2 lands as prepared (cea43e4), with the gate, at 896 lines by code-organization.md 7's command; its report's `Size:` gives 896 and this ruling. 11.2's Size becomes 450.
+     - The block is ruling 113's again (26.1, 747 against 290): a Shape that two new crates implement in full, with nothing between it and the next increment that needs it (11.3), and code-organization.md 7's aims held: its counted files are 11.2's Files alone, the largest `crates/hearth-protocol-builder/src/lib.rs` at 368 lines, under 800.
+     - The same block twice becomes a standing rule (development.md, 10.4), in the README's "Rules of this plan": "**An increment past twice its Size** (rulings 113 and 130; it replaces, for this plan, code-organization.md 7's "Past that, it asks before landing" up to three times the Size): it lands at its count without asking when each counted file is in its Files, each file is at most 800 lines, and each test its Test shape names is there. Its report's `Size:` gives the count by file and names this rule. Past three times its Size, or with a counted file outside its Files, it still stops on a question before landing, with the count by file."
+     - Unchanged: code-organization.md 7's count and its aims (a file of at most 800 lines, a test function of at most 40); 11.3's Size and Shape.
+
 ## For the user
 
 The long-term choices the user may veto:

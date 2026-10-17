@@ -211,7 +211,7 @@ Don't: keep a deadline on git (render.md 2.2: none in M1); write render's limits
 the protocol layer (`max` is the listed size, checked by render); hold
 more than one blob's bytes; name a child domain but through the root's
 `pub use`.
-Size: at most 300 lines. Removes: nothing.
+Size: at most 450 lines (ruling 130: 896 landed as prepared). Removes: nothing.
 
 ### 11.3 The service, the printer, and the real loop
 Scope: `hearth-service-builder` (its `iterate`, programming-model.md, 2);

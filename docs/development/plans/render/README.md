@@ -267,6 +267,14 @@ the closing repins (Repin). The increments of each session are in its file.
   These limits are guides: each landing's report lists its lines outside
   its Files (`git diff --numstat origin/main...HEAD -- <those paths>`),
   and a limit passed is a question before landing.
+- **An increment past twice its Size** (rulings 113 and 130; it replaces,
+  for this plan, code-organization.md 7's "Past that, it asks before
+  landing" up to three times the Size): it lands at its count without
+  asking when each counted file is in its Files, each file is at most 800
+  lines, and each test its Test shape names is there. Its report's
+  `Size:` gives the count by file and names this rule. Past three times
+  its Size, or with a counted file outside its Files, it still stops on a
+  question before landing, with the count by file.
 - **A Proof's "Bound: N s"** is an aim for the test's time as nextest
   prints it, building aside; a bound missed is noted in the report, and
   the landing stands.
