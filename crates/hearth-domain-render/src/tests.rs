@@ -21,3 +21,5 @@ mod forms;
 
 mod entries;
 mod references;
+
+mod debian;

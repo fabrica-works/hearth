@@ -58,6 +58,7 @@ fn a_documents_blob_reaches_render_decoded_with_its_placement() {
                 members: None,
                 at: Position { line: 1, column: 1 },
                 layer: DocumentLayer {
+                    debian: None,
                     tasks: Box::new([]),
                     placement: Some(Placement {
                         at: Position { line: 1, column: 14 },
@@ -142,7 +143,7 @@ fn the_last_document_waits_for_successful_exit_and_resource_closure() {
             read: Decoded::Document(Document {
                 members: None,
                 at: Position { line: 1, column: 1 },
-                layer: DocumentLayer { tasks: Box::new([]), placement: None }
+                layer: DocumentLayer { debian: None, tasks: Box::new([]), placement: None }
             })
         }),
         "the decoded blob follows Closed for every resource"

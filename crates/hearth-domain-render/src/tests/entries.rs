@@ -25,7 +25,14 @@ fn a_true_guard_passes_and_a_false_one_errs_at_its_key_with_its_message() {
 #[test]
 fn every_false_guard_of_every_present_task_errs() {
     let (mut side, checked) = fixtures::guarded_tasks();
-    crate::call::guards::check(&side.documents, &mut side.errors, &SHIPPED, &fixtures::meta(), &checked);
+    crate::call::guards::check(
+        &side.documents,
+        &mut side.errors,
+        &SHIPPED,
+        &fixtures::meta(),
+        &checked,
+        &Roots::x1_prod().debian,
+    );
     let (errors, _) = side.errors.finish();
     let mut names = skein_lib::List::with_capacity(u32::try_from(errors.len()).expect("fault count"));
     for error in &errors {
@@ -97,9 +104,7 @@ use fixtures::{
 };
 #[test]
 fn a_for_each_entry_stands_for_one_entry_per_list_element_from_zero() {
-    let expanded =
-        entries::expand(&declared_entries([list_entry()]), &Roots::x1_prod().context(), &SHIPPED, &mut { u64::MAX })
-            .expect("expand");
+    let expanded = fixtures::expansion(&declared_entries([list_entry()]), &SHIPPED, u64::MAX).expect("expand");
     assert_eq!(expanded_keys(&expanded).as_ref(), &[b"/etc/0-sudo".as_slice(), b"/etc/1-wheel".as_slice()]);
 }
 #[test]
@@ -115,16 +120,13 @@ fn a_for_each_over_a_map_binds_key_and_value_in_key_order_skipping_absent() {
 fn an_if_false_for_an_element_leaves_that_element_out() {
     let mut entry = list_entry();
     entry.when = Some(condition([name(0, b"key", Missing::Error), op(7, Op::Integer(0)), op(4, Op::Equal)]));
-    let expanded =
-        entries::expand(&declared_entries([entry]), &Roots::x1_prod().context(), &SHIPPED, &mut { u64::MAX })
-            .expect("expand");
+    let expanded = fixtures::expansion(&declared_entries([entry]), &SHIPPED, u64::MAX).expect("expand");
     assert_eq!(expanded_keys(&expanded).as_ref(), &[b"/etc/0-sudo".as_slice()]);
 }
 #[test]
 fn an_entry_if_over_an_undefined_optional_setting_leaves_the_entry_out() {
     let declared = declared_entries([entry(plain(b"ops"), None, Some(setting(b"wifi")))]);
-    let expanded =
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { u64::MAX }).expect("expand");
+    let expanded = fixtures::expansion(&declared, &SHIPPED, u64::MAX).expect("expand");
     assert_eq!(only(&expanded.groups).entries.len(), 0);
 }
 const UNBOUND: &[&[u8]] = &[b"key", b"value"];
@@ -134,7 +136,7 @@ fn key_and_value_in_a_plain_entrys_if_are_unknown() {
         let declared =
             declared_entries([entry(plain(b"ops"), None, Some(condition([fixtures::name(0, name, Missing::Error)])))]);
         assert_eq!(
-            entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { u64::MAX }),
+            fixtures::expansion(&declared, &SHIPPED, u64::MAX),
             Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Unknown), at: at(3, 20), also: None }),
             "row {row}"
         );
@@ -146,7 +148,7 @@ fn a_for_each_over_undefined_or_a_scalar_fails_at_its_expression() {
     for (row, &(setting_name, kind)) in ITERABLE_FAULTS.iter().enumerate() {
         let declared = declared_entries([entry(plain(b"ops"), Some(setting(setting_name)), None)]);
         assert_eq!(
-            entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { u64::MAX }),
+            fixtures::expansion(&declared, &SHIPPED, u64::MAX),
             Err(entries::Fault { kind: Kind::Evaluation(kind), at: at(3, 20), also: None }),
             "row {row}"
         );
@@ -156,7 +158,7 @@ fn a_for_each_over_undefined_or_a_scalar_fails_at_its_expression() {
 fn two_elements_making_one_key_are_a_collision_naming_the_first() {
     let declared = declared_entries([entry(plain(b"ops"), Some(setting(b"tags")), None)]);
     assert_eq!(
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { u64::MAX }),
+        fixtures::expansion(&declared, &SHIPPED, u64::MAX),
         Err(entries::Fault {
             kind: Kind::Collision(crate::errors::Collision::Key { key: copy_of(b"ops") }),
             at: at(3, 5),
@@ -170,7 +172,7 @@ fn two_entries_making_one_key_collide() {
     second.key = crate::revision::declaration::Interpolated::Plain { at: at(4, 5), text: copy_of(b"ops") };
     let declared = declared_entries([entry(plain(b"ops"), None, None), second]);
     assert_eq!(
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { u64::MAX }),
+        fixtures::expansion(&declared, &SHIPPED, u64::MAX),
         Err(entries::Fault {
             kind: Kind::Collision(crate::errors::Collision::Key { key: copy_of(b"ops") }),
             at: at(4, 5),
@@ -184,43 +186,43 @@ fn an_if_false_entry_makes_no_collision() {
         entry(plain(b"ops"), None, None),
         entry(plain(b"ops"), Some(setting(b"tags")), Some(condition([op(0, Op::Boolean(false))]))),
     ]);
-    let expanded =
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { u64::MAX }).expect("expand");
+    let expanded = fixtures::expansion(&declared, &SHIPPED, u64::MAX).expect("expand");
     assert_eq!(expanded_keys(&expanded).as_ref(), &[b"ops".as_slice()]);
 }
 #[test]
 fn expanding_past_the_entry_limit_fails_at_the_for_each() {
     assert_eq!(
-        entries::expand(&declared_entries([numeric_entry(4)]), &Roots::x1_prod().context(), &THREE_ENTRIES, &mut {
-            u64::MAX
-        }),
+        fixtures::expansion(&declared_entries([numeric_entry(THREE_ENTRIES.expansion + 1)]), &THREE_ENTRIES, u64::MAX),
         Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Limit), at: at(3, 20), also: None })
     );
 }
 #[test]
 fn exactly_the_entry_limit_passes() {
     let expanded =
-        entries::expand(&declared_entries([numeric_entry(3)]), &Roots::x1_prod().context(), &THREE_ENTRIES, &mut {
-            u64::MAX
-        })
-        .expect("expand");
+        fixtures::expansion(&declared_entries([numeric_entry(THREE_ENTRIES.expansion)]), &THREE_ENTRIES, u64::MAX)
+            .expect("expand");
     assert_eq!(expanded_keys(&expanded).as_ref(), &[b"0".as_slice(), b"1".as_slice(), b"2".as_slice()]);
 }
 #[test]
 fn the_entry_count_runs_across_a_tasks_maps() {
-    let declared = entry_maps([entry_map(Map::Groups, [numeric_entry(3)]), entry_map(Map::Users, [list_entry()])]);
+    let declared = entry_maps([
+        entry_map(Map::Groups, [numeric_entry(THREE_ENTRIES.expansion)]),
+        entry_map(Map::Users, [list_entry()]),
+    ]);
     assert_eq!(
-        entries::expand(&declared, &Roots::x1_prod().context(), &THREE_ENTRIES, &mut { u64::MAX }),
+        fixtures::expansion(&declared, &THREE_ENTRIES, u64::MAX),
         Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Limit), at: at(3, 20), also: None })
     );
 }
 #[test]
 fn the_entry_count_skips_if_false_elements() {
-    let mut entry = numeric_entry(6);
-    entry.when = Some(condition([name(0, b"key", Missing::Error), op(7, Op::Integer(3)), op(4, Op::GreaterOrEqual)]));
-    let expanded =
-        entries::expand(&declared_entries([entry]), &Roots::x1_prod().context(), &THREE_ENTRIES, &mut { u64::MAX })
-            .expect("expand");
+    let mut entry = numeric_entry(THREE_ENTRIES.expansion * 2);
+    entry.when = Some(condition([
+        name(0, b"key", Missing::Error),
+        op(7, Op::Integer(i64::from(THREE_ENTRIES.expansion))),
+        op(4, Op::GreaterOrEqual),
+    ]));
+    let expanded = fixtures::expansion(&declared_entries([entry]), &THREE_ENTRIES, u64::MAX).expect("expand");
     assert_eq!(expanded_keys(&expanded).as_ref(), &[b"3".as_slice(), b"4".as_slice(), b"5".as_slice()]);
 }
 const ELEMENTS: &[(u32, i64, &[u8])] = &[(0, 0, b"sudo"), (1, 1, b"wheel")];
@@ -237,9 +239,7 @@ fn an_elements_index_rebinds_its_key_and_value() {
 }
 #[test]
 fn a_concrete_entry_keeps_its_element_index() {
-    let expanded =
-        entries::expand(&declared_entries([list_entry()]), &Roots::x1_prod().context(), &SHIPPED, &mut { u64::MAX })
-            .expect("expand");
+    let expanded = fixtures::expansion(&declared_entries([list_entry()]), &SHIPPED, u64::MAX).expect("expand");
     let group = only(&expanded.groups);
     let mut elements = skein_lib::List::with_capacity(SHIPPED.expansion);
     for entry in &group.entries {
@@ -265,15 +265,13 @@ fn a_key_and_a_field_interpolate_text_and_integers_in_order() {
             entry_output([name(0, b"value", Missing::Error)]),
         ])),
     )]);
-    let expanded =
-        entries::expand(&declared_entries([entry]), &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded })
-            .expect("expand");
+    let expanded = fixtures::expansion(&declared_entries([entry]), &SHIPPED, SHIPPED.expanded).expect("expand");
     let group = only(&expanded.groups);
-    let [sudo, wheel] = group.entries.as_ref() else { panic!("two elements") };
-    assert_eq!(
-        (sudo.text(Name::From), wheel.text(Name::From)),
-        (Some(b"x-42ysudo".as_slice()), Some(b"x-42ywheel".as_slice()))
-    );
+    let mut fields = skein_lib::List::with_capacity(u32::try_from(group.entries.len()).expect("fixture entries"));
+    for entry in &group.entries {
+        fields.push(entry.text(Name::From)).expect("entry count");
+    }
+    assert_eq!(fields.as_slice(), [Some(b"x-42ysudo".as_slice()), Some(b"x-42ywheel".as_slice())]);
 }
 const BOOLEAN_STRINGS: &[fixtures::StringPlace] = &[
     fixtures::StringPlace::Key,
@@ -285,9 +283,7 @@ const BOOLEAN_STRINGS: &[fixtures::StringPlace] = &[
 fn a_boolean_in_a_string_fails_with_type_wherever_it_stands() {
     for (row, &place) in BOOLEAN_STRINGS.iter().enumerate() {
         assert_eq!(
-            entries::expand(&fixtures::boolean_string(place), &Roots::x1_prod().context(), &SHIPPED, &mut {
-                SHIPPED.expanded
-            }),
+            fixtures::expansion(&fixtures::boolean_string(place), &SHIPPED, SHIPPED.expanded),
             Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Type), at: at(3, 5), also: None }),
             "row {row}"
         );
@@ -299,7 +295,7 @@ fn a_list_or_map_in_a_string_fails_with_output() {
     for (row, name) in COLLECTIONS.iter().enumerate() {
         let declared = fields([field(Name::From, Literal::Text(setting_tag(name)))]);
         assert_eq!(
-            entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+            fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded),
             Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Output), at: FIELD_AT, also: None }),
             "row {row}"
         );
@@ -311,25 +307,18 @@ fn a_field_written_as_one_tag_is_absent_when_undefined() {
         field(Name::From, Literal::Text(setting_tag(b"wifi"))),
         field(Name::Uid, Literal::Typed(setting_tag(b"wifi"))),
     ]);
-    let expanded =
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }).expect("expand");
+    let expanded = fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded).expect("expand");
     assert_eq!(only(&only(&expanded.groups).entries).fields.as_ref(), &[]);
 }
 #[test]
 fn an_undefined_key_is_an_error() {
     let declared = declared_entries([entry(setting_tag(b"wifi"), None, None)]);
-    assert_eq!(
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
-        Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Undefined), at: FIELD_AT, also: None })
-    );
+    assert_eq!(fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded), Err(fixtures::UNDEFINED_FIELD));
 }
 #[test]
 fn an_undefined_value_beside_text_is_an_error() {
     let declared = fields([field(Name::From, Literal::Text(fixtures::mixed_optional()))]);
-    assert_eq!(
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
-        Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Undefined), at: FIELD_AT, also: None })
-    );
+    assert_eq!(fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded), Err(fixtures::UNDEFINED_FIELD));
 }
 const WRONG_TYPED: &[(Name, TypeName)] = &[
     (Name::Uid, TypeName::Int),
@@ -342,7 +331,7 @@ fn a_typed_field_must_have_its_fields_type() {
     for (row, (name, expected)) in WRONG_TYPED.iter().enumerate() {
         let declared = fields([field(*name, Literal::Typed(setting_tag(b"name")))]);
         assert_eq!(
-            entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+            fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded),
             Err(entries::Fault {
                 kind: Kind::Schema(Schema::Wrong { expected: expected.clone() }),
                 at: FIELD_AT,
@@ -356,7 +345,7 @@ fn a_typed_field_must_have_its_fields_type() {
 fn a_typed_field_requires_one_output_tag() {
     let declared = fields([field(Name::Uid, Literal::Typed(plain(b"42")))]);
     assert_eq!(
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+        fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded),
         Err(entries::Fault { kind: Kind::Schema(Schema::Wrong { expected: TypeName::Int }), at: at(3, 5), also: None })
     );
 }
@@ -366,8 +355,7 @@ fn a_typed_fields_accessor_keeps_its_value() {
         field(Name::Uid, Literal::Typed(setting_tag(b"port"))),
         field(Name::Directory, Literal::Typed(setting_tag(b"enabled"))),
     ]);
-    let expanded =
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }).expect("expand");
+    let expanded = fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded).expect("expand");
     let entry = only(&only(&expanded.groups).entries);
     assert_eq!((entry.int(Name::Uid), entry.bool(Name::Directory)), (Some(2222), Some(true)));
 }
@@ -377,8 +365,7 @@ fn a_list_fields_elements_interpolate_one_by_one() {
         Name::Groups,
         Literal::Strings { at: FIELD_AT, each: Box::new([setting_tag(b"name"), plain(b"wheel")]) },
     )]);
-    let expanded =
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }).expect("expand");
+    let expanded = fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded).expect("expand");
     assert_eq!(
         only(&only(&expanded.groups).entries).strings(Name::Groups),
         Some([copy_of(b"x1"), copy_of(b"wheel")].as_slice())
@@ -387,8 +374,7 @@ fn a_list_fields_elements_interpolate_one_by_one() {
 #[test]
 fn a_typed_list_keeps_every_string() {
     let declared = fields([field(Name::Groups, Literal::Typed(setting_tag(b"tags")))]);
-    let expanded =
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }).expect("expand");
+    let expanded = fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded).expect("expand");
     assert_eq!(
         only(&only(&expanded.groups).entries).strings(Name::Groups),
         Some([copy_of(b"sudo"), copy_of(b"wheel")].as_slice())
@@ -398,10 +384,7 @@ fn a_typed_list_keeps_every_string() {
 fn an_undefined_value_in_a_list_is_an_error() {
     let declared =
         fields([field(Name::Groups, Literal::Strings { at: FIELD_AT, each: Box::new([setting_tag(b"wifi")]) })]);
-    assert_eq!(
-        entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
-        Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Undefined), at: FIELD_AT, also: None })
-    );
+    assert_eq!(fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded), Err(fixtures::UNDEFINED_FIELD));
 }
 #[test]
 fn key_and_value_in_a_plain_entrys_string_field_are_unknown() {
@@ -411,7 +394,7 @@ fn key_and_value_in_a_plain_entrys_string_field_are_unknown() {
             Literal::Text(parts([entry_output([fixtures::name(0, name, Missing::Error)])])),
         )]);
         assert_eq!(
-            entries::expand(&declared, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
+            fixtures::expansion(&declared, &SHIPPED, SHIPPED.expanded),
             Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Unknown), at: at(3, 5), also: None }),
             "row {row}"
         );
@@ -419,8 +402,7 @@ fn key_and_value_in_a_plain_entrys_string_field_are_unknown() {
 }
 #[test]
 fn a_required_field_the_entry_lacks_is_a_missing_field_at_the_entry() {
-    let expanded =
-        entries::expand(&fields([]), &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }).expect("expand");
+    let expanded = fixtures::expansion(&fields([]), &SHIPPED, SHIPPED.expanded).expect("expand");
     assert_eq!(
         crate::kinds::required(only(&only(&expanded.groups).entries), Name::Uid),
         Err(Schema::MissingField { field: copy_of(b"uid") })
@@ -430,7 +412,7 @@ fn a_required_field_the_entry_lacks_is_a_missing_field_at_the_entry() {
 fn expanded_text_past_the_targets_budget_fails_at_the_field() {
     let declared = fields([field(Name::From, Literal::Text(fixtures::budget_text()))]);
     assert_eq!(
-        entries::expand(&declared, &Roots::x1_prod().context(), &EXPANDED_TEXT, &mut { EXPANDED_TEXT.expanded }),
+        fixtures::expansion(&declared, &EXPANDED_TEXT, EXPANDED_TEXT.expanded),
         Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Limit), at: FIELD_AT, also: None })
     );
 }
@@ -445,8 +427,5 @@ fn a_typed_range_keeps_its_base_and_count() {
 #[test]
 fn a_range_member_is_never_absent() {
     let declaration = fields([fixtures::range_field(Literal::Typed(setting_tag(b"wifi")))]);
-    assert_eq!(
-        entries::expand(&declaration, &Roots::x1_prod().context(), &SHIPPED, &mut { SHIPPED.expanded }),
-        Err(entries::Fault { kind: Kind::Evaluation(FaultKind::Undefined), at: FIELD_AT, also: None })
-    );
+    assert_eq!(fixtures::expansion(&declaration, &SHIPPED, SHIPPED.expanded), Err(fixtures::UNDEFINED_FIELD));
 }

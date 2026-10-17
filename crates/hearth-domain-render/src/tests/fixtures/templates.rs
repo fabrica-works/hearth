@@ -66,6 +66,7 @@ pub fn keeping_templates() -> (crate::Render, skein_lib::Env<Limits>, skein_lib:
                 tasks: super::Value::Map(Box::new([])),
             }]),
         },
+        super::Roots::x1_prod().debian,
         crate::parts::config::Config { tree: Box::new([]) },
         5,
     ));

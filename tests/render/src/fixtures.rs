@@ -20,7 +20,7 @@ pub fn document(placement: Option<Placement>) -> Decoded {
     Decoded::Document(Document {
         members: None,
         at: Position { line: 1, column: 1 },
-        layer: Layer { placement, tasks: Box::new([]) },
+        layer: Layer { debian: Some(written_debian()), placement, tasks: Box::new([]) },
     })
 }
 #[must_use]
@@ -123,6 +123,7 @@ pub fn with_task() -> Repository {
             members: None,
             at: Position { line: 1, column: 1 },
             layer: Layer {
+                debian: None,
                 placement: None,
                 tasks: Box::new([hearth_domain_render::revision::Task {
                     name: b"motd".as_slice().into(),
@@ -172,6 +173,7 @@ pub fn tasks(names: &[(&[u8], bool)], placement: Option<Placement>) -> Decoded {
         members: None,
         at: Position { line: 1, column: 1 },
         layer: Layer {
+            debian: None,
             placement,
             tasks: names
                 .iter()
@@ -269,7 +271,7 @@ pub fn members(names: &[(&[u8], bool)]) -> Decoded {
             .map(|(name, removed)| Member {
                 name: Box::from(*name),
                 at: Position { line: 1, column: 12 },
-                layer: if *removed { None } else { Some(Layer { placement: None, tasks: Box::new([]) }) },
+                layer: if *removed { None } else { Some(Layer { debian: None, placement: None, tasks: Box::new([]) }) },
             })
             .collect(),
     });
@@ -327,6 +329,7 @@ pub fn task_patch(task: &[u8], setting: &[u8], kind: hearth_domain_render::revis
         members: None,
         at,
         layer: Layer {
+            debian: None,
             placement: None,
             tasks: Box::new([Task {
                 name: Box::from(task),
@@ -545,4 +548,39 @@ pub fn read_blobs(requests: &[hearth_domain_render::vocabulary::Request]) -> &[h
 #[must_use]
 pub fn render_targets(repository: &Repository, targets: &[&[u8]], seed: u64) -> crate::parent::Run {
     crate::parent::run(repository, targets, seed)
+}
+
+#[must_use]
+pub fn written_debian() -> hearth_domain_render::revision::Value {
+    use hearth_domain_render::revision::{Kind, Pair, Value};
+    let at = Position { line: 1, column: 1 };
+    let text = |value: &[u8]| Value { at, kind: Kind::String(value.into()) };
+    let pair = |name: &[u8], value| Pair { key: name.into(), at, value };
+    Value {
+        at,
+        kind: Kind::Map(
+            vec![
+                pair(b"architecture", text(b"amd64")),
+                pair(
+                    b"pockets",
+                    Value {
+                        at,
+                        kind: Kind::Map(
+                            vec![
+                                pair(b"security", Value { at, kind: Kind::Bool(false) }),
+                                pair(b"updates", Value { at, kind: Kind::Bool(false) }),
+                            ]
+                            .into_boxed_slice(),
+                        ),
+                    },
+                ),
+                pair(
+                    b"snapshot",
+                    Value { at, kind: Kind::Map(vec![pair(b"archive", text(b"20261001T030405Z"))].into_boxed_slice()) },
+                ),
+                pair(b"suite", text(b"forky")),
+            ]
+            .into_boxed_slice(),
+        ),
+    }
 }

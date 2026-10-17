@@ -102,7 +102,7 @@ fn a_document_without_placement_keeps_its_position_and_absence() {
         target::Document {
             members: None,
             at: target::Position { line: 2, column: 4 },
-            layer: target::Layer { placement: None, tasks: Box::new([]) }
+            layer: target::Layer { debian: None, placement: None, tasks: Box::new([]) }
         },
         "no placement is introduced"
     );
@@ -796,4 +796,5 @@ mod guards;
 
 mod expansion;
 
+mod debian;
 mod fields;

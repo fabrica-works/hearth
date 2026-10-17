@@ -29,7 +29,11 @@ pub fn discovered(documents: revision::Documents) -> Fleet {
     Fleet { documents, targets }
 }
 pub fn document(placement: Option<revision::Placement>) -> revision::Document {
-    revision::Document { at: at(1, 1), members: None, layer: revision::Layer { placement, tasks: Box::new([]) } }
+    revision::Document {
+        at: at(1, 1),
+        members: None,
+        layer: revision::Layer { debian: None, placement, tasks: Box::new([]) },
+    }
 }
 pub fn placement(on: Option<&[u8]>) -> revision::Placement {
     let mut link = None;

@@ -168,6 +168,7 @@ pub struct Member {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Layer {
+    pub debian: Option<Value>,
     pub placement: Option<Placement>,
     pub tasks: Box<[Task]>,
 }

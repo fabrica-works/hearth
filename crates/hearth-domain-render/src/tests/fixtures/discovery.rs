@@ -18,7 +18,11 @@ pub fn member_documents(
     {
         documents.set(
             &Oid(bytes::copy_of(path)),
-            Document { at: composition::at(1, 1), layer: Layer { placement: None, tasks: Box::new([]) }, members },
+            Document {
+                at: composition::at(1, 1),
+                layer: Layer { debian: None, placement: None, tasks: Box::new([]) },
+                members,
+            },
         );
     }
     documents
@@ -26,7 +30,11 @@ pub fn member_documents(
 pub fn members(names: &[(&[u8], bool)]) -> crate::revision::Members {
     let mut each = skein_lib::List::with_capacity(u32::try_from(names.len()).expect("fixture members"));
     for &(name, removed) in names {
-        let layer = if removed { None } else { Some(crate::revision::Layer { placement: None, tasks: Box::new([]) }) };
+        let layer = if removed {
+            None
+        } else {
+            Some(crate::revision::Layer { debian: None, placement: None, tasks: Box::new([]) })
+        };
         each.push(crate::revision::Member { name: bytes::copy_of(name), at: composition::at(1, 12), layer })
             .expect("fixture members");
     }
@@ -111,8 +119,11 @@ pub fn rule_document(
     member: bool,
 ) -> crate::revision::Documents {
     use crate::revision::{Document, Layer, Placement, Runs, Task};
-    let mut document =
-        Document { at: composition::at(1, 1), layer: Layer { tasks: Box::new([]), placement: None }, members: None };
+    let mut document = Document {
+        at: composition::at(1, 1),
+        layer: Layer { debian: None, tasks: Box::new([]), placement: None },
+        members: None,
+    };
     if !task.is_empty() {
         document.layer.tasks = Box::new([Task {
             name: bytes::copy_of(task),
@@ -141,7 +152,7 @@ pub fn rule_document(
             for each in &mut members.each {
                 each.layer = Some(document.layer.clone());
             }
-            document.layer = Layer { placement: None, tasks: Box::new([]) };
+            document.layer = Layer { debian: None, placement: None, tasks: Box::new([]) };
         }
         document.members = Some(members);
     }
@@ -149,7 +160,11 @@ pub fn rule_document(
     with_document(
         &documents,
         b"tasks/motd/task.json",
-        Document { at: composition::at(1, 1), members: None, layer: Layer { tasks: Box::new([]), placement: None } },
+        Document {
+            at: composition::at(1, 1),
+            members: None,
+            layer: Layer { debian: None, tasks: Box::new([]), placement: None },
+        },
     )
 }
 pub fn container_documents(on: &[u8]) -> crate::revision::Documents {
@@ -168,6 +183,7 @@ pub fn container_documents(on: &[u8]) -> crate::revision::Documents {
                 at: composition::at(1, 1),
                 members: None,
                 layer: Layer {
+                    debian: None,
                     tasks: Box::new([]),
                     placement: Some(Placement {
                         at: composition::at(1, 2),
@@ -188,7 +204,11 @@ pub fn container_documents(on: &[u8]) -> crate::revision::Documents {
     with_document(
         &documents,
         b"envs/prod.json",
-        Document { at: composition::at(1, 1), members: None, layer: Layer { tasks: Box::new([]), placement: None } },
+        Document {
+            at: composition::at(1, 1),
+            members: None,
+            layer: Layer { debian: None, tasks: Box::new([]), placement: None },
+        },
     )
 }
 

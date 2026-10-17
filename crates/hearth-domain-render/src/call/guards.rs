@@ -15,6 +15,7 @@ pub(crate) fn contained(
     meta: &Meta,
     checked: &Validated,
     containers: &[crate::compose::Container],
+    debian: &Value,
 ) -> bool {
     let target = context::target(meta, containers);
     let empty = Value::Map(Box::new([]));
@@ -22,7 +23,7 @@ pub(crate) fn contained(
     for task in &checked.tasks {
         let Some((document, Some(declaration))) = documents.declaration(&task.name) else { continue };
         let context =
-            Context { target: &target, debian: &empty, settings: &task.settings, tasks: &task.tasks, exports: &empty };
+            Context { target: &target, debian, settings: &task.settings, tasks: &task.tasks, exports: &empty };
         for fault in entries::guards(declaration, &context, limits) {
             valid = false;
             errors.push(Error {
@@ -43,7 +44,7 @@ pub(crate) fn contained(
     for task in &checked.tasks {
         let Some((document, Some(declaration))) = documents.declaration(&task.name) else { continue };
         let context =
-            Context { target: &target, debian: &empty, settings: &task.settings, tasks: &task.tasks, exports: &empty };
+            Context { target: &target, debian, settings: &task.settings, tasks: &task.tasks, exports: &empty };
         if let Err(fault) = entries::expand(declaration, &context, limits, &mut left) {
             valid = false;
             let path = documents.path(document);
@@ -72,6 +73,7 @@ pub(crate) fn check(
     limits: &crate::limits::Limits,
     meta: &Meta,
     checked: &Validated,
+    debian: &Value,
 ) -> bool {
-    contained(documents, errors, limits, meta, checked, &[])
+    contained(documents, errors, limits, meta, checked, &[], debian)
 }

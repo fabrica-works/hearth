@@ -174,7 +174,7 @@ fn two_targets_of_one_name_fail_both_with_one_error() {
     let documents = fixtures::with_document(
         &documents,
         b"hosts/stoa-1/stoa-1-lab.json",
-        Document { at: at(1, 1), members: None, layer: Layer { placement: None, tasks: Box::new([]) } },
+        Document { at: at(1, 1), members: None, layer: Layer { debian: None, placement: None, tasks: Box::new([]) } },
     );
     let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
     assert_eq!(

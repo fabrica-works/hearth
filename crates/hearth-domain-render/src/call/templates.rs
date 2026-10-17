@@ -24,6 +24,7 @@ pub(crate) struct Target {
     containers: Box<[crate::compose::Container]>,
     meta_digest: Digest,
     tasks: Box<[schema::Checked]>,
+    debian: Value,
     task: usize,
     rendered: u64,
     entry: usize,
@@ -39,6 +40,7 @@ impl Target {
         containers: Box<[crate::compose::Container]>,
         meta_digest: Digest,
         checked: schema::Validated,
+        debian: Value,
         config: Config,
         capacity: u32,
     ) -> Self {
@@ -51,6 +53,7 @@ impl Target {
             containers,
             meta_digest,
             tasks: checked.tasks,
+            debian,
             task: 0,
             rendered: 0,
             entry: 0,
@@ -67,7 +70,7 @@ impl Target {
             if self.roots.is_none() {
                 self.roots = Some(Roots {
                     target: context::target(&self.meta, &self.containers),
-                    debian: Value::Map(Box::new([])),
+                    debian: self.debian.clone(),
                     settings: core::mem::replace(&mut task.settings, Value::Map(Box::new([]))),
                     tasks: core::mem::replace(&mut task.tasks, Value::Map(Box::new([]))),
                     exports: Value::Map(Box::new([])),

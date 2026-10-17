@@ -21,8 +21,9 @@ pub struct File {
     pub body: &'static [u8],
     pub mode: u32,
 }
+pub const DEBIAN: &[u8] = br#"{"debian":{"suite":"forky","architecture":"amd64","snapshot":{"archive":"20261001T030405Z"},"pockets":{"updates":false,"security":false}}}"#;
 pub const THIN: &[File] = &[
-    File { path: "fleet.json", body: b"{}", mode: 0o644 },
+    File { path: "fleet.json", body: DEBIAN, mode: 0o644 },
     File { path: "envs/prod.json", body: b"{}", mode: 0o644 },
     File { path: "hosts/x1/x1.json", body: b"{\"motd\":{}}", mode: 0o644 },
     File {
@@ -170,7 +171,7 @@ pub fn thin_with(files: &[File]) -> Vec<File> {
     combined
 }
 pub const LAYERS: &[File] = &[
-    File { path: "fleet.json", body: br#"{"motd":{}}"#, mode: 0o644 },
+    File { path: "fleet.json", body: br#"{"debian":{"suite":"forky","architecture":"amd64","snapshot":{"archive":"20261001T030405Z"},"pockets":{"updates":false,"security":false}},"motd":{}}"#, mode: 0o644 },
     File { path: "envs/prod.json", body: br#"{"issue":{}}"#, mode: 0o644 },
     File { path: "hosts/x1/x1.json", body: br#"{"motd":{},"issue":{}}"#, mode: 0o644 },
     File {
@@ -227,7 +228,7 @@ pub fn diff(repository: &Repository, asked: &Asked<'_>) -> Rendered {
     )
 }
 pub const MOTD: &[File] = &[
-    File { path: "fleet.json", body: b"{}", mode: 0o644 },
+    File { path: "fleet.json", body: DEBIAN, mode: 0o644 },
     File { path: "envs/prod.json", body: b"{}", mode: 0o644 },
     File { path: "envs/lab.json", body: b"{}", mode: 0o644 },
     File { path: "hosts/ion/ion.json", body: b"{}", mode: 0o644 },
@@ -607,6 +608,7 @@ pub const BROKEN_TEMPLATE: File =
     File { path: "tasks/motd/tree/etc/issue.j2", body: b"Host:\n{{ target.name\n", mode: 0o644 };
 
 pub const CLUSTER: &[File] = &[
+    File { path: "fleet.json", body: DEBIAN, mode: 0o644 },
     File {
         path: "envs/lab.json",
         body: br#"{"placement":{"kind":"vm","firmware":"efi","hardware":"incus"}}"#,
@@ -635,6 +637,7 @@ pub const USERS: &[File] = &[
 ];
 
 pub const CONTAINERS: &[File] = &[
+    File { path: "fleet.json", body: DEBIAN, mode: 0o644 },
     File { path: "envs/prod.json", body: b"{}", mode: 0o644 },
     File { path: "envs/lab.json", body: b"{}", mode: 0o644 },
     File { path: "hosts/rhi/rhi.json", body: b"{}", mode: 0o644 },
@@ -727,3 +730,13 @@ pub fn contained() -> Rendered {
     let repository = Repository::make("contained", &thin_with(CONTAINED));
     render(&repository, &[b"chat-prod", b"rhi-lab", b"rhi-prod"], Form::Text)
 }
+
+pub const DEBIAN_LAYERS: &[File] = &[
+    File { path: "fleet.json", body: br#"{"debian":{"suite":"trixie","architecture":"amd64","snapshot":{"archive":"20261001T030405Z"},"pockets":{"updates":false,"security":false}}}"#, mode: 0o644 },
+    File { path: "hosts/x1/x1.json", body: br#"{"motd":{},"debian":{"suite":"forky","components":{"contrib":true}}}"#, mode: 0o644 },
+    File { path: "hosts/x1/x1-prod.json", body: br#"{"placement":{"kind":"metal","firmware":"efi","hardware":"7th-gen"},"debian":{"components":{"non-free-firmware":true}}}"#, mode: 0o644 },
+    File { path: "tasks/motd/tree/etc/debian.j2", body: b"{{ debian.suite }} {{ debian.architecture }} {{ debian.snapshot.archive }} {{ debian.components | keys | join(',') }}\n", mode: 0o644 },
+];
+
+pub const REFUSED_DEBIAN: File =
+    File { path: "hosts/x1/x1.json", body: br#"{"motd":{},"debian":{"components":{"main":false}}}"#, mode: 0o644 };

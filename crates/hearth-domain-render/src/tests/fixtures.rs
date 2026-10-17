@@ -233,6 +233,7 @@ pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
             members: None,
             at,
             layer: Layer {
+                debian: Some(written_debian()),
                 placement: None,
                 tasks: Box::new([Task { name: bytes::copy_of(b"motd"), at, value: composition::map(at, &[]) }]),
             },
@@ -244,6 +245,7 @@ pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
             members: None,
             at,
             layer: Layer {
+                debian: None,
                 placement: Some(crate::revision::Placement {
                     at,
                     kind: Runs::Metal,
@@ -784,3 +786,5 @@ mod references;
 pub use references::*;
 
 pub mod containers;
+mod debian;
+pub use debian::*;

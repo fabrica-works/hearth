@@ -663,3 +663,28 @@ fn a_hosts_template_lists_the_containers_placed_on_it() {
 fn a_hosts_containers_leave_the_render_successful() {
     assert_eq!(fixtures::contained().exit, Exit::Code(0));
 }
+#[test]
+fn a_template_reads_the_debian_root_composed_over_three_layers() {
+    let repository = Repository::make("debian-layers", &fixtures::thin_with(fixtures::DEBIAN_LAYERS));
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["  /etc/debian "]),
+        "  /etc/debian              file 0644 root:root f745f2a642a2\n"
+    );
+}
+#[test]
+fn a_debian_the_schema_refuses_prints_the_layer_that_set_it() {
+    let repository =
+        Repository::make("debian-refused", &fixtures::thin_with(core::slice::from_ref(&fixtures::REFUSED_DEBIAN)));
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        String::from_utf8_lossy(&rendered.stdout),
+        "hosts/x1/x1.json:1:43: x1-prod: debian.components must keep main on\n"
+    );
+}
+#[test]
+fn a_refused_debian_exits_with_configuration_failure() {
+    let repository =
+        Repository::make("debian-refused-exit", &fixtures::thin_with(core::slice::from_ref(&fixtures::REFUSED_DEBIAN)));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}

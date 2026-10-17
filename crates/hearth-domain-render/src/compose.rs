@@ -770,3 +770,6 @@ pub(crate) fn metadata(target: &Target, placement: revision::Placement) -> crate
         },
     }
 }
+
+mod debian;
+pub use debian::debian;

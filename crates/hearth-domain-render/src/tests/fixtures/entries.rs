@@ -211,3 +211,16 @@ pub fn range_field(count: Literal) -> Field {
         },
     )
 }
+
+pub fn expansion(
+    declared: &Declaration,
+    limits: &crate::limits::Limits,
+    mut left: u64,
+) -> Result<crate::entries::Expanded, crate::entries::Fault> {
+    crate::entries::expand(declared, &super::Roots::x1_prod().context(), limits, &mut left)
+}
+pub const UNDEFINED_FIELD: crate::entries::Fault = crate::entries::Fault {
+    kind: crate::errors::Kind::Evaluation(crate::evaluate::FaultKind::Undefined),
+    at: FIELD_AT,
+    also: None,
+};

@@ -220,6 +220,7 @@ pub fn layers(declaration: &Declaration, layers: Layers) -> (crate::compose::Tar
                 members: None,
                 at: at(2, 1),
                 layer: Layer {
+                    debian: None,
                     placement: None,
                     tasks: Box::new([Task { name: copy_of(b"task"), at: at(2, 2), value }]),
                 },

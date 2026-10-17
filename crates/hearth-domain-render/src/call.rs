@@ -1,4 +1,5 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
+mod debian;
 pub(crate) mod guards;
 mod references;
 pub(crate) mod templates;
@@ -521,7 +522,19 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
-            if !guards::contained(&self.documents, &mut self.errors, &self.limits, &meta, &checked, &containers) {
+            let Some(debian) = debian::check(&self.documents, &mut self.merge, &mut self.errors, target) else {
+                self.outcome = self.outcome.worst(Outcome::Failed);
+                continue;
+            };
+            if !guards::contained(
+                &self.documents,
+                &mut self.errors,
+                &self.limits,
+                &meta,
+                &checked,
+                &containers,
+                &debian,
+            ) {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             }
@@ -535,22 +548,26 @@ impl Side {
                 containers,
                 meta_digest,
                 checked,
+                debian,
                 config,
                 u32::try_from(self.entries.len()).expect("listing count"),
             ));
             return self.template();
         }
+        Some(self.finished())
+    }
+    fn finished(&mut self) -> Answer {
         if !self.diff
             && let Some(error) = self.errors.get(self.error_next)
         {
             self.error_next = self.error_next.saturating_add(1);
-            return Some(Answer::Error(error.clone()));
+            return Answer::Error(error.clone());
         }
-        Some(Answer::Rendered {
+        Answer::Rendered {
             outcome: self.outcome.worst(self.errors.outcome()),
             diff: None,
             left_out: self.errors.left_out(),
-        })
+        }
     }
 }
 
