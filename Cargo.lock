@@ -31,6 +31,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-fake-machine"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
 name = "hearth-git-world"
 version = "0.0.0"
 dependencies = [
