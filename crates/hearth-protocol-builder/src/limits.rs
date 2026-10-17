@@ -2,6 +2,7 @@
 use crate::{config, git_machine, records};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
+    pub mmdebstrap: hearth_protocol_mmdebstrap::limits::Limits,
     pub walk: Walk,
     pub git: git_machine::limits::Limits,
     pub config: config::limits::Limits,
@@ -17,6 +18,7 @@ pub struct Walk {
     pub entries: u32,
 }
 pub const SHIPPED: Limits = Limits {
+    mmdebstrap: hearth_protocol_mmdebstrap::limits::SHIPPED,
     walk: Walk { depth: 16, page: 64, entries: 65_536 },
     tree: crate::tree::limits::SHIPPED,
     git: git_machine::limits::SHIPPED,

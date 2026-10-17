@@ -754,3 +754,5 @@ mod exported;
 mod package_changes;
 
 mod export_changes;
+
+mod resolve;

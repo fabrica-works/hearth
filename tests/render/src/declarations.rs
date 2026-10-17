@@ -227,6 +227,7 @@ pub fn expand(tree: &Tree, roots: &Roots, limits: &Limits) -> Expansion {
             Kind::Store(_)
             | Kind::Decode(_)
             | Kind::Repository(_)
+            | Kind::Resolution(_)
             | Kind::Tool(_)
             | Kind::Composition(_)
             | Kind::Guard(_)

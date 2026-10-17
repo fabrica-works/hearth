@@ -30,6 +30,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
         &mut render,
         &env,
         Event::Render {
+            resolve: false,
             repository: Box::from(b"/repository/.git".as_slice()),
             revision: Box::from(b"HEAD".as_slice()),
             targets: targets.iter().map(|t| Box::from(*t)).collect(),
@@ -51,6 +52,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                 Output::Request(request) => {
                     let mut at = env.now;
                     let events = match &request {
+                        Request::Resolve { .. } => unreachable!("resolve disabled"),
                         Request::Find { request, .. } => vec![Event::Absent { request: *request }],
                         Request::Keep { request, sha256, .. } => {
                             vec![Event::Kept { request: *request, sha256: *sha256 }]
@@ -66,7 +68,8 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                         }
                     };
                     let token = match &request {
-                        Request::Find { request, .. }
+                        Request::Resolve { request, .. }
+                        | Request::Find { request, .. }
                         | Request::Keep { request, .. }
                         | Request::List { request, .. }
                         | Request::Read { request, .. }
@@ -87,7 +90,9 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
             env.now = at;
             let event = schedule.next(at).expect("scheduled event");
             let token = match &event {
-                Event::Found { request, .. }
+                Event::Inst { request, .. }
+                | Event::Resolved { request, .. }
+                | Event::Found { request, .. }
                 | Event::Absent { request }
                 | Event::Kept { request, .. }
                 | Event::Listed { request, .. }

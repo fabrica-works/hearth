@@ -18,6 +18,7 @@ fn render_s_options_become_the_call_and_its_form() {
     assert_eq!(
         invocation.call,
         Call::Render {
+            resolve: false,
             repository: b"/".as_slice().into(),
             revision: b"main".as_slice().into(),
             targets: Box::new([b"x1-prod".as_slice().into(), b"x2-prod".as_slice().into()])
@@ -30,7 +31,6 @@ fn render_s_options_become_the_call_and_its_form() {
 const MISUSES: &[(&[&str], Misuse, &[u8])] = &[
     (&["bogus"], Misuse::Command, b"bogus"),
     (&["diff"], Misuse::Value, b"diff"),
-    (&["render", "--resolve"], Misuse::Option, b"--resolve"),
     (&["render", "--bogus"], Misuse::Option, b"--bogus"),
     (&["render", "--at"], Misuse::Value, b"--at"),
 ];
@@ -128,7 +128,7 @@ fn the_revision_defaults_to_head() {
     let invocation =
         argv::invocation(&words(&["render", "--repo", "/", "--store", "/store"]), None, None, Path::new("/"))
             .expect("invocation");
-    let Call::Render { revision, .. } = invocation.call else { panic!("render call") };
+    let Call::Render { resolve: false, revision, .. } = invocation.call else { panic!("render call") };
     assert_eq!(&*revision, b"HEAD", "default revision");
 }
 
@@ -164,4 +164,24 @@ fn a_malformed_from_or_to_is_usage_before_the_loop() {
             "{args:?}"
         );
     }
+}
+
+#[test]
+fn render_takes_resolve() {
+    let invocation = argv::invocation(
+        &words(&["render", "--resolve", "--repo", "/", "--store", "/store"]),
+        None,
+        None,
+        Path::new("/"),
+    )
+    .expect("render");
+    assert_eq!(
+        invocation.call,
+        Call::Render {
+            resolve: true,
+            repository: b"/".as_slice().into(),
+            revision: b"HEAD".as_slice().into(),
+            targets: Box::new([])
+        }
+    );
 }

@@ -20,6 +20,8 @@ pub struct Place {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
     Exported(Exported),
+
+    Resolution(Resolution),
     Guard(Guard),
     Collision(Collision),
     Store(StoreError),
@@ -75,6 +77,7 @@ pub enum Field {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Limit {
+    Closure,
     Template,
     Document,
     Decoded,
@@ -367,6 +370,7 @@ pub struct Tool {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Command {
+    Mmdebstrap,
     RevParse,
     LsTree,
     CatFile,
@@ -374,6 +378,7 @@ pub enum Command {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Ended {
+    Timeout,
     Start,
     Exit(u8),
     Signal(u32),
@@ -485,4 +490,13 @@ pub enum Cause {
     Composition(Composition),
     Schema(Schema),
     Evaluation(crate::evaluate::FaultKind),
+}
+
+/// Apt's configuration verdict and the bounded closure (render.md, 5.5, 7.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Resolution {
+    Unknown { package: Box<[u8]> },
+    Unsatisfiable { package: Option<Box<[u8]>> },
+    Absent { uri: Box<[u8]>, suite: Box<[u8]> },
+    TooMany { max: u32 },
 }

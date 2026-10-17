@@ -40,9 +40,11 @@ pub fn invocation(
     let mut repository = None;
     let mut store = None;
     let mut targets = Vec::new();
+    let mut resolve = false;
     while let Some(word) = words.next() {
         match word.as_bytes() {
             b"--json" => {}
+            b"--resolve" if !diff => resolve = true,
             b"--at" | b"--repo" | b"--store" | b"--target" => {
                 if (diff && word == "--at") || (!diff && word == "--target") {
                     return Err(usage(Misuse::Option, word));
@@ -79,11 +81,13 @@ pub fn invocation(
             }
         } else {
             Call::Render {
+                resolve,
                 repository: repository.as_os_str().as_bytes().into(),
                 revision: revision.as_bytes().into(),
                 targets: targets.into_boxed_slice(),
             }
         },
+        proxy: None,
         form: form(args),
         store: cwd.join(store),
     })

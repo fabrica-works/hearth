@@ -16,6 +16,7 @@ struct Frame {
 }
 #[derive(Debug)]
 pub(super) struct Walker {
+    owner: Token,
     frames: Stack<Frame>,
     opening: Option<Box<[u8]>>,
     closing: Option<Box<[u8]>>,
@@ -24,15 +25,19 @@ pub(super) struct Walker {
 }
 impl Walker {
     pub fn new(limits: Walk, root: Fd, below: &mut Queue<Asked>) -> Self {
+        Self::at(limits, root, b".", OWNER, below)
+    }
+    pub fn at(limits: Walk, root: Fd, name: &[u8], owner: Token, below: &mut Queue<Asked>) -> Self {
         below.push(Asked::File(file::Request::OpenDirectory {
-            owner: OWNER,
+            owner,
             root,
-            name: bytes::copy_of(b"."),
+            name: bytes::copy_of(name),
             no_follow: true,
         }));
         Self {
+            owner,
             frames: Stack::with_capacity(limits.depth),
-            opening: Some(bytes::copy_of(b".")),
+            opening: Some(bytes::copy_of(name)),
             closing: None,
             count: 0,
             failed: limits.depth == 0 || limits.page == 0,
@@ -44,13 +49,17 @@ impl Walker {
                 let name = self.opening.take().expect("walk opening");
                 if self.failed {
                     self.closing = Some(name);
-                    below.push(Asked::File(file::Request::Close { owner: OWNER, file }));
+                    below.push(Asked::File(file::Request::Close { owner: self.owner, file }));
                     return None;
                 }
                 self.frames
                     .push(Frame { token: file, name, entries: Box::new([]), at: 0, last: false })
                     .expect("depth checked");
-                below.push(Asked::File(file::Request::ListPage { owner: OWNER, directory: file, max: limits.page }));
+                below.push(Asked::File(file::Request::ListPage {
+                    owner: self.owner,
+                    directory: file,
+                    max: limits.page,
+                }));
                 return None;
             }
             file::Event::Listed { entries, .. } => {
@@ -66,7 +75,7 @@ impl Walker {
                 if !self.failed {
                     if let Some(parent) = self.frames.top() {
                         below.push(Asked::Beneath(Beneath::Remove {
-                            owner: OWNER,
+                            owner: self.owner,
                             root: parent.token,
                             name,
                             directory: true,
@@ -111,14 +120,14 @@ impl Walker {
                 let entry = frame.entries.get(frame.at.saturating_sub(1)).expect("entry cursor");
                 self.opening = Some(entry.name.clone());
                 below.push(Asked::Beneath(Beneath::OpenDirectory {
-                    owner: OWNER,
+                    owner: self.owner,
                     root: frame.token,
                     name: entry.name.clone(),
                     no_follow: true,
                 }));
             } else {
                 below.push(Asked::Beneath(Beneath::Remove {
-                    owner: OWNER,
+                    owner: self.owner,
                     root: frame.token,
                     name: entry.name.clone(),
                     directory: false,
@@ -127,7 +136,11 @@ impl Walker {
             return None;
         }
         if !frame.last {
-            below.push(Asked::File(file::Request::ListPage { owner: OWNER, directory: frame.token, max: limits.page }));
+            below.push(Asked::File(file::Request::ListPage {
+                owner: self.owner,
+                directory: frame.token,
+                max: limits.page,
+            }));
             return None;
         }
         self.close(below)
@@ -135,7 +148,7 @@ impl Walker {
     fn close(&mut self, below: &mut Queue<Asked>) -> Option<Event> {
         if let Some(frame) = self.frames.pop() {
             self.closing = Some(frame.name);
-            below.push(Asked::File(file::Request::Close { owner: OWNER, file: frame.token }));
+            below.push(Asked::File(file::Request::Close { owner: self.owner, file: frame.token }));
             None
         } else {
             Some(Event::Failed)

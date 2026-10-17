@@ -1,6 +1,8 @@
 //! Configured render bounds (render.md, 2.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
+    pub closure: u32,
+    pub resolve: skein_lib::Duration,
     pub targets: u32,
     pub errors: u32,
     pub tasks: u32,
@@ -23,6 +25,8 @@ pub struct Limits {
     pub exported: u64,
 }
 pub const SHIPPED: Limits = Limits {
+    closure: 8_192,
+    resolve: skein_lib::Duration::from_secs(600),
     targets: 1_024,
     errors: 256,
     tasks: 1_024,

@@ -23,6 +23,7 @@ pub const DOCUMENT: &[u8] = b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"
 
 pub fn call() -> builder::vocabulary::Call {
     builder::vocabulary::Call::Render {
+        resolve: false,
         repository: bytes::copy_of(b"/repo"),
         revision: bytes::copy_of(b"HEAD"),
         targets: Box::new([]),
@@ -775,3 +776,6 @@ pub use packages::*;
 
 mod resolution;
 pub use resolution::*;
+
+mod resolve;
+pub use resolve::*;

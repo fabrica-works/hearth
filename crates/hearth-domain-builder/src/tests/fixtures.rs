@@ -6,7 +6,12 @@ pub fn env() -> Env<Limits> {
     Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS }
 }
 pub fn call() -> Call {
-    Call::Render { repository: bytes::copy_of(b"/repo"), revision: bytes::copy_of(b"HEAD"), targets: Box::new([]) }
+    Call::Render {
+        resolve: false,
+        repository: bytes::copy_of(b"/repo"),
+        revision: bytes::copy_of(b"HEAD"),
+        targets: Box::new([]),
+    }
 }
 pub fn spec() -> render::parts::Spec {
     render::parts::Spec {

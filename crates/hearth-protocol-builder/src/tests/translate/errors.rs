@@ -53,6 +53,7 @@ fn decode_field_back(field: record_errors::Field) -> render_errors::Field {
 }
 fn decode_limit_back(limit: record_errors::Limit) -> render_errors::Limit {
     match limit {
+        record_errors::Limit::Closure => render_errors::Limit::Closure,
         record_errors::Limit::Template => render_errors::Limit::Template,
         record_errors::Limit::Document => render_errors::Limit::Document,
         record_errors::Limit::Decoded => render_errors::Limit::Decoded,
@@ -238,6 +239,7 @@ fn each_shape_field_fault_translates_its_kind_and_back() {
     }
 }
 const DECODE_LIMITS: &[(render_errors::Limit, record_errors::Limit)] = &[
+    (render_errors::Limit::Closure, record_errors::Limit::Closure),
     (render_errors::Limit::Document, record_errors::Limit::Document),
     (render_errors::Limit::Decoded, record_errors::Limit::Decoded),
     (render_errors::Limit::Static, record_errors::Limit::Static),
@@ -544,5 +546,21 @@ fn each_declared_fault_translates_to_render_and_back() {
         let rendered = crate::translate::errors::declared(input);
         let back = declared_config(declared_back(crate::translate::errors::declared_to_records(rendered)));
         assert_eq!(back, input, "row {row}: declaration fault");
+    }
+}
+
+fn resolution_back(fault: record_errors::Resolution) -> render_errors::Resolution {
+    match fault {
+        record_errors::Resolution::Unknown { package } => render_errors::Resolution::Unknown { package },
+        record_errors::Resolution::Unsatisfiable { package } => render_errors::Resolution::Unsatisfiable { package },
+        record_errors::Resolution::Absent { uri, suite } => render_errors::Resolution::Absent { uri, suite },
+        record_errors::Resolution::TooMany { max } => render_errors::Resolution::TooMany { max },
+    }
+}
+#[test]
+fn each_resolution_fault_translates_and_back() {
+    for (row, input) in crate::tests::fixtures::resolution_faults().into_iter().enumerate() {
+        let back = resolution_back(crate::translate::errors::resolution(input.clone()));
+        assert_eq!(back, input, "row {row}: resolution through records and back");
     }
 }

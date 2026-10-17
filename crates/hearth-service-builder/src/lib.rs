@@ -20,6 +20,7 @@ use skein_io::{
 use skein_lib::{Env, Queue, Time, Wall};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Configuration {
+    pub proxy: Option<Box<[u8]>>,
     pub store: Box<[u8]>,
     pub limits: Limits,
     pub uid: u32,
@@ -82,7 +83,8 @@ impl Service {
             io_submissions: Queue::with_capacity(limits.queue),
             file_submissions: Queue::with_capacity(limits.queue),
             io_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.io },
-            protocol: Protocol::new(&limits.protocol, call, form, roots, &configuration.store, seed),
+            protocol: Protocol::new(&limits.protocol, call, form, roots, &configuration.store, seed)
+                .with_proxy(configured_proxy(configuration)),
             protocol_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.protocol },
             domain: Builder::new(&limits.domain, configuration.uid),
             domain_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.domain },
@@ -166,6 +168,10 @@ impl Service {
             || !self.file_submissions.is_empty()
             || !self.io_submissions.is_empty()
             || self.protocol.work_pending()
+            || match protocol::next_deadline(&self.protocol) {
+                Some(at) => at <= now,
+                None => false,
+            }
             || match domain::next_deadline(&self.domain) {
                 Some(at) => at <= now,
                 None => false,
@@ -179,10 +185,15 @@ impl Service {
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        [self.io.next_deadline(), self.files.next_deadline(), domain::next_deadline(&self.domain)]
-            .into_iter()
-            .flatten()
-            .min()
+        [
+            self.io.next_deadline(),
+            self.files.next_deadline(),
+            domain::next_deadline(&self.domain),
+            protocol::next_deadline(&self.protocol),
+        ]
+        .into_iter()
+        .flatten()
+        .min()
     }
 }
 #[must_use]
@@ -261,6 +272,9 @@ fn io_up(service: &mut Service) {
     }
 }
 fn protocol_up(service: &mut Service) {
+    if protocol_room(service, protocol::MAX_OUT_RESUME) {
+        protocol::fire(&mut service.protocol, &service.protocol_env, &mut service.calls, &mut service.asked);
+    }
     for _ in 0..service.told.capacity() {
         if !service.protocol.work_pending() || !protocol_room(service, protocol::MAX_OUT_RESUME) {
             break;
@@ -433,4 +447,11 @@ fn beneath(files: &FileIo, request: protocol::Beneath) -> file::Request {
             directory,
         },
     }
+}
+
+fn configured_proxy(configuration: &Configuration) -> Option<protocol::Proxy> {
+    Some(
+        protocol::Proxy::new(configuration.proxy.as_deref()?, &configuration.limits.protocol.mmdebstrap)
+            .expect("validated proxy"),
+    )
 }

@@ -40,6 +40,7 @@ fn each_repository_kind_translates_and_back() {
 }
 fn ended_back(ended: record_errors::Ended) -> render_errors::Ended {
     match ended {
+        record_errors::Ended::Timeout => render_errors::Ended::Timeout,
         record_errors::Ended::Start => render_errors::Ended::Start,
         record_errors::Ended::Exit(code) => render_errors::Ended::Exit(code),
         record_errors::Ended::Signal(signal) => render_errors::Ended::Signal(signal),
@@ -50,6 +51,7 @@ fn ended_back(ended: record_errors::Ended) -> render_errors::Ended {
 }
 fn command_back(command: record_errors::Command) -> render_errors::Command {
     match command {
+        record_errors::Command::Mmdebstrap => render_errors::Command::Mmdebstrap,
         record_errors::Command::RevParse => render_errors::Command::RevParse,
         record_errors::Command::LsTree => render_errors::Command::LsTree,
         record_errors::Command::CatFile => render_errors::Command::CatFile,
@@ -57,6 +59,7 @@ fn command_back(command: record_errors::Command) -> render_errors::Command {
     }
 }
 const TOOLS: &[(render_errors::Command, render_errors::Ended)] = &[
+    (render_errors::Command::Mmdebstrap, render_errors::Ended::Timeout),
     (render_errors::Command::Diff, render_errors::Ended::Exit(1)),
     (render_errors::Command::RevParse, render_errors::Ended::Start),
     (render_errors::Command::LsTree, render_errors::Ended::Exit(128)),

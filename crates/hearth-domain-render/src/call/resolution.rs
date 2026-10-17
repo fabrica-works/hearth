@@ -14,10 +14,27 @@ pub(crate) struct Finding {
     next: usize,
     asked: Map<Digest, Option<Digest>>,
     pending: Option<Digest>,
+    deadline: Option<skein_lib::Time>,
+    attempted: Map<Digest, ()>,
+    count: u32,
 }
 impl Finding {
+    pub fn resolve(&mut self, deadline: Option<skein_lib::Time>) {
+        self.deadline = deadline;
+    }
+    pub fn inst(&mut self) {
+        self.count = self.count.saturating_add(1);
+    }
     pub fn new(capacity: u32) -> Self {
-        Self { assembled: false, next: 0, asked: Map::with_capacity(capacity), pending: None }
+        Self {
+            assembled: false,
+            next: 0,
+            asked: Map::with_capacity(capacity),
+            pending: None,
+            deadline: None,
+            attempted: Map::with_capacity(capacity),
+            count: 0,
+        }
     }
 }
 impl Side {
@@ -46,6 +63,11 @@ impl Side {
         }
         for (_, made) in &self.made {
             let Made::Spec(spec) = made else { continue };
+            if let Some(packages) = packages(spec)
+                && packages.variant == parts::packages::Variant::Container
+            {
+                continue;
+            }
             if let Some(resolution) = &spec.resolution {
                 let key = resolution.key();
                 if !self.finding.asked.contains_key(&key) {
@@ -53,6 +75,33 @@ impl Side {
                     self.finding.pending = Some(key);
                     self.ready = false;
                     out.push(Output::Request(Request::Find { request: Token::new(5), key }));
+                    return None;
+                }
+            }
+        }
+        if let Some(deadline) = self.finding.deadline {
+            for (_, made) in &self.made {
+                let Made::Spec(spec) = made else { continue };
+                let Some(packages) = packages(spec) else { continue };
+                if packages.variant == parts::packages::Variant::Container {
+                    continue;
+                }
+                let Some(resolution) = &spec.resolution else { continue };
+                let key = resolution.key();
+                if self.finding.asked.get(&key) == Some(&None) && !self.finding.attempted.contains_key(&key) {
+                    self.finding.attempted.insert(key, ()).expect("target capacity");
+                    self.finding.pending = Some(key);
+                    self.finding.count = 0;
+                    self.ready = false;
+                    out.push(Output::Request(Request::Resolve {
+                        request: Token::new(6),
+                        key,
+                        sources: packages.sources.clone(),
+                        names: packages.request.clone(),
+                        variant: packages.variant,
+                        apt: packages.apt.clone(),
+                        deadline,
+                    }));
                     return None;
                 }
             }
@@ -77,6 +126,42 @@ impl Side {
         }
         Some(self.finished())
     }
+    pub(crate) fn resolved(&mut self, failure: Option<(crate::vocabulary::Class, crate::vocabulary::Failure)>) {
+        let key = self.finding.pending.take().expect("one resolve in flight");
+        let failure = if self.finding.count > self.limits.closure {
+            Some((
+                crate::vocabulary::Class::Configuration,
+                crate::vocabulary::Failure::TooLarge {
+                    limit: crate::errors::Limit::Closure,
+                    max: u64::from(self.limits.closure),
+                },
+            ))
+        } else {
+            failure
+        };
+        if let Some((class, failure)) = failure {
+            let kind = failure_kind(failure);
+            if let Some(kind) = kind {
+                for (target, made) in &self.made {
+                    if let Made::Spec(spec) = made
+                        && let Some(resolution) = &spec.resolution
+                        && resolution.key() == key
+                    {
+                        self.errors.push(crate::errors::Error {
+                            side: None,
+                            kind: kind.clone(),
+                            class,
+                            at: None,
+                            also: None,
+                            target: Some(target.clone()),
+                            task: None,
+                        });
+                    }
+                }
+            }
+        }
+        self.ready = true;
+    }
     pub(crate) fn found(&mut self, digest: Option<Digest>, failed: bool) {
         let key = self.finding.pending.take().expect("one find in flight");
         *self.finding.asked.get_mut(&key).expect("asked key") = digest;
@@ -85,4 +170,39 @@ impl Side {
         }
         self.ready = true;
     }
+}
+
+fn packages(spec: &parts::Spec) -> Option<&parts::packages::Packages> {
+    for part in &spec.parts {
+        if let parts::PartRecord::Packages(packages) = &part.record {
+            return Some(packages);
+        }
+    }
+    None
+}
+
+fn failure_kind(failure: crate::vocabulary::Failure) -> Option<crate::errors::Kind> {
+    use crate::{
+        errors::{Decode, Kind, Limit, Resolution},
+        resolution::Cause,
+        vocabulary::Failure,
+    };
+    Some(match failure {
+        Failure::Run { tool: _, cause: Some(Cause::Unknown(package)) } => {
+            Kind::Resolution(Resolution::Unknown { package })
+        }
+        Failure::Run { tool: _, cause: Some(Cause::Unsatisfiable(package)) } => {
+            Kind::Resolution(Resolution::Unsatisfiable { package })
+        }
+        Failure::Run { tool: _, cause: Some(Cause::Absent { uri, suite }) } => {
+            Kind::Resolution(Resolution::Absent { uri, suite })
+        }
+        Failure::Run { tool, cause: None | Some(Cause::Fetch | Cause::Resolve | Cause::Space | Cause::Other) }
+        | Failure::Tool(tool) => Kind::Tool(tool),
+        Failure::TooLarge { limit: Limit::Closure, max } => {
+            Kind::Resolution(Resolution::TooMany { max: u32::try_from(max).expect("closure limit is u32") })
+        }
+        Failure::TooLarge { limit, max } => Kind::Decode(Decode::TooLarge { limit, max }),
+        Failure::Store => return None,
+    })
 }

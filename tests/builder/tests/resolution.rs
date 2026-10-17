@@ -52,3 +52,12 @@ fn the_test_repositorys_targets_render_the_pins_resolution_inputs() {
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("\"sources\":{\"architecture\":\"amd64\",\"archive\":\"20261017T143929Z\",\"components\":[\"main\"],\"suite\":\"forky\",\"updates\":false}"), "{text}");
 }
+
+#[test]
+fn resolve_with_its_key_recorded_runs_no_mmdebstrap() {
+    let repository = fixtures::recorded_test_min("resolve-recorded");
+    let rendered = fixtures::resolve(&repository, &[b"test-min"], Form::Text, &fixtures::dead_proxy());
+    assert!(fixtures::lines_starting(&rendered.stdout, &["packages "]).ends_with("resolution 21e9a02feb65 known\n"));
+    assert_eq!(rendered.exit, Exit::Code(0));
+    assert!(fixtures::names(&repository.scratch().path().join("store/staging")).is_empty());
+}

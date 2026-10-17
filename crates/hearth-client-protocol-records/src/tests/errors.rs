@@ -580,3 +580,34 @@ fn a_collision_prints_its_json_kind_and_key() {
 mod templates;
 
 mod exported;
+
+const RESOLUTION_MESSAGES: &[(fixtures::ResolutionInput, &str)] = &[
+    (fixtures::ResolutionInput::Unknown, "apt cannot locate package \"apt\"\n"),
+    (fixtures::ResolutionInput::Unsatisfiable, "unsatisfiable dependencies of \"apt\"\n"),
+    (fixtures::ResolutionInput::Absent, "the archive http://one/ does not have forky\n"),
+    (fixtures::ResolutionInput::TooMany, "a closure past 8192 packages\n"),
+];
+#[test]
+fn each_resolution_message_prints_as_worded() {
+    for (row, &(input, expected)) in RESOLUTION_MESSAGES.iter().enumerate() {
+        assert_eq!(
+            print(&Record::Error(fixtures::resolution_error(input))).as_deref(),
+            Ok(expected.as_bytes()),
+            "row {row}: {input:?}"
+        );
+    }
+}
+#[test]
+fn mmdebstraps_timeout_prints_as_timed_out() {
+    assert_eq!(
+        print(&Record::Error(fixtures::mmdebstrap_error(crate::errors::Ended::Timeout))).as_deref(),
+        Ok(b"mmdebstrap timed out\n".as_slice())
+    );
+}
+#[test]
+fn mmdebstraps_refused_start_prints_as_could_not_start() {
+    assert_eq!(
+        print(&Record::Error(fixtures::mmdebstrap_error(crate::errors::Ended::Start))).as_deref(),
+        Ok(b"mmdebstrap could not start\n".as_slice())
+    );
+}

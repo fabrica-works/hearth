@@ -10,15 +10,19 @@ use hearth_client_protocol_records as records;
 pub use hearth_domain_builder as builder;
 use hearth_protocol_config as config;
 use hearth_protocol_git as git_machine;
+pub use hearth_protocol_mmdebstrap::vector::Proxy;
 pub use records::form::Form;
 mod cache;
 mod client;
+mod events;
 mod git;
 mod keep;
 mod terminal;
-use terminal::{listing_failed, stream_ended};
+use events::stream_up;
+use terminal::listing_failed;
 pub mod limits;
 mod read;
+mod resolve;
 mod store;
 mod walk;
 use hearth_protocol_tree as tree;
@@ -111,6 +115,8 @@ pub struct Protocol {
     child: Option<git::Child>,
     mode: Option<Mode>,
     keeping: Option<keep::Keep>,
+    resolving: Option<resolve::Resolve>,
+    proxy: Option<Proxy>,
 }
 impl Protocol {
     #[must_use]
@@ -129,7 +135,14 @@ impl Protocol {
             child: None,
             mode: None,
             keeping: None,
+            resolving: None,
+            proxy: None,
         }
+    }
+    #[must_use]
+    pub fn with_proxy(mut self, proxy: Option<Proxy>) -> Self {
+        self.proxy = proxy;
+        self
     }
     #[must_use]
     pub fn take_startup(&mut self) -> Option<Box<[u8]>> {
@@ -163,7 +176,8 @@ impl Protocol {
     }
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.keeping.is_none()
+        self.resolving.is_none()
+            && self.keeping.is_none()
             && self.mode.is_none()
             && self.child.is_none()
             && self.call.is_none()
@@ -174,6 +188,9 @@ impl Protocol {
     pub fn work_pending(&self) -> bool {
         if self.call.is_some() || self.client.work_pending() || self.progress.work_pending() {
             return true;
+        }
+        if let Some(resolve) = &self.resolving {
+            return resolve.ready();
         }
         if let Some(keep) = &self.keeping {
             return keep.work_pending();
@@ -264,6 +281,7 @@ pub fn down(
             assert!(protocol.mode.is_none() && protocol.child.is_none(), "one git request at a time");
             assert!(protocol.keeping.is_none(), "one cache request at a time");
             match request {
+                request @ render::vocabulary::Request::Resolve { .. } => protocol.resolve(request, env, below),
                 render::vocabulary::Request::Find { .. } => unreachable!("root routes finds to store"),
                 request @ render::vocabulary::Request::Keep { .. } => protocol.keep(request, env),
                 render::vocabulary::Request::List { request, repository, revision } => {
@@ -330,6 +348,16 @@ pub fn down(
     }
 }
 pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, above: &mut Queue<Event>, below: &mut Queue<Asked>) {
+    if let Some(resolve) = &mut protocol.resolving {
+        let owned = match &ev {
+            Told::File(event) => event.owner() == resolve::OWNER,
+            Told::Io(event) => !protocol.client.owns(event) && !protocol.progress.owns(event),
+        };
+        if owned {
+            resolve.up(ev, protocol.roots, env, above, below);
+            return;
+        }
+    }
     let event = match ev {
         Told::Io(event) => event,
         Told::File(event) => {
@@ -486,6 +514,9 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
     }
     if protocol.client.work_pending() {
         protocol.client.resume(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, below);
+        return;
+    }
+    if protocol.resume_resolve(env, above, below) {
         return;
     }
     if let Some(keep) = &mut protocol.keeping {
@@ -737,44 +768,15 @@ fn failure(
 #[cfg(test)]
 mod tests;
 
-fn stream_up(child: &mut git::Child, owner: Token, up: Up) -> Option<Up> {
-    if child.closing {
-        return None;
+pub fn fire(protocol: &mut Protocol, env: &Env<Limits>, _above: &mut Queue<Event>, _below: &mut Queue<Asked>) {
+    if let Some(resolve) = &mut protocol.resolving {
+        resolve.fire(env);
     }
-    if let Up::Failed(_) = &up {
-        child.fault = Some(render::errors::Ended::Stream);
+}
+#[must_use]
+pub fn next_deadline(protocol: &Protocol) -> Option<skein_lib::Time> {
+    match &protocol.resolving {
+        Some(resolve) => resolve.next_deadline(),
+        None => None,
     }
-    if child.error == Some(owner) {
-        match up {
-            Up::Bytes(bytes) => {
-                child.tail.admit(&bytes);
-                child.error_state = Intake::Demand;
-            }
-            Up::End => {
-                child.error_state = Intake::Ended;
-            }
-            Up::Failed(_) => {
-                child.error_state = Intake::Ended;
-                child.failed = true;
-            }
-            Up::Room => unreachable!("read-only stderr"),
-        }
-        return None;
-    }
-    if child.output == Some(owner) && (child.output_state == Intake::Draining || child.failed) {
-        match up {
-            Up::Bytes(_) => child.output_state = Intake::Waiting,
-            Up::End => child.output_state = Intake::Ended,
-            Up::Failed(_) => {
-                child.output_state = Intake::Ended;
-                child.failed = true;
-            }
-            Up::Room => unreachable!("read-only stdout"),
-        }
-        return None;
-    }
-    if child.output == Some(owner) {
-        child.output_state = if stream_ended(&up) { Intake::Ended } else { Intake::Waiting };
-    }
-    Some(up)
 }

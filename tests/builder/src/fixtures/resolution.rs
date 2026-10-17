@@ -114,3 +114,33 @@ pub fn recorded_test_min(label: &str) -> super::Repository {
 pub fn record_test_min(repository: &super::Repository) {
     super::lay(&repository.scratch().path().join("store"), &[super::Laid::Resolution(test_min_recorded())]);
 }
+
+#[must_use]
+pub fn dead_proxy() -> Box<[u8]> {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("loopback port");
+    format!("http://{}", listener.local_addr().expect("bound address")).into_bytes().into()
+}
+
+use super::{Call, Form, Release, Rendered, Repository};
+use std::os::unix::ffi::OsStrExt;
+pub(super) fn call_at(repository: &Repository, at: &str, targets: &[&[u8]], resolve: bool) -> Call {
+    Call::Render {
+        resolve,
+        repository: repository.work_tree.join(".git").as_os_str().as_bytes().into(),
+        revision: at.as_bytes().into(),
+        targets: targets.iter().map(|target| Box::<[u8]>::from(*target)).collect(),
+    }
+}
+#[must_use]
+pub fn resolve(repository: &Repository, targets: &[&[u8]], form: Form, proxy: &[u8]) -> Rendered {
+    super::run_holding(
+        repository,
+        call_at(repository, "HEAD", targets, true),
+        form,
+        None,
+        &hearth::limits(),
+        Release::After(skein_lib::Duration::ZERO),
+        Some(proxy.into()),
+    )
+    .rendered
+}

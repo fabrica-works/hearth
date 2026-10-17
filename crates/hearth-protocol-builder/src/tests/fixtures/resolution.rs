@@ -50,3 +50,15 @@ pub fn resolution_record(inputs: tree::resolution::Inputs) -> tree::resolution::
 fn boxed_resolution(value: Option<render::keys::Resolution>) -> Option<Box<render::keys::Resolution>> {
     Some(Box::new(value?))
 }
+
+#[must_use]
+pub fn resolution_faults() -> [render::errors::Resolution; 5] {
+    use render::errors::Resolution;
+    [
+        Resolution::Unknown { package: b"apt".as_slice().into() },
+        Resolution::Unsatisfiable { package: Some(b"curl".as_slice().into()) },
+        Resolution::Unsatisfiable { package: None },
+        Resolution::Absent { uri: b"http://one/".as_slice().into(), suite: b"forky".as_slice().into() },
+        Resolution::TooMany { max: super::CLOSURE_LIMIT },
+    ]
+}

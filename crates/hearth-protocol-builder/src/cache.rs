@@ -183,7 +183,7 @@ impl Cache {
         self.name.clone()
     }
 }
-fn hex(writer: &mut Writer, byte: u8) {
+pub(super) fn hex(writer: &mut Writer, byte: u8) {
     for digit in [byte >> 4_u8, byte & 15] {
         writer
             .put(&[if digit < 10 { b'0'.saturating_add(digit) } else { b'a'.saturating_add(digit.saturating_sub(10)) }])

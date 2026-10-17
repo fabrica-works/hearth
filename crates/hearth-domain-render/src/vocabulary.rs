@@ -8,25 +8,106 @@ pub use hearth_lib::encode::Digest;
 use skein_lib::Token;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
-    Found { request: Token, digest: Digest },
-    Absent { request: Token },
-    Diff { repository: Box<[u8]>, from: Box<[u8]>, to: Box<[u8]>, targets: Box<[Box<[u8]>]> },
-    Render { repository: Box<[u8]>, revision: Box<[u8]>, targets: Box<[Box<[u8]>]> },
-    Listed { request: Token, commit: Oid, entries: Box<[Entry]> },
-    Unresolved { request: Token },
-    Read { request: Token, oid: Oid, read: Decoded },
-    Kept { request: Token, sha256: Digest },
-    Cached { request: Token, oid: Oid, size: u64, sha256: Digest },
-    Hunks { request: Token, hunks: crate::diff::Hunks },
-    Failed { request: Token, class: Class, at: Option<Box<[u8]>>, failure: Failure },
+    Inst {
+        request: Token,
+        inst: crate::resolution::Inst,
+    },
+    Resolved {
+        request: Token,
+        lines: Box<[crate::resolution::Line]>,
+        tools: crate::resolution::Tools,
+        costs: crate::resolution::Costs,
+    },
+    Found {
+        request: Token,
+        digest: Digest,
+    },
+    Absent {
+        request: Token,
+    },
+    Diff {
+        repository: Box<[u8]>,
+        from: Box<[u8]>,
+        to: Box<[u8]>,
+        targets: Box<[Box<[u8]>]>,
+    },
+    Render {
+        resolve: bool,
+        repository: Box<[u8]>,
+        revision: Box<[u8]>,
+        targets: Box<[Box<[u8]>]>,
+    },
+    Listed {
+        request: Token,
+        commit: Oid,
+        entries: Box<[Entry]>,
+    },
+    Unresolved {
+        request: Token,
+    },
+    Read {
+        request: Token,
+        oid: Oid,
+        read: Decoded,
+    },
+    Kept {
+        request: Token,
+        sha256: Digest,
+    },
+    Cached {
+        request: Token,
+        oid: Oid,
+        size: u64,
+        sha256: Digest,
+    },
+    Hunks {
+        request: Token,
+        hunks: crate::diff::Hunks,
+    },
+    Failed {
+        request: Token,
+        class: Class,
+        at: Option<Box<[u8]>>,
+        failure: Failure,
+    },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
-    Find { request: Token, key: Digest },
-    Keep { request: Token, path: Box<[u8]>, sha256: Digest, bytes: Box<[u8]> },
-    Hunks { request: Token, before: Digest, after: Digest },
-    List { request: Token, repository: Box<[u8]>, revision: Box<[u8]> },
-    Read { request: Token, repository: Box<[u8]>, commit: Oid, blobs: Box<[Blob]> },
+    Resolve {
+        request: Token,
+        key: Digest,
+        sources: crate::parts::packages::Sources,
+        names: Box<[Box<[u8]>]>,
+        variant: crate::parts::packages::Variant,
+        apt: crate::parts::packages::Apt,
+        deadline: skein_lib::Time,
+    },
+    Find {
+        request: Token,
+        key: Digest,
+    },
+    Keep {
+        request: Token,
+        path: Box<[u8]>,
+        sha256: Digest,
+        bytes: Box<[u8]>,
+    },
+    Hunks {
+        request: Token,
+        before: Digest,
+        after: Digest,
+    },
+    List {
+        request: Token,
+        repository: Box<[u8]>,
+        revision: Box<[u8]>,
+    },
+    Read {
+        request: Token,
+        repository: Box<[u8]>,
+        commit: Oid,
+        blobs: Box<[Blob]>,
+    },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
@@ -84,6 +165,7 @@ impl Outcome {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Failure {
+    Run { tool: crate::errors::Tool, cause: Option<crate::resolution::Cause> },
     Tool(crate::errors::Tool),
     TooLarge { limit: crate::errors::Limit, max: u64 },
     Store,

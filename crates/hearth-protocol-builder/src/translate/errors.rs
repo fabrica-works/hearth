@@ -73,6 +73,7 @@ pub fn error(error: target::Error) -> records::errors::Error {
         target::Kind::Guard(target::Guard { name, message }) => {
             records::errors::Kind::Guard(records::errors::Guard { name, message })
         }
+        target::Kind::Resolution(fault) => records::errors::Kind::Resolution(resolution(fault)),
         target::Kind::Store(fault) => records::errors::Kind::Store(store_error(fault)),
         target::Kind::Evaluation(kind) => records::errors::Kind::Evaluation(evaluation(kind)),
         target::Kind::Schema(fault) => records::errors::Kind::Schema(schema(fault)),
@@ -144,6 +145,7 @@ pub fn field(field: target::Field) -> records::errors::Field {
 #[must_use]
 pub fn limit(limit: target::Limit) -> records::errors::Limit {
     match limit {
+        target::Limit::Closure => records::errors::Limit::Closure,
         target::Limit::Template => records::errors::Limit::Template,
         target::Limit::Document => records::errors::Limit::Document,
         target::Limit::Decoded => records::errors::Limit::Decoded,
@@ -425,12 +427,14 @@ pub fn repository(why: target::Repository) -> records::errors::Repository {
 pub fn tool(tool: target::Tool) -> records::errors::Tool {
     use records::errors as out;
     let command = match tool.command {
+        target::Command::Mmdebstrap => out::Command::Mmdebstrap,
         target::Command::RevParse => out::Command::RevParse,
         target::Command::LsTree => out::Command::LsTree,
         target::Command::CatFile => out::Command::CatFile,
         target::Command::Diff => out::Command::Diff,
     };
     let ended = match tool.ended {
+        target::Ended::Timeout => out::Ended::Timeout,
         target::Ended::Start => out::Ended::Start,
         target::Ended::Exit(code) => out::Ended::Exit(code),
         target::Ended::Signal(signal) => out::Ended::Signal(signal),
@@ -649,4 +653,15 @@ fn exported(value: target::Exported) -> records::errors::Exported {
         target::Cause::Evaluation(value) => records::errors::Cause::Evaluation(evaluation(value)),
     };
     records::errors::Exported { exporter, task, cause }
+}
+
+#[must_use]
+pub fn resolution(fault: target::Resolution) -> records::errors::Resolution {
+    use records::errors::Resolution;
+    match fault {
+        target::Resolution::Unknown { package } => Resolution::Unknown { package },
+        target::Resolution::Unsatisfiable { package } => Resolution::Unsatisfiable { package },
+        target::Resolution::Absent { uri, suite } => Resolution::Absent { uri, suite },
+        target::Resolution::TooMany { max } => Resolution::TooMany { max },
+    }
 }

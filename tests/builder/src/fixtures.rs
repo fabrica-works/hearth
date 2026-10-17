@@ -149,15 +149,12 @@ pub fn render(repository: &Repository, targets: &[&[u8]], form: Form) -> Rendere
 }
 #[must_use]
 pub fn render_at(repository: &Repository, at: &str, targets: &[&[u8]], form: Form) -> Rendered {
-    let call = Call::Render {
-        repository: repository.work_tree.join(".git").as_os_str().as_bytes().into(),
-        revision: at.as_bytes().into(),
-        targets: targets.iter().map(|target| Box::<[u8]>::from(*target)).collect(),
-    };
+    let call = call_at(repository, at, targets, false);
     run(repository, call, form, None)
 }
 fn run(repository: &Repository, call: Call, form: Form, store: Option<&Path>) -> Rendered {
-    run_holding(repository, call, form, store, &hearth::limits(), Release::After(skein_lib::Duration::ZERO)).rendered
+    run_holding(repository, call, form, store, &hearth::limits(), Release::After(skein_lib::Duration::ZERO), None)
+        .rendered
 }
 
 pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         6bc0dd7fe1dd\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
@@ -304,12 +301,8 @@ fn render_call(
     limits: &hearth::Limits,
     release: Release,
 ) -> Held {
-    let call = Call::Render {
-        repository: repository.work_tree.join(".git").as_os_str().as_bytes().into(),
-        revision: at.as_bytes().into(),
-        targets: targets.iter().map(|target| Box::<[u8]>::from(*target)).collect(),
-    };
-    run_holding(repository, call, form, None, limits, release)
+    let call = call_at(repository, at, targets, false);
+    run_holding(repository, call, form, None, limits, release, None)
 }
 fn run_holding(
     repository: &Repository,
@@ -318,6 +311,7 @@ fn run_holding(
     store: Option<&Path>,
     limits: &hearth::Limits,
     release: Release,
+    proxy: Option<Box<[u8]>>,
 ) -> Held {
     let output = repository.scratch.path().join("stdout");
     let fd = Fd::new(fs::File::create(&output).expect("output file").into_raw_fd());
@@ -331,7 +325,7 @@ fn run_holding(
         lock.lock().expect("lock store");
         Some(lock)
     };
-    let mut client = Client::open(Invocation { call, form, store }, limits, fd, 7).expect("client startup");
+    let mut client = Client::open(Invocation { call, form, store, proxy }, limits, fd, 7).expect("client startup");
     let error = repository.scratch.path().join("stderr");
     client
         .adopt_error(Fd::new(fs::File::create(&error).expect("error output").into_raw_fd()))

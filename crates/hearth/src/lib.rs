@@ -15,6 +15,7 @@ use std::{
 };
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Invocation {
+    pub proxy: Option<Box<[u8]>>,
     pub call: Call,
     pub form: Form,
     pub store: PathBuf,
@@ -54,6 +55,7 @@ impl Client {
         let staging = opened.next().expect("staging");
         let mut service = Service::new(
             &Configuration {
+                proxy: invocation.proxy,
                 limits: *limits,
                 uid: skein_shell::effective_user(),
                 store: invocation.store.as_os_str().as_bytes().into(),

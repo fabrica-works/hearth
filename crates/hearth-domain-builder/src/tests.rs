@@ -131,6 +131,7 @@ fn a_refused_blob_fails_its_read_at_its_last_blob() {
         &mut builder,
         &fixtures::env(),
         Event::Render(RenderEvent::Render {
+            resolve: false,
             repository: bytes::copy_of(b"/repo"),
             revision: bytes::copy_of(b"HEAD"),
             targets: Box::new([]),

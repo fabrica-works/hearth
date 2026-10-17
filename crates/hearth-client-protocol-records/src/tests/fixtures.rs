@@ -419,3 +419,6 @@ pub use packages::{boot_change, change_record};
 pub use packages::{initramfs_change, preseed_change, requested_packages_change};
 
 pub use packages::unchanged_packages_change;
+
+mod resolution;
+pub use resolution::*;

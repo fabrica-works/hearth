@@ -33,3 +33,5 @@ mod boot;
 mod kinds;
 
 mod keys;
+
+mod resolution;

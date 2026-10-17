@@ -219,7 +219,8 @@ fn has(settings: &compose::Settings, task: &[u8]) -> bool {
 fn broken(kind: &Kind) -> bool {
     match kind {
         Kind::Decode(_) | Kind::Repository(_) | Kind::Composition(_) => true,
-        Kind::Exported(_)
+        Kind::Resolution(_)
+        | Kind::Exported(_)
         | Kind::Tool(_)
         | Kind::Guard(_)
         | Kind::Collision(_)
@@ -269,7 +270,12 @@ fn exported(error: &Error, exporter: &[u8], task: &[u8]) -> Option<Error> {
         Kind::Composition(value) => Cause::Composition(value.clone()),
         Kind::Schema(value) => Cause::Schema(value.clone()),
         Kind::Evaluation(value) => Cause::Evaluation(*value),
-        Kind::Exported(_) | Kind::Tool(_) | Kind::Guard(_) | Kind::Collision(_) | Kind::Store(_) => return None,
+        Kind::Resolution(_)
+        | Kind::Exported(_)
+        | Kind::Tool(_)
+        | Kind::Guard(_)
+        | Kind::Collision(_)
+        | Kind::Store(_) => return None,
     };
     let mut error = error.clone();
     error.kind =

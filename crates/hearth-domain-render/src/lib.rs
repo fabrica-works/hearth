@@ -13,6 +13,7 @@ pub mod keys;
 pub mod kinds;
 pub mod limits;
 pub mod parts;
+pub mod resolution;
 pub mod revision;
 pub mod schema;
 pub mod vocabulary;
@@ -44,10 +45,12 @@ impl Render {
 }
 pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<Output>) {
     match ev {
-        Event::Render { repository, revision, targets } => {
+        Event::Render { resolve, repository, revision, targets } => {
             assert!(render.call.is_none(), "one render call at a time");
             let request = Request::List { request: Token::new(1), repository: repository.clone(), revision };
-            render.call = Some(call::Call::new(repository, targets, &env.limits));
+            let mut call = call::Call::new(repository, targets, &env.limits);
+            call.side.finding.resolve(if resolve { Some(env.now.saturating_add(env.limits.resolve)) } else { None });
+            render.call = Some(call);
             out.push(Output::Request(request));
         }
         Event::Diff { repository, from, to, targets } => {
@@ -76,6 +79,14 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             assert_eq!(request, Token::new(1), "listing token");
             render.call.as_mut().expect("active call").side.fail(Outcome::Usage);
         }
+        Event::Inst { request, inst: _ } => {
+            assert_eq!(request, Token::new(6), "resolve token");
+            render.call.as_mut().expect("active call").side.finding.inst();
+        }
+        Event::Resolved { request, lines: _, tools: _, costs: _ } => {
+            assert_eq!(request, Token::new(6), "resolve token");
+            render.call.as_mut().expect("active call").side.resolved(None);
+        }
         Event::Found { request, digest } => {
             assert_eq!(request, Token::new(5), "find token");
             render.call.as_mut().expect("active call").side.found(Some(digest), false);
@@ -94,6 +105,10 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
                 return;
             }
             let side = &mut render.call.as_mut().expect("active call").side;
+            if request == Token::new(6) {
+                side.resolved(Some((class, failure)));
+                return;
+            }
             if request == Token::new(5) {
                 side.found(None, true);
                 return;
@@ -103,7 +118,9 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
                 return;
             }
             let kind = match failure {
-                vocabulary::Failure::Tool(tool) => Some(errors::Kind::Tool(tool)),
+                vocabulary::Failure::Run { tool, .. } | vocabulary::Failure::Tool(tool) => {
+                    Some(errors::Kind::Tool(tool))
+                }
                 vocabulary::Failure::TooLarge { limit, max } => {
                     Some(errors::Kind::Decode(errors::Decode::TooLarge { limit, max }))
                 }

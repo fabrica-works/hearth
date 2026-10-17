@@ -23,6 +23,7 @@ pub struct Tool {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Command {
+    Mmdebstrap,
     RevParse,
     LsTree,
     CatFile,
@@ -30,6 +31,7 @@ pub enum Command {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Ended {
+    Timeout,
     Start,
     Exit(u8),
     Signal(u32),
@@ -84,6 +86,7 @@ impl Repository {
 impl Command {
     fn name(self) -> &'static [u8] {
         match self {
+            Self::Mmdebstrap => b"mmdebstrap",
             Self::RevParse => b"rev_parse",
             Self::LsTree => b"ls_tree",
             Self::CatFile => b"cat_file",
@@ -92,6 +95,7 @@ impl Command {
     }
     pub(super) fn text(self) -> &'static [u8] {
         match self {
+            Self::Mmdebstrap => b"mmdebstrap",
             Self::RevParse => b"git rev-parse",
             Self::LsTree => b"git ls-tree",
             Self::CatFile => b"git cat-file",
@@ -103,6 +107,7 @@ impl Tool {
     pub(super) fn text(&self, lines: &mut Lines) {
         lines.put(self.command.text());
         match &self.ended {
+            Ended::Timeout => lines.put(b" timed out"),
             Ended::Start => lines.put(b" could not start"),
             Ended::Exit(code) => {
                 lines.put(b" exited ");
@@ -126,6 +131,7 @@ impl Tool {
         json.key(b"ended");
         json.object_start();
         match &self.ended {
+            Ended::Timeout => field(json, b"kind", b"timeout"),
             Ended::Start => field(json, b"kind", b"start"),
             Ended::Exit(code) => {
                 json.key(b"code");

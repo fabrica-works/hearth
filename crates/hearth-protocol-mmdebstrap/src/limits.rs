@@ -1,5 +1,5 @@
 //! Configured limits (render.md, 2.3 and 5; store.md, 6.1).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Limits {
     pub path: u32,
     pub name: u32,

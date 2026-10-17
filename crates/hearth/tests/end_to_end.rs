@@ -38,3 +38,17 @@ fn end_to_end_diff() {
     assert_eq!(String::from_utf8_lossy(&ended.stdout), fixtures::MOTD_DIFF_TEXT);
     assert_eq!(ended.exit, Some(Exit::Code(1)), "stderr: {}", String::from_utf8_lossy(&ended.stderr));
 }
+
+#[test]
+fn end_to_end_render_resolve() {
+    let repository = fixtures::recorded_test_min("end-to-end-render-resolve");
+    let store = repository.scratch().path().join("store");
+    let ended = fixtures::binary(
+        env!("CARGO_BIN_EXE_hearth").as_ref(),
+        &["render".as_ref(), "--resolve".as_ref(), "test-min".as_ref(), "--store".as_ref(), store.as_os_str()],
+        &[],
+        repository.work_tree(),
+    );
+    assert!(fixtures::lines_starting(&ended.stdout, &["packages "]).ends_with("resolution 21e9a02feb65 known\n"));
+    assert_eq!(ended.exit, Some(Exit::Code(0)), "stderr: {}", String::from_utf8_lossy(&ended.stderr));
+}

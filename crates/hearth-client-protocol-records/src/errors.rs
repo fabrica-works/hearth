@@ -19,6 +19,8 @@ pub struct Error {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
     Exported(Exported),
+
+    Resolution(Resolution),
     Store(StoreError),
     Evaluation(Evaluation),
     Schema(Schema),
@@ -76,6 +78,7 @@ impl Error {
                 lines.quote(key);
                 lines.put(b" is made twice");
             }
+            Kind::Resolution(error) => error.text(lines),
             Kind::Store(error) => error.text(lines),
             Kind::Decode(decode) => decode.text(lines),
             Kind::Repository(why) => why.text(lines),
@@ -122,6 +125,11 @@ impl Error {
                 field(json, b"key", key);
                 field(json, b"kind", b"key");
                 json.object_end();
+            }
+            Kind::Resolution(error) => {
+                field(json, b"kind", b"resolution");
+                json.key(b"resolution");
+                error.json(json);
             }
             Kind::Store(error) => {
                 field(json, b"kind", b"store");
@@ -256,6 +264,7 @@ pub enum Field {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Limit {
+    Closure,
     Template,
     Document,
     Decoded,
@@ -321,6 +330,7 @@ impl Decode {
             }
             Self::TooLarge { limit, max } => {
                 lines.put(match limit {
+                    Limit::Closure => b"a closure past ",
                     Limit::Template => b"a template past ",
                     Limit::Document => b"a document past ",
                     Limit::Decoded => b"decoded documents past ",
@@ -411,6 +421,7 @@ impl Decode {
                     json,
                     b"limit",
                     match limit {
+                        Limit::Closure => b"closure",
                         Limit::Template => b"template",
                         Limit::Document => b"document",
                         Limit::Decoded => b"decoded",
@@ -759,3 +770,6 @@ impl Exported {
         json.object_end();
     }
 }
+
+mod resolution;
+pub use resolution::Resolution;

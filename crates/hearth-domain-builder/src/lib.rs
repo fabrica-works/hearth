@@ -183,7 +183,9 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
             }
             let event = match builder.call.take().expect("opening call") {
                 Call::Diff { repository, from, to, targets } => RenderEvent::Diff { repository, from, to, targets },
-                Call::Render { repository, revision, targets } => RenderEvent::Render { repository, revision, targets },
+                Call::Render { resolve, repository, revision, targets } => {
+                    RenderEvent::Render { resolve, repository, revision, targets }
+                }
             };
             let render_env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
             render::step(&mut builder.render, &render_env, event, &mut builder.output);

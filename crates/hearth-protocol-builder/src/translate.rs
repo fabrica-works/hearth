@@ -8,6 +8,7 @@ pub mod changes;
 pub mod errors;
 pub mod instructions;
 pub mod operations;
+pub mod resolution;
 pub mod store;
 
 pub mod hunks;

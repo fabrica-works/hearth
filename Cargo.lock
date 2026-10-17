@@ -219,6 +219,7 @@ dependencies = [
  "hearth-lib",
  "hearth-protocol-config",
  "hearth-protocol-git",
+ "hearth-protocol-mmdebstrap",
  "hearth-protocol-template",
  "hearth-protocol-tree",
  "skein-io",
