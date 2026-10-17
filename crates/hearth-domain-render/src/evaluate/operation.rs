@@ -21,6 +21,22 @@ pub enum Op {
     List { length: u32 },
     Defined,
     NotDefined,
+    Not,
+    Equal,
+    NotEqual,
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual,
+    In,
+    NotIn,
+    Concat,
+    Add,
+    Subtract,
+    JumpIfFalseKeeping { over: u32 },
+    JumpIfTrueKeeping { over: u32 },
+    JumpIfFalse { over: u32 },
+    Jump { over: u32 },
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Missing {

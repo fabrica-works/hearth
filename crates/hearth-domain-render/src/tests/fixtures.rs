@@ -160,3 +160,36 @@ pub fn owned(value: Operand<'_>) -> Option<Value> {
         }
     })
 }
+
+pub fn code(operations: &[Op]) -> Box<[Operation]> {
+    let mut result = skein_lib::List::with_capacity(u32::try_from(operations.len()).expect("fixture fits"));
+    for (at, operation) in operations.iter().enumerate() {
+        result.push(op(u32::try_from(at).expect("fixture fits"), operation.clone())).expect("room");
+    }
+    result.into_boxed()
+}
+#[derive(Clone, Copy, Debug)]
+pub enum Input {
+    Undefined,
+    Bool(bool),
+    Int(i64),
+    Text(&'static [u8]),
+    List(&'static [Input]),
+}
+pub fn operand(input: Input) -> Operand<'static> {
+    match input {
+        Input::Undefined => Operand::Undefined,
+        Input::Bool(v) => Operand::Bool(v),
+        Input::Int(v) => Operand::Int(v),
+        Input::Text(v) => Operand::String(bytes::copy_of(v)),
+        Input::List(v) => {
+            let mut items = skein_lib::List::with_capacity(u32::try_from(v.len()).expect("small"));
+            for value in v {
+                items.push(operand(*value)).expect("room");
+            }
+            Operand::List { depth: 1, items: items.into_boxed() }
+        }
+    }
+}
+
+pub const FALSE: bool = false;
