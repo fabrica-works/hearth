@@ -475,3 +475,20 @@ fn a_template_with_its_default_setting_leaves_the_call_successful() {
     let repository = Repository::make("template-default-exit", &fixtures::thin_with(fixtures::GREET));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(0));
 }
+
+#[test]
+fn a_missing_file_and_target_print_where_the_base_sets_them() {
+    let repository = Repository::make("references-schema", &fixtures::thin_with(fixtures::REFERENCES));
+    assert_eq!(
+        String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout),
+        concat!(
+            "hosts/x1/x1.json:1:28: x1-prod: net: no file lab-ca/lab.crt at this revision\n",
+            "hosts/x1/x1.json:1:54: x1-prod: net: no target x9-prod in prod\n",
+        )
+    );
+}
+#[test]
+fn missing_file_and_target_references_exit_with_configuration_failure() {
+    let repository = Repository::make("references-schema-exit", &fixtures::thin_with(fixtures::REFERENCES));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}

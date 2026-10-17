@@ -336,6 +336,12 @@ pub fn declaration_map_to_records(value: render::revision::declaration::Map) -> 
 #[must_use]
 pub fn schema(schema: target::Schema) -> records::errors::Schema {
     match schema {
+        target::Schema::Malformed { format } => records::errors::Schema::Malformed { format: self::format(format) },
+        target::Schema::Target { name, environment } => records::errors::Schema::Target { name, environment },
+        target::Schema::File { path } => records::errors::Schema::File { path },
+        target::Schema::Large { path, max } => records::errors::Schema::Large { path, max },
+        target::Schema::Main => records::errors::Schema::Main,
+        target::Schema::Security => records::errors::Schema::Security,
         target::Schema::Undeclared { setting, declared } => records::errors::Schema::Undeclared { setting, declared },
         target::Schema::Missing { setting } => records::errors::Schema::Missing { setting },
         target::Schema::Absent { task } => records::errors::Schema::Absent { task },
@@ -577,5 +583,19 @@ pub fn evaluation(kind: render::evaluate::FaultKind) -> records::errors::Evaluat
         FaultKind::Path => records::errors::Evaluation::Path,
         FaultKind::Output => records::errors::Evaluation::Output,
         FaultKind::Limit => records::errors::Evaluation::Limit,
+    }
+}
+
+#[must_use]
+pub fn format(format: target::Format) -> records::errors::Format {
+    match format {
+        target::Format::Path => records::errors::Format::Path,
+        target::Format::Mode => records::errors::Format::Mode,
+        target::Format::Duration => records::errors::Format::Duration,
+        target::Format::Secret => records::errors::Format::Secret,
+        target::Format::File => records::errors::Format::File,
+        target::Format::Key => records::errors::Format::Key,
+        target::Format::Timestamp => records::errors::Format::Timestamp,
+        target::Format::Debian => records::errors::Format::Debian,
     }
 }

@@ -560,3 +560,5 @@ fn a_missing_task_error_names_its_task_in_text() {
 fn a_missing_task_error_names_its_task_in_json() {
     assert_eq!(form::print(Form::JsonLines, &Record::Error(fixtures::missing_task()), Some(Type::Error), &limits::SHIPPED).as_deref(), Ok(b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":\"task\",\"class\":\"configuration\",\"task\":\"motd\"}\n".as_slice()));
 }
+
+mod forms;

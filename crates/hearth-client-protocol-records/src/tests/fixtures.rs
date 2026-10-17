@@ -145,6 +145,12 @@ pub fn duplicate() -> crate::errors::Error {
 
 #[derive(Clone, Copy, Debug)]
 pub enum SchemaInput {
+    Malformed(crate::errors::Format),
+    Target { name: &'static [u8], environment: &'static [u8] },
+    File(&'static [u8]),
+    Large { path: &'static [u8], max: u64 },
+    Main,
+    Security,
     Undeclared { setting: &'static [u8], declared: &'static [&'static [u8]] },
     Missing(&'static [u8]),
     Absent(&'static [u8]),
@@ -162,6 +168,14 @@ pub enum SchemaInput {
 pub fn schema_fault(input: SchemaInput) -> crate::errors::Schema {
     use crate::errors::Schema;
     match input {
+        SchemaInput::Malformed(format) => Schema::Malformed { format },
+        SchemaInput::Target { name, environment } => {
+            Schema::Target { name: copy_of(name), environment: copy_of(environment) }
+        }
+        SchemaInput::File(path) => Schema::File { path: copy_of(path) },
+        SchemaInput::Large { path, max } => Schema::Large { path: copy_of(path), max },
+        SchemaInput::Main => Schema::Main,
+        SchemaInput::Security => Schema::Security,
         SchemaInput::Undeclared { setting, declared } => {
             Schema::Undeclared { setting: copy_of(setting), declared: schema_names(declared) }
         }

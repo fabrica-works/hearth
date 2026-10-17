@@ -289,6 +289,24 @@ pub enum Schema {
     Undeclared { setting: Box<[u8]>, declared: Box<[Box<[u8]>]> },
     Missing { setting: Box<[u8]> },
     Absent { task: Box<[u8]> },
+    Malformed { format: Format },
+    Target { name: Box<[u8]>, environment: Box<[u8]> },
+    File { path: Box<[u8]> },
+    Large { path: Box<[u8]>, max: u64 },
+    Main,
+    Security,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Format {
+    Path,
+    Mode,
+    Duration,
+    Secret,
+    File,
+    Key,
+    Timestamp,
+    Debian,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

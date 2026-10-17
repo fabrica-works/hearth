@@ -64,6 +64,7 @@ fn a_read_fault_makes_only_its_reading_task_unsound() {
     let mut faults = skein_lib::List::with_capacity(4);
     let defaults = crate::schema::declarations(
         &documents,
+        documents.entries(),
         &mut crate::schema::Validator::new(&crate::limits::SHIPPED),
         &mut crate::compose::Merge::new(&crate::limits::SHIPPED),
         &mut faults,
@@ -79,6 +80,7 @@ fn sound_tasks_are_looked_up_in_name_order() {
     let mut faults = skein_lib::List::with_capacity(4);
     let defaults = crate::schema::declarations(
         &documents,
+        documents.entries(),
         &mut crate::schema::Validator::new(&crate::limits::SHIPPED),
         &mut crate::compose::Merge::new(&crate::limits::SHIPPED),
         &mut faults,

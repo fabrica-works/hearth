@@ -54,10 +54,14 @@ pub fn composed(value: &revision::Value) -> Composed {
 }
 type DeclarationFaults = Box<[(Box<[u8]>, Fault)]>;
 pub fn defaults(declaration: &Declaration) -> (Defaults, DeclarationFaults) {
+    defaults_with_listing(declaration, &[])
+}
+pub fn defaults_with_listing(declaration: &Declaration, listing: &[revision::Entry]) -> (Defaults, DeclarationFaults) {
     let documents = declarations(&[(b"task", Some(declaration.clone()))]);
     let mut faults = skein_lib::List::with_capacity(16);
     let defaults = schema::declarations(
         &documents,
+        listing,
         &mut Validator::new(&limits::SHIPPED),
         &mut Merge::new(&limits::SHIPPED),
         &mut faults,
@@ -65,12 +69,21 @@ pub fn defaults(declaration: &Declaration) -> (Defaults, DeclarationFaults) {
     (defaults, faults.into_boxed())
 }
 pub fn validate(declaration: &Declaration, value: &Composed, check: &Check<'_>) -> Result<Value, Box<[Fault]>> {
-    let (defaults, errors) = defaults(declaration);
+    validate_with(declaration, value, check, &[], &limits::SHIPPED)
+}
+pub fn validate_with(
+    declaration: &Declaration,
+    value: &Composed,
+    check: &Check<'_>,
+    listing: &[revision::Entry],
+    limits: &limits::Limits,
+) -> Result<Value, Box<[Fault]>> {
+    let (defaults, errors) = defaults_with_listing(declaration, listing);
     assert_eq!(errors.as_ref(), &[], "fixture defaults are sound");
-    let against = Against { declaration, defaults: defaults.of(b"task").expect("sound fixture"), listing: &[] };
+    let against = Against { declaration, defaults: defaults.of(b"task").expect("sound fixture"), listing };
     let mut faults = skein_lib::List::with_capacity(16);
     let mut left = u64::MAX;
-    match Validator::new(&limits::SHIPPED).settings(value, &against, check, &mut left, &mut faults) {
+    match Validator::new(limits).settings(value, &against, check, &mut left, &mut faults) {
         Some(value) => Ok(value),
         None => Err(faults.into_boxed()),
     }
@@ -147,6 +160,7 @@ pub fn target_schema(tasks: &[(&[u8], Declaration)], values: &[(&[u8], revision:
     let mut faults = skein_lib::List::with_capacity(16);
     let defaults = schema::declarations(
         &documents,
+        documents.entries(),
         &mut Validator::new(&limits::SHIPPED),
         &mut Merge::new(&limits::SHIPPED),
         &mut faults,

@@ -279,6 +279,9 @@ pub fn with_int_setting() -> Repository {
 }
 #[must_use]
 pub fn with_setting(form: hearth_domain_render::revision::declaration::Form) -> Repository {
+    with_default_setting(form, None)
+}
+fn with_default_setting(form: hearth_domain_render::revision::declaration::Form, default: Option<&[u8]>) -> Repository {
     use hearth_domain_render::revision::declaration::{Declaration, Spec, Text, Type};
     let mut repository = with_task();
     let at = Position { line: 2, column: 7 };
@@ -293,8 +296,11 @@ pub fn with_setting(form: hearth_domain_render::revision::declaration::Form) -> 
                 name: Text { at, text: Box::from(b"x".as_slice()) },
                 at,
                 ty: 0,
-                default: None,
-                optional: true,
+                default: default.map(|value| hearth_domain_render::revision::Value {
+                    at,
+                    kind: hearth_domain_render::revision::Kind::String(Box::from(value)),
+                }),
+                optional: default.is_none(),
                 min: None,
                 max: None,
                 max_length: None,
@@ -415,5 +421,26 @@ pub fn templates_for_many_targets() -> Repository {
         repository.documents.push((oid(byte), tasks(&[(b"motd", false)], Some(placement()))));
     }
     repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
+    repository
+}
+
+#[must_use]
+pub fn with_default_target(peer: &[u8]) -> Repository {
+    with_default_setting(hearth_domain_render::revision::declaration::Form::Target, Some(peer))
+}
+
+#[must_use]
+pub fn with_peer_targets(peer: &[u8]) -> Repository {
+    let mut repository = with_default_target(peer);
+    repository.entries.extend([
+        entry(b"envs/lab.json", b'5'),
+        entry(b"hosts/x2/x2-prod.json", b'6'),
+        entry(b"hosts/x2/x2-lab.json", b'7'),
+    ]);
+    repository.documents.extend([
+        (oid(b'5'), document(None)),
+        (oid(b'6'), document(Some(placement()))),
+        (oid(b'7'), document(Some(placement()))),
+    ]);
     repository
 }

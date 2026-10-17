@@ -448,36 +448,6 @@ impl Side {
         }
         Some(parts::config::Config { tree: files.into_boxed() })
     }
-    fn repository_valid(&self, target: &Target, index: usize) -> bool {
-        for (entry, invalid) in self.entries.iter().zip(&self.invalid) {
-            if !invalid {
-                continue;
-            }
-            if let Some(task) = revision::task(&entry.path) {
-                if let Some(settings) = self.settings.get(index) {
-                    for present in &settings.tasks {
-                        if present.name.as_ref() == task {
-                            return false;
-                        }
-                    }
-                }
-            } else {
-                if revision::base(&entry.path) == Some(target.base.as_ref()) {
-                    return false;
-                }
-                for index in
-                    [target.fleet, target.base_document, Some(target.environment_document), Some(target.base_env)]
-                        .into_iter()
-                        .flatten()
-                {
-                    if self.documents.path(index) == entry.path.as_ref() {
-                        return false;
-                    }
-                }
-            }
-        }
-        true
-    }
     pub fn answer(&mut self) -> Option<Answer> {
         if self.rendering.is_some() {
             return self.template();
@@ -529,7 +499,8 @@ impl Side {
             };
             let meta_digest = meta::digest(&meta);
             let settings = self.settings.get(self.next.saturating_sub(1)).expect("target settings");
-            let check = crate::schema::Check::Target { environment: &target.environment, targets: &[] };
+            let names = validation::targets(&self.targets, &target.environment);
+            let check = crate::schema::Check::Target { environment: &target.environment, targets: &names };
             let mut faults = List::with_capacity(16);
             let available = self.validated;
             let checked = crate::schema::validate(

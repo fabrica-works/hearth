@@ -19,7 +19,7 @@ pub struct Shape {
 }
 pub const SMALL: Shape = Shape { depth: 2, width: 2 };
 pub const WIDE: Shape = Shape { depth: 4, width: 3 };
-pub const KINDS: &[&str] = &["wrong", "enum", "below", "above", "length", "undeclared", "missing"];
+pub const KINDS: &[&str] = &["wrong", "enum", "below", "above", "length", "undeclared", "missing", "malformed"];
 const AT: revision::Position = revision::Position { line: 2, column: 7 };
 #[must_use]
 pub fn declaration(rng: &mut Rng, shape: Shape) -> Declaration {
@@ -121,14 +121,15 @@ fn setting(rng: &mut Rng, declaration: &Declaration, ty: u32) -> Composed {
         match form {
             Form::Bool => Composite::Bool(rng.chance(500)),
             Form::Int => Composite::Int(i64::try_from(rng.below(8)).expect("small") - 2),
-            Form::String
-            | Form::Path
-            | Form::Mode
-            | Form::Duration
-            | Form::Secret
-            | Form::Target
-            | Form::File
-            | Form::Enum(_) => Composite::String(Box::from(if rng.chance(500) { b"a".as_slice() } else { b"xxxx" })),
+            Form::Path => Composite::String(Box::from(if rng.chance(500) { b"/a".as_slice() } else { b"a/../b" })),
+            Form::Mode => Composite::String(Box::from(if rng.chance(500) { b"644".as_slice() } else { b"0844" })),
+            Form::Duration => Composite::String(Box::from(if rng.chance(500) { b"14d".as_slice() } else { b"05s" })),
+            Form::Secret => {
+                Composite::String(Box::from(if rng.chance(500) { b"users/free".as_slice() } else { b"Users/free" }))
+            }
+            Form::String | Form::Target | Form::File | Form::Enum(_) => {
+                Composite::String(Box::from(if rng.chance(500) { b"a".as_slice() } else { b"xxxx" }))
+            }
             Form::List(ty) => Composite::List((0..rng.below(5)).map(|_| setting(rng, declaration, *ty)).collect()),
             Form::Map(ty) => Composite::Map(
                 (0..rng.below(5))
@@ -167,17 +168,20 @@ fn setting(rng: &mut Rng, declaration: &Declaration, ty: u32) -> Composed {
 /// Returns all schema faults from the real bounded validator.
 pub fn validate(declaration: &Declaration, settings: &Composed) -> Result<Value, Box<[Fault]>> {
     let entry = super::fixtures::entry(b"tasks/task/task.json", b'7');
-    let mut documents = revision::Documents::new(&[entry]);
+    let listing = [super::fixtures::entry(b"a", b'8'), entry];
+    let mut documents = revision::Documents::new(&listing);
     documents.set_declaration(&super::fixtures::oid(b'7'), declaration.clone());
     let mut faults = List::with_capacity(16);
     let defaults = schema::declarations(
         &documents,
+        &listing,
         &mut Validator::new(&limits::SHIPPED),
         &mut hearth_domain_render::compose::Merge::new(&limits::SHIPPED),
         &mut faults,
     );
     assert_eq!(faults.len(), 0, "generated defaults are sound");
-    let against = Against { declaration, defaults: defaults.of(b"task").expect("sound declaration"), listing: &[] };
+    let against =
+        Against { declaration, defaults: defaults.of(b"task").expect("sound declaration"), listing: &listing };
     let mut faults = List::with_capacity(16);
     let mut left = u64::MAX;
     match Validator::new(&limits::SHIPPED).settings(settings, &against, &Check::Default, &mut left, &mut faults) {
@@ -350,7 +354,7 @@ fn checked(
             }
             Value::String(v.clone())
         }
-        (Composite::String(v), _) => Value::String(v.clone()),
+        (Composite::String(v), form) => checked_string(form, value, v, faults),
         (Composite::List(values), Form::List(ty)) => {
             Value::List(values.iter().map(|value| checked(declaration, value, *ty, None, faults)).collect())
         }
@@ -381,5 +385,78 @@ pub const fn kind(schema: &Schema) -> &'static str {
         Schema::Null => "null",
         Schema::Task { .. } => "task",
         Schema::Unread { .. } => "unread",
+        Schema::Malformed { .. } => "malformed",
+        Schema::Target { .. } => "target",
+        Schema::File { .. } => "file",
+        Schema::Large { .. } => "large",
+        Schema::Main => "main",
+        Schema::Security => "security",
+    }
+}
+
+fn reference_format(form: &Form) -> Option<hearth_domain_render::errors::Format> {
+    use hearth_domain_render::errors::Format;
+    match form {
+        Form::Path => Some(Format::Path),
+        Form::Mode => Some(Format::Mode),
+        Form::Duration => Some(Format::Duration),
+        Form::Secret => Some(Format::Secret),
+        Form::File => Some(Format::File),
+        Form::Bool
+        | Form::Int
+        | Form::String
+        | Form::Target
+        | Form::Enum(_)
+        | Form::List(_)
+        | Form::Map(_)
+        | Form::Object(_) => None,
+    }
+}
+fn valid_form(format: hearth_domain_render::errors::Format, value: &[u8]) -> bool {
+    use hearth_domain_render::errors::Format;
+    let string = std::str::from_utf8(value).expect("generated UTF-8");
+    let segments = |s: &str| s.split('/').all(|s| !["", ".", ".."].contains(&s));
+    match format {
+        Format::Path => string == "/" || string.strip_prefix('/').is_some_and(segments),
+        Format::Mode => (3..=4).contains(&string.len()) && string.chars().all(|c| ('0'..='7').contains(&c)),
+        Format::Duration => duration(value).is_some(),
+        Format::Secret => {
+            string.len() <= 255
+                && segments(string)
+                && string.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "._-/".contains(c))
+        }
+        Format::File => segments(string),
+        Format::Key | Format::Timestamp | Format::Debian => unreachable!("only generated forms"),
+    }
+}
+fn duration(value: &[u8]) -> Option<i64> {
+    let string = std::str::from_utf8(value).ok()?;
+    let (number, unit) = string.split_at_checked(string.len().checked_sub(1)?)?;
+    if number.starts_with('0') || number.is_empty() || !number.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    let multiplier = match unit {
+        "s" => 1,
+        "m" => 60,
+        "h" => 3600,
+        "d" => 86400,
+        _ => return None,
+    };
+    number.parse::<i64>().ok()?.checked_mul(multiplier)
+}
+
+fn checked_string(form: &Form, value: &Composed, v: &[u8], faults: &mut Vec<Fault>) -> Value {
+    if let Some(format) = reference_format(form)
+        && !valid_form(format, v)
+    {
+        issue(faults, value, Schema::Malformed { format });
+    }
+    if matches!(form, Form::File) && v != b"a" {
+        issue(faults, value, Schema::File { path: Box::from(v) });
+    }
+    if matches!(form, Form::Duration) && valid_form(hearth_domain_render::errors::Format::Duration, v) {
+        Value::Int(duration(v).expect("independently checked duration"))
+    } else {
+        Value::String(Box::from(v))
     }
 }

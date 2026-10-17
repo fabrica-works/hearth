@@ -1,6 +1,9 @@
 //! Schema diagnostics placed at their source documents.
 use super::{Side, Target, compose};
-use crate::{errors, revision::Documents};
+use crate::{
+    errors,
+    revision::{self, Documents},
+};
 use alloc::boxed::Box;
 use skein_lib::List;
 
@@ -46,6 +49,37 @@ pub(super) fn schema_errors(
 }
 
 impl Side {
+    pub(super) fn repository_valid(&self, target: &Target, index: usize) -> bool {
+        for (entry, invalid) in self.entries.iter().zip(&self.invalid) {
+            if !invalid {
+                continue;
+            }
+            if let Some(task) = revision::task(&entry.path) {
+                if let Some(settings) = self.settings.get(index) {
+                    for present in &settings.tasks {
+                        if present.name.as_ref() == task {
+                            return false;
+                        }
+                    }
+                }
+            } else {
+                if revision::base(&entry.path) == Some(target.base.as_ref()) {
+                    return false;
+                }
+                for index in
+                    [target.fleet, target.base_document, Some(target.environment_document), Some(target.base_env)]
+                        .into_iter()
+                        .flatten()
+                {
+                    if self.documents.path(index) == entry.path.as_ref() {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
     pub(super) fn dependencies_valid(&self, target: &Target, index: usize) -> bool {
         if !self.repository_valid(target, index) {
             return false;
@@ -63,7 +97,13 @@ impl Side {
 
     pub(super) fn defaults(&mut self, targets: &[Target]) {
         let mut faults = List::with_capacity(16);
-        self.defaults = crate::schema::declarations(&self.documents, &mut self.validator, &mut self.merge, &mut faults);
+        self.defaults = crate::schema::declarations(
+            &self.documents,
+            &self.entries,
+            &mut self.validator,
+            &mut self.merge,
+            &mut faults,
+        );
         let revision =
             crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
         crate::schema::unclaimed(targets, &revision, &mut self.validator, &mut self.merge, &mut faults);
@@ -110,7 +150,8 @@ pub(super) fn host_schema(
 ) -> bool {
     for (target, settings) in targets.iter().zip(settings) {
         if target.name.as_ref() == name {
-            let check = crate::schema::Check::Target { environment: &target.environment, targets: &[] };
+            let names = self::targets(targets, &target.environment);
+            let check = crate::schema::Check::Target { environment: &target.environment, targets: &names };
             return crate::schema::validate(
                 settings,
                 revision,
@@ -123,4 +164,14 @@ pub(super) fn host_schema(
         }
     }
     false
+}
+
+pub(super) fn targets(targets: &[Target], environment: &[u8]) -> Box<[Box<[u8]>]> {
+    let mut names = List::with_capacity(u32::try_from(targets.len()).expect("bounded targets"));
+    for target in targets {
+        if target.environment.as_ref() == environment {
+            names.push(target.name.clone()).expect("target count");
+        }
+    }
+    names.into_boxed()
 }

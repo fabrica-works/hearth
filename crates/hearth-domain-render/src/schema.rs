@@ -1,10 +1,13 @@
 //! Declared schemas, defaults and target settings (format.md, 6).
+mod debian;
+pub mod forms;
 mod targets;
 use crate::{
     errors::Schema,
     revision::{self, Documents, Position},
 };
 use alloc::boxed::Box;
+pub use debian::debian;
 use skein_lib::{List, Map, bytes};
 pub use targets::{Checked, Revision, Validated, unclaimed, validate};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -52,6 +55,7 @@ impl Default for Defaults {
 }
 pub fn declarations(
     documents: &Documents,
+    listing: &[revision::Entry],
     validator: &mut Validator,
     merge: &mut Merge,
     faults: &mut List<(Box<[u8]>, Fault)>,
@@ -105,7 +109,7 @@ pub fn declarations(
         }
         if before == faults.len() {
             let mut local = List::with_capacity(16);
-            let defaults = task_defaults(declaration, document, validator, merge, &mut local);
+            let defaults = task_defaults(declaration, document, listing, validator, merge, &mut local);
             for fault in &local {
                 push(faults, task, fault.clone());
             }
@@ -190,6 +194,7 @@ pub struct Validator {
     steps: u64,
     left: u64,
     limited: bool,
+    static_file: u64,
 }
 impl Validator {
     #[must_use]
@@ -198,6 +203,7 @@ impl Validator {
             stack: Stack::with_capacity(limits.depth.saturating_add(1)),
             left: u64::MAX,
             limited: false,
+            static_file: u64::from(limits.static_file),
             steps: limits.decoded.saturating_mul(u64::from(limits.document)).saturating_mul(4).saturating_add(4),
         }
     }
@@ -234,7 +240,7 @@ impl Validator {
         let mut valid = true;
         for _ in 0..self.steps {
             if let Some((value, wanted)) = pending.take() {
-                finished = self.enter(value, wanted, against.declaration, faults, &mut valid);
+                finished = self.enter(value, wanted, against, check, faults, &mut valid);
                 if self.limited {
                     for _ in 0..self.stack.len() {
                         drop(self.stack.pop());
@@ -261,10 +267,12 @@ impl Validator {
         &mut self,
         value: Composed,
         wanted: Wanted,
-        declaration: &Declaration,
+        against: &Against<'_>,
+        check: &Check<'_>,
         faults: &mut List<Fault>,
         valid: &mut bool,
     ) -> Option<Evaluated> {
+        let declaration = against.declaration;
         let root = match &wanted {
             Wanted::Settings(_) => true,
             Wanted::Type(_) | Wanted::Spec(_) => false,
@@ -290,6 +298,11 @@ impl Validator {
             *valid = false;
             return None;
         }
+        if let Some(schema) = forms::fault(&value, &form, check, against.listing, self.static_file) {
+            fault(faults, value.from, schema);
+            *valid = false;
+            return None;
+        }
         let charge = storage(&value.kind, &form);
         match self.left.checked_sub(charge) {
             Some(left) => self.left = left,
@@ -301,7 +314,11 @@ impl Validator {
         match value.kind {
             Composite::Bool(value) => Some(Evaluated::Bool(value)),
             Composite::Int(value) => Some(Evaluated::Int(value)),
-            Composite::String(value) => Some(Evaluated::String(value)),
+            Composite::String(value) => Some(if let Form::Duration = form {
+                Evaluated::Int(forms::seconds(&value).expect("checked duration"))
+            } else {
+                Evaluated::String(value)
+            }),
             Composite::List(items) => {
                 let Form::List(ty) = form else { unreachable!("list type checked") };
                 let made = List::with_capacity(u32::try_from(items.len()).expect("bounded list"));
@@ -440,9 +457,12 @@ impl MapFrame {
                 if let Some(fields) = fields {
                     unknown(faults, pair, fields, *root);
                     *valid = false;
-                } else {
+                } else if forms::check(crate::errors::Format::Key, &pair.key) {
                     *key = Some(pair.key.clone());
                     return Advance::Next(pair.value.clone(), Wanted::Type(*ty));
+                } else {
+                    fault(faults, pair.from, Schema::Malformed { format: crate::errors::Format::Key });
+                    *valid = false;
                 }
             }
             (None, None) => return Advance::Done,
@@ -551,6 +571,7 @@ fn type_fault(kind: &Composite, form: &Form, spec: Option<&Spec>) -> Option<Sche
 fn task_defaults(
     declaration: &Declaration,
     document: u32,
+    listing: &[revision::Entry],
     validator: &mut Validator,
     merge: &mut Merge,
     faults: &mut List<Fault>,
@@ -588,7 +609,7 @@ fn task_defaults(
     for index in (0..defaults.values.len()).rev() {
         let value = defaults.values.get(index).expect("counted");
         if let Some(composed) = &value.value {
-            let against = Against { declaration, defaults: &defaults, listing: &[] };
+            let against = Against { declaration, defaults: &defaults, listing };
             if validator
                 .walk(composed.clone(), Wanted::Spec(value.spec.clone()), &against, &Check::Default, faults)
                 .is_none()

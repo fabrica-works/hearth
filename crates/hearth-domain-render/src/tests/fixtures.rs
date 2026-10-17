@@ -626,6 +626,7 @@ pub fn check_declarations(documents: &crate::revision::Documents) -> Box<[(Box<[
     let mut faults = skein_lib::List::with_capacity(4);
     drop(crate::schema::declarations(
         documents,
+        documents.entries(),
         &mut crate::schema::Validator::new(&limits::SHIPPED),
         &mut crate::compose::Merge::new(&limits::SHIPPED),
         &mut faults,
@@ -767,3 +768,5 @@ pub fn answer(call: &mut crate::call::Side) -> crate::vocabulary::Answer {
 }
 mod templates;
 pub use templates::*;
+
+pub mod forms;

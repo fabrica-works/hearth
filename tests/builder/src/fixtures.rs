@@ -671,3 +671,8 @@ pub const GREET: &[File] = &[
     },
     File { path: "tasks/greet/tree/etc/greeting.j2", body: b"{{ settings.greeting }}\n", mode: 0o644 },
 ];
+
+pub const REFERENCES: &[File] = &[
+    File { path: "tasks/net/task.json", mode: 0o644, body: br#"{"settings":{"ca":{"type":"file","doc":"The certificate."},"peer":{"type":"target","doc":"The peer."}}}"# },
+    File { path: "hosts/x1/x1.json", mode: 0o644, body: br#"{"motd": {}, "net": {"ca": "lab-ca/lab.crt", "peer": "x9-prod"}}"# },
+];

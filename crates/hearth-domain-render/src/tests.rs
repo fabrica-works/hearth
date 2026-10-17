@@ -16,3 +16,5 @@ mod filters;
 mod schema;
 
 mod templates;
+
+mod forms;

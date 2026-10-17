@@ -150,3 +150,66 @@ fn validated_bytes_are_returned_when_a_target_is_answered() {
         .collect();
     assert_eq!(names, &[b"x1-lab".as_slice(), b"x1-prod".as_slice()]);
 }
+
+#[test]
+fn a_default_target_is_checked_where_it_is_filled() {
+    for seed in 0..8 {
+        let run = parent::run(&fixtures::with_default_target(b"x9-prod"), &[], seed);
+        assert_eq!(
+            run.answers.as_slice(),
+            &[Answer::Error(Error {
+                side: None,
+                kind: Kind::Schema(Schema::Target {
+                    name: Box::from(b"x9-prod".as_slice()),
+                    environment: Box::from(b"prod".as_slice())
+                }),
+                class: Class::Configuration,
+                at: Some(Place {
+                    path: Box::from(b"tasks/motd/task.json".as_slice()),
+                    position: Some(Position { line: 2, column: 7 })
+                }),
+                also: None,
+                target: Some(Box::from(b"x1-prod".as_slice())),
+                task: Some(Box::from(b"motd".as_slice())),
+            })],
+            "seed {seed}"
+        );
+    }
+}
+
+#[test]
+fn an_unselected_target_is_available_to_a_reference() {
+    for seed in 0..8 {
+        let run = parent::run(&fixtures::with_peer_targets(b"x2-prod"), &[b"x1-prod"], seed);
+        assert_eq!(
+            (run.answers.len(), run.answers.iter().filter(|answer| matches!(answer, Answer::Spec(_))).count()),
+            (1, 1),
+            "seed {seed}"
+        );
+    }
+}
+#[test]
+fn a_target_reference_cannot_cross_environments() {
+    for seed in 0..8 {
+        let run = parent::run(&fixtures::with_peer_targets(b"x2-lab"), &[b"x1-prod"], seed);
+        assert_eq!(
+            run.answers.as_slice(),
+            &[Answer::Error(Error {
+                side: None,
+                kind: Kind::Schema(Schema::Target {
+                    name: Box::from(b"x2-lab".as_slice()),
+                    environment: Box::from(b"prod".as_slice())
+                }),
+                class: Class::Configuration,
+                at: Some(Place {
+                    path: Box::from(b"tasks/motd/task.json".as_slice()),
+                    position: Some(Position { line: 2, column: 7 })
+                }),
+                also: None,
+                target: Some(Box::from(b"x1-prod".as_slice())),
+                task: Some(Box::from(b"motd".as_slice())),
+            })],
+            "seed {seed}"
+        );
+    }
+}

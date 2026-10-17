@@ -457,7 +457,7 @@ pub fn every_form() -> [crate::config::schema::Form; 13] {
     ]
 }
 #[must_use]
-pub fn schema_faults() -> [render::errors::Schema; 13] {
+pub fn schema_faults() -> [render::errors::Schema; 19] {
     use render::errors::Schema;
     [
         Schema::Undeclared { setting: bytes::copy_of(b"greting"), declared: Box::new([bytes::copy_of(b"greeting")]) },
@@ -472,6 +472,12 @@ pub fn schema_faults() -> [render::errors::Schema; 13] {
         Schema::Above { max: 59999 },
         Schema::Length { max_length: 8 },
         Schema::Null,
+        Schema::Malformed { format: render::errors::Format::Path },
+        Schema::Target { name: bytes::copy_of(b"x9-prod"), environment: bytes::copy_of(b"prod") },
+        Schema::File { path: bytes::copy_of(b"lab-ca/lab.crt") },
+        Schema::Large { path: bytes::copy_of(b"lab-ca/big.crt"), max: 67_108_864 },
+        Schema::Main,
+        Schema::Security,
         Schema::UndeclaredField {
             field: bytes::copy_of(b"shel"),
             declared: Box::new([bytes::copy_of(b"shell"), bytes::copy_of(b"uid")]),

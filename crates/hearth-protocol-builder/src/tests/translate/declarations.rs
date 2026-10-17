@@ -69,6 +69,16 @@ fn each_form_translates_to_render_and_back() {
 }
 fn schema_back(schema: crate::records::errors::Schema) -> render::errors::Schema {
     match schema {
+        crate::records::errors::Schema::Malformed { format } => {
+            render::errors::Schema::Malformed { format: super::forms::format_back(format) }
+        }
+        crate::records::errors::Schema::Target { name, environment } => {
+            render::errors::Schema::Target { name, environment }
+        }
+        crate::records::errors::Schema::File { path } => render::errors::Schema::File { path },
+        crate::records::errors::Schema::Large { path, max } => render::errors::Schema::Large { path, max },
+        crate::records::errors::Schema::Main => render::errors::Schema::Main,
+        crate::records::errors::Schema::Security => render::errors::Schema::Security,
         crate::records::errors::Schema::Undeclared { setting, declared } => {
             render::errors::Schema::Undeclared { setting, declared }
         }
