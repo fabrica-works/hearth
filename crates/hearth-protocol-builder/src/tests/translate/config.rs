@@ -7,3 +7,7 @@ pub(super) fn config_back(config: records::parts::config::Config) -> render::par
     }
     render::parts::config::Config { tree: tree.into_boxed() }
 }
+
+pub(super) fn part_back(value: records::parts::config::Config) -> render::parts::PartRecord {
+    render::parts::PartRecord::Config(config_back(value))
+}

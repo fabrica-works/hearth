@@ -5,7 +5,7 @@ use hearth_lib::{
     hash::H,
 };
 use skein_lib::{List, bytes};
-mod build;
+pub(super) mod build;
 mod declarations;
 pub use build::{build, read};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

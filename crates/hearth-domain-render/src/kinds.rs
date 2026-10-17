@@ -14,5 +14,6 @@ pub fn required(entry: &Concrete, name: Name) -> Result<(), Schema> {
     Err(Schema::MissingField { field: skein_lib::bytes::copy_of(name.key()) })
 }
 
+pub mod cmdline;
 pub mod packages;
 pub mod preseeds;

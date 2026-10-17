@@ -620,6 +620,7 @@ pub fn format(format: target::Format) -> records::errors::Format {
         target::Format::Debian => records::errors::Format::Debian,
         target::Format::Preseed => records::errors::Format::Preseed,
         target::Format::Module => records::errors::Format::Module,
+        target::Format::Param => records::errors::Format::Param,
     }
 }
 

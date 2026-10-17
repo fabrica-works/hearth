@@ -28,4 +28,5 @@ mod live;
 mod packages;
 mod secrets;
 
+mod boot;
 mod kinds;

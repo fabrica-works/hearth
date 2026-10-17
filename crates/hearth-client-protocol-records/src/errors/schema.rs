@@ -12,6 +12,7 @@ pub enum Format {
     Debian,
     Preseed,
     Module,
+    Param,
 }
 impl Format {
     pub(super) fn name(self) -> &'static [u8] {
@@ -27,6 +28,7 @@ impl Format {
             Self::Debian => b"debian",
             Self::Preseed => b"preseed",
             Self::Module => b"module",
+            Self::Param => b"param",
         }
     }
 }

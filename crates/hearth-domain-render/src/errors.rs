@@ -177,6 +177,11 @@ impl Collector {
             }
         }
     }
+    pub(crate) fn extend(&mut self, errors: Box<[Error]>) {
+        for error in errors {
+            self.push(error);
+        }
+    }
     #[must_use]
     pub fn finish(mut self) -> (Box<[Error]>, u32) {
         let mut errors = skein_lib::List::with_capacity(self.kept.len());
@@ -317,6 +322,7 @@ pub enum Format {
     Debian,
     Preseed,
     Module,
+    Param,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

@@ -115,3 +115,45 @@ pub fn module_expansion() -> Expansion {
 }
 
 pub const PRESEED_FIELDS: &[(Name, &[u8])] = &[(Name::Type, b"select"), (Name::Value, b"Europe")];
+pub const MIN_CMDLINE_ORDER: i64 = 0;
+pub const DEFAULT_CMDLINE_ORDER: u16 = 500;
+pub const MAX_CMDLINE_ORDER: i64 = 999;
+pub fn cmdline(key: &[u8], param: Option<&[u8]>, order: Option<i64>) -> Concrete {
+    let fields = match param {
+        Some(param) => &[(Name::Param, param)][..],
+        None => &[],
+    };
+    let expansion = super::concrete_expansion(Map::Cmdline, &[(key, fields)]);
+    let mut entry = super::only(&super::only(&super::only(&expansion.tasks).groups).entries).clone();
+    if let Some(order) = order {
+        let mut fields = List::with_capacity(2);
+        for field in entry.fields {
+            fields.push(field).expect("fixture count");
+        }
+        fields
+            .push(crate::entries::Made {
+                name: Name::Order,
+                at: super::FIELD_AT,
+                value: crate::entries::Fielded::Int(order),
+            })
+            .expect("fixture count");
+        entry.fields = fields.into_boxed();
+    }
+    entry
+}
+type ParameterRow<'a> = (&'a [u8], &'a [u8], &'a [u8], Option<i64>);
+pub fn boot_expansion(rows: &[ParameterRow<'_>]) -> Expansion {
+    let mut tasks = List::with_capacity(u32::try_from(rows.len()).expect("fixture count"));
+    for &(task, key, param, order) in rows {
+        tasks
+            .push(Expanded {
+                task: copy_of(task),
+                groups: Box::new([Group { map: Map::Cmdline, entries: Box::new([cmdline(key, Some(param), order)]) }]),
+            })
+            .expect("fixture count");
+    }
+    Expansion { tasks: tasks.into_boxed() }
+}
+pub fn built_boot(rows: &[ParameterRow<'_>]) -> crate::parts::boot::Boot {
+    crate::parts::boot::build(&boot_expansion(rows), &super::containers::placement(None)).expect("valid parameters")
+}

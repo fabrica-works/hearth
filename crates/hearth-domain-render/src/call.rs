@@ -500,7 +500,9 @@ impl Side {
             ) else {
                 continue;
             };
-            let Some(packages) = packages::build(&debian, &p, &expansion, set.as_ref(), &meta, &mut self.errors) else {
+            let Some((packages, boot)) =
+                packages::build(&debian, &p, &expansion, set.as_ref(), &meta, &mut self.errors)
+            else {
                 continue;
             };
             let Some((secrets, live)) = secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome) else {
@@ -508,9 +510,7 @@ impl Side {
             };
             let mut faults = List::with_capacity(files::fault_capacity(&expansion, self.entries.len()));
             let plans = self.plans(&meta, &checked, &expansion, &mut faults);
-            for fault in faults.into_boxed() {
-                self.errors.push(fault);
-            }
+            self.errors.extend(faults.into_boxed());
             let Some(plans) = plans else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
@@ -522,7 +522,7 @@ impl Side {
                 meta_digest,
                 checked,
                 debian,
-                templates::Prepared { plans, expansion, secrets, packages, live },
+                templates::Prepared { plans, expansion, secrets, packages, live, boot },
                 capacity,
             ));
             return self.template();

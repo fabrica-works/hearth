@@ -368,7 +368,7 @@ pub fn config_mut(spec: &mut Spec) -> &mut Config {
     for part in &mut spec.parts {
         match &mut part.record {
             PartRecord::Config(config) => return config,
-            PartRecord::Secrets(_) | PartRecord::Live(_) | PartRecord::Packages(_) => {}
+            PartRecord::Secrets(_) | PartRecord::Live(_) | PartRecord::Packages(_) | PartRecord::Boot(_) => {}
         }
     }
     panic!("config part")

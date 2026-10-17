@@ -2,6 +2,7 @@
 use crate::revision::Oid;
 use alloc::boxed::Box;
 use hearth_lib::{encode::Digest, hash::H};
+pub mod boot;
 pub mod config;
 pub mod live;
 pub mod meta;
@@ -27,6 +28,7 @@ pub enum PartRecord {
     Secrets(secrets::Secrets),
     Packages(packages::Packages),
     Live(live::Live),
+    Boot(boot::Boot),
 }
 #[must_use]
 pub fn spec_digest(meta: &Digest, parts: &[Part]) -> Digest {
@@ -41,6 +43,7 @@ pub fn spec_digest(meta: &Digest, parts: &[Part]) -> Digest {
             PartRecord::Secrets(_) => b"secrets",
             PartRecord::Packages(_) => b"packages",
             PartRecord::Live(_) => b"live",
+            PartRecord::Boot(_) => b"boot",
         };
         ordered.insert(skein_lib::bytes::copy_of(name), part.digest).expect("part count");
     }

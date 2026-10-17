@@ -1,5 +1,6 @@
 //! Render's part vocabulary mapped to client records (render.md, 4.2).
 use crate::{records::records as target, render::parts as source};
+pub mod boot;
 pub mod config;
 pub mod live;
 pub mod packages;
@@ -14,6 +15,7 @@ pub fn part(part: source::Part) -> target::Part {
             source::PartRecord::Secrets(value) => target::PartRecord::Secrets(secrets::secrets(value)),
             source::PartRecord::Packages(value) => target::PartRecord::Packages(packages::packages(value)),
             source::PartRecord::Live(value) => target::PartRecord::Live(live::live(value)),
+            source::PartRecord::Boot(value) => target::PartRecord::Boot(boot::boot(value)),
         },
     }
 }

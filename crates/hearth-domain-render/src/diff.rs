@@ -68,7 +68,7 @@ pub struct Tally {
 pub const fn layer(part: &PartRecord) -> Layer {
     match part {
         PartRecord::Config(_) => Layer::Config,
-        PartRecord::Secrets(_) => Layer::Slot,
+        PartRecord::Secrets(_) | PartRecord::Boot(_) => Layer::Slot,
         PartRecord::Packages(_) => Layer::Packages,
         PartRecord::Live(_) => Layer::Other,
     }
@@ -127,7 +127,7 @@ fn config_part(spec: &Spec) -> Option<(&Digest, &config::Config)> {
     for part in &spec.parts {
         match &part.record {
             PartRecord::Config(config) => found = Some((&part.digest, config)),
-            PartRecord::Secrets(_) | PartRecord::Live(_) | PartRecord::Packages(_) => {} // transitional: hearth 19.5, 17.5
+            PartRecord::Secrets(_) | PartRecord::Live(_) | PartRecord::Packages(_) | PartRecord::Boot(_) => {} // transitional: hearth 19.5, 17.5
         }
     }
     found

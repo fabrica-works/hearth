@@ -111,7 +111,7 @@ pub fn build(
     }
     Ok(Packages { sources, request: request.into_boxed(), variant, preseeds, initramfs, apt })
 }
-pub(super) fn error(
+pub(in crate::parts) fn error(
     schema: Schema,
     task: Option<&[u8]>,
     position: Option<revision::Position>,

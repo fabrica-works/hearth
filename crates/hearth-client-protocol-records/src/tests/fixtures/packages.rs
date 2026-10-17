@@ -55,3 +55,14 @@ pub fn preseeded_spec() -> Box<Spec> {
     }
     spec
 }
+pub fn boot_spec() -> Box<Spec> {
+    let mut spec = super::x1_prod();
+    spec.parts = Box::new([Part {
+        digest: super::digest([0xbc, 0x6c, 0xab, 0x41, 0x72, 0x52]),
+        record: PartRecord::Boot(crate::parts::boot::Boot {
+            params: Box::new([copy_of(b"quiet"), copy_of(b"audit=0")]),
+            mutable: true,
+        }),
+    }]);
+    spec
+}

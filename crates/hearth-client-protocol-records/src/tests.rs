@@ -11,4 +11,5 @@ mod progress;
 mod live;
 mod secrets;
 
+mod boot;
 mod packages;

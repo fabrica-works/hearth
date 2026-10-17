@@ -134,12 +134,11 @@ fn spec_back(spec: records::records::Spec) -> Option<render::parts::Spec> {
     let mut translated = skein_lib::List::with_capacity(u32::try_from(parts.len()).expect("bounded parts"));
     for records::records::Part { digest, record } in parts {
         let record = match record {
-            records::records::PartRecord::Config(config) => {
-                render::parts::PartRecord::Config(config::config_back(config))
-            }
+            records::records::PartRecord::Config(value) => config::part_back(value),
             records::records::PartRecord::Secrets(value) => render::parts::PartRecord::Secrets(secrets::back(value)),
             records::records::PartRecord::Packages(value) => packages::part_back(value),
             records::records::PartRecord::Live(value) => render::parts::PartRecord::Live(live::back(value)),
+            records::records::PartRecord::Boot(value) => boot::part_back(value),
         };
         translated.push(render::parts::Part { digest: hearth_lib::encode::Digest(digest), record }).expect("part room");
     }
@@ -779,5 +778,6 @@ mod config;
 mod live;
 mod secrets;
 
+mod boot;
 mod files;
 mod packages;

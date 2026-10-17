@@ -8,7 +8,7 @@ use skein_lib::bytes;
 #[must_use]
 pub fn check(format: Format, value: &[u8]) -> bool {
     match format {
-        Format::Preseed | Format::Module => unreachable!("declaration forms checked by kinds"),
+        Format::Preseed | Format::Module | Format::Param => unreachable!("declaration forms checked by kinds"),
         Format::Link => return crate::kinds::files::link(value),
         Format::Path => {
             return value == b"/"
@@ -48,7 +48,8 @@ pub fn check(format: Format, value: &[u8]) -> bool {
             | Format::Duration
             | Format::Key
             | Format::Preseed
-            | Format::Module => {
+            | Format::Module
+            | Format::Param => {
                 unreachable!("forms checked above")
             }
         };

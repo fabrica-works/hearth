@@ -101,6 +101,7 @@ pub fn template_prepared(
     expansion: crate::entries::Expansion,
 ) -> crate::call::templates::Prepared {
     crate::call::templates::Prepared {
+        boot: super::built_boot(&[]),
         plans,
         expansion,
         secrets: crate::parts::secrets::Secrets {

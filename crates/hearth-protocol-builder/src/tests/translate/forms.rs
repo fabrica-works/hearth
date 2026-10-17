@@ -12,6 +12,7 @@ pub(super) fn format_back(format: records::Format) -> render::Format {
         records::Format::Debian => render::Format::Debian,
         records::Format::Preseed => render::Format::Preseed,
         records::Format::Module => render::Format::Module,
+        records::Format::Param => render::Format::Param,
     }
 }
 const FORMATS: &[render::Format] = &[
@@ -26,6 +27,7 @@ const FORMATS: &[render::Format] = &[
     render::Format::Debian,
     render::Format::Preseed,
     render::Format::Module,
+    render::Format::Param,
 ];
 #[test]
 fn each_schema_format_translates_and_back() {

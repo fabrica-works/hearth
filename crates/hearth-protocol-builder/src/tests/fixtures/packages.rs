@@ -107,3 +107,11 @@ fn optional_initramfs(value: Option<source::Initramfs>) -> Option<target::Initra
         },
     })
 }
+#[must_use]
+pub fn boot_records() -> [crate::render::parts::boot::Boot; 2] {
+    use skein_lib::bytes::copy_of;
+    [
+        crate::render::parts::boot::Boot { params: Box::new([]), mutable: false },
+        crate::render::parts::boot::Boot { params: Box::new([copy_of(b"quiet"), copy_of(b"audit=0")]), mutable: true },
+    ]
+}
