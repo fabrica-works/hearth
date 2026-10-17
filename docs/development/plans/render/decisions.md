@@ -867,6 +867,35 @@ None yet.
      2. It leaves `a_third_script_name_is_an_enum_fault` and the range half of `script_order_defaults_to_500_and_ranges_over_0_to_999` (its default half goes on), and changes nothing in `hearth-protocol-config`'s `scripts` decoding or its tests.
      3. It does not land before the answer's ruling: once all else is done, it reports and waits.
 
+170. **A script's third name and an order out of range stay decode errors** (design answer, hearth-18.4's block of 2026-10-17T22:53:11Z).
+     **A script's third name and an order out of range stay 04.1's decode errors** (design answer, hearth-18.4's block of 2026-10-17T22:53:11Z). The designer's answer, hearth a079343 ("Answer render's question of 22:58: a script's name and order are decoded"), decides it; ruling 169's interim ends, and 18.4 may land once its gate passes:
+
+     # Answer: hearth 18.4, a third script name and an order out of range are decode errors
+
+     Landed: hearth a079343 ("Answer render's question of 22:58: a script's name and order are decoded"), with `land --docs`: format.md 4.3 and 5.8; render.md 7.2's decode and schema rows; plans/render/hearth/18-tree-users.md (18.4) and 04-declarations.md. It replaces ruling 169's interim.
+
+
+     main's decode stands. 04.1's `Declared::Name` at the key and `Declared::Order` at the value stay, kind `decode` (`hearth-protocol-config/src/declaration.rs:244`, :252, :255). format.md 5.8's word changes. render.md 7.2's rows keep their kinds, and the decode row now says what it covers.
+
+     - **The line.** format.md 5.2: "Every declaration but `doc`, `settings`, `reads`, `requires`, `scripts`, `exports` and `bless` is a map of entries"; "Strings outside entries are taken as written". render.md 7.2, decode: "a document or a declaration not of its shape".
+     - **format.md 5.8 now reads:** "Its keys are those two alone (2.1), each an object of an optional `order` (4.3). `scripts` is not a map of entries (5.2): it is decoded as written, so a third key is a decode error at the key, and an `order` that is not an integer from 0 to 999 one at its value (render.md, 7.2)." This replaces "Its keys are those two alone (2.1): any other is a schema error."
+     - **format.md 4.3 gains:** "Out of that range, an `order` is a decode error in `scripts`, which is decoded as written (5.8), and a schema error in a boot parameter, an entry whose `order` may be an expression (5.2)." So cmdline's `Schema::Below`/`Above` (`kinds/cmdline.rs:40-44`) stand.
+     - **render.md 7.2's decode row** now reads "a document or a declaration not of its shape as written (a key, a name, a JSON form, or a value outside an entry that format.md bounds itself, such as `doc`'s one line or a script's `order`: format.md, 5.1, 5.2 and 5.8), a key of a later milestone (format.md, 2.2)".
+     - **render.md 7.2's schema row** replaces "a key or value of a later milestone" with "an entry's field out of its kind's form once evaluated, such as a tmpfiles type or a boot parameter's `order` (format.md, 5.2), a value of a later milestone (format.md, 2.2)". This matches main, where `checks` and `artifact` are `Declared::Later` and a placement's later keys are `Shape::Unknown`, all decode.
+     - **What changes in 18.4.** Its Shape drops "a third name is `Schema::Enum` (5.8); `order` default 500, 0 to 999 (`Below`, `Above`)". In their place: "a third name and an `order` outside 0 to 999 are 04.1's decode errors (`Declared::Name` at the key, `Declared::Order` at the value; format.md 5.8), so render takes each `Script`'s `fragment` and `order` (500 when absent) as decoded, and refuses neither".
+     - **18.4's tests.** Its Test shape drops `a_third_script_name_is_an_enum_fault`. `script_order_defaults_to_500_and_ranges_over_0_to_999` becomes `script_order_defaults_to_500`, its default half.
+     - **18.4's Don't** gains: "change `hearth-protocol-config`'s `scripts` decoding or its tests (04.1's)".
+     - **04-declarations.md:85** now reads "`Declared::Later`: a decode error at its key", where it said "a schema error".
+
+     What stays unchanged:
+     - protocol-config's `scripts` and its four tests (`src/tests/declaration.rs:62`, :69, :150, :244);
+     - the records' "invalid declaration name" and "order must be from 0 to 999";
+     - the rest of 18.4: presets, tmpfiles, `NoScript`, `Stray`, digests, the real test and the proof;
+     - 18.4's Size, at most 250 lines;
+     - format.md's tmpfiles (5.6) and data (5.7) schema errors, which are on entries.
+
+     Nothing is deferred, so `later.md` gains no row.
+
 ## For the user
 
 The long-term choices the user may veto:
