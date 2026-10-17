@@ -331,6 +331,18 @@ None yet.
      26.2 keeps its Size, 340, and implementer.md's tolerance: past 680, it
      stops with the count by file, as 26.1 did.
 
+114. **hearth 25's Shapes against main** (ready check of hearth-25.1).
+     hearth 25's Shapes against main (ready check of hearth-25.1), against hearth cea230d and skein 303c829: `hearth/25-diff.md` corrected.
+
+     1. 25.1's Needs gain hearth 32.1: `src/parts/config.rs` is new in 32.1 (`32-static-binary.md`, its Files), and 25.1 changes it.
+     2. 25.1's Files gain `src/tests/outcome.rs`: `OUTCOMES: [Outcome; 4]` and `WORST: [[Outcome; 4]; 4]` (`:2`, `:3`) grow to 5 with `Negative`, between `TryAgain` and `Done`.
+     3. 25.1's Files gain the render world: `tests/render/src/parent.rs:43` (`Answer::Rendered { outcome }`, which takes `diff`, and explicit arms for `Answer::Change`, `Request::Hunks`, `Event::Diff` and `Hunks`), and `tests/render/tests/thin.rs:102`'s match (an `Answer::Change` arm): `tests/render/Cargo.toml:22` denies `wildcard_enum_match_arm`.
+     4. `fixtures::spec(target, parts)` goes beside `meta()` (`crates/hearth-domain-render/src/tests/fixtures.rs:45`); `x1_prod` is the world's (`tests/render/src/fixtures.rs:33`).
+     5. render.md is read at 31bed37, its last change on main; the sections 25 names are there.
+     6. The real-git reference: render.md 6.3's example is a 3-line-context hunk (`@@ -9,5 +9,5 @@`), so "not 6.3's `--unified=0` example" goes.
+
+     The check's runs at cea230d: fmt, clippy and nextest 210 of 210, fuzzy 4 of 4. Done when 3 waits on 11.2 and 11.3, as planned. A further exhaustive match on the enums 25.1 grows gains its arms the same way, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

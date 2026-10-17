@@ -11,7 +11,7 @@ change's resolution are hearth 45's.
 
 ## Read first
 
-- hearth's `render.md` (at `175e92f`): 1, 2.2, 4.1, 4.5, 5.1, 5.4, 6.1 to
+- hearth's `render.md` (at `31bed37`): 1, 2.2, 4.1, 4.5, 5.1, 5.4, 6.1 to
   6.3, 8.2, 8.4, 10; `client/README.md`: 3.1 to 3.3; `store.md`: 2.1;
   `format.md`: 3.3, 3.4; `testing.md`: 2.7.
 - `decisions.md`, 2 and 6; `findings/skein-io.md`, 2 and 6.
@@ -111,14 +111,21 @@ target (`added`, `removed`, `same`, `changed` with config's tree
 entries, `failed`); the rebuild; the tally; `Outcome::Negative`; the
 root's `Call::Diff` and `Answer::Change`; `translate/changes.rs`.
 Needs: hearth 11; hearth 40.1 (`Change`, `TargetChange`, `Rebuild`,
-`Tally`, `Terminal`'s `diff`).
+`Tally`, `Terminal`'s `diff`); hearth 32.1 (`src/parts/config.rs`).
 Files: render `src/{lib, vocabulary, call}.rs` (shared), new
-`src/diff.rs`, `src/parts/config.rs`, `src/tests.rs`, new
-`src/tests/diff.rs`, `src/tests/fixtures.rs`; the root's `src/{lib,
+`src/diff.rs`, `src/parts/config.rs` (32.1's), `src/tests.rs`, new
+`src/tests/diff.rs`, `src/tests/fixtures.rs`, `src/tests/outcome.rs`
+(`OUTCOMES` and `WORST` grow to 5 and 5 by 5, `Negative` between
+`TryAgain` and `Done`); the root's `src/{lib,
 vocabulary}.rs`, `src/tests.rs`; protocol `src/translate.rs`, new
 `src/translate/changes.rs`, `src/translate/answers.rs`,
 `src/tests/translate.rs`; `tests/builder/{src/fixtures.rs,
-tests/real.rs}`.
+tests/real.rs}`; the render world's `tests/render/src/parent.rs` (`:43`'s
+`Answer::Rendered { outcome }` takes `diff`, and explicit arms for
+`Answer::Change`, `Request::Hunks`, `Event::Diff` and `Hunks`: the world
+denies `wildcard_enum_match_arm`) and `tests/render/tests/thin.rs`
+(`:102`'s match gains an `Answer::Change` arm). A further exhaustive match
+on these enums gains its arms the same way, named in the commit body.
 Shape: the sketches. `call.rs`: hearth 11's one-revision state becomes
 `call::Side`; a render call holds one and answers as it goes, a diff
 call two, `from` then `to`, each keeping what it made of each target
@@ -133,8 +140,8 @@ their layers. `parts::config::change`
 walks both trees by path, in byte order. The outcome is the worst of
 each side's failures, then `Negative` if a change is not `Same`.
 Test shape: unit (`crates/hearth-domain-render/src/tests/diff.rs`, new,
-each under 20 ms; `fixtures::spec(target, parts)` beside hearth 11's
-`x1_prod`):
+each under 20 ms; `fixtures::spec(target, parts)` beside `meta()` in
+`src/tests/fixtures.rs`):
 ```rust
 // crates/hearth-domain-render/src/tests/diff.rs
 const REBUILDS: &[(&[Layer], Rebuild)] = &[
@@ -232,8 +239,8 @@ the `Change` without hunks, outcome `TryAgain`, exit 75),
 (records); `each_hunk_line_kind_translates_and_back`. Real, each under
 0.5 s: 25.1's reference, its literal grown to `fixtures::MOTD_DIFF_TEXT`,
 each file line followed by git's `@@ -1 +1 @@`, `-Welcome.` and
-`+Welcome, and be kind.` at 15 spaces (real git at `--unified=3`, not
-6.3's `--unified=0` example). Also
+`+Welcome, and be kind.` at 15 spaces (real git at `--unified=3`, as in
+6.3's example). Also
 `a_store_inside_a_work_tree_diffs_as_outside_any_repository`
 (`fixtures::work_tree(at, config)`: `git init`, each entry set in it,
 here `diff.interHunkContext=10`, the store beneath it via `Asked { store:
