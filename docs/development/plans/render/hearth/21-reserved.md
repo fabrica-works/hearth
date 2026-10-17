@@ -303,11 +303,15 @@ Size: at most 220 lines.
 Removes: nothing.
 
 ### 21.4 The `hearth` task: present, declared, and passing every rule
-Scope: format.md 5.12; render.md 3.2; hearth 12's presence; log 68.
+Scope: format.md 5.12; render.md 3.2, and 3.4's container on its host;
+hearth 12's presence; log 68.
 Needs: nothing beyond 21.3; hearth 42.3 (`Composition::Task`, `CONTAINERS`).
-Files: render `src/{compose, call, errors}.rs`, `src/tests/{compose,
-fixtures, errors}.rs`, `src/tests/fixtures/schemas.rs`;
-protocol, records and `tests/builder` as 21.1's; both fixtures modules: `THIN`
+Files: render `src/{compose, call, errors}.rs`, `src/call/validation.rs`,
+`src/tests/{compose, fixtures, errors}.rs`, `src/tests/fixtures/schemas.rs`;
+protocol, records and `tests/builder` as 21.1's, and the `Host` arms:
+records `src/errors/composition.rs`, `src/tests/errors.rs`; protocol
+`src/translate/errors.rs`, `src/tests/translate/composition.rs`;
+`tests/render/{src/fixtures.rs, tests/compose.rs}`; both fixtures modules: `THIN`
 and the scripted `x1_prod` gain `tasks/hearth/task.json` `{}` (a ripple past
 README's 20 lines, as 17.1's: a planner's ruling), and each repository that
 is not built on them: `MOTD` and `CONTAINERS` (`tests/builder/src/fixtures.rs`,
@@ -340,6 +344,22 @@ any other target is accepted: one `Present` (not two), `implicit` false.
 `fleet.json` and `envs/` keys for `hearth` are settings, as for any task; a
 container has none: a key for it on a container is dropped, with no error. Nothing else:
 the task's packages, user, software and presets are the repository's.
+A container reads of its host its placement alone (render.md 3.4, the
+designer's answer of 2026-10-17). `compose::placed` reports the `on` as now
+(`Unknown`, `Elsewhere`, `Container`); then, in `answer()` (`call.rs:449`):
+- while a document the host composes is refused, the container is left out,
+  `Failed`, with no error of its own (42.3): `Side::host_valid` keeps of
+  `dependencies_valid` its four documents alone (each decoded, and none
+  marked in `invalid`, by the listing or by `compose::rules`), and drops
+  `repository_valid`'s task half, its base half (a stray file under the
+  host's base) and `files_valid`;
+- else a host whose placement composes to none gives the container
+  `On { on, host: Unplaced }` (`Host::Unplaced` new; text `, a target with
+  no placement`, JSON `"unplaced"`), at its `on`, in the document `placed`
+  names for the other `Host`s.
+`validation::host_schema` goes, with its call at `call.rs:451`; `needed` is
+the asked targets alone, so that a container asked reads none of its host's
+files and prints none of their errors.
 Test shape: unit, `src/tests/compose.rs`, under 20 ms:
 `the_hearth_task_is_present_in_every_target_but_a_container`,
 `a_fleet_key_for_hearth_reaches_the_implicit_task_as_settings`,
@@ -372,21 +392,37 @@ askpass` (100755), `tree/etc/hearth/alarms.json.j2`): exit 0, and
 08.2's `testing/repos/test` as main has it: its `tasks/hearth/task.json`
 holds a `doc` alone, and 21.4 leaves it so; a target with no other task):
 `lines_starting` over `  request` is empty, exit 0.
-`a_container_renders_without_a_hearth_declaration_and_a_host_does_not` waits
-for the designer's answer to whether a container renders when its host
-fails (ruling 162): main leaves such a container
-out (42-listing-members-rules.md, Rules; `call/validation.rs:129`). Its host
-half holds either way: on `NO_HEARTH` (42.3's `CONTAINERS` with
-`chat-prod.json` overridden to `"on": "rhi-prod"`, as `CONTAINERS` places it
-on `rhi-lab`; no `tasks/hearth`), asked `rhi-prod`, stdout is
+`a_container_renders_without_a_hearth_declaration_and_a_host_does_not`, on
+`NO_HEARTH` (42.3's `CONTAINERS` with `chat-prod.json` overridden to
+`"on": "rhi-prod"`, as `CONTAINERS` places it on `rhi-lab`; no
+`tasks/hearth`): asked `chat-prod`, `lines_starting` over `target ` is
+exactly `target       chat-prod   base chat   environment prod`, no line
+starts `tasks/` or `hosts/`, and exit 0; asked `rhi-prod`, stdout is
 `tasks/hearth/task.json: rhi-prod: no task hearth under tasks/` (the records
-print no task for `Composition::Task`, `errors.rs:66`) and exit 2. `a_container_naming_hearth_is_refused_at_the_key` (`chat-prod.json`
+print no task for `Composition::Task`, `errors.rs:66`) and exit 2.
+In the render world (`tests/render/tests/compose.rs`), 8 seeds each, as its
+neighbours: `a_container_whose_unselected_host_s_settings_failed_is_left_out_
+without_an_error` (`:150`) becomes `a_container_renders_whatever_else_fails_
+on_its_host`: on `container_with_unsound_host()`, asked `x1-prod`, one
+`Answer::Spec` of `x1-prod`, `Outcome::Done`; `a_container_on_a_host_with_no_
+placement_errs_at_its_on`: `containers()` with document `b'4'` (the host's
+`hosts/a-b/a-b-prod.json`) set to `document(None)`, asked `x1-prod`, one
+`Answer::Error`, `Composition::On { on: a-b-prod, host: Host::Unplaced }` at
+`(1, 43)`, `Outcome::Failed`. `a_container_whose_host_failed_is_left_out_
+without_an_error` (`:123`, a refused host document) holds unchanged. The
+records' and the protocol's `Host` tests gain `Unplaced`'s row, text and
+JSON. `a_container_naming_hearth_is_refused_at_the_key` (`chat-prod.json`
 `{"placement": {"kind": "container", "on": "rhi-prod"}, "hearth": {}}`): the
 `hosts/` line begins `hosts/chat/chat-prod.json:1:56: chat-prod: hearth: `.
 Don't: write the data part's `snapshots` and `backups` policies (M5, M6);
-check `hearth`'s uid or range; refuse the task's own files.
-Size: at most 220 lines.
-Removes: 12.1's "Don't ... add the `hearth` task (hearth 21)".
+check `hearth`'s uid or range; refuse the task's own files; leave a container
+out for what fails on its host but its documents and placement.
+Size: at most 260 lines.
+Removes: 12.1's "Don't ... add the `hearth` task (hearth 21)"; 42.3's leaving
+out of a container whose host's tasks, settings or files fail, or a stray
+file under its base (`validation::host_schema`; in `host_valid`,
+`repository_valid`'s task and base halves and `files_valid`; `needed`'s
+host clause).
 
 ## Interface sketches
 
@@ -412,7 +448,7 @@ pub fn entries(expansion: &mut Expansion, target: &[u8], container: bool) -> Box
 impl Expansion { pub fn refuse(&mut self, map: Map, task: &[u8], key: &[u8]); } // `of` skips what it refused
 // src/compose.rs (12's): `Present::implicit: bool` (`Install::at: Option<Position>` is 18.1's)
 
-// crates/hearth-domain-render/src/errors.rs: `Kind` gains `Reserved(Reserved)`; `Composition` none
+// crates/hearth-domain-render/src/errors.rs: `Kind` gains `Reserved(Reserved)`; `Composition` none; `Host` gains `Unplaced` (21.4)
 /// render.md 7.2's `reserved`: the rule, and the key, word, unit or path at fault.
 pub struct Reserved { pub rule: Rule, pub what: Box<[u8]> }
 pub enum Rule {

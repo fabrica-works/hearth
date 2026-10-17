@@ -1,6 +1,6 @@
 # The IaC format
 
-Provisional, 2026-10-09, revised 2026-10-16. The format of an IaC
+Provisional, 2026-10-09, revised 2026-10-17. The format of an IaC
 repository as hearth reads it: the repository's files, how targets are
 made from bases and environments, how layers merge, what a task declares
 and the schema of its settings, the template language, exports between
@@ -323,7 +323,9 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 - **A container names its host** in `placement.on`. A host's containers
   are the targets of its environment placed on it; render hands them to
   the host's templates as `target.containers` (7.7), a map from target
-  name to placement.
+  name to placement. A container reads no more of its host than that
+  placement, so what else fails on its host leaves it rendering
+  (render.md, 3.4).
 - **One source of truth.** The host keeps no list of its containers,
   where draft/brainstorm.md (7.7) kept one in the host's configuration.
   The bash fleet's `runner:600` user, declared once for carbon and again
@@ -1236,7 +1238,9 @@ declares it (render.md, 7.2):
   (which starts the steward, which starts builders) and its user, which
   machine.md (8.3) and slots.md assume. Its files are in the repository
   like any task's, `tasks/hearth/`, so the release a fleet runs is
-  pinned by a change.
+  pinned by a change. A revision without them fails each target that
+  has the task, as any task that does not exist does (3.3; render.md,
+  7.2), and its containers render (render.md, 3.4).
 - **But a container's:** render adds no `hearth` task to a
   container's target, and naming it there, in its base, member or
   base-env layer (3.3), is a `reserved` error at the key. The `hearth`

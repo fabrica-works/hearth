@@ -1,6 +1,6 @@
 # Render
 
-Provisional, 2026-10-09, revised 2026-10-16. How hearth turns a revision
+Provisional, 2026-10-09, revised 2026-10-17. How hearth turns a revision
 of an IaC repository and a target into a spec: what render reads and how
 it reads it, its pipeline, the spec's parts and their digests, package
 resolution, the rendered diff of a change, its errors, its crates and
@@ -324,6 +324,22 @@ and step 4 reads other targets of the same environment.
   container's placement is read alike: each entry of `target.containers`
   holds the fields of the container's `target.placement`, and a container
   whose placement cannot be composed fails its host.
+- **A container reads of its host its placement alone:** that `on` names
+  a target of its environment that is not a container (format.md, 3.4).
+  Its context holds nothing else of the host (format.md, 7.7), and its
+  data part none of the host's policies (4.3). So what else fails on the
+  host (a task that does not exist, `hearth` among them when
+  `tasks/hearth/` is absent; a declaration or a file of its tasks; its
+  settings, its guards, its entries) leaves its containers as they are,
+  and they render. A host whose placement cannot be composed fails each
+  container placed on it:
+  - while a document the host composes is refused, by its decode, the
+    listing or a rule of composition (3.1, 7.2), the container is left
+    out under that error, which prints whatever targets are asked, once
+    and without a target (7.1);
+  - a host whose documents are not refused but compose no placement
+    gives each container asked a `composition` error at its `on` (7.2),
+    beside the host's own when the host is asked too.
 
 ### 3.5 Conditions
 
@@ -1051,7 +1067,9 @@ error
   the network, a timeout) and the same revision may succeed later.
 - **Render collects every independent error:** a broken document fails
   the targets that compose it, a broken task the targets that have it,
-  and the rest goes on. Errors are sorted by path, line, column and
+  and the rest goes on. A target asked that does not render always has
+  an error printed for it: its own, or the revision's error it is left
+  out under (3.1, 3.4). Errors are sorted by path, line, column and
   target, then side, those with no place after those with one, by
   target; and bounded (2.3): one bound over a command's answer, a diff's
   two sides together. An error past the 256th is counted, not kept, and
@@ -1085,7 +1103,7 @@ error
 |---|---|
 | decode | not JSON, a duplicate key, a fraction, invalid UTF-8, a `null` inside a list, a document or a declaration not of its shape, a template's syntax, an unknown filter; a limit met while reading the revision: its listing's, a file's, the decoded documents' and templates', the 1,025th target or task, a task's 513th setting (2.3) |
 | repository | a document out of place, an environment that does not exist, a directory named out of form, a path that is not UTF-8, a submodule, a stray file in a task, two sources for one destination, a `.j2` link or a bare `.j2` |
-| composition | two targets of one name, a target's name past 63 bytes, a task that does not exist, `null` for a task in a default (the `hearth` task's is `reserved`), `placement` in a base, `null` for `placement` or `members`, `members` in `fleet.json` or `envs/`, a target with no placement, a container's `on` that names a container or a target of another environment; [M5] a container's parameters on another kind, or an id range that overlaps another's (format.md, 3.5) |
+| composition | two targets of one name, a target's name past 63 bytes, a task that does not exist, `null` for a task in a default (the `hearth` task's is `reserved`), `placement` in a base, `null` for `placement` or `members`, `members` in `fleet.json` or `envs/`, a target with no placement, a container's `on` that names a container, a target of another environment or one with no placement (3.4); [M5] a container's parameters on another kind, or an id range that overlaps another's (format.md, 3.5) |
 | schema | an undeclared setting, a wrong type, a missing required setting, an undeclared read, a bad default, a key or value of a later milestone (format.md, 2.2) |
 | evaluation | an undefined value used, a type error in an expression, an overflow, a `for_each` that is not a map or list; a limit met while composing, validating, evaluating or rendering a target (2.3) |
 | exported | another target's exports that this one reads cannot be computed (3.4): `target` is the reader, the kind names the exporter and its task, `at` is the cause's place, and the class is the cause's |

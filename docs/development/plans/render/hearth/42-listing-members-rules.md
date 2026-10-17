@@ -49,8 +49,13 @@ and Rules bind here as there.
 - **Names:** 2.4's base, environment and member forms forbid a dot and
   every target holds a `-`, so a made name is never `hearth`: 42.2
   checks the 63 bytes alone. `tasks` is tasks in a revision, as
-  "targets in a revision" before it. A container whose host failed is
-  left out with no error of its own: it depends on the host's documents.
+  "targets in a revision" before it. A container whose host's documents
+  are refused is left out with no error of its own, under that document's
+  error, which prints with any command: it depends on the host's
+  placement. From hearth 21.4 (render.md 3.4, the designer's answer of
+  2026-10-17), what else fails on the host leaves the container
+  rendering, and a host whose documents compose no placement gives it
+  `On { host: Unplaced }`.
 - **Later sessions:** 20 gives `target.containers`; 21 the `hearth` task;
   24 mmdebstrap's `Command` and `Ended::Timeout`; 45.1 a failed diff's
   error per target (42.1 adds git's diff `Command`).
