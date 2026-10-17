@@ -71,3 +71,6 @@ pub fn template_plans(entries: &[crate::revision::Entry]) -> Box<[Plan]> {
 
 mod sources;
 pub use sources::*;
+
+mod accounts;
+pub use accounts::*;

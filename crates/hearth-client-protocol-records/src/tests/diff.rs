@@ -1,10 +1,11 @@
-use super::fixtures;
+use super::fixtures::{
+    self, diff_change as change, diff_terminal as terminal, diff_text as text, fixture_hunks as hunks,
+};
 use crate::{
     diff::*,
     form::{self, Form},
     limits,
-    outcome::Outcome,
-    records::{Record, Terminal, Type},
+    records::{Record, Type},
 };
 use alloc::boxed::Box;
 use skein_lib::bytes::copy_of;
@@ -51,7 +52,7 @@ fn a_binary_file_prints_no_hunk_line() {
     assert_eq!(text(&Record::Change(value)).as_deref(), Ok(NO_HUNKS.as_bytes()));
 }
 const JSON_CHANGE: &str = concat!(
-    r#"{"record":"change","target":"carbon-prod","kind":"changed","changed":{"parts":[{"kind":"config","tree":[{"after":{"content_digest":"2222222222222222222222222222222222222222222222222222222222222222","group":"root","kind":"file","mode":"0644","owner":"root"},"before":{"content_digest":"1111111111111111111111111111111111111111111111111111111111111111","group":"root","kind":"file","mode":"0644","owner":"root"},"hunks":{"binary":false,"left_out":0,"lines":[{"kind":"header","text":"@@ -9,5 +9,5 @@ ListenPort=51820"},{"kind":"context","text":"[WireGuardPeer]"},{"kind":"context","text":"PublicKey=m3NY8…="},{"kind":"context","text":"AllowedIPs=10.0.0.1/32"},{"kind":"removed","text":"Endpoint=194.164.162.157:51820"},{"kind":"added","text":"Endpoint=194.164.162.158:51820"},{"kind":"context","text":"PersistentKeepalive=25"}]},"kind":"changed","path":"/etc/systemd/network/wg0.netdev","sizes":{"after":268,"before":268}}]}],"rebuild":{"kind":"from_config"}}}"#,
+    r#"{"record":"change","target":"carbon-prod","kind":"changed","changed":{"parts":[{"kind":"config","groups":[],"users":[],"members":[],"tree":[{"after":{"content_digest":"2222222222222222222222222222222222222222222222222222222222222222","group":"root","kind":"file","mode":"0644","owner":"root"},"before":{"content_digest":"1111111111111111111111111111111111111111111111111111111111111111","group":"root","kind":"file","mode":"0644","owner":"root"},"hunks":{"binary":false,"left_out":0,"lines":[{"kind":"header","text":"@@ -9,5 +9,5 @@ ListenPort=51820"},{"kind":"context","text":"[WireGuardPeer]"},{"kind":"context","text":"PublicKey=m3NY8…="},{"kind":"context","text":"AllowedIPs=10.0.0.1/32"},{"kind":"removed","text":"Endpoint=194.164.162.157:51820"},{"kind":"added","text":"Endpoint=194.164.162.158:51820"},{"kind":"context","text":"PersistentKeepalive=25"}]},"kind":"changed","path":"/etc/systemd/network/wg0.netdev","sizes":{"after":268,"before":268}}]}],"rebuild":{"kind":"from_config"}}}"#,
     "\n",
 );
 #[test]
@@ -137,35 +138,6 @@ fn every_rebuild_prints_its_named_form() {
         );
     }
 }
-fn change(target: &[u8], change: TargetChange) -> Record {
-    Record::Change(Change { target: copy_of(target), change })
-}
-fn text(record: &Record) -> Result<Box<[u8]>, form::Refusal> {
-    form::print(Form::Text, record, Some(Type::Change), &limits::SHIPPED)
-}
-fn terminal(targets: u32, changed: u32, unchanged: u32) -> Record {
-    Record::Terminal(Terminal {
-        outcome: Outcome::Negative,
-        diff: Some(fixtures::tally(targets, changed, unchanged)),
-        left_out: 0,
-    })
-}
-fn hunks(value: &mut Change) -> &mut Hunks {
-    match &mut value.change {
-        TargetChange::Changed { parts, .. } => match fixtures::only_mut(parts) {
-            PartChange::Meta(_) | PartChange::Packages(_) | PartChange::Boot(_) | PartChange::Exports(_) => {
-                panic!("config change")
-            }
-            PartChange::Config(config) => match fixtures::only_mut(&mut config.tree) {
-                EntryChange::Changed { hunks, .. } => hunks.as_mut().expect("fixture hunks"),
-                EntryChange::Added { .. } | EntryChange::Removed { .. } => unreachable!("changed file fixture"),
-            },
-        },
-        TargetChange::Added { .. } | TargetChange::Removed | TargetChange::Same | TargetChange::Failed { .. } => {
-            unreachable!("changed fixture")
-        }
-    }
-}
 
 const NO_NEWLINE_FORMS: &[(Form, &str)] = &[
     (
@@ -175,7 +147,7 @@ const NO_NEWLINE_FORMS: &[(Form, &str)] = &[
     (
         Form::JsonLines,
         concat!(
-            r#"{"record":"change","target":"carbon-prod","kind":"changed","changed":{"parts":[{"kind":"config","tree":[{"after":{"content_digest":"2222222222222222222222222222222222222222222222222222222222222222","group":"root","kind":"file","mode":"0644","owner":"root"},"before":{"content_digest":"1111111111111111111111111111111111111111111111111111111111111111","group":"root","kind":"file","mode":"0644","owner":"root"},"hunks":{"binary":false,"left_out":0,"lines":[{"kind":"no_newline","text":" No newline at end of file"}]},"kind":"changed","path":"/etc/systemd/network/wg0.netdev","sizes":{"after":268,"before":268}}]}],"rebuild":{"kind":"from_config"}}}"#,
+            r#"{"record":"change","target":"carbon-prod","kind":"changed","changed":{"parts":[{"kind":"config","groups":[],"users":[],"members":[],"tree":[{"after":{"content_digest":"2222222222222222222222222222222222222222222222222222222222222222","group":"root","kind":"file","mode":"0644","owner":"root"},"before":{"content_digest":"1111111111111111111111111111111111111111111111111111111111111111","group":"root","kind":"file","mode":"0644","owner":"root"},"hunks":{"binary":false,"left_out":0,"lines":[{"kind":"no_newline","text":" No newline at end of file"}]},"kind":"changed","path":"/etc/systemd/network/wg0.netdev","sizes":{"after":268,"before":268}}]}],"rebuild":{"kind":"from_config"}}}"#,
             "\n"
         ),
     ),

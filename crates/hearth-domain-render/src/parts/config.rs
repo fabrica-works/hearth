@@ -7,6 +7,9 @@ use hearth_lib::{
 };
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Config {
+    pub groups: Box<[Group]>,
+    pub users: Box<[User]>,
+    pub members: Box<[Member]>,
     pub tree: Box<[TreeEntry]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -39,7 +42,8 @@ pub fn digest(config: &Config) -> Digest {
     hash.finish()
 }
 pub fn encode(config: &Config, record: &mut Encoder) {
-    record.map(1);
+    record.map(4);
+    accounts::encode(config, record);
     record.key(b"tree");
     record.map(u64::try_from(config.tree.len()).expect("bounded tree"));
     for entry in &config.tree {
@@ -82,6 +86,7 @@ pub fn encode(config: &Config, record: &mut Encoder) {
             }
         }
     }
+    accounts::encode_users(config, record);
 }
 
 fn absolute(path: &[u8]) -> Box<[u8]> {
@@ -94,6 +99,9 @@ fn absolute(path: &[u8]) -> Box<[u8]> {
 /// Paths changed in byte order (render.md, 6.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Change {
+    pub groups: Box<[GroupKeyed]>,
+    pub users: Box<[UserKeyed]>,
+    pub members: Box<[MemberChange]>,
     pub tree: Box<[EntryChange]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -104,6 +112,9 @@ pub enum EntryChange {
 }
 #[must_use]
 pub fn change(before: Option<&Config>, after: Option<&Config>) -> Change {
+    let groups = changes::groups(before, after);
+    let users = changes::users(before, after);
+    let members = changes::members(before, after);
     let before = match before {
         Some(config) => config.tree.as_ref(),
         None => &[],
@@ -141,7 +152,7 @@ pub fn change(before: Option<&Config>, after: Option<&Config>) -> Change {
         };
         tree.push(change).expect("tree capacity");
     }
-    Change { tree: tree.into_boxed() }
+    Change { tree: tree.into_boxed(), groups, users, members }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -181,3 +192,29 @@ impl EntryChange {
 pub fn rendered(path: &[u8], mode: Mode, content_digest: Digest) -> TreeEntry {
     file(path.strip_suffix(b".j2").expect("template suffix"), mode, content_digest)
 }
+
+mod accounts;
+pub use accounts::{Group, GroupKind, Member, User, UserKind};
+
+pub use accounts::build as accounts;
+pub(crate) use accounts::rows as account_rows;
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum GroupKeyed {
+    Added { key: Box<[u8]>, value: GroupKind },
+    Removed { key: Box<[u8]>, value: GroupKind },
+    Changed { key: Box<[u8]>, before: GroupKind, after: GroupKind },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum UserKeyed {
+    Added { key: Box<[u8]>, value: UserKind },
+    Removed { key: Box<[u8]>, value: UserKind },
+    Changed { key: Box<[u8]>, before: UserKind, after: UserKind },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum MemberChange {
+    Added(Member),
+    Removed(Member),
+}
+
+mod changes;

@@ -100,6 +100,9 @@ fn changed_parts_are_compared_by_digest_and_rebuild_from_config() {
         TargetChange::Changed {
             rebuild: Rebuild::FromConfig,
             parts: Box::new([diff::PartChange::Config(config::Change {
+                groups: Box::new([]),
+                users: Box::new([]),
+                members: Box::new([]),
                 tree: Box::new([EntryChange::Added {
                     path: bytes::copy_of(b"/added"),
                     node: Node::File {

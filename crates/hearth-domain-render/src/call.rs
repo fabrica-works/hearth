@@ -432,6 +432,20 @@ impl Side {
         (self.names.is_empty() || self.names.contains(&target.name))
             && self.dependencies_valid(target, self.next.saturating_sub(1))
     }
+    fn placement_host_valid(&mut self, placement: &revision::Placement) -> bool {
+        let Some(on) = &placement.on else { return true };
+        let revision =
+            crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
+        self.host_valid(&on.target)
+            && validation::host_schema(
+                &on.target,
+                &self.targets,
+                &self.settings,
+                &revision,
+                &mut self.validator,
+                self.validated,
+            )
+    }
     pub fn answer(&mut self) -> Option<Answer> {
         if self.rendering.is_some() {
             return self.template();
@@ -454,22 +468,7 @@ impl Side {
                 self.next = self.next.saturating_sub(1);
                 return None;
             }
-            let revision = crate::schema::Revision {
-                documents: &self.documents,
-                defaults: &self.defaults,
-                listing: &self.entries,
-            };
-            if let Some(on) = &p.on
-                && (!self.host_valid(&on.target)
-                    || !validation::host_schema(
-                        &on.target,
-                        &self.targets,
-                        &self.settings,
-                        &revision,
-                        &mut self.validator,
-                        self.validated,
-                    ))
-            {
+            if !self.placement_host_valid(&p) {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             }
@@ -508,7 +507,9 @@ impl Side {
             else {
                 continue;
             };
-            let Some((secrets, live)) = secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome) else {
+            let Some((secrets, live, accounts)) =
+                secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome)
+            else {
                 continue;
             };
             let mut faults = List::with_capacity(files::fault_capacity(&expansion, self.entries.len()));
@@ -518,16 +519,24 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
-            let capacity = self.plan_capacity(&plans);
-            self.rendering = Some(templates::Target::new(
+            self.prepare_rendering(
                 meta,
                 containers,
                 meta_digest,
                 checked,
                 debian,
-                templates::Prepared { plans, expansion, secrets, packages, live, boot, exports, export_roots },
-                capacity,
-            ));
+                templates::Prepared {
+                    accounts,
+                    plans,
+                    expansion,
+                    secrets,
+                    packages,
+                    live,
+                    boot,
+                    exports,
+                    export_roots,
+                },
+            );
             return self.template();
         }
         Some(self.finished())

@@ -179,26 +179,6 @@ pub fn operand(input: Input) -> Operand<'static> {
 }
 
 pub const FALSE: bool = false;
-pub fn config() -> crate::parts::config::Config {
-    use crate::{
-        parts::config::{self, Config},
-        revision::Mode,
-    };
-    Config {
-        tree: Box::new([
-            config::file(
-                b"etc/motd",
-                Mode::File,
-                digest("775324fcea7f2cdcbf11df25550e362669caceb6e69c8370374d2d436bb63123"),
-            ),
-            config::file(
-                b"usr/local/bin/motd",
-                Mode::Executable,
-                digest("f487088ec8b18ff569dfede6f12e5fa91983f9f6dd2f3e0b6cee4349a231e745"),
-            ),
-        ]),
-    }
-}
 
 pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
     use crate::revision::{Document, Layer, Oid, Position, Task};
@@ -301,28 +281,21 @@ pub mod composition {
     }
 }
 
-pub fn spec(target: &[u8], parts: &[crate::parts::Part]) -> crate::parts::Spec {
-    let mut meta = meta();
-    meta.target = bytes::copy_of(target);
-    crate::parts::Spec {
-        resolution: None,
-        meta,
-        meta_digest: Digest([1; 32]),
-        digest: Digest([2; 32]),
-        commit: crate::revision::Oid(bytes::copy_of(b"0123456789abcdef0123456789abcdef01234567")),
-        parts: parts.into(),
-    }
-}
-
 pub fn diff_trees() -> (crate::parts::config::Config, crate::parts::config::Config) {
     use crate::parts::config::{self, Config};
     let before = Config {
+        groups: Box::new([]),
+        users: Box::new([]),
+        members: Box::new([]),
         tree: Box::new([
             config::file(b"changed", crate::revision::Mode::File, Digest([1; 32])),
             config::file(b"removed", crate::revision::Mode::File, Digest([1; 32])),
         ]),
     };
     let after = Config {
+        groups: Box::new([]),
+        users: Box::new([]),
+        members: Box::new([]),
         tree: Box::new([
             config::file(b"added", crate::revision::Mode::File, Digest([2; 32])),
             config::file(b"changed", crate::revision::Mode::File, Digest([2; 32])),
@@ -338,13 +311,24 @@ pub fn changed_specs() -> (crate::parts::Spec, crate::parts::Spec) {
     };
     let before = spec(
         b"x1-prod",
-        &[Part { digest: Digest([1; 32]), record: PartRecord::Config(Config { tree: Box::new([]) }) }],
+        &[Part {
+            digest: Digest([1; 32]),
+            record: PartRecord::Config(Config {
+                groups: Box::new([]),
+                users: Box::new([]),
+                members: Box::new([]),
+                tree: Box::new([]),
+            }),
+        }],
     );
     let mut after = spec(
         b"x1-prod",
         &[Part {
             digest: Digest([2; 32]),
             record: PartRecord::Config(Config {
+                groups: Box::new([]),
+                users: Box::new([]),
+                members: Box::new([]),
                 tree: Box::new([TreeEntry {
                     path: bytes::copy_of(b"/added"),
                     node: Node::File {
@@ -484,6 +468,9 @@ pub fn hunk_call() -> (crate::Render, skein_lib::Env<limits::Limits>, skein_lib:
             &[Part {
                 digest,
                 record: PartRecord::Config(Config {
+                    groups: Box::new([]),
+                    users: Box::new([]),
+                    members: Box::new([]),
                     tree: Box::new([TreeEntry { path: bytes::copy_of(b"/etc/motd"), node }]),
                 }),
             }],
@@ -776,4 +763,6 @@ pub use exports::*;
 mod resolution;
 pub use resolution::*;
 
+mod config;
 pub mod export_readers;
+pub use config::*;

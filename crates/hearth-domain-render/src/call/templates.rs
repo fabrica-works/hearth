@@ -8,11 +8,7 @@ use crate::{
         context::{self, Roots},
         template,
     },
-    parts::{
-        self,
-        config::{Config, TreeEntry},
-        meta::Meta,
-    },
+    parts::{self, config::TreeEntry, meta::Meta},
     revision, schema,
     vocabulary::{Answer, Class, Outcome, Output, Request},
 };
@@ -20,6 +16,7 @@ use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
 use skein_lib::{List, Map, Queue, Token};
 pub(crate) struct Prepared {
+    pub accounts: crate::kinds::users::Accounts,
     pub plans: Box<[Plan]>,
     pub expansion: crate::entries::Expansion,
     pub secrets: parts::secrets::Secrets,
@@ -48,6 +45,7 @@ pub(crate) struct Target {
     entry: usize,
     roots: Option<Roots>,
     tree: Map<Box<[u8]>, TreeEntry>,
+    accounts: crate::kinds::users::Accounts,
     plans: Box<[Plan]>,
     outcome: Outcome,
     keeping: Option<TreeEntry>,
@@ -63,7 +61,7 @@ impl Target {
         prepared: Prepared,
         capacity: u32,
     ) -> Self {
-        let Prepared { plans, expansion, secrets, packages, live, boot, exports, export_roots } = prepared;
+        let Prepared { accounts, plans, expansion, secrets, packages, live, boot, exports, export_roots } = prepared;
         let mut tree = Map::with_capacity(capacity);
         for plan in &plans {
             for install in &plan.installs {
@@ -110,6 +108,7 @@ impl Target {
             entry: 0,
             roots: None,
             tree,
+            accounts,
             plans,
             outcome: Outcome::Done,
             keeping: None,
@@ -206,6 +205,19 @@ impl Target {
     }
 }
 impl Side {
+    pub(super) fn prepare_rendering(
+        &mut self,
+        meta: Meta,
+        containers: Box<[crate::compose::Container]>,
+        meta_digest: Digest,
+        checked: schema::Validated,
+        debian: Value,
+        prepared: Prepared,
+    ) {
+        let capacity = self.plan_capacity(&prepared.plans);
+        self.rendering = Some(Target::new(meta, containers, meta_digest, checked, debian, prepared, capacity));
+    }
+
     pub(super) fn answer_for(&mut self, out: &mut Queue<Output>) -> Option<Answer> {
         let answer = self.answer();
         if answer.is_none() {
@@ -267,7 +279,7 @@ impl Side {
         for (_, file) in &target.tree {
             files.push(file.clone()).expect("tree count");
         }
-        let config = Config { tree: files.into_boxed() };
+        let config = parts::config::account_rows(&target.accounts, files.into_boxed());
         let parts = Box::new([
             parts::Part { digest: parts::boot::digest(&target.boot), record: parts::PartRecord::Boot(target.boot) },
             parts::Part {

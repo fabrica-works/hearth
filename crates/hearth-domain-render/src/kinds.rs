@@ -17,3 +17,6 @@ pub fn required(entry: &Concrete, name: Name) -> Result<(), Schema> {
 pub mod cmdline;
 pub mod packages;
 pub mod preseeds;
+
+pub mod groups;
+pub mod users;

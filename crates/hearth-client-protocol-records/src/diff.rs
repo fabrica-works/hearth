@@ -83,6 +83,9 @@ pub struct PlacementPair {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ConfigChange {
+    pub groups: Box<[GroupKeyed]>,
+    pub users: Box<[UserKeyed]>,
+    pub members: Box<[MemberChange]>,
     pub tree: Box<[EntryChange]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -253,6 +256,7 @@ impl Rebuild {
 }
 impl ConfigChange {
     fn text(&self, lines: &mut Lines) {
+        self.accounts_text(lines);
         let mut column = 52;
         for entry in &*self.tree {
             column = column.max(entry.path().len().saturating_add(15));
@@ -305,6 +309,7 @@ impl ConfigChange {
     fn json(&self, json: &mut Encoder) {
         json.object_start();
         field(json, b"kind", b"config");
+        self.accounts_json(json);
         json.key(b"tree");
         json.array_start();
         for entry in &*self.tree {
@@ -433,5 +438,186 @@ impl Tally {
         json.unsigned(u64::from(self.changed));
         json.key(b"unchanged");
         json.unsigned(u64::from(self.unchanged));
+    }
+}
+
+use crate::parts::config::{GroupKind, Member, UserKind};
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum GroupKeyed {
+    Added { key: Box<[u8]>, value: GroupKind },
+    Removed { key: Box<[u8]>, value: GroupKind },
+    Changed { key: Box<[u8]>, before: GroupKind, after: GroupKind },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum UserKeyed {
+    Added { key: Box<[u8]>, value: UserKind },
+    Removed { key: Box<[u8]>, value: UserKind },
+    Changed { key: Box<[u8]>, before: UserKind, after: UserKind },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum MemberChange {
+    Added(Member),
+    Removed(Member),
+}
+
+mod accounts {
+    use super::{ConfigChange, GroupKeyed, MemberChange, UserKeyed};
+    use crate::form::text::Lines;
+    use skein_json::writer::Encoder;
+    impl GroupKeyed {
+        fn text(&self, lines: &mut Lines) {
+            let (mark, key, value) = match self {
+                Self::Added { key, value } => (b"+", key, value),
+                Self::Removed { key, value } => (b"-", key, value),
+                Self::Changed { key, after, .. } => (b"~", key, after),
+            };
+            lines.put(b"  config   ");
+            lines.put(mark);
+            lines.put(b" groups ");
+            lines.put(key);
+            lines.pad_to(52);
+            value.text(lines);
+            lines.put(b"\n");
+        }
+        fn json(&self, json: &mut Encoder) {
+            json.object_start();
+            match self {
+                Self::Added { key, value } | Self::Removed { key, value } => {
+                    json.key(b"key");
+                    json.string(key);
+                    json.key(b"kind");
+                    json.string(match self {
+                        Self::Added { .. } => b"added",
+                        Self::Removed { .. } => b"removed",
+                        Self::Changed { .. } => unreachable!("added or removed"),
+                    });
+                    json.key(b"value");
+                    value.json(json);
+                }
+                Self::Changed { key, before, after } => {
+                    json.key(b"after");
+                    after.json(json);
+                    json.key(b"before");
+                    before.json(json);
+                    json.key(b"key");
+                    json.string(key);
+                    json.key(b"kind");
+                    json.string(b"changed");
+                }
+            }
+            json.object_end();
+        }
+    }
+    impl UserKeyed {
+        fn text(&self, lines: &mut Lines) {
+            let (mark, key, value) = match self {
+                Self::Added { key, value } => (b"+", key, value),
+                Self::Removed { key, value } => (b"-", key, value),
+                Self::Changed { key, after, .. } => (b"~", key, after),
+            };
+            lines.put(b"  config   ");
+            lines.put(mark);
+            lines.put(b" users ");
+            lines.put(key);
+            lines.pad_to(52);
+            value.text(lines);
+            lines.put(b"\n");
+        }
+        fn json(&self, json: &mut Encoder) {
+            json.object_start();
+            match self {
+                Self::Added { key, value } | Self::Removed { key, value } => {
+                    json.key(b"key");
+                    json.string(key);
+                    json.key(b"kind");
+                    json.string(match self {
+                        Self::Added { .. } => b"added",
+                        Self::Removed { .. } => b"removed",
+                        Self::Changed { .. } => unreachable!("added or removed"),
+                    });
+                    json.key(b"value");
+                    value.json(json);
+                }
+                Self::Changed { key, before, after } => {
+                    json.key(b"after");
+                    after.json(json);
+                    json.key(b"before");
+                    before.json(json);
+                    json.key(b"key");
+                    json.string(key);
+                    json.key(b"kind");
+                    json.string(b"changed");
+                }
+            }
+            json.object_end();
+        }
+    }
+    impl MemberChange {
+        fn text(&self, lines: &mut Lines) {
+            let (mark, member) = match self {
+                Self::Added(member) => (b"+", member),
+                Self::Removed(member) => (b"-", member),
+            };
+            lines.put(b"  config   ");
+            lines.put(mark);
+            lines.put(b" members ");
+            lines.put(&member.user);
+            lines.put(b" ");
+            lines.put(&member.group);
+            lines.put(
+                b"
+",
+            );
+        }
+        fn json(&self, json: &mut Encoder) {
+            json.object_start();
+            json.key(b"kind");
+            let member = match self {
+                Self::Added(member) => {
+                    json.string(b"added");
+                    member
+                }
+                Self::Removed(member) => {
+                    json.string(b"removed");
+                    member
+                }
+            };
+            json.key(b"value");
+            member.json(json);
+            json.object_end();
+        }
+    }
+    impl ConfigChange {
+        pub(super) fn accounts_text(&self, lines: &mut Lines) {
+            for row in &self.groups {
+                row.text(lines);
+            }
+            for row in &self.users {
+                row.text(lines);
+            }
+            for row in &self.members {
+                row.text(lines);
+            }
+        }
+        pub(super) fn accounts_json(&self, json: &mut Encoder) {
+            json.key(b"groups");
+            json.array_start();
+            for row in &self.groups {
+                row.json(json);
+            }
+            json.array_end();
+            json.key(b"users");
+            json.array_start();
+            for row in &self.users {
+                row.json(json);
+            }
+            json.array_end();
+            json.key(b"members");
+            json.array_start();
+            for row in &self.members {
+                row.json(json);
+            }
+            json.array_end();
+        }
     }
 }

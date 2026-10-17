@@ -3,7 +3,7 @@ use hearth_lib::encode::Item;
 use hearth_protocol_tree::resolution::{Costs, Inputs, Line, Made, Package, Resolution};
 use skein_lib::{Duration, Wall};
 pub const TEST_MIN_KEY: &str = "21e9a02feb654883ef051d247cb14db878e04c03c2f7675c784a679ea0956d5d";
-pub const TEST_MIN_KEYS_LINE: &str = "keys         packages 46a0bdef5234   software 2dcc0e90ef26   config 7e21fbd8744b";
+pub const TEST_MIN_KEYS_LINE: &str = "keys         packages 46a0bdef5234   software 2dcc0e90ef26   config 408d4c837487";
 pub const TEST_MIN_DIGEST: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
     0x90, 0x8a, 0x3b, 0x8a, 0x1d, 0xdd, 0x78, 0x10, 0x0f, 0x9f, 0x44, 0xb2, 0xd3, 0xe6, 0xb3, 0xf4, 0xed, 0xfd, 0x65,
     0xb2, 0x26, 0xdf, 0x34, 0x8e, 0x50, 0x21, 0xb5, 0xd6, 0xd3, 0x7f, 0x63, 0x8b,

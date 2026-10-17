@@ -3,6 +3,9 @@ use crate::form::text::Lines;
 use alloc::boxed::Box;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Config {
+    pub groups: Box<[Group]>,
+    pub users: Box<[User]>,
+    pub members: Box<[Member]>,
     pub tree: Box<[TreeEntry]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -18,6 +21,7 @@ pub enum Node {
 }
 impl Config {
     pub(crate) fn text(&self, lines: &mut Lines) {
+        self.accounts_text(lines);
         let mut column = 27;
         for entry in &*self.tree {
             column = column.max(entry.path.len().saturating_add(4));
@@ -62,6 +66,7 @@ impl Config {
 impl Config {
     pub(crate) fn json(&self, json: &mut skein_json::writer::Encoder) {
         json.object_start();
+        self.accounts_json(json);
         json.key(b"tree");
         json.object_start();
         for entry in &*self.tree {
@@ -69,6 +74,7 @@ impl Config {
             entry.node.json(json);
         }
         json.object_end();
+        self.users_json(json);
         json.object_end();
     }
 }
@@ -121,3 +127,6 @@ fn octal(mode: u16) -> [u8; 4] {
     }
     digits
 }
+
+mod accounts;
+pub use accounts::{Group, GroupKind, Member, User, UserKind};

@@ -8,7 +8,7 @@ fn a_recorded_resolution_prints_known_and_the_layer_keys() {
     let printed = fixtures::lines_starting(&out.stdout, &["packages ", "keys "]);
     assert_eq!(
         printed,
-        "packages     part bc297e38f7e3   resolution 21e9a02feb65 known\nkeys         packages 46a0bdef5234   software 2dcc0e90ef26   config 7e21fbd8744b\n"
+        "packages     part bc297e38f7e3   resolution 21e9a02feb65 known\nkeys         packages 46a0bdef5234   software 2dcc0e90ef26   config 408d4c837487\n"
     );
 }
 #[test]
@@ -43,7 +43,7 @@ fn the_json_spec_gives_the_resolution_and_its_keys_whole() {
     let repository = fixtures::recorded_test_min("json-known");
     let out = fixtures::render(&repository, &[b"test-min"], Form::JsonLines);
     let text = String::from_utf8_lossy(&out.stdout);
-    assert!(text.contains("\"resolution\":{\"key\":\"21e9a02feb654883ef051d247cb14db878e04c03c2f7675c784a679ea0956d5d\",\"keys\":{\"config\":\"7e21fbd8744bc006f0cc08f66ea133dbe733e584a298d8e767720f221b8e2115\",\"packages\":\"46a0bdef5234b595f1095d5abd8f8bfc4f87527310a915430a44d5bab394f1ae\",\"software\":\"2dcc0e90ef26625638bfbdf0ab35ca3af6ff0799502b0b3f44f88ad7d9674672\"},\"kind\":\"known\"}"), "{text}");
+    assert!(text.contains("\"resolution\":{\"key\":\"21e9a02feb654883ef051d247cb14db878e04c03c2f7675c784a679ea0956d5d\",\"keys\":{\"config\":\"408d4c8374870a24dcc3d3b9305872b6900cbf2eee9ea27356e7c80dff38c690\",\"packages\":\"46a0bdef5234b595f1095d5abd8f8bfc4f87527310a915430a44d5bab394f1ae\",\"software\":\"2dcc0e90ef26625638bfbdf0ab35ca3af6ff0799502b0b3f44f88ad7d9674672\"},\"kind\":\"known\"}"), "{text}");
 }
 #[test]
 fn the_test_repositorys_targets_render_the_pins_resolution_inputs() {

@@ -61,12 +61,17 @@ pub fn part_change(part: source::PartChange) -> target::PartChange {
             environment: optional_name_pair(meta.environment),
             placement: optional_placement_pair(meta.placement),
         }),
-        source::PartChange::Config(config::Change { tree }) => {
+        source::PartChange::Config(config::Change { tree, groups, users, members }) => {
             let mut translated = List::with_capacity(u32::try_from(tree.len()).expect("bounded tree"));
             for entry in tree {
                 translated.push(entry_change(entry)).expect("tree capacity");
             }
-            target::PartChange::Config(target::ConfigChange { tree: translated.into_boxed() })
+            target::PartChange::Config(target::ConfigChange {
+                tree: translated.into_boxed(),
+                groups: account_changes::groups(groups),
+                users: account_changes::users(users),
+                members: account_changes::members(members),
+            })
         }
     }
 }
@@ -164,5 +169,55 @@ fn placement(placement: crate::render::parts::meta::Placement) -> crate::records
         firmware: optional_firmware(placement.firmware),
         hardware: placement.hardware,
         on: placement.on,
+    }
+}
+
+mod account_changes {
+    use crate::translate::parts::config::{group, member, user};
+    use crate::{records::diff as target, render::parts::config as source};
+    use alloc::boxed::Box;
+    pub(super) fn groups(entries: Box<[source::GroupKeyed]>) -> Box<[target::GroupKeyed]> {
+        let mut translated = skein_lib::List::with_capacity(u32::try_from(entries.len()).expect("entry count"));
+        for entry in entries {
+            translated
+                .push(match entry {
+                    source::GroupKeyed::Added { key, value } => target::GroupKeyed::Added { key, value: group(value) },
+                    source::GroupKeyed::Removed { key, value } => {
+                        target::GroupKeyed::Removed { key, value: group(value) }
+                    }
+                    source::GroupKeyed::Changed { key, before, after } => {
+                        target::GroupKeyed::Changed { key, before: group(before), after: group(after) }
+                    }
+                })
+                .expect("entry count");
+        }
+        translated.into_boxed()
+    }
+    pub(super) fn users(entries: Box<[source::UserKeyed]>) -> Box<[target::UserKeyed]> {
+        let mut translated = skein_lib::List::with_capacity(u32::try_from(entries.len()).expect("entry count"));
+        for entry in entries {
+            translated
+                .push(match entry {
+                    source::UserKeyed::Added { key, value } => target::UserKeyed::Added { key, value: user(value) },
+                    source::UserKeyed::Removed { key, value } => target::UserKeyed::Removed { key, value: user(value) },
+                    source::UserKeyed::Changed { key, before, after } => {
+                        target::UserKeyed::Changed { key, before: user(before), after: user(after) }
+                    }
+                })
+                .expect("entry count");
+        }
+        translated.into_boxed()
+    }
+    pub(super) fn members(entries: Box<[source::MemberChange]>) -> Box<[target::MemberChange]> {
+        let mut translated = skein_lib::List::with_capacity(u32::try_from(entries.len()).expect("entry count"));
+        for entry in entries {
+            translated
+                .push(match entry {
+                    source::MemberChange::Added(value) => target::MemberChange::Added(member(value)),
+                    source::MemberChange::Removed(value) => target::MemberChange::Removed(member(value)),
+                })
+                .expect("entry count");
+        }
+        translated.into_boxed()
     }
 }

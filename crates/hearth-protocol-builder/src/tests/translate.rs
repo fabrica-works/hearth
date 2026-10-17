@@ -179,6 +179,9 @@ fn a_config_part_translates_to_the_records_and_back() {
     let source = render::parts::Part {
         digest: hearth_lib::encode::Digest([7; 32]),
         record: render::parts::PartRecord::Config(render::parts::config::Config {
+            groups: Box::new([]),
+            users: Box::new([]),
+            members: Box::new([]),
             tree: Box::new([render::parts::config::file(
                 b"etc/motd",
                 target::Mode::Executable,
@@ -192,6 +195,9 @@ fn a_config_part_translates_to_the_records_and_back() {
     assert_eq!(
         config::config_back(config),
         render::parts::config::Config {
+            groups: Box::new([]),
+            users: Box::new([]),
+            members: Box::new([]),
             tree: Box::new([render::parts::config::TreeEntry {
                 path: skein_lib::bytes::copy_of(b"/etc/motd"),
                 node: render::parts::config::Node::File {
@@ -330,17 +336,8 @@ fn change_back(change: client_diff::TargetChange) -> diff::TargetChange {
                     client_diff::PartChange::Meta(meta) => {
                         translated.push(diff::PartChange::Meta(meta::back(meta))).expect("parts");
                     }
-                    client_diff::PartChange::Config(client_diff::ConfigChange { tree }) => {
-                        let mut entries =
-                            skein_lib::List::with_capacity(u32::try_from(tree.len()).expect("bounded tree"));
-                        for entry in tree {
-                            entries.push(entry_back(entry)).expect("tree room");
-                        }
-                        translated
-                            .push(diff::PartChange::Config(render::parts::config::Change {
-                                tree: entries.into_boxed(),
-                            }))
-                            .expect("part room");
+                    client_diff::PartChange::Config(change) => {
+                        translated.push(diff::PartChange::Config(accounts::change_back(change))).expect("part room");
                     }
                 }
             }
@@ -438,6 +435,9 @@ fn a_changed_config_entry_translates_its_sizes_and_hunks() {
         change_back(translated.change),
         diff::TargetChange::Changed {
             parts: Box::new([diff::PartChange::Config(render::parts::config::Change {
+                groups: Box::new([]),
+                users: Box::new([]),
+                members: Box::new([]),
                 tree: Box::new([render::parts::config::EntryChange::Changed {
                     path: skein_lib::bytes::copy_of(b"/etc/motd"),
                     before: render::parts::config::Node::File {
@@ -753,6 +753,7 @@ mod specs;
 mod exported;
 mod package_changes;
 
+mod accounts;
 mod export_changes;
 
 mod resolve;

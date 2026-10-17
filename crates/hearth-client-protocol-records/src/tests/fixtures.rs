@@ -35,6 +35,9 @@ pub fn x1_prod() -> Box<Spec> {
         parts: Box::new([Part {
             digest: digest([0xe7, 0xc2, 0xa0, 0xd9, 0x5b, 0x13]),
             record: PartRecord::Config(Config {
+                groups: Box::new([]),
+                users: Box::new([]),
+                members: Box::new([]),
                 tree: Box::new([TreeEntry {
                     path: copy_of(b"/etc/hostname"),
                     node: Node::File {
@@ -89,6 +92,9 @@ pub fn wg0_changed() -> crate::diff::Change {
         change: TargetChange::Changed {
             rebuild: Rebuild::FromConfig,
             parts: Box::new([PartChange::Config(ConfigChange {
+                groups: Box::new([]),
+                users: Box::new([]),
+                members: Box::new([]),
                 tree: Box::new([EntryChange::Changed {
                     path: copy_of(b"/etc/systemd/network/wg0.netdev"),
                     before: file([0x11; 32]),
@@ -422,3 +428,8 @@ pub use packages::unchanged_packages_change;
 
 mod resolution;
 pub use resolution::*;
+mod accounts;
+pub use accounts::*;
+
+mod diff;
+pub use diff::*;

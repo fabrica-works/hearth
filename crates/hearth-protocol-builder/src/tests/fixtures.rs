@@ -324,6 +324,9 @@ pub fn config_change() -> render::diff::Change {
         target: bytes::copy_of(b"x1-prod"),
         change: diff::TargetChange::Changed {
             parts: Box::new([diff::PartChange::Config(config::Change {
+                groups: Box::new([]),
+                users: Box::new([]),
+                members: Box::new([]),
                 tree: Box::new([config::EntryChange::Changed {
                     path: bytes::copy_of(b"/etc/motd"),
                     before: config::file(b"etc/motd", Mode::File, hearth_lib::encode::Digest([1; 32])).node,
@@ -779,3 +782,5 @@ pub use resolution::*;
 
 mod resolve;
 pub use resolve::*;
+mod accounts;
+pub use accounts::*;
