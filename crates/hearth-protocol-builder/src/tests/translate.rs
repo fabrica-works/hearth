@@ -756,6 +756,7 @@ mod live;
 mod secrets;
 mod software;
 
+mod additions;
 mod boot;
 mod exports;
 mod files;

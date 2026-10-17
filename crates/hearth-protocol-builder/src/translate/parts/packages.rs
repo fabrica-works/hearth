@@ -4,9 +4,17 @@ use alloc::boxed::Box;
 use skein_lib::List;
 #[must_use]
 pub fn packages(packages: source::Packages) -> target::Packages {
-    let source::Packages { sources: value, request, variant: kind, preseeds: answers, initramfs, apt: options } =
-        packages;
+    let source::Packages {
+        sources: value,
+        request,
+        variant: kind,
+        preseeds: answers,
+        initramfs,
+        initramfs_file,
+        apt: options,
+    } = packages;
     target::Packages {
+        initramfs_file: file(initramfs_file),
         sources: sources(value),
         request,
         variant: variant(kind),
@@ -103,4 +111,8 @@ fn initramfs_pair(value: Option<source::InitramfsPair>) -> Option<target::Initra
 fn apt_pair(value: Option<source::AptPair>) -> Option<target::AptPair> {
     let source::AptPair { before, after } = value?;
     Some(target::AptPair { before: apt(before), after: apt(after) })
+}
+
+fn file(digest: Option<crate::render::vocabulary::Digest>) -> Option<[u8; 32]> {
+    Some(digest?.0)
 }

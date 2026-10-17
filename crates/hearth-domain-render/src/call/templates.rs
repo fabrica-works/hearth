@@ -60,6 +60,8 @@ pub(crate) struct Target {
     script: usize,
     software_rows: Map<(u16, Box<[u8]>), parts::config::Script>,
     request: Option<Request>,
+    addition: u8,
+    subordinate: Option<Box<[u8]>>,
 }
 impl Target {
     pub fn new(
@@ -87,7 +89,9 @@ impl Target {
         let super::scripts::Installation { plans, presets, tmpfiles, scripts } = installation;
         let script_rows = Map::with_capacity(u32::try_from(scripts.len()).expect("task bound"));
         let script_capacity = script_rows.capacity();
-        let mut tree = Map::with_capacity(capacity);
+        let mut tree = Map::with_capacity(capacity.saturating_add(2));
+        let subordinate = crate::additions::subordinate(&accounts);
+        let tmpfiles = additions::tmpfiles(&expansion, tmpfiles);
         for plan in &plans {
             for install in &plan.installs {
                 let node = match &install.make {
@@ -146,6 +150,8 @@ impl Target {
             script: 0,
             software_rows: Map::with_capacity(script_capacity),
             request: None,
+            addition: 0,
+            subordinate,
         }
     }
     fn run(&mut self, side: &mut Side) -> bool {
@@ -154,7 +160,7 @@ impl Target {
             return true;
         }
         for _ in 0..=self.tasks.len() {
-            let Some(task) = self.tasks.get_mut(self.task) else { return false };
+            let Some(task) = self.tasks.get_mut(self.task) else { break };
             if self.roots.is_none() {
                 self.roots = Some(Roots {
                     target: context::target(&self.meta, &self.containers),
@@ -204,7 +210,7 @@ impl Target {
             self.entry = 0;
             self.roots = None;
         }
-        false
+        self.addition(side)
     }
 }
 impl Side {
@@ -221,7 +227,8 @@ impl Side {
         let mut sizes = Map::with_capacity(
             self.sizes
                 .capacity()
-                .saturating_add(u32::try_from(prepared.installation.scripts.len()).expect("task bound")),
+                .saturating_add(u32::try_from(prepared.installation.scripts.len()).expect("task bound"))
+                .saturating_add(3),
         );
         for (digest, size) in &self.sizes {
             sizes.insert(*digest, *size).expect("size bound");
@@ -259,6 +266,10 @@ impl Side {
                 Keeping::SoftwareScript(script) => {
                     assert_eq!(digest, script.content_digest, "kept rendered digest");
                     target.software_rows.insert((script.order, script.task.clone()), script).expect("task bound");
+                }
+                Keeping::Initramfs(expected) => {
+                    assert_eq!(digest, expected, "kept initramfs digest");
+                    target.packages.initramfs_file = Some(digest);
                 }
                 Keeping::Script(script) => {
                     assert_eq!(digest, script.content_digest, "kept rendered digest");
@@ -411,5 +422,7 @@ enum Keeping {
     File(TreeEntry),
     Script(parts::config::Script),
     SoftwareScript(parts::config::Script),
+    Initramfs(Digest),
 }
+mod additions;
 mod scripts;

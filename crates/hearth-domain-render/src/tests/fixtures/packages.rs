@@ -8,6 +8,7 @@ pub const MIN_PACKAGE_NAME: usize = 2;
 pub const MAX_PACKAGE_NAME: usize = 256;
 pub fn thin_packages() -> Packages {
     Packages {
+        initramfs_file: None,
         sources: Sources {
             suite: copy_of(b"forky"),
             architecture: copy_of(b"amd64"),

@@ -781,6 +781,7 @@ pub mod accounts;
 
 pub const DISTINCT_TEAMS_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         880ff6e893e0\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nsoftware     part 656d135b92c3\nconfig       part d8c246718666\n  groups     dev -\n  groups     ops -\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ndata         part 2d4765200bab\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
 
+pub mod additions;
 pub mod data;
 pub mod scripts;
 pub mod software;

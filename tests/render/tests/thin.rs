@@ -275,7 +275,7 @@ fn a_shared_templates_different_outputs_fit_for_each_target() {
 fn a_tree_link_shares_the_read_and_a_template_adds_a_keep() {
     assert_eq!(
         fixtures::configuration_requests(&fixtures::render(&fixtures::template_and_link()).requests).len(),
-        4,
-        "the rendered template adds its Keep request"
+        5,
+        "the rendered template and render-owned initramfs add their Keep requests"
     );
 }

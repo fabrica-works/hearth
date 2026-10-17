@@ -73,6 +73,8 @@ fn static_files_enter_the_cache_by_sha256_and_no_temporary_stays() {
     assert_eq!(
         names,
         [
+            "42ecbc10b6791c87aa0ca833e522946a40a7eece2297a745c5c10cea07baea96",
+            "42ecbc10b6791c87aa0ca833e522946a40a7eece2297a745c5c10cea07baea96.record",
             "775324fcea7f2cdcbf11df25550e362669caceb6e69c8370374d2d436bb63123",
             "775324fcea7f2cdcbf11df25550e362669caceb6e69c8370374d2d436bb63123.record",
             "f487088ec8b18ff569dfede6f12e5fa91983f9f6dd2f3e0b6cee4349a231e745",
@@ -709,6 +711,8 @@ mod package_changes;
 #[path = "real/diff.rs"]
 mod diff;
 
+#[path = "real/additions.rs"]
+mod additions;
 #[path = "real/data.rs"]
 mod data;
 #[path = "real/scripts.rs"]

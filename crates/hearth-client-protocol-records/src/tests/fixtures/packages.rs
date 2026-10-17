@@ -5,6 +5,7 @@ use crate::{
 use skein_lib::bytes::copy_of;
 pub fn packages_record() -> Packages {
     Packages {
+        initramfs_file: None,
         sources: Sources {
             suite: copy_of(b"forky"),
             architecture: copy_of(b"amd64"),
@@ -125,4 +126,9 @@ pub fn initramfs_change() -> crate::diff::PartChange {
 #[must_use]
 pub fn unchanged_packages_change() -> crate::diff::PartChange {
     package_change(Names { added: Box::new([]), removed: Box::new([]) })
+}
+
+pub fn packages_json(spec: Box<Spec>) -> Box<[u8]> {
+    crate::form::print(crate::form::Form::JsonLines, &crate::records::Record::Spec(spec), None, &crate::limits::SHIPPED)
+        .expect("packages json")
 }

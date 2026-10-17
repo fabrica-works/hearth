@@ -1,8 +1,7 @@
 use super::fixtures;
 use crate::{
-    form::{self, Form},
-    limits,
-    records::{Record, Resolution},
+    form::Form,
+    records::{PartRecord, Resolution},
 };
 #[test]
 fn the_packages_line_ends_with_its_resolution_as_render_md_shows() {
@@ -45,8 +44,7 @@ fn all_four_components_print_in_fixed_order() {
 }
 #[test]
 fn json_gives_the_packages_record_in_key_order() {
-    let json = form::print(Form::JsonLines, &Record::Spec(fixtures::packages_spec()), None, &limits::SHIPPED)
-        .expect("packages json");
+    let json = fixtures::packages_json(fixtures::packages_spec());
     let start = skein_lib::bytes::find(&json, br#"{"record":"part","target":"x1-prod","name":"packages""#)
         .expect("packages part");
     assert_eq!(json.get(start..).expect("part suffix"), concat!(r#"{"record":"part","target":"x1-prod","name":"packages","digest":"4be1c0d2a7f10000000000000000000000000000000000000000000000000000","packages":{"apt":{"install_recommends":false},"initramfs":{"microcode":"generic","modules":[]},"preseeds":{},"request":["curl","tzdata"],"sources":{"architecture":"amd64","archive":"20261001T030405Z","components":["main","contrib","non-free","non-free-firmware"],"security":"20261002T030405Z","suite":"forky","updates":true},"variant":"apt"}}"#, "\n").as_bytes());
@@ -65,4 +63,16 @@ fn a_component_error_names_the_package_and_the_component() {
 fn preseeds_and_modules_print_as_render_md_9_2_shows() {
     let text = fixtures::packages_text(fixtures::preseeded_spec());
     assert!(skein_lib::bytes::find(&text, b"  variant    apt\n  preseed    a/answer string word\n  preseed    tzdata/Areas select Europe owner other\n  initramfs  btrfs nvme\n  microcode  generic\n").is_some());
+}
+
+#[test]
+fn json_gives_the_initramfs_file_beside_the_packages_digest() {
+    let mut spec = fixtures::packages_spec();
+    for part in &mut spec.parts {
+        if let PartRecord::Packages(packages) = &mut part.record {
+            packages.initramfs_file = Some([7; 32]);
+        }
+    }
+    let json = fixtures::packages_json(spec);
+    assert!(skein_lib::bytes::find(&json, br#""digest":"4be1c0d2a7f10000000000000000000000000000000000000000000000000000","initramfs_file":"0707070707070707070707070707070707070707070707070707070707070707","packages":{"#).is_some());
 }

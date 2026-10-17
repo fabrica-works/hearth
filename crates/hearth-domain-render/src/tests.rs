@@ -33,6 +33,7 @@ mod software;
 mod boot;
 mod kinds;
 
+mod additions;
 mod keys;
 
 mod resolution;

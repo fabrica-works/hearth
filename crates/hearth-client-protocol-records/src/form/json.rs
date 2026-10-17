@@ -121,6 +121,12 @@ fn line(json: &mut Encoder, record: &Record, index: usize) {
                         field(json, b"name", part.record.name());
                         json.key(b"digest");
                         digest(json, &part.digest);
+                        if let crate::records::PartRecord::Packages(packages) = &part.record
+                            && let Some(file) = &packages.initramfs_file
+                        {
+                            json.key(b"initramfs_file");
+                            digest(json, file);
+                        }
                         json.key(part.record.name());
                         part.record.json(json);
                     }

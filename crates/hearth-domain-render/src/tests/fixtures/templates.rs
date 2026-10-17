@@ -100,6 +100,8 @@ pub fn template_prepared(
     plans: Box<[crate::kinds::files::Plan]>,
     expansion: crate::entries::Expansion,
 ) -> crate::call::templates::Prepared {
+    let mut packages = super::thin_packages();
+    packages.initramfs = None;
     crate::call::templates::Prepared {
         data: crate::parts::data::Data { entries: Box::new([]) },
         accounts: crate::kinds::users::Accounts { users: Box::new([]), groups: Box::new([]) },
@@ -121,7 +123,7 @@ pub fn template_prepared(
             passwords: Box::new([]),
             identity: Box::new([]),
         },
-        packages: super::thin_packages(),
+        packages,
         live: crate::parts::live::Live { paths: Box::new([]) },
         exports: crate::parts::exports::build(Box::new([])),
         export_roots: crate::evaluate::Value::Map(Box::new([])),

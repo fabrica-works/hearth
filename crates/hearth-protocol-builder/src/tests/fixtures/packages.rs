@@ -3,9 +3,17 @@ use crate::{records::parts::packages as source, render::parts::packages as targe
 use skein_lib::List;
 #[must_use]
 pub fn packages_back(packages: source::Packages) -> target::Packages {
-    let source::Packages { sources: value, request, variant: kind, preseeds: answers, initramfs, apt: options } =
-        packages;
+    let source::Packages {
+        sources: value,
+        request,
+        variant: kind,
+        preseeds: answers,
+        initramfs,
+        initramfs_file,
+        apt: options,
+    } = packages;
     target::Packages {
+        initramfs_file: file(initramfs_file),
         sources: sources(value),
         request,
         variant: variant(kind),
@@ -108,6 +116,7 @@ fn apt_pair(value: Option<source::AptPair>) -> Option<target::AptPair> {
 pub fn package_records() -> [target::Packages; 2] {
     use skein_lib::bytes::copy_of;
     [target::Variant::Apt, target::Variant::Container].map(|variant| target::Packages {
+        initramfs_file: Some(super::ABC),
         sources: target::Sources {
             suite: copy_of(b"forky"),
             architecture: copy_of(b"arm64"),
@@ -181,4 +190,8 @@ pub fn boot_change_back(value: crate::records::parts::boot::Change) -> crate::re
         before: crate::render::parts::boot::Boot { params: value.before.params, mutable: value.before.mutable },
         after: crate::render::parts::boot::Boot { params: value.after.params, mutable: value.after.mutable },
     }
+}
+
+fn file(digest: Option<[u8; 32]>) -> Option<hearth_lib::encode::Digest> {
+    Some(hearth_lib::encode::Digest(digest?))
 }

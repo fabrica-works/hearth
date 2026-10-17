@@ -15,8 +15,8 @@ fn render_lists_once_then_reads_every_configuration_document_once() {
         repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
         let run = parent::run(&repository, &[b"x1-prod"], seed);
         let requests = fixtures::configuration_requests(&run.requests);
-        let [Request::List { .. }, Request::Read { blobs, .. }] = requests.as_slice() else {
-            panic!("list then documents")
+        let [Request::List { .. }, Request::Read { blobs, .. }, Request::Keep { .. }] = requests.as_slice() else {
+            panic!("list, documents, then render-owned initramfs")
         };
         assert_eq!(
             blobs.iter().map(|blob| blob.oid.0.as_ref()).collect::<Vec<_>>(),
@@ -45,7 +45,7 @@ fn fleet_and_environment_keys_never_add_a_task() {
         let config = hearth_render_world::fixtures::config_part(&spec.parts);
         assert_eq!(config.tree.as_ref(), [], "seed {seed}");
         let requests = fixtures::configuration_requests(&run.requests);
-        assert_eq!(requests.len(), 2, "absent tasks are never read, seed {seed}");
+        assert_eq!(requests.len(), 3, "absent tasks are never read; render adds its initramfs, seed {seed}");
     }
 }
 #[test]

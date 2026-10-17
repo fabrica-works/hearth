@@ -109,7 +109,21 @@ pub fn resolving_builder(env: &skein_lib::Env<crate::Limits>) -> (Builder, Queue
         );
     }
     for _ in 0_u32..64 {
-        if !out.is_empty() {
+        let keep = match out.iter().next() {
+            Some(Request::Render(render::vocabulary::Request::Keep { request, sha256, .. })) => {
+                Some((*request, *sha256))
+            }
+            Some(_) | None => None,
+        };
+        if let Some((request, sha256)) = keep {
+            drop(out.pop());
+            crate::step(
+                &mut builder,
+                env,
+                Event::Render(render::vocabulary::Event::Kept { request, sha256 }),
+                &mut out,
+            );
+        } else if !out.is_empty() {
             break;
         }
         crate::resume(&mut builder, env, &mut out);

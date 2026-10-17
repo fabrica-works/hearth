@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 use alloc::boxed::Box;
+pub mod additions;
 mod call;
 pub mod compose;
 pub mod diff;

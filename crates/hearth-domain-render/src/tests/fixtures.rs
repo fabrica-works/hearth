@@ -791,6 +791,7 @@ pub use config::*;
 
 mod software;
 pub use software::*;
+pub mod additions;
 mod scripts;
 pub use scripts::*;
 

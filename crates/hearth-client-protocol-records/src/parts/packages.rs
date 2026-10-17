@@ -6,6 +6,7 @@ pub(crate) use change::value_text;
 pub use change::*;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Packages {
+    pub initramfs_file: Option<[u8; 32]>,
     pub sources: Sources,
     pub request: Box<[Box<[u8]>]>,
     pub variant: Variant,
