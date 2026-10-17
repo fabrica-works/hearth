@@ -1,0 +1,15 @@
+{
+  "doc": "The VM test target's kernel, initramfs, services and hearth tools.",
+  "packages": {
+    "efibootmgr": {},
+    "git": {},
+    "incus-agent": {},
+    "linux-image-amd64": {},
+    "mmdebstrap": {},
+    "openssh-server": {},
+    "systemd": {},
+    "systemd-container": {},
+    "tiny-initramfs": {},
+    "uidmap": {}
+  }
+}

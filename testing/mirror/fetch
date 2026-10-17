@@ -1,0 +1,118 @@
+#!/bin/sh
+# Fetch the signed local test mirror once (testing.md, 6.2).
+set -eu
+for tool in curl sqv xz sha256sum awk sed wc date mkdir ln mv dirname cat tr head grep cut; do
+    command -v "$tool" >/dev/null || { echo "missing tool: $tool" >&2; exit 1; }
+done
+keyring=/usr/share/keyrings/debian-archive-keyring.pgp
+test -r "$keyring" || { echo "missing keyring: $keyring" >&2; exit 1; }
+pin=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/pin
+field() { awk -v field="$1" '$1 == field { $1=""; sub(/^ /, ""); print }' "$pin"; }
+archive=$(field archive)
+suite=$(field suite)
+arch=$(field architecture)
+components=$(field components)
+digest=$(field digest)
+case ${XDG_CACHE_HOME-} in
+    /*) cache=$XDG_CACHE_HOME ;;
+    *) case ${HOME-} in
+        /*) cache=$HOME/.cache ;;
+        *) echo 'an absolute XDG_CACHE_HOME or HOME is required' >&2; exit 1 ;;
+    esac ;;
+esac
+cache=$cache/hearth-test-mirror
+mode=${1-}
+case "$mode" in ''|--pin) ;; *) echo 'usage: testing/mirror/fetch [--pin]' >&2; exit 1 ;; esac
+test "$#" -le 1 || { echo 'too many arguments' >&2; exit 1; }
+if test "$mode" != --pin && test -d "$cache/$digest"; then
+    echo "present: $cache/$digest"
+    exit 0
+fi
+stage=$cache/.fetch-$$
+mkdir -p "$cache"
+mkdir "$stage"
+total=0
+trap 'printf "total bytes: %s\n" "$total"' 0
+fetch() {
+    url=$1
+    output=$2
+    shift 2
+    result=0
+    curl --fail --location --max-redirs 2 --connect-timeout 20 --max-time 120 \
+        --dump-header "$stage/headers" --output "$output" "$@" --write-out '%{url_effective} %{size_download}\n' "$url" > "$stage/receipt" || result=$?
+    cat "$stage/receipt"
+    bytes=$(awk '{printf "%.0f", $2}' "$stage/receipt")
+    total=$((total + bytes))
+    test "$result" = 0 || exit "$result"
+    effective=$(awk '{print $1}' "$stage/receipt")
+}
+origin=https://snapshot.debian.org
+if test "$mode" = --pin; then
+    now=$(date -u +%Y%m%dT%H%M%SZ)
+    listing=$origin/archive/debian/$now/dists/$suite/
+    printf 'listing: %s\n' "$listing"
+    fetch "$listing" "$stage/listing" --max-filesize 1048576
+    archive=$(printf '%s\n' "$effective" | sed -n 's|.*/archive/debian/\([0-9]\{8\}T[0-9]\{6\}Z\)/dists/.*|\1|p')
+    if test -z "$archive" || test "$archive" = "$now"; then
+        year=$(printf '%s' "$now" | cut -c 1-4)
+        month=$(printf '%s' "$now" | cut -c 5-6 | sed 's/^0//')
+        listing=$origin/archive/debian/?year=$year\&month=$month
+        printf 'listing: %s\n' "$listing"
+        fetch "$listing" "$stage/month" --max-filesize 1048576
+        archive=$(grep -oE '[0-9]{8}T[0-9]{6}Z' "$stage/month" |
+            awk -v now="$now" '$0 <= now && $0 > latest { latest=$0 } END { print latest }')
+    fi
+    if ! printf '%s\n' "$archive" | grep -Eq '^[0-9]{8}T[0-9]{6}Z$' ||
+        ! awk -v archive="$archive" -v now="$now" 'BEGIN { exit !(archive <= now) }'; then
+        echo "no canonical timestamp at or before $now; see listing URLs above" >&2
+        exit 1
+    fi
+fi
+fetch "$origin/archive/debian/$archive/dists/$suite/InRelease" "$stage/InRelease"
+sqv --keyring "$keyring" --cleartext --output="$stage/Release" "$stage/InRelease"
+new_digest=$(sha256sum "$stage/InRelease" | awk '{print $1}')
+if test "$mode" != --pin && test "$digest" != "$new_digest"; then
+    echo 'InRelease digest differs from the pin' >&2; exit 1
+fi
+digest=$new_digest
+printf 'snapshot: %s/archive/debian/%s/dists/%s/InRelease\n' "$origin" "$archive" "$suite"
+suite_dir=$stage/archive/debian/$archive/dists/$suite
+mkdir -p "$suite_dir"
+mv "$stage/InRelease" "$suite_dir/InRelease"
+entry() {
+    awk -v path="$1" '/^SHA256:$/ { sha=1; next } /^[^ ]/ { sha=0 }
+        sha && $3 == path { print $1, $2; n++ }
+        END { if (n != 1) exit 1 }' "$stage/Release"
+}
+check() {
+    test "$(wc -c < "$1" | tr -d ' ')" = "$3" || { echo "size mismatch: $1" >&2; exit 1; }
+    printf '%s  %s\n' "$2" "$1" | sha256sum --check -
+}
+for component in $components; do
+    relative=$component/binary-$arch/Packages
+    set -- $(entry "$relative.xz")
+    xz_hash=$1
+    xz_size=$2
+    index_dir=$suite_dir/$component/binary-$arch
+    mkdir -p "$index_dir/by-hash/SHA256" "$stage/checked/$component/binary-$arch"
+    fetch "$origin/archive/debian/$archive/dists/$suite/$relative.xz" "$index_dir/Packages.xz"
+    check "$index_dir/Packages.xz" "$xz_hash" "$xz_size"
+    ln "$index_dir/Packages.xz" "$index_dir/by-hash/SHA256/$xz_hash"
+    checked=$stage/checked/$component/binary-$arch/Packages
+    xz -dc "$index_dir/Packages.xz" > "$checked"
+    set -- $(entry "$relative")
+    check "$checked" "$1" "$2"
+done
+if test -d "$cache/$digest"; then
+    echo "destination already exists: $cache/$digest" >&2; exit 1
+fi
+mv "$stage" "$cache/$digest"
+if test "$mode" = --pin; then
+    awk -v archive="$archive" -v digest="$digest" '
+        $1 == "archive" { print "archive", archive; next }
+        $1 == "digest" { print "digest", digest; next }
+        { print }' "$pin" > "$pin.new"
+    mv "$pin.new" "$pin"
+fi
+printf 'total bytes: %s\ndirectory: %s\n' "$total" "$cache/$digest"
+trap - 0

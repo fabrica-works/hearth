@@ -1,0 +1,8 @@
+# The signed snapshot indexes for test-min and test-boot (testing.md, 6.2).
+archive 20261017T143929Z
+suite forky
+architecture amd64
+components main
+digest 421f8808357cdbc76bc7fa7d6268d5dd22a8b4d608e4e736ebe6a744844cbbd8
+target test-min apt
+target test-boot apt efibootmgr git incus-agent linux-image-amd64 mmdebstrap openssh-server systemd systemd-container tiny-initramfs uidmap

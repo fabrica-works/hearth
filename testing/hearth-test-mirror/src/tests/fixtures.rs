@@ -37,3 +37,23 @@ pub fn request(proxy: &crate::Proxy, head: &str) -> Vec<u8> {
     stream.read_to_end(&mut answer).unwrap();
     answer
 }
+
+pub fn repository(name: &str) -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../repos").join(name)
+}
+pub fn files(root: &Path) -> Vec<String> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut files = Vec::new();
+    while let Some(dir) = pending.pop() {
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else {
+                files.push(path.strip_prefix(root).unwrap().to_str().unwrap().to_owned());
+            }
+        }
+    }
+    files.sort();
+    files
+}
