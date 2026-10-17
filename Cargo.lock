@@ -39,6 +39,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-mmdebstrap-world"
+version = "0.0.0"
+dependencies = [
+ "hearth-protocol-mmdebstrap",
+ "skein-heap",
+ "skein-lib",
+ "skein-world",
+]
+
+[[package]]
 name = "hearth-protocol-git"
 version = "0.0.0"
 dependencies = [

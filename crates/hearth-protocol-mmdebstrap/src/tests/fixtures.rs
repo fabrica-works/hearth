@@ -29,3 +29,17 @@ pub fn simulate(names: &[&[u8]]) -> Simulate {
         apt: Apt { install_recommends: false },
     }
 }
+
+pub fn opened() -> (
+    skein_lib::Env<limits::Limits>,
+    crate::output::Reader,
+    skein_lib::Queue<crate::output::Seen>,
+    skein_lib::Queue<skein_lib::stream::Down>,
+) {
+    let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: limits::SHIPPED };
+    let mut reader = crate::output::Reader::new(&env.limits);
+    let mut below = skein_lib::Queue::with_capacity(1);
+    crate::output::open(&mut reader, &env, &mut below);
+    assert!(below.pop().is_some(), "open demands a scan");
+    (env, reader, skein_lib::Queue::with_capacity(1), below)
+}
