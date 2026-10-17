@@ -365,6 +365,13 @@ None yet.
 
      The check's runs, with these applied on a scratch world: clippy clean (it failed on 4 before); default 229 of 229, 9 of them hearth-tree-world; fuzzy 6 of 6, 2 of them tree. The reference memory test took 0.82 to 0.89 s against the 0.5 s aim, 0.3 s of it the check's own filename search. A further test or sketch that names the old bound takes the new one, and the commit body lists it.
 
+117. **hearth 14's Shapes against main** (ready check of hearth-14.1).
+     hearth 14's Shapes against main (ready check of hearth-14.1), against hearth cea230d and skein 2112fce (since moved by hearth 37.1 and 37.2, whose `Op` and `Missing` match the Interface sketch variant for variant): `hearth/14-evaluate.md` corrected.
+
+     1. `a_lookup_of_the_wrong_type_fails_even_in_a_chain` takes `settings.peers[0]`, an integer into a map, in place of `settings.tags[-1]`: format.md 7.5 says "A negative index is outside the list", which is `NoIndex` (`an_index_outside_the_list_fails_at_its_bracket`, 2 of 2 and -1), not `Type`.
+
+     The check's runs, with 14.1 and 14.2 built from the sketches: fmt and clippy clean; default 222 of 222; fuzzy 4 of 4. Its search found no user of `Limits`, `SHIPPED` or `Missing` that the Files miss. A further case listed under the wrong kind of fault moves to its kind's test, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

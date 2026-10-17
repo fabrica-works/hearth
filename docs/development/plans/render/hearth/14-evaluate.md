@@ -143,7 +143,8 @@ Result<Option<Value>, Fault>` at `limits::SHIPPED` (`None`: undefined).
 Unit tests, each under 20 ms: `a_key_of_a_root_gives_the_maps_value`,
 `an_unknown_name_fails_at_its_offset` (also before `is defined`, 7.6),
 `a_lookup_of_the_wrong_type_fails_even_in_a_chain` (`settings.tags.x`,
-`settings.port[0]`, `settings.tags[-1]`), `a_missing_key_fails_at_the_keys_offset`,
+`settings.port[0]`, `settings.peers[0]`: an integer into a map; `-1` is
+`NoIndex`, below), `a_missing_key_fails_at_the_keys_offset`,
 `a_key_named_like_a_method_is_only_a_key` (`settings.keys`: `NoKey`, 7.4's
 `u.keys`), `absent_optional_values_read_as_undefined_however_marked`
 (`settings.wifi`; `tasks.wifi`, an optional read's absent task, 6.4),
