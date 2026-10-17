@@ -132,6 +132,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-protocol-config"
+version = "0.0.0"
+dependencies = [
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
 name = "hearth-protocol-git"
 version = "0.0.0"
 dependencies = [
