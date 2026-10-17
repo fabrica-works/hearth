@@ -111,14 +111,14 @@ impl Client {
             Request::Answer(Answer::Change(change)) => {
                 records::records::Record::Change(super::translate::changes::change(change))
             }
-            Request::Reply { to, outcome, diff } => {
+            Request::Reply { to, outcome, diff, left_out } => {
                 assert_eq!(to.into_token(), Token::new(0), "the initial call's reply");
                 let outcome =
                     if self.refused { outcome.worst(crate::render::vocabulary::Outcome::Failed) } else { outcome };
                 self.terminal = Some(outcome);
                 let outcome = answers::outcome(outcome);
                 let diff = super::translate::changes::optional_tally(diff);
-                records::records::Record::Terminal(records::records::Terminal { outcome, diff, left_out: 0 })
+                records::records::Record::Terminal(records::records::Terminal { outcome, diff, left_out })
             }
             Request::Store(_) | Request::Unopened { .. } | Request::Render(_) => {
                 unreachable!("git requests stay in the protocol")

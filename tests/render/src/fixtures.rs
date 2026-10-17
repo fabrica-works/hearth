@@ -215,3 +215,23 @@ pub fn wide_roots() -> Roots {
         ])),
     }
 }
+
+#[must_use]
+pub fn broken_envs(count: u32) -> Repository {
+    use hearth_domain_render::{errors::Decode, revision::Oid};
+    let mut repository = x1_prod();
+    for index in 0..count {
+        let path = format!("envs/e{index:03}.json").into_bytes().into_boxed_slice();
+        let oid = Oid(path.clone());
+        repository.entries.push(Entry { path, oid: oid.clone(), mode: Mode::File, size: 24 });
+        repository.documents.push((
+            oid,
+            Decoded::Refused {
+                at: Position { line: 1, column: 14 },
+                fault: Decode::Duplicate { key: b"motd".as_slice().into() },
+                also: Some(Position { line: 1, column: 2 }),
+            },
+        ));
+    }
+    repository
+}

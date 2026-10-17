@@ -28,7 +28,7 @@ pub enum Answer {
     Spec(Spec),
     Error(crate::errors::Error),
     Change(crate::diff::Change),
-    Rendered { outcome: Outcome, diff: Option<crate::diff::Tally> },
+    Rendered { outcome: Outcome, diff: Option<crate::diff::Tally>, left_out: u32 },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Output {

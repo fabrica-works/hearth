@@ -19,7 +19,7 @@ pub enum Request {
     Store(store::vocabulary::Request),
     Unopened { to: ReplyTo, why: store::vocabulary::Why },
     Answer(Answer),
-    Reply { to: ReplyTo, outcome: render::vocabulary::Outcome, diff: Option<render::diff::Tally> },
+    Reply { to: ReplyTo, outcome: render::vocabulary::Outcome, diff: Option<render::diff::Tally>, left_out: u32 },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {

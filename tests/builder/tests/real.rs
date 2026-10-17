@@ -267,3 +267,29 @@ fn a_task_json_out_of_shape_exits_with_configuration_failure() {
     let repository = Repository::make("miskeyed-exit", &fixtures::thin_with(fixtures::MISKEYED));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
+
+#[test]
+fn hearth_render_prints_256_errors_then_the_count() {
+    let repository = fixtures::broken_envs(300);
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    let stdout = fixtures::lines_starting(&rendered.stdout, &["envs/", "44 "]);
+    let mut lines = stdout.lines();
+    assert_eq!(lines.next(), Some("envs/e000.json:1:14: duplicate key \"motd\" (envs/e000.json:1:2)"));
+    assert_eq!(lines.next_back(), Some("44 more errors"));
+    assert_eq!(lines.next_back(), Some("envs/e255.json:1:14: duplicate key \"motd\" (envs/e255.json:1:2)"));
+    assert_eq!(lines.count(), 254);
+}
+#[test]
+fn hearth_render_with_300_broken_documents_exits_with_configuration_failure() {
+    let repository = fixtures::broken_envs(300);
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
+#[test]
+fn hearth_render_json_gives_left_out_44() {
+    let repository = fixtures::broken_envs(300);
+    let rendered = fixtures::render(&repository, &[], Form::JsonLines);
+    assert_eq!(
+        String::from_utf8_lossy(&rendered.stdout).lines().last(),
+        Some("{\"record\":\"outcome\",\"outcome\":\"failed\",\"left_out\":44}")
+    );
+}

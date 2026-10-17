@@ -51,9 +51,12 @@ impl Builder {
                 Output::Answer(RenderAnswer::Spec(spec)) => Request::Answer(Answer::Spec(spec)),
                 Output::Answer(RenderAnswer::Error(error)) => Request::Answer(Answer::Error(error)),
                 Output::Answer(RenderAnswer::Change(change)) => Request::Answer(Answer::Change(change)),
-                Output::Answer(RenderAnswer::Rendered { outcome, diff }) => {
-                    Request::Reply { to: self.reply.take().expect("active call owns its reply"), outcome, diff }
-                }
+                Output::Answer(RenderAnswer::Rendered { outcome, diff, left_out }) => Request::Reply {
+                    to: self.reply.take().expect("active call owns its reply"),
+                    outcome,
+                    diff,
+                    left_out,
+                },
             });
         }
     }

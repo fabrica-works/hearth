@@ -17,7 +17,7 @@ pub(crate) struct Side {
     pub commit: Option<Oid>,
     pub targets: Box<[Target]>,
     pub documents: Documents,
-    pub errors: List<errors::Error>,
+    pub errors: errors::Collector,
     pub error_next: u32,
     pub paths: Box<[Box<[u8]>]>,
     pub settings: Box<[compose::Settings]>,
@@ -43,7 +43,7 @@ impl Side {
             commit: None,
             targets: Box::new([]),
             documents: Documents::new(&[]),
-            errors: List::with_capacity(16),
+            errors: errors::Collector::new(limits),
             error_next: 0,
             paths: Box::new([]),
             settings: Box::new([]),
@@ -379,7 +379,11 @@ impl Side {
             self.error_next = self.error_next.saturating_add(1);
             return Answer::Error(error.clone());
         }
-        Answer::Rendered { outcome: self.outcome, diff: None }
+        Answer::Rendered {
+            outcome: self.outcome.worst(self.errors.outcome()),
+            diff: None,
+            left_out: self.errors.left_out(),
+        }
     }
 }
 
@@ -408,6 +412,7 @@ pub(crate) struct Comparison {
     outcome: Outcome,
     pending: Option<crate::diff::Change>,
     entry: usize,
+    left_out: u32,
 }
 impl Call {
     pub fn new(repository: Box<[u8]>, names: Box<[Box<[u8]>]>, limits: &Limits) -> Self {
@@ -425,6 +430,7 @@ impl Call {
             outcome: Outcome::Done,
             pending: None,
             entry: 0,
+            left_out: call.side.errors.left_out(),
         });
         call
     }
@@ -466,7 +472,10 @@ impl Call {
                         .expect("target capacity");
                     return false;
                 }
-                Answer::Rendered { outcome, diff: _ } => diff.outcome = diff.outcome.worst(outcome),
+                Answer::Rendered { outcome, diff: _, left_out } => {
+                    diff.outcome = diff.outcome.worst(outcome);
+                    diff.left_out = diff.left_out.saturating_add(left_out);
+                }
                 Answer::Error(error) => {
                     out.push(Output::Answer(Answer::Error(error)));
                     return false;
@@ -474,7 +483,7 @@ impl Call {
                 Answer::Change(_) => unreachable!("a side renders specs"),
             }
             let Some(commit) = self.side.commit.clone() else {
-                out.push(Output::Answer(Answer::Rendered { outcome: diff.outcome, diff: None }));
+                out.push(Output::Answer(diff.terminal()));
                 return true;
             };
             if let Some(revision) = diff.revision.take() {
@@ -538,7 +547,7 @@ impl Call {
             diff.entry = 0;
             return false;
         }
-        out.push(Output::Answer(Answer::Rendered { outcome: diff.outcome, diff: diff.tally.take() }));
+        out.push(Output::Answer(diff.terminal()));
         true
     }
 }
@@ -551,6 +560,9 @@ struct RenderedSide {
 }
 
 impl Comparison {
+    fn terminal(&mut self) -> Answer {
+        Answer::Rendered { outcome: self.outcome, diff: self.tally.take(), left_out: self.left_out }
+    }
     fn resume_hunks(&mut self, sizes: &Sizes, max: u32) -> (Output, bool) {
         let change = self.pending.as_mut().expect("pending change");
         let from = self.from.as_ref().expect("from rendered");

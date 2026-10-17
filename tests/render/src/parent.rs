@@ -10,6 +10,7 @@ use skein_world::domain::{Ledger, Schedule, Span};
 pub struct Run {
     pub answers: Vec<Answer>,
     pub outcome: Outcome,
+    pub left_out: u32,
     pub requests: Vec<Request>,
 }
 #[must_use]
@@ -24,7 +25,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
     let mut schedule = Schedule::new();
     let mut ledger = Ledger::new("render request");
     let mut rng = Rng::new(seed);
-    let mut run = Run { answers: Vec::new(), outcome: Outcome::Done, requests: Vec::new() };
+    let mut run = Run { answers: Vec::new(), outcome: Outcome::Done, left_out: 0, requests: Vec::new() };
     render::step(
         &mut render,
         &env,
@@ -42,8 +43,9 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                     Answer::Spec(spec) => run.answers.push(Answer::Spec(spec)),
                     Answer::Error(error) => run.answers.push(Answer::Error(error)),
                     Answer::Change(change) => run.answers.push(Answer::Change(change)),
-                    Answer::Rendered { outcome, diff: _ } => {
+                    Answer::Rendered { outcome, diff: _, left_out } => {
                         run.outcome = outcome;
+                        run.left_out = left_out;
                     }
                 },
                 Output::Request(request) => {

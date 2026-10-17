@@ -79,3 +79,23 @@ fn a_broken_task_json_no_target_has_prints_once_and_fails_nothing() {
         );
     }
 }
+
+#[test]
+fn three_hundred_broken_documents_answer_256_errors_then_the_count() {
+    let repository = fixtures::broken_envs(300);
+    for seed in 0..8 {
+        let run = parent::run(&repository, &[], seed);
+        let errors: Vec<_> = run
+            .answers
+            .iter()
+            .filter_map(|answer| match answer {
+                Answer::Error(error) => Some(error),
+                Answer::Spec(_) | Answer::Change(_) | Answer::Rendered { .. } => None,
+            })
+            .collect();
+        assert_eq!(errors.len(), 256, "seed {seed}");
+        assert_eq!(run.left_out, 44, "seed {seed}");
+        assert_eq!(errors.first().expect("first error").at.as_ref().expect("place").path.as_ref(), b"envs/e000.json");
+        assert_eq!(errors.last().expect("last error").at.as_ref().expect("place").path.as_ref(), b"envs/e255.json");
+    }
+}

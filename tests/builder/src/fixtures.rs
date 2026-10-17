@@ -468,3 +468,15 @@ pub fn diff_beneath_work_tree(label: &str, attributes: bool) -> Rendered {
 }
 
 pub const MISKEYED: &[File] = &[File { path: "tasks/motd/task.json", body: b"{\"setting\": {}}", mode: 0o644 }];
+
+/// THIN and independently broken environments, including environments with no target.
+#[must_use]
+pub fn broken_envs(count: u32) -> Repository {
+    let repository = Repository::make("broken-envs", THIN);
+    for index in 0..count {
+        fs::write(repository.work_tree.join(format!("envs/e{index:03}.json")), b"{\"motd\": {}, \"motd\": {}}")
+            .expect("broken environment");
+    }
+    drop(repository.next(&[], &[]));
+    repository
+}
