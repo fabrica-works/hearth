@@ -52,6 +52,17 @@ impl<'c> Evaluator<'c> {
         let second = if filter.arity() == 2 { self.pop() } else { Operand::Undefined };
         let first = if filter.arity() != 0 { self.pop() } else { Operand::Undefined };
         let input = self.pop();
+        for value in [&input, &first, &second] {
+            match value {
+                Operand::Loop { .. } => return Err(FaultKind::Type),
+                Operand::Undefined
+                | Operand::Bool(_)
+                | Operand::Int(_)
+                | Operand::String(_)
+                | Operand::List { .. }
+                | Operand::Value(_) => {}
+            }
+        }
         if filter == Filter::Default && input.undefined() {
             return Ok(first);
         }
@@ -85,7 +96,7 @@ impl<'c> Evaluator<'c> {
                         length
                     }
                     View::Undefined => return Err(FaultKind::Undefined),
-                    View::Bool(_) | View::Int(_) => return Err(FaultKind::Type),
+                    View::Loop | View::Bool(_) | View::Int(_) => return Err(FaultKind::Type),
                 };
                 Ok(Operand::Int(match i64::try_from(length) {
                     Ok(length) => length,
@@ -120,7 +131,7 @@ fn text<'v>(value: &'v Operand<'_>) -> Result<&'v [u8], FaultKind> {
     match walk::view(value) {
         View::String(text) => Ok(text),
         View::Undefined => Err(FaultKind::Undefined),
-        View::Bool(_) | View::Int(_) | View::List(_) | View::Map(_) => Err(FaultKind::Type),
+        View::Loop | View::Bool(_) | View::Int(_) | View::List(_) | View::Map(_) => Err(FaultKind::Type),
     }
 }
 fn scalar(value: View<'_>) -> Result<Written<'_>, FaultKind> {
@@ -128,7 +139,7 @@ fn scalar(value: View<'_>) -> Result<Written<'_>, FaultKind> {
         View::String(v) => Ok(Written::Bytes(v)),
         View::Int(v) => Ok(Written::Integer { negative: v < 0, digits: Decimal::of(v.unsigned_abs()) }),
         View::Undefined => Err(FaultKind::Undefined),
-        View::Bool(_) | View::List(_) | View::Map(_) => Err(FaultKind::Type),
+        View::Loop | View::Bool(_) | View::List(_) | View::Map(_) => Err(FaultKind::Type),
     }
 }
 fn join<'c>(input: &Operand<'c>, separator: &[u8], budget: &mut Budget) -> Result<Operand<'c>, FaultKind> {
@@ -277,7 +288,7 @@ fn sort<'c>(mut input: Operand<'c>, budget: &mut Budget, nesting: u32) -> Result
             View::Int(v) => Key::Int(v),
             View::String(v) => Key::Text(v),
             View::Undefined => return Err(FaultKind::Undefined),
-            View::Bool(_) | View::List(_) | View::Map(_) => return Err(FaultKind::Type),
+            View::Loop | View::Bool(_) | View::List(_) | View::Map(_) => return Err(FaultKind::Type),
         };
         let kind = match key {
             Key::Int(_) => false,
@@ -304,7 +315,8 @@ fn sort<'c>(mut input: Operand<'c>, budget: &mut Budget, nesting: u32) -> Result
             Operand::List { items, depth: _ } => {
                 core::mem::replace(items.get_mut(index).expect("within length"), Operand::Undefined)
             }
-            Operand::Undefined
+            Operand::Loop { .. }
+            | Operand::Undefined
             | Operand::Bool(_)
             | Operand::Int(_)
             | Operand::String(_)

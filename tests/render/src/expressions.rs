@@ -351,6 +351,7 @@ pub fn evaluate(tree: &Tree, roots: &Roots, limits: &Limits) -> Result<Option<Pl
 }
 fn owned(operand: Operand<'_>) -> Option<Plain> {
     Some(match operand {
+        Operand::Loop { .. } => panic!("loop needs a template context"),
         Operand::Undefined => return None,
         Operand::Value(v) => v.clone(),
         Operand::Bool(v) => Value::Bool(v),

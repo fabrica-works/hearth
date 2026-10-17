@@ -14,3 +14,5 @@ mod errors;
 mod filters;
 
 mod schema;
+
+mod templates;

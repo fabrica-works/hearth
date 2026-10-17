@@ -103,3 +103,25 @@ pub fn target(meta: &Meta) -> Value {
     ]))
 }
 use alloc::boxed::Box;
+
+/// One task's owned context roots (format.md, 7.7).
+#[derive(Debug)]
+pub struct Roots {
+    pub target: Value,
+    pub debian: Value,
+    pub settings: Value,
+    pub tasks: Value,
+    pub exports: Value,
+}
+impl Roots {
+    #[must_use]
+    pub fn context(&self) -> Context<'_> {
+        Context {
+            target: &self.target,
+            debian: &self.debian,
+            settings: &self.settings,
+            tasks: &self.tasks,
+            exports: &self.exports,
+        }
+    }
+}

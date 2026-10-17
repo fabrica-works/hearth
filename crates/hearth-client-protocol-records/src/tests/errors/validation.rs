@@ -153,3 +153,20 @@ fn target_schema_faults_print_their_json_fields() {
         assert_eq!(printed.as_deref(), Ok(expected.as_bytes()), "row {row}");
     }
 }
+
+#[test]
+fn an_evaluation_error_prints_its_target_task_and_message() {
+    let mut error = fixtures::duplicate();
+    error.kind = Kind::Evaluation(Evaluation::NoKey);
+    error.at = Some(Place {
+        path: copy_of(b"tasks/motd/tree/etc/issue.j2"),
+        position: Some(Position { line: 1, column: 11 }),
+    });
+    error.also = None;
+    error.target = Some(copy_of(b"x1-prod"));
+    error.task = Some(copy_of(b"motd"));
+    assert_eq!(
+        form::print(Form::Text, &Record::Error(error), None, &limits::SHIPPED).as_deref(),
+        Ok(b"tasks/motd/tree/etc/issue.j2:1:11: x1-prod: motd: a missing key\n".as_slice())
+    );
+}

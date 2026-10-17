@@ -433,3 +433,45 @@ fn a_container_on_another_environment_s_target_exits_two() {
     let repository = Repository::make("containers-exit", fixtures::CONTAINERS);
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
+
+#[test]
+fn hearth_render_lists_a_rendered_template_by_its_sha256() {
+    let repository = Repository::make("templated", &fixtures::thin_with(fixtures::TEMPLATED));
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["  /etc/hostname", "  /etc/issue"]),
+        "  /etc/hostname            file 0644 root:root 21c50adeb849\n  /etc/issue               file 0644 root:root e75f92b4b841\n"
+    );
+}
+#[test]
+fn a_rendered_template_leaves_the_call_successful() {
+    let repository = Repository::make("templated-exit", &fixtures::thin_with(fixtures::TEMPLATED));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(0));
+}
+#[test]
+fn a_missing_key_in_a_template_prints_its_evaluation_error() {
+    let repository = Repository::make("template-key", &fixtures::thin_with(&[fixtures::MISSING_TEMPLATE_KEY]));
+    assert_eq!(
+        fixtures::render(&repository, &[], Form::Text).stdout,
+        b"tasks/motd/tree/etc/issue.j2:1:11: x1-prod: motd: a missing key\n"
+    );
+}
+#[test]
+fn a_missing_key_in_a_template_fails_the_call() {
+    let repository = Repository::make("template-key-exit", &fixtures::thin_with(&[fixtures::MISSING_TEMPLATE_KEY]));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
+#[test]
+fn a_template_prints_the_default_its_setting_was_filled_with() {
+    let repository = Repository::make("template-default", &fixtures::thin_with(fixtures::GREET));
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["  /etc/greeting"]),
+        "  /etc/greeting            file 0644 root:root 5891b5b522d5\n"
+    );
+}
+#[test]
+fn a_template_with_its_default_setting_leaves_the_call_successful() {
+    let repository = Repository::make("template-default-exit", &fixtures::thin_with(fixtures::GREET));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(0));
+}

@@ -151,3 +151,9 @@ impl EntryChange {
         }
     }
 }
+
+/// A rendered template installs with exactly its last suffix removed.
+#[must_use]
+pub fn rendered(path: &[u8], mode: Mode, content_digest: Digest) -> TreeEntry {
+    file(path.strip_suffix(b".j2").expect("template suffix"), mode, content_digest)
+}

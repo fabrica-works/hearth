@@ -9,6 +9,7 @@ use skein_lib::{Decimal, Writer, bytes};
 pub fn truthy(operand: &Operand<'_>) -> bool {
     match walk::view(operand) {
         View::Undefined => false,
+        View::Loop => true,
         View::Bool(v) => v,
         View::Int(v) => v != 0,
         View::String(v) => !v.is_empty(),
@@ -34,7 +35,7 @@ pub fn output<'v>(operand: &'v Operand<'_>) -> Result<Written<'v>, FaultKind> {
         View::Bool(v) => Ok(Written::Bytes(if v { b"true" } else { b"false" })),
         View::String(v) => Ok(Written::Bytes(v)),
         View::Int(v) => Ok(Written::Integer { negative: v < 0, digits: Decimal::of(v.unsigned_abs()) }),
-        View::List(_) | View::Map(_) => Err(FaultKind::Output),
+        View::Loop | View::List(_) | View::Map(_) => Err(FaultKind::Output),
     }
 }
 impl Written<'_> {
@@ -114,11 +115,12 @@ fn joined<'v>(operand: &'v Operand<'_>) -> Result<Written<'v>, FaultKind> {
     match walk::view(operand) {
         View::Int(_) | View::String(_) => output(operand),
         View::Undefined => Err(FaultKind::Undefined),
-        View::Bool(_) | View::List(_) | View::Map(_) => Err(FaultKind::Type),
+        View::Loop | View::Bool(_) | View::List(_) | View::Map(_) => Err(FaultKind::Type),
     }
 }
 fn order(a: View<'_>, b: View<'_>) -> Result<Ordering, FaultKind> {
     match (a, b) {
+        (View::Loop, _) | (_, View::Loop) => Err(FaultKind::Type),
         (View::Int(a), View::Int(b)) => Ok(a.cmp(&b)),
         (View::String(a), View::String(b)) => Ok(a.cmp(b)),
         (View::Undefined | View::Bool(_) | View::List(_) | View::Map(_), _)
@@ -129,6 +131,10 @@ fn order(a: View<'_>, b: View<'_>) -> Result<Ordering, FaultKind> {
     }
 }
 fn contains(needle: View<'_>, haystack: View<'_>, capacity: u32, steps: u64) -> Result<bool, FaultKind> {
+    match needle {
+        View::Loop => return Err(FaultKind::Type),
+        View::Undefined | View::Bool(_) | View::Int(_) | View::String(_) | View::List(_) | View::Map(_) => {}
+    }
     match haystack {
         View::String(text) => {
             let View::String(needle) = needle else {
@@ -154,6 +160,6 @@ fn contains(needle: View<'_>, haystack: View<'_>, capacity: u32, steps: u64) -> 
             Ok(false)
         }
         View::Undefined => Err(FaultKind::Undefined),
-        View::Bool(_) | View::Int(_) => Err(FaultKind::Type),
+        View::Loop | View::Bool(_) | View::Int(_) => Err(FaultKind::Type),
     }
 }

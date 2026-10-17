@@ -655,3 +655,19 @@ pub const CONTAINERS: &[File] = &[
         mode: 0o644,
     },
 ];
+
+pub const TEMPLATED: &[File] = &[
+    File { path: "tasks/motd/tree/etc/hostname.j2", body: b"{{ target.name }}\n", mode: 0o644 },
+    File { path: "tasks/motd/tree/etc/issue.j2", body: b"{% set kind = target.placement.kind %}{{ target.base }} runs on {{ kind }}{% if target.member is defined %} as {{ target.member }}{% endif %}.\n{% for word in ['one', 'two'] %}{{ loop.index }}: {{ word }}\n{% endfor %}", mode: 0o644 },
+];
+pub const MISSING_TEMPLATE_KEY: File =
+    File { path: "tasks/motd/tree/etc/issue.j2", body: b"{{ target.nam }}\n", mode: 0o644 };
+pub const GREET: &[File] = &[
+    File { path: "hosts/x1/x1.json", body: br#"{"motd":{},"greet":{}}"#, mode: 0o644 },
+    File {
+        path: "tasks/greet/task.json",
+        body: br#"{"settings":{"greeting":{"type":"string","default":"hello","doc":"The greeting."}}}"#,
+        mode: 0o644,
+    },
+    File { path: "tasks/greet/tree/etc/greeting.j2", body: b"{{ settings.greeting }}\n", mode: 0o644 },
+];

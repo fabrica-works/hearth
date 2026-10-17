@@ -46,8 +46,38 @@ fn a_task_removed_by_null_in_the_base_env_gives_no_files() {
     let (mut call, target) = fixtures::removed_task();
     call.targets = Box::new([target]);
     call.commit = Some(crate::revision::Oid(skein_lib::bytes::copy_of(b"commit")));
-    let crate::vocabulary::Answer::Spec(spec) = call.answer() else { panic!("removed task still renders its target") };
-    let [part] = spec.parts.as_ref() else { panic!("config part") };
+    let crate::vocabulary::Answer::Spec(spec) = fixtures::answer(&mut call) else {
+        panic!("removed task still renders its target")
+    };
+    let part = fixtures::only(&spec.parts);
     let crate::parts::PartRecord::Config(config) = &part.record;
     assert_eq!(config.tree.as_ref(), [], "null removes the task's files");
+}
+
+#[test]
+fn a_template_installs_less_one_j2_with_gits_mode() {
+    for (row, &(mode, expected)) in MODES.iter().enumerate() {
+        assert_eq!(
+            crate::parts::config::rendered(b"etc/hostname.j2", mode, hearth_lib::encode::Digest([1; 32])),
+            crate::parts::config::TreeEntry {
+                path: b"/etc/hostname".as_slice().into(),
+                node: crate::parts::config::Node::File {
+                    content_digest: hearth_lib::encode::Digest([1; 32]),
+                    mode: expected,
+                    owner: b"root".as_slice().into(),
+                    group: b"root".as_slice().into(),
+                }
+            },
+            "row {row}"
+        );
+    }
+}
+#[test]
+fn x_j2_j2_installs_at_x_j2() {
+    assert_eq!(
+        crate::parts::config::rendered(b"x.j2.j2", crate::revision::Mode::File, hearth_lib::encode::Digest([1; 32]))
+            .path
+            .as_ref(),
+        b"/x.j2"
+    );
 }

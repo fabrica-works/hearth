@@ -55,10 +55,10 @@ fn errors_follow_the_last_spec_and_precede_rendered() {
     call.targets = Box::new([target]);
     call.commit = Some(Oid(copy_of(b"commit")));
     errors::push(&mut call.errors, errors::refused(b"envs/lab.json", None, Decode::Unexpected, None));
-    let Answer::Spec(spec) = call.answer() else { panic!("spec first") };
+    let Answer::Spec(spec) = fixtures::answer(&mut call) else { panic!("spec first") };
     assert_eq!(spec.meta.target.as_ref(), b"x1-prod");
     assert_eq!(
-        call.answer(),
+        fixtures::answer(&mut call),
         Answer::Error(Error {
             side: None,
             kind: Kind::Decode(Decode::Unexpected),
@@ -69,7 +69,7 @@ fn errors_follow_the_last_spec_and_precede_rendered() {
             task: None
         })
     );
-    assert_eq!(call.answer(), Answer::Rendered { outcome: Outcome::Failed, diff: None, left_out: 0 });
+    assert_eq!(fixtures::answer(&mut call), Answer::Rendered { outcome: Outcome::Failed, diff: None, left_out: 0 });
 }
 #[test]
 fn a_document_past_its_limit_errs_at_its_path_and_fails_its_targets() {
@@ -77,7 +77,7 @@ fn a_document_past_its_limit_errs_at_its_path_and_fails_its_targets() {
     let mut out = skein_lib::Queue::with_capacity(1);
     call.files(limits::SHIPPED, &mut out);
     assert_eq!(
-        call.answer(),
+        fixtures::answer(&mut call),
         Answer::Error(Error {
             side: None,
             kind: Kind::Decode(Decode::TooLarge { limit: Limit::Document, max: 16 }),
@@ -129,7 +129,7 @@ fn a_static_file_past_its_limit_errs_and_no_read_asks_it() {
     let mut out = skein_lib::Queue::with_capacity(1);
     assert!(!call.files(limits::Limits { static_file: 8, ..limits::SHIPPED }, &mut out));
     assert_eq!(
-        call.answer(),
+        fixtures::answer(&mut call),
         Answer::Error(Error {
             side: None,
             kind: Kind::Decode(Decode::TooLarge { limit: Limit::Static, max: 8 }),
@@ -202,7 +202,7 @@ fn a_left_out_operational_error_still_makes_the_call_try_again() {
     let mut error = fixtures::unplaced(b"t");
     error.class = Class::Operational;
     call.errors.push(error);
-    assert_eq!(call.answer(), Answer::Rendered { outcome: Outcome::TryAgain, diff: None, left_out: 1 });
+    assert_eq!(fixtures::answer(&mut call), Answer::Rendered { outcome: Outcome::TryAgain, diff: None, left_out: 1 });
 }
 const BOUNDS: &[u32] = &[0, 1, 3, 8];
 #[test]

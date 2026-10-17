@@ -19,6 +19,14 @@ pub(super) fn key<'c>(value: Operand<'c>, name: &[u8], missing: Missing) -> Resu
             }),
             None => absent(missing, FaultKind::NoKey),
         },
+        Operand::Loop { index0, length } => match name {
+            b"index" => Ok(Operand::Int(i64::from(index0).saturating_add(1))),
+            b"index0" => Ok(Operand::Int(i64::from(index0))),
+            b"first" => Ok(Operand::Bool(index0 == 0)),
+            b"last" => Ok(Operand::Bool(index0.saturating_add(1) == length)),
+            b"length" => Ok(Operand::Int(i64::from(length))),
+            _name => absent(missing, FaultKind::NoKey),
+        },
         Operand::Undefined => absent(missing, FaultKind::Undefined),
         Operand::Value(Value::Bool(_) | Value::Int(_) | Value::String(_) | Value::List(_))
         | Operand::Bool(_)
@@ -53,9 +61,10 @@ pub(super) fn item<'c>(value: Operand<'c>, index: Operand<'c>, missing: Missing)
         Operand::Int(i) => index_integer(value, i, missing),
         Operand::Value(Value::Int(i)) => index_integer(value, *i, missing),
         Operand::Undefined => Err(FaultKind::Undefined),
-        Operand::Value(Value::Bool(_) | Value::List(_) | Value::Map(_)) | Operand::Bool(_) | Operand::List { .. } => {
-            Err(FaultKind::Type)
-        }
+        Operand::Loop { .. }
+        | Operand::Value(Value::Bool(_) | Value::List(_) | Value::Map(_))
+        | Operand::Bool(_)
+        | Operand::List { .. } => Err(FaultKind::Type),
     }
 }
 fn index_integer(value: Operand<'_>, index: i64, missing: Missing) -> Result<Operand<'_>, FaultKind> {
@@ -77,7 +86,8 @@ fn index_integer(value: Operand<'_>, index: i64, missing: Missing) -> Result<Ope
             absent(missing, FaultKind::NoIndex)
         }
         Operand::Undefined => absent(missing, FaultKind::Undefined),
-        Operand::Value(Value::Bool(_) | Value::Int(_) | Value::String(_) | Value::Map(_))
+        Operand::Loop { .. }
+        | Operand::Value(Value::Bool(_) | Value::Int(_) | Value::String(_) | Value::Map(_))
         | Operand::Bool(_)
         | Operand::Int(_)
         | Operand::String(_) => Err(FaultKind::Type),

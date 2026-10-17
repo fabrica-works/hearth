@@ -63,6 +63,7 @@ fn json_pass(
     let mut length = 0;
     for _ in 0..steps {
         match value {
+            View::Loop => return Err(FaultKind::Type),
             View::Undefined => return Err(FaultKind::Undefined),
             View::Bool(v) => put(&mut writer, &mut length, if v { b"true" } else { b"false" })?,
             View::Int(v) => {

@@ -57,28 +57,13 @@ pub fn meta() -> Meta {
     }
 }
 
+pub use crate::evaluate::context::Roots;
 use crate::evaluate::{
-    self, Bindings, Budget, Context, Entry, Evaluator, Expression, Fault, Missing, Op, Operand, Operation, Value,
+    self, Bindings, Budget, Entry, Evaluator, Expression, Fault, Missing, Op, Operand, Operation, Value,
 };
 use crate::limits;
-#[derive(Debug)]
-pub struct Roots {
-    pub target: Value,
-    pub debian: Value,
-    pub settings: Value,
-    pub tasks: Value,
-    pub exports: Value,
-}
 impl Roots {
-    pub fn context(&self) -> Context<'_> {
-        Context {
-            target: &self.target,
-            debian: &self.debian,
-            settings: &self.settings,
-            tasks: &self.tasks,
-            exports: &self.exports,
-        }
-    }
+    #[must_use]
     pub fn x1_prod() -> Self {
         Self {
             target: evaluate::context::target(&meta()),
@@ -146,6 +131,7 @@ pub fn evaluate_at(roots: &Roots, operations: &[Operation], limits: &limits::Lim
 }
 pub fn owned(value: Operand<'_>) -> Option<Value> {
     Some(match value {
+        Operand::Loop { .. } => panic!("loop needs a template context"),
         Operand::Undefined => return None,
         Operand::Value(v) => v.clone(),
         Operand::Bool(v) => Value::Bool(v),
@@ -769,3 +755,15 @@ mod discovery;
 pub use discovery::{
     container_documents, member_documents, member_layers, members, retain_task, rule_document, with_document,
 };
+
+/// Drives internal progress until the next answer.
+pub fn answer(call: &mut crate::call::Side) -> crate::vocabulary::Answer {
+    for _ in 0_u32..100 {
+        if let Some(answer) = call.answer() {
+            return answer;
+        }
+    }
+    panic!("fixture answer bound")
+}
+mod templates;
+pub use templates::*;

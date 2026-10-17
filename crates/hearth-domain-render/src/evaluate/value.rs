@@ -18,6 +18,7 @@ pub struct Entry {
 #[derive(Clone, Debug)]
 pub enum Operand<'c> {
     Undefined,
+    Loop { index0: u32, length: u32 },
     Value(&'c Value),
     Bool(bool),
     Int(i64),
@@ -29,7 +30,9 @@ impl Operand<'_> {
     pub const fn undefined(&self) -> bool {
         match self {
             Self::Undefined => true,
-            Self::Value(_) | Self::Bool(_) | Self::Int(_) | Self::String(_) | Self::List { .. } => false,
+            Self::Loop { .. } | Self::Value(_) | Self::Bool(_) | Self::Int(_) | Self::String(_) | Self::List { .. } => {
+                false
+            }
         }
     }
 }
@@ -40,6 +43,7 @@ pub(super) fn copy<'c>(value: &Operand<'c>, budget: &mut Budget, nesting: u32) -
     for _ in 0..=budget.left.saturating_mul(2).saturating_add(u64::from(nesting)).saturating_add(1) {
         let copied = match next {
             Operand::Undefined => Operand::Undefined,
+            Operand::Loop { index0, length } => Operand::Loop { index0: *index0, length: *length },
             Operand::Value(v) => Operand::Value(v),
             Operand::Bool(v) => Operand::Bool(*v),
             Operand::Int(v) => Operand::Int(*v),

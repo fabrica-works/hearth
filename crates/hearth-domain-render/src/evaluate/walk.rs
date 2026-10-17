@@ -4,6 +4,7 @@ use skein_lib::Stack;
 #[derive(Clone, Copy, Debug)]
 pub(super) enum View<'v> {
     Undefined,
+    Loop,
     Bool(bool),
     Int(i64),
     String(&'v [u8]),
@@ -32,6 +33,7 @@ impl<'v> Items<'v> {
 pub(super) fn view<'v>(operand: &'v Operand<'v>) -> View<'v> {
     match operand {
         Operand::Undefined => View::Undefined,
+        Operand::Loop { .. } => View::Loop,
         Operand::Bool(v) => View::Bool(*v),
         Operand::Int(v) => View::Int(*v),
         Operand::String(v) => View::String(v),
@@ -91,6 +93,7 @@ pub(super) fn equal<'v>(mut left: View<'v>, mut right: View<'v>, capacity: u32, 
     let mut frames = Stack::with_capacity(capacity);
     for _ in 0..steps {
         let same = match (left, right) {
+            (View::Loop, _) | (_, View::Loop) => return Err(FaultKind::Type),
             (View::Undefined, _) | (_, View::Undefined) => return Err(FaultKind::Undefined),
             (View::Bool(a), View::Bool(b)) => a == b,
             (View::Int(a), View::Int(b)) => a == b,

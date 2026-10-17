@@ -385,3 +385,35 @@ fn container_on_host(repository: &mut Repository) {
     });
     set_document(repository, b'3', document(Some(placed)));
 }
+
+#[must_use]
+pub fn tree_templates(files: &[(&[u8], Mode, &[u8])]) -> Repository {
+    let mut repository = with_task();
+    for (index, &(path, mode, body)) in files.iter().enumerate() {
+        let byte = b'5' + u8::try_from(index).expect("small fixture");
+        let mut entry = entry(path, byte);
+        entry.mode = mode;
+        entry.size = u64::try_from(body.len()).expect("fixture bytes");
+        repository.entries.push(entry);
+        repository.blobs.push((oid(byte), body.into()));
+    }
+    repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
+    repository
+}
+
+#[must_use]
+pub fn templates_for_many_targets() -> Repository {
+    const NAMES: &[&str] = &["a", "b", "c", "d", "e", "f", "g", "h"];
+    let mut repository = tree_templates(&[
+        (b"tasks/motd/tree/etc/a.j2", Mode::File, b"{{ target.name }}a"),
+        (b"tasks/motd/tree/etc/b.j2", Mode::File, b"{{ target.name }}b"),
+        (b"tasks/motd/tree/etc/c.j2", Mode::File, b"{{ target.name }}c"),
+    ]);
+    for (index, name) in NAMES.iter().enumerate() {
+        let byte = b'8' + u8::try_from(index).expect("small fixture");
+        repository.entries.push(entry(format!("hosts/{name}/{name}-prod.json").as_bytes(), byte));
+        repository.documents.push((oid(byte), tasks(&[(b"motd", false)], Some(placement()))));
+    }
+    repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
+    repository
+}

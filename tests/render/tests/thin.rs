@@ -223,6 +223,70 @@ fn a_template_and_a_link_are_left_out_of_the_tree() {
     let Answer::Spec(spec) = only(&run.answers) else { panic!("one target") };
     let part = only(&spec.parts);
     let hearth_domain_render::parts::PartRecord::Config(config) = &part.record;
-    assert_eq!(config.tree.as_ref(), []);
+    assert_eq!(
+        config.tree.as_ref(),
+        &[hearth_domain_render::parts::config::TreeEntry {
+            path: b"/etc/template".as_slice().into(),
+            node: hearth_domain_render::parts::config::Node::File {
+                content_digest: fixtures::digest("2689367b205c16ce32ed4200942b8b8b1e262dfc70d9bc9fbc77c49699a4f1df"),
+                mode: 0o644,
+                owner: b"root".as_slice().into(),
+                group: b"root".as_slice().into(),
+            },
+        }]
+    );
     assert_eq!(run.requests.len(), 3, "the second read includes the template");
+}
+
+#[test]
+fn the_tree_orders_by_installed_path_when_the_suffix_reorders() {
+    let repository = fixtures::tree_templates(&[
+        (b"tasks/motd/tree/etc/a-b", hearth_domain_render::revision::Mode::File, b"ab"),
+        (b"tasks/motd/tree/etc/a.j2", hearth_domain_render::revision::Mode::File, b"a"),
+    ]);
+    let run = parent::run(&repository, &[], 0);
+    let Answer::Spec(spec) = only(&run.answers) else { panic!("one spec") };
+    let hearth_domain_render::parts::PartRecord::Config(config) = &only(&spec.parts).record;
+    assert_eq!(
+        config.tree.iter().map(|entry| entry.path.as_ref()).collect::<Vec<_>>(),
+        [b"/etc/a".as_slice(), b"/etc/a-b"]
+    );
+}
+
+const FAULTING_TEMPLATES: &[(&[u8], hearth_domain_render::revision::Mode, &[u8])] = &[
+    (b"tasks/motd/tree/etc/a.j2", hearth_domain_render::revision::Mode::File, b"{{ target.nam }}{{ settings.no }}"),
+    (b"tasks/motd/tree/etc/b.j2", hearth_domain_render::revision::Mode::File, b"header\n{{ target.zz }}{{ tasks.no }}"),
+];
+const FIRST_FAULTS: &[(&[u8], Position, hearth_domain_render::errors::Kind)] = &[
+    (
+        b"tasks/motd/tree/etc/a.j2",
+        Position { line: 1, column: 11 },
+        hearth_domain_render::errors::Kind::Evaluation(hearth_domain_render::evaluate::FaultKind::NoKey),
+    ),
+    (
+        b"tasks/motd/tree/etc/b.j2",
+        Position { line: 2, column: 11 },
+        hearth_domain_render::errors::Kind::Evaluation(hearth_domain_render::evaluate::FaultKind::NoKey),
+    ),
+];
+#[test]
+fn each_template_runs_after_a_fault_and_gives_its_first_fault() {
+    let repository = fixtures::tree_templates(FAULTING_TEMPLATES);
+    let run = parent::run(&repository, &[], 0);
+    let errors: Vec<_> = run
+        .answers
+        .iter()
+        .map(|answer| {
+            let Answer::Error(error) = answer else { panic!("evaluation error") };
+            let place = error.at.as_ref().expect("template place");
+            (place.path.as_ref(), place.position.expect("fault position"), error.kind.clone())
+        })
+        .collect();
+    assert_eq!(errors, FIRST_FAULTS);
+}
+
+#[test]
+fn a_shared_templates_different_outputs_fit_for_each_target() {
+    let run = parent::run(&fixtures::templates_for_many_targets(), &[], 0);
+    assert_eq!(run.answers.len(), 9);
 }

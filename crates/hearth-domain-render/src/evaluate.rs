@@ -2,6 +2,7 @@
 pub mod context;
 mod escape;
 pub mod filter;
+mod frame;
 pub mod template;
 pub use filter::Filter;
 mod lookup;
@@ -292,6 +293,7 @@ impl<'c> Evaluator<'c> {
         for _ in 0..length {
             let value = self.pop();
             match &value {
+                Operand::Loop { .. } => return Err(FaultKind::Type),
                 Operand::Undefined => return Err(FaultKind::Undefined),
                 Operand::List { depth: inner, items: _ } => depth = depth.max(inner.saturating_add(1)),
                 Operand::Value(_) | Operand::Bool(_) | Operand::Int(_) | Operand::String(_) => {}

@@ -1,10 +1,11 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
+mod templates;
 mod validation;
 use crate::{
     compose::{self, Target},
     errors::{self, Decode, Limit},
     limits::Limits,
-    parts::{self, Spec, meta},
+    parts::{self, meta},
     revision::{self, Budget, Documents, Entry, Mode, Oid},
     vocabulary::{Answer, As, Blob, Decoded, Outcome, Output, Request},
 };
@@ -33,6 +34,9 @@ pub(crate) struct Side {
     pub invalid: Box<[bool]>,
     pub refused: Map<Oid, ()>,
     pub cached: Map<Oid, hearth_lib::encode::Digest>,
+    pub templates: Map<Oid, crate::evaluate::template::Template>,
+    pub rendering: Option<templates::Target>,
+    pub limits: Limits,
     pub sizes: Sizes,
     pub files: bool,
     pub read: usize,
@@ -64,6 +68,9 @@ impl Side {
             invalid: Box::new([]),
             refused: Map::with_capacity(0),
             cached: Map::with_capacity(0),
+            templates: Map::with_capacity(0),
+            rendering: None,
+            limits: *limits,
             sizes: Map::with_capacity(0),
             files: false,
             read: 0,
@@ -207,7 +214,9 @@ impl Side {
         let expected = self.pending.get(self.read).expect("one event per requested blob");
         assert_eq!(&expected.oid, oid, "blobs answer in request order");
         match read {
-            Decoded::Template(_) => {}
+            Decoded::Template(template) => {
+                self.templates.insert(oid.clone(), template).expect("listing capacity");
+            }
             Decoded::Document(document) => {
                 self.documents.set(oid, document);
             }
@@ -292,8 +301,9 @@ impl Side {
         self.compose();
         let capacity = u32::try_from(self.entries.len()).expect("listing capacity");
         self.cached = Map::with_capacity(capacity);
+        self.templates = Map::with_capacity(capacity);
         self.refused = Map::with_capacity(capacity);
-        self.sizes = Map::with_capacity(capacity);
+        self.sizes = Map::with_capacity(self.size_capacity());
         let mut blobs = List::with_capacity(capacity);
         let mut paths = List::with_capacity(capacity);
         for entry in &self.entries {
@@ -468,7 +478,10 @@ impl Side {
         }
         true
     }
-    pub fn answer(&mut self) -> Answer {
+    pub fn answer(&mut self) -> Option<Answer> {
+        if self.rendering.is_some() {
+            return self.template();
+        }
         for target in self.targets.get(self.next..).expect("answer cursor within targets") {
             self.next = self.next.saturating_add(1);
             if !self.names.is_empty() && !self.names.contains(&target.name) {
@@ -532,38 +545,35 @@ impl Side {
             if self.validator.limited() {
                 errors::push(&mut self.errors, validation::limit(&target.name));
             }
-            if checked.is_none() {
+            let Some(checked) = checked else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
-            }
+            };
             let Some(config) = self.config(self.settings.get(self.next.saturating_sub(1)).expect("target settings"))
             else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
-            let parts = Box::new([parts::Part {
-                digest: parts::config::digest(&config),
-                record: parts::PartRecord::Config(config),
-            }]);
-            return Answer::Spec(Spec {
-                digest: parts::spec_digest(&meta_digest, parts.as_ref()),
+            self.rendering = Some(templates::Target::new(
                 meta,
                 meta_digest,
-                commit: self.commit.clone().expect("listed commit"),
-                parts,
-            });
+                checked,
+                config,
+                u32::try_from(self.entries.len()).expect("listing count"),
+            ));
+            return self.template();
         }
         if !self.diff
             && let Some(error) = self.errors.get(self.error_next)
         {
             self.error_next = self.error_next.saturating_add(1);
-            return Answer::Error(error.clone());
+            return Some(Answer::Error(error.clone()));
         }
-        Answer::Rendered {
+        Some(Answer::Rendered {
             outcome: self.outcome.worst(self.errors.outcome()),
             diff: None,
             left_out: self.errors.left_out(),
-        }
+        })
     }
 }
 
@@ -651,7 +661,7 @@ impl Call {
             return false;
         }
         let Some(diff) = &mut self.diff else {
-            let answer = self.side.answer();
+            let Some(answer) = self.side.answer() else { return false };
             let done = match &answer {
                 Answer::Rendered { .. } => true,
                 Answer::Spec(_) | Answer::Change(_) | Answer::Error(_) => false,
@@ -661,22 +671,23 @@ impl Call {
         };
         if diff.tally.is_none() {
             match self.side.answer() {
-                Answer::Spec(spec) => {
+                None => return false,
+                Some(Answer::Spec(spec)) => {
                     self.side
                         .made
                         .insert(spec.meta.target.clone(), crate::diff::Made::Spec(Box::new(spec)))
                         .expect("target capacity");
                     return false;
                 }
-                Answer::Rendered { outcome, diff: _, left_out } => {
+                Some(Answer::Rendered { outcome, diff: _, left_out }) => {
                     diff.outcome = diff.outcome.worst(outcome);
                     diff.left_out = left_out;
                 }
-                Answer::Error(error) => {
+                Some(Answer::Error(error)) => {
                     out.push(Output::Answer(Answer::Error(error)));
                     return false;
                 }
-                Answer::Change(_) => unreachable!("a side renders specs"),
+                Some(Answer::Change(_)) => unreachable!("a side renders specs"),
             }
             let Some(commit) = self.side.commit.clone() else {
                 return diff.finish(&mut self.side, out);
