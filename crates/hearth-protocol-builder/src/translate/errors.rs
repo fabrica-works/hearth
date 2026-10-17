@@ -27,7 +27,8 @@ pub fn fault(
             }
             tokenizer::Error::Stream(_) => return None,
         },
-        config::Fault::Stream(_) | config::Fault::Declaration(_) => return None,
+        config::Fault::Stream(_) => return None,
+        config::Fault::Declaration(value) => target::Decode::Declaration(declared(value)),
         config::Fault::Duplicate { key, first } => {
             return Some((target::Decode::Duplicate { key }, Some(super::documents::position(first))));
         }
@@ -84,6 +85,7 @@ fn position_to_records(position: Option<render::revision::Position>) -> Option<r
 #[must_use]
 pub fn decode(fault: target::Decode) -> records::errors::Decode {
     match fault {
+        target::Decode::Declaration(value) => records::errors::Decode::Declaration(declared_to_records(value)),
         target::Decode::Unexpected => records::errors::Decode::Unexpected,
         target::Decode::Trailing => records::errors::Decode::Trailing,
         target::Decode::TooDeep => records::errors::Decode::TooDeep,
@@ -131,5 +133,189 @@ pub fn limit(limit: target::Limit) -> records::errors::Limit {
         target::Limit::Document => records::errors::Limit::Document,
         target::Limit::Decoded => records::errors::Limit::Decoded,
         target::Limit::Static => records::errors::Limit::Static,
+    }
+}
+
+#[must_use]
+pub fn declared(value: config::Declared) -> target::Declared {
+    match value {
+        config::Declared::Unknown { of } => target::Declared::Unknown { of: object(of) },
+        config::Declared::Later => target::Declared::Later,
+        config::Declared::Wrong { expected } => target::Declared::Wrong { expected: config_expected(expected) },
+        config::Declared::Missing { key } => target::Declared::Missing { key: required(key) },
+        config::Declared::Name => target::Declared::Name,
+        config::Declared::Doc => target::Declared::Doc,
+        config::Declared::Order => target::Declared::Order,
+        config::Declared::Optional => target::Declared::Optional,
+        config::Declared::Bound => target::Declared::Bound,
+        config::Declared::Above => target::Declared::Above,
+        config::Declared::Enum => target::Declared::Enum,
+        config::Declared::Settings => target::Declared::Settings,
+        config::Declared::Secret => target::Declared::Secret,
+    }
+}
+
+#[must_use]
+pub fn object(value: config::Object) -> target::Object {
+    match value {
+        config::Object::Declaration => target::Object::Declaration,
+        config::Object::Read => target::Object::Read,
+        config::Object::Guard => target::Object::Guard,
+        config::Object::Script => target::Object::Script,
+        config::Object::Bless => target::Object::Bless,
+        config::Object::Entry(map) => target::Object::Entry(declaration_map(map)),
+        config::Object::Range => target::Object::Range,
+        config::Object::Spec => target::Object::Spec,
+        config::Object::Export => target::Object::Export,
+        config::Object::Type => target::Object::Type,
+    }
+}
+
+#[must_use]
+pub fn config_expected(value: config::Expected) -> target::Expected {
+    match value {
+        config::Expected::Object => target::Expected::Object,
+        config::Expected::String => target::Expected::String,
+        config::Expected::Strings => target::Expected::Strings,
+        config::Expected::Bool => target::Expected::Bool,
+        config::Expected::Int => target::Expected::Int,
+        config::Expected::Field(takes) => target::Expected::Field(config_takes(takes)),
+        config::Expected::True => target::Expected::True,
+        config::Expected::Type => target::Expected::Type,
+    }
+}
+
+#[must_use]
+pub fn required(value: config::Required) -> target::Required {
+    match value {
+        config::Required::If => target::Required::If,
+        config::Required::Message => target::Required::Message,
+        config::Required::Type => target::Required::Type,
+        config::Required::Doc => target::Required::Doc,
+        config::Required::Value => target::Required::Value,
+    }
+}
+
+#[must_use]
+pub fn config_takes(value: config::entries::Takes) -> target::Takes {
+    match value {
+        config::entries::Takes::Text => target::Takes::Text,
+        config::entries::Takes::Int => target::Takes::Int,
+        config::entries::Takes::Bool => target::Takes::Bool,
+        config::entries::Takes::Strings => target::Takes::Strings,
+        config::entries::Takes::Range => target::Takes::Range,
+    }
+}
+
+#[must_use]
+pub fn declaration_map(value: config::entries::Map) -> render::revision::declaration::Map {
+    match value {
+        config::entries::Map::Packages => render::revision::declaration::Map::Packages,
+        config::entries::Map::Preseeds => render::revision::declaration::Map::Preseeds,
+        config::entries::Map::Initramfs => render::revision::declaration::Map::Initramfs,
+        config::entries::Map::Software => render::revision::declaration::Map::Software,
+        config::entries::Map::Files => render::revision::declaration::Map::Files,
+        config::entries::Map::Users => render::revision::declaration::Map::Users,
+        config::entries::Map::Groups => render::revision::declaration::Map::Groups,
+        config::entries::Map::Presets => render::revision::declaration::Map::Presets,
+        config::entries::Map::Tmpfiles => render::revision::declaration::Map::Tmpfiles,
+        config::entries::Map::Data => render::revision::declaration::Map::Data,
+        config::entries::Map::Secrets => render::revision::declaration::Map::Secrets,
+        config::entries::Map::Identity => render::revision::declaration::Map::Identity,
+        config::entries::Map::Cmdline => render::revision::declaration::Map::Cmdline,
+        config::entries::Map::Live => render::revision::declaration::Map::Live,
+    }
+}
+
+#[must_use]
+pub fn declared_to_records(value: target::Declared) -> records::errors::Declared {
+    match value {
+        target::Declared::Unknown { of } => records::errors::Declared::Unknown { of: object_to_records(of) },
+        target::Declared::Later => records::errors::Declared::Later,
+        target::Declared::Wrong { expected } => {
+            records::errors::Declared::Wrong { expected: expected_to_records(expected) }
+        }
+        target::Declared::Missing { key } => records::errors::Declared::Missing { key: required_to_records(key) },
+        target::Declared::Name => records::errors::Declared::Name,
+        target::Declared::Doc => records::errors::Declared::Doc,
+        target::Declared::Order => records::errors::Declared::Order,
+        target::Declared::Optional => records::errors::Declared::Optional,
+        target::Declared::Bound => records::errors::Declared::Bound,
+        target::Declared::Above => records::errors::Declared::Above,
+        target::Declared::Enum => records::errors::Declared::Enum,
+        target::Declared::Settings => records::errors::Declared::Settings,
+        target::Declared::Secret => records::errors::Declared::Secret,
+    }
+}
+
+#[must_use]
+pub fn object_to_records(value: target::Object) -> records::errors::Object {
+    match value {
+        target::Object::Declaration => records::errors::Object::Declaration,
+        target::Object::Read => records::errors::Object::Read,
+        target::Object::Guard => records::errors::Object::Guard,
+        target::Object::Script => records::errors::Object::Script,
+        target::Object::Bless => records::errors::Object::Bless,
+        target::Object::Entry(map) => records::errors::Object::Entry(declaration_map_to_records(map)),
+        target::Object::Range => records::errors::Object::Range,
+        target::Object::Spec => records::errors::Object::Spec,
+        target::Object::Export => records::errors::Object::Export,
+        target::Object::Type => records::errors::Object::Type,
+    }
+}
+
+#[must_use]
+pub fn expected_to_records(value: target::Expected) -> records::errors::Expected {
+    match value {
+        target::Expected::Object => records::errors::Expected::Object,
+        target::Expected::String => records::errors::Expected::String,
+        target::Expected::Strings => records::errors::Expected::Strings,
+        target::Expected::Bool => records::errors::Expected::Bool,
+        target::Expected::Int => records::errors::Expected::Int,
+        target::Expected::Field(takes) => records::errors::Expected::Field(takes_to_records(takes)),
+        target::Expected::True => records::errors::Expected::True,
+        target::Expected::Type => records::errors::Expected::Type,
+    }
+}
+
+#[must_use]
+pub fn required_to_records(value: target::Required) -> records::errors::Required {
+    match value {
+        target::Required::If => records::errors::Required::If,
+        target::Required::Message => records::errors::Required::Message,
+        target::Required::Type => records::errors::Required::Type,
+        target::Required::Doc => records::errors::Required::Doc,
+        target::Required::Value => records::errors::Required::Value,
+    }
+}
+
+#[must_use]
+pub fn takes_to_records(value: target::Takes) -> records::errors::Takes {
+    match value {
+        target::Takes::Text => records::errors::Takes::Text,
+        target::Takes::Int => records::errors::Takes::Int,
+        target::Takes::Bool => records::errors::Takes::Bool,
+        target::Takes::Strings => records::errors::Takes::Strings,
+        target::Takes::Range => records::errors::Takes::Range,
+    }
+}
+
+#[must_use]
+pub fn declaration_map_to_records(value: render::revision::declaration::Map) -> records::errors::Map {
+    match value {
+        render::revision::declaration::Map::Packages => records::errors::Map::Packages,
+        render::revision::declaration::Map::Preseeds => records::errors::Map::Preseeds,
+        render::revision::declaration::Map::Initramfs => records::errors::Map::Initramfs,
+        render::revision::declaration::Map::Software => records::errors::Map::Software,
+        render::revision::declaration::Map::Files => records::errors::Map::Files,
+        render::revision::declaration::Map::Users => records::errors::Map::Users,
+        render::revision::declaration::Map::Groups => records::errors::Map::Groups,
+        render::revision::declaration::Map::Presets => records::errors::Map::Presets,
+        render::revision::declaration::Map::Tmpfiles => records::errors::Map::Tmpfiles,
+        render::revision::declaration::Map::Data => records::errors::Map::Data,
+        render::revision::declaration::Map::Secrets => records::errors::Map::Secrets,
+        render::revision::declaration::Map::Identity => records::errors::Map::Identity,
+        render::revision::declaration::Map::Cmdline => records::errors::Map::Cmdline,
+        render::revision::declaration::Map::Live => records::errors::Map::Live,
     }
 }

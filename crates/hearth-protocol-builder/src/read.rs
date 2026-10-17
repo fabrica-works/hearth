@@ -50,16 +50,12 @@ impl Decode {
                         Ok(document) => Ok(Decoded::Document(translate::documents::document(document))),
                         Err(error) => Err(error),
                     },
-                    render::vocabulary::As::Declaration => match value.kind {
-                        config::json::Kind::Map(_) => Ok(Decoded::Declaration),
-                        config::json::Kind::Null
-                        | config::json::Kind::Bool(_)
-                        | config::json::Kind::Int(_)
-                        | config::json::Kind::String(_)
-                        | config::json::Kind::List(_) => {
-                            Err(config::Error { at: value.at, fault: config::Fault::NotObject })
+                    render::vocabulary::As::Declaration => {
+                        match config::declaration::declaration(value, &env.limits.config) {
+                            Ok(_) => Ok(Decoded::Declaration),
+                            Err(error) => Err(error),
                         }
-                    },
+                    }
                     render::vocabulary::As::Cached => unreachable!("static bytes are never decoded"),
                 },
                 config::json::Event::Failed(error) => Err(error),

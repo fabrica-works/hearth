@@ -132,6 +132,7 @@ impl Place {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Decode {
+    Declaration(Declared),
     ListNull,
     Unexpected,
     Trailing,
@@ -180,6 +181,7 @@ pub enum Limit {
 impl Decode {
     fn text(&self, lines: &mut Lines) {
         match self {
+            Self::Declaration(declared) => declared.text(lines),
             Self::Unexpected => lines.put(b"not JSON: unexpected byte"),
             Self::Trailing => lines.put(b"not JSON: trailing bytes"),
             Self::TooDeep => lines.put(b"JSON nested too deeply"),
@@ -240,6 +242,13 @@ impl Decode {
     }
     fn json(&self, json: &mut Encoder) {
         match self {
+            Self::Declaration(declared) => {
+                json.object_start();
+                json.key(b"declared");
+                declared.json(json);
+                field(json, b"kind", b"declaration");
+                json.object_end();
+            }
             Self::Unexpected => json.string(b"unexpected"),
             Self::Trailing => json.string(b"trailing"),
             Self::TooDeep => json.string(b"too_deep"),
@@ -325,6 +334,212 @@ impl Field {
             Self::Hardware => b"hardware",
             Self::On => b"on",
             Self::Mutable => b"mutable",
+        }
+    }
+}
+
+/// Why a decoded task.json is no declaration (format.md, 5.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Declared {
+    Unknown { of: Object },
+    Later,
+    Wrong { expected: Expected },
+    Missing { key: Required },
+    Name,
+    Doc,
+    Order,
+    Optional,
+    Bound,
+    Above,
+    Enum,
+    Settings,
+    Secret,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Object {
+    Declaration,
+    Read,
+    Guard,
+    Script,
+    Bless,
+    Entry(Map),
+    Range,
+    Spec,
+    Export,
+    Type,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Expected {
+    Object,
+    String,
+    Strings,
+    Bool,
+    Int,
+    Field(Takes),
+    True,
+    Type,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Required {
+    If,
+    Message,
+    Type,
+    Doc,
+    Value,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Map {
+    Packages,
+    Preseeds,
+    Initramfs,
+    Software,
+    Files,
+    Users,
+    Groups,
+    Presets,
+    Tmpfiles,
+    Data,
+    Secrets,
+    Identity,
+    Cmdline,
+    Live,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Takes {
+    Text,
+    Int,
+    Bool,
+    Strings,
+    Range,
+}
+
+impl Declared {
+    fn text(self, lines: &mut Lines) {
+        match self {
+            Self::Unknown { of } => {
+                lines.put(b"no such key in a ");
+                lines.put(of.name());
+            }
+            Self::Wrong { expected } => {
+                lines.put(b"not ");
+                lines.put(expected.name());
+            }
+            Self::Missing { key } => {
+                lines.put(b"missing ");
+                lines.put(key.name());
+            }
+            Self::Later => lines.put(b"a key for a later milestone"),
+            Self::Name => lines.put(b"invalid declaration name"),
+            Self::Doc => lines.put(b"doc must be one line within its length limit"),
+            Self::Order => lines.put(b"order must be from 0 to 999"),
+            Self::Optional => lines.put(b"optional beside a default"),
+            Self::Bound => lines.put(b"a bound on a type it does not bound"),
+            Self::Above => lines.put(b"min above max"),
+            Self::Enum => lines.put(b"an enum must list distinct values"),
+            Self::Settings => lines.put(b"too many settings"),
+            Self::Secret => lines.put(b"an export type holds secret"),
+        }
+    }
+    fn json(self, json: &mut Encoder) {
+        json.object_start();
+        match self {
+            Self::Unknown { of } => {
+                field(json, b"kind", b"unknown");
+                field(json, b"of", of.name());
+            }
+            Self::Wrong { expected } => {
+                field(json, b"kind", b"wrong");
+                field(json, b"expected", expected.name());
+            }
+            Self::Missing { key } => {
+                field(json, b"kind", b"missing");
+                field(json, b"key", key.name());
+            }
+            Self::Later => field(json, b"kind", b"later"),
+            Self::Name => field(json, b"kind", b"name"),
+            Self::Doc => field(json, b"kind", b"doc"),
+            Self::Order => field(json, b"kind", b"order"),
+            Self::Optional => field(json, b"kind", b"optional"),
+            Self::Bound => field(json, b"kind", b"bound"),
+            Self::Above => field(json, b"kind", b"above"),
+            Self::Enum => field(json, b"kind", b"enum"),
+            Self::Settings => field(json, b"kind", b"settings"),
+            Self::Secret => field(json, b"kind", b"secret"),
+        }
+        json.object_end();
+    }
+}
+impl Object {
+    fn name(self) -> &'static [u8] {
+        match self {
+            Self::Declaration => b"declaration",
+            Self::Read => b"read",
+            Self::Guard => b"guard",
+            Self::Script => b"script",
+            Self::Bless => b"bless",
+            Self::Range => b"range",
+            Self::Spec => b"spec",
+            Self::Export => b"export",
+            Self::Type => b"type",
+            Self::Entry(map) => map.name(),
+        }
+    }
+}
+impl Map {
+    fn name(self) -> &'static [u8] {
+        match self {
+            Self::Packages => b"packages entry",
+            Self::Preseeds => b"preseeds entry",
+            Self::Initramfs => b"initramfs entry",
+            Self::Software => b"software entry",
+            Self::Files => b"files entry",
+            Self::Users => b"users entry",
+            Self::Groups => b"groups entry",
+            Self::Presets => b"presets entry",
+            Self::Tmpfiles => b"tmpfiles entry",
+            Self::Data => b"data entry",
+            Self::Secrets => b"secrets entry",
+            Self::Identity => b"identity entry",
+            Self::Cmdline => b"cmdline entry",
+            Self::Live => b"live entry",
+        }
+    }
+}
+impl Expected {
+    fn name(self) -> &'static [u8] {
+        match self {
+            Self::Object => b"an object",
+            Self::String => b"a string",
+            Self::Strings => b"a list of strings",
+            Self::Bool => b"a bool",
+            Self::Int => b"an int",
+            Self::True => b"true",
+            Self::Type => b"a type",
+            Self::Field(takes) => takes.name(),
+        }
+    }
+}
+impl Takes {
+    fn name(self) -> &'static [u8] {
+        match self {
+            Self::Text => b"a string",
+            Self::Int => b"an int",
+            Self::Bool => b"a bool",
+            Self::Strings => b"a list of strings",
+            Self::Range => b"a range",
+        }
+    }
+}
+impl Required {
+    fn name(self) -> &'static [u8] {
+        match self {
+            Self::If => b"if",
+            Self::Message => b"message",
+            Self::Type => b"type",
+            Self::Doc => b"doc",
+            Self::Value => b"value",
         }
     }
 }

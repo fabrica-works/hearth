@@ -23,6 +23,7 @@ pub enum Kind {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Decode {
+    Declaration(Declared),
     ListNull,
     Unexpected,
     Trailing,
@@ -99,4 +100,63 @@ pub(crate) fn push(errors: &mut skein_lib::List<Error>, error: Error) {
         *errors = larger;
     }
     errors.push(error).expect("error capacity reserved");
+}
+
+/// Why a decoded task.json is no declaration (format.md, 5.1).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Declared {
+    Unknown { of: Object },
+    Later,
+    Wrong { expected: Expected },
+    Missing { key: Required },
+    Name,
+    Doc,
+    Order,
+    Optional,
+    Bound,
+    Above,
+    Enum,
+    Settings,
+    Secret,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Object {
+    Declaration,
+    Read,
+    Guard,
+    Script,
+    Bless,
+    Entry(revision::declaration::Map),
+    Range,
+    Spec,
+    Export,
+    Type,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Expected {
+    Object,
+    String,
+    Strings,
+    Bool,
+    Int,
+    Field(Takes),
+    True,
+    Type,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Required {
+    If,
+    Message,
+    Type,
+    Doc,
+    Value,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Takes {
+    Text,
+    Int,
+    Bool,
+    Strings,
+    Range,
 }

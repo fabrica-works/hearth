@@ -211,3 +211,47 @@ fn a_decode_key_prints_quotes_and_controls_on_one_line() {
         Ok(b"envs/lab.json:1:14: duplicate key \"a\\n\\\"\\\\\\x01\"\n".as_slice())
     );
 }
+
+const DECLARATION_LINES: &[(crate::errors::Declared, &str)] = &[
+    (
+        crate::errors::Declared::Unknown { of: crate::errors::Object::Declaration },
+        "tasks/motd/task.json:1:2: motd: no such key in a declaration\n",
+    ),
+    (
+        crate::errors::Declared::Unknown { of: crate::errors::Object::Entry(crate::errors::Map::Files) },
+        "tasks/motd/task.json:1:2: motd: no such key in a files entry\n",
+    ),
+    (
+        crate::errors::Declared::Wrong { expected: crate::errors::Expected::String },
+        "tasks/motd/task.json:1:2: motd: not a string\n",
+    ),
+    (crate::errors::Declared::Optional, "tasks/motd/task.json:1:2: motd: optional beside a default\n"),
+];
+#[test]
+fn a_declaration_fault_prints_its_object_after_its_place() {
+    for (row, (declared, line)) in DECLARATION_LINES.iter().enumerate() {
+        let record = Record::Error(crate::errors::Error {
+            kind: crate::errors::Kind::Decode(crate::errors::Decode::Declaration(*declared)),
+            class: crate::errors::Class::Configuration,
+            at: Some(Place { path: copy_of(b"tasks/motd/task.json"), position: Some(Position { line: 1, column: 2 }) }),
+            also: None,
+            target: None,
+            task: Some(copy_of(b"motd")),
+        });
+        assert_eq!(print(&record).as_deref(), Ok(line.as_bytes()), "row {row}");
+    }
+}
+#[test]
+fn a_declaration_fault_prints_its_json_fields() {
+    let record = Record::Error(crate::errors::Error {
+        kind: crate::errors::Kind::Decode(crate::errors::Decode::Declaration(crate::errors::Declared::Unknown {
+            of: crate::errors::Object::Declaration,
+        })),
+        class: crate::errors::Class::Configuration,
+        at: None,
+        also: None,
+        target: None,
+        task: None,
+    });
+    assert_eq!(form::print(Form::JsonLines, &record, Some(Type::Error), &limits::SHIPPED).as_deref(), Ok(b"{\"record\":\"error\",\"kind\":\"decode\",\"decode\":{\"declared\":{\"kind\":\"unknown\",\"of\":\"declaration\"},\"kind\":\"declaration\"},\"class\":\"configuration\"}\n".as_slice()));
+}

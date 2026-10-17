@@ -180,5 +180,5 @@ fn a_template_and_a_link_are_left_out_of_the_tree() {
     let part = only(&spec.parts);
     let hearth_domain_render::parts::PartRecord::Config(config) = &part.record;
     assert_eq!(config.tree.as_ref(), []);
-    assert_eq!(run.requests.len(), 3, "only the declaration is read in the second phase");
+    assert_eq!(run.requests.len(), 2, "the first read includes the declaration; no static files need a second");
 }

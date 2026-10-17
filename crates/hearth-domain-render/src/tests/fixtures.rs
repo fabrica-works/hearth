@@ -514,3 +514,25 @@ pub fn hunk_call() -> (crate::Render, skein_lib::Env<limits::Limits>, skein_lib:
     );
     (crate::Render { call: Some(call) }, env, out)
 }
+
+pub fn declaration_call() -> crate::call::Side {
+    use crate::revision::{Entry, Mode, Oid};
+    let entries = [
+        Entry {
+            path: bytes::copy_of(b"tasks/motd/task.json"),
+            mode: Mode::File,
+            oid: Oid(bytes::copy_of(b"motd")),
+            size: 2,
+        },
+        Entry {
+            path: bytes::copy_of(b"tasks/core/task.json"),
+            mode: Mode::File,
+            oid: Oid(bytes::copy_of(b"core")),
+            size: 2,
+        },
+    ];
+    let mut call = crate::call::Side::new(bytes::copy_of(b"/repo"), Box::new([]), &limits::SHIPPED);
+    let mut out = skein_lib::Queue::with_capacity(1);
+    call.listed(limits::SHIPPED, Oid(bytes::copy_of(b"commit")), &entries, &mut out);
+    call
+}

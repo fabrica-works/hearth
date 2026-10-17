@@ -152,3 +152,38 @@ fn a_batch_failure_closes_the_child_without_waiting_for_exit() {
         "a failed batch closes immediately"
     );
 }
+
+#[test]
+fn a_task_json_reaches_render_through_declaration() {
+    let mut layer = Layer::new();
+    let blob =
+        crate::render::vocabulary::Blob { kind: crate::render::vocabulary::As::Declaration, ..fixtures::blob(b"{}") };
+    layer.read(Box::new([blob]));
+    assert_eq!(
+        layer.run(&fixtures::batch(b"{}"), Exit::Code(0)),
+        RootEvent::Render(Event::Read { request: REQUEST, oid: fixtures::oid(), read: Decoded::Declaration })
+    );
+}
+#[test]
+fn a_declaration_config_refuses_answers_refused_with_its_fault() {
+    let mut layer = Layer::new();
+    let blob = crate::render::vocabulary::Blob {
+        kind: crate::render::vocabulary::As::Declaration,
+        ..fixtures::blob(b"{\"setting\":{}}")
+    };
+    layer.read(Box::new([blob]));
+    assert_eq!(
+        layer.run(&fixtures::batch(b"{\"setting\":{}}"), Exit::Code(0)),
+        RootEvent::Render(Event::Read {
+            request: REQUEST,
+            oid: fixtures::oid(),
+            read: Decoded::Refused {
+                at: Position { line: 1, column: 2 },
+                fault: crate::render::errors::Decode::Declaration(crate::render::errors::Declared::Unknown {
+                    of: crate::render::errors::Object::Declaration
+                }),
+                also: None
+            }
+        })
+    );
+}

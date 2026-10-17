@@ -466,3 +466,5 @@ pub fn diff_beneath_work_tree(label: &str, attributes: bool) -> Rendered {
     let store = containing.join("store");
     diff(&repository, &Asked { store: Some(&store), targets: &[b"x1-prod"], ..Asked::new(&from, &to) })
 }
+
+pub const MISKEYED: &[File] = &[File { path: "tasks/motd/task.json", body: b"{\"setting\": {}}", mode: 0o644 }];

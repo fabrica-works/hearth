@@ -27,7 +27,6 @@ pub(crate) struct Side {
     pub entries: Box<[Entry]>,
     pub cached: Map<Oid, hearth_lib::encode::Digest>,
     pub sizes: Sizes,
-    pub declarations: Map<Oid, bool>,
     pub files: bool,
     pub read: usize,
     pub next: usize,
@@ -54,7 +53,6 @@ impl Side {
             entries: Box::new([]),
             cached: Map::with_capacity(0),
             sizes: Map::with_capacity(0),
-            declarations: Map::with_capacity(0),
             files: false,
             read: 0,
             next: 0,
@@ -131,7 +129,18 @@ impl Side {
                 return;
             } else {
                 blobs
-                    .push(Blob { oid: entry.oid.clone(), size: entry.size, kind: As::Document })
+                    .push(Blob {
+                        oid: entry.oid.clone(),
+                        size: entry.size,
+                        kind: match revision::class(&entry.path) {
+                            revision::Class::Declaration { .. } => As::Declaration,
+                            revision::Class::Fleet
+                            | revision::Class::Environment { .. }
+                            | revision::Class::Host { .. }
+                            | revision::Class::Tree { .. }
+                            | revision::Class::Other => As::Document,
+                        },
+                    })
                     .expect("document count");
                 paths.push(entry.path.clone()).expect("document count");
             }
@@ -157,7 +166,7 @@ impl Side {
                 self.documents.set(oid, document);
             }
             Decoded::Declaration => {
-                self.declarations.insert(oid.clone(), true).expect("listed declarations");
+                self.documents.set_declaration(oid);
             }
             Decoded::Refused { at, fault, also } => {
                 let path = self.paths.get(self.read).expect("requested path");
@@ -199,18 +208,17 @@ impl Side {
         let capacity = u32::try_from(self.entries.len()).expect("listing capacity");
         self.cached = Map::with_capacity(capacity);
         self.sizes = Map::with_capacity(capacity);
-        self.declarations = Map::with_capacity(capacity);
         let mut blobs = List::with_capacity(capacity);
         let mut paths = List::with_capacity(capacity);
         for entry in &self.entries {
             let kind = match revision::class(&entry.path) {
-                revision::Class::Declaration { task } => Some((task, As::Declaration, limits.document)),
                 revision::Class::Tree { task, path }
                     if !path.ends_with(b".j2") && entry.mode != Mode::Link && entry.mode != Mode::Submodule =>
                 {
                     Some((task, As::Cached, limits.static_file))
                 }
-                revision::Class::Fleet
+                revision::Class::Declaration { .. }
+                | revision::Class::Fleet
                 | revision::Class::Environment { .. }
                 | revision::Class::Host { .. }
                 | revision::Class::Tree { .. }
@@ -230,19 +238,6 @@ impl Side {
                     );
                     self.outcome = self.outcome.worst(Outcome::Failed);
                 } else if !contains(&blobs, &entry.oid, kind) {
-                    if kind == As::Declaration && !self.budget.take(entry.size) {
-                        errors::push(
-                            &mut self.errors,
-                            errors::refused(
-                                &entry.path,
-                                None,
-                                Decode::TooLarge { limit: Limit::Decoded, max: limits.decoded },
-                                None,
-                            ),
-                        );
-                        self.fail(Outcome::Failed);
-                        return false;
-                    }
                     blobs.push(Blob { oid: entry.oid.clone(), size: entry.size, kind }).expect("listing capacity");
                     paths.push(entry.path.clone()).expect("listing capacity");
                 }
@@ -288,7 +283,10 @@ impl Side {
             for entry in &self.entries {
                 match revision::class(&entry.path) {
                     revision::Class::Declaration { task: name } if name == task.as_ref() => {
-                        declared = self.declarations.get(&entry.oid) == Some(&true);
+                        declared = match self.documents.declaration(name) {
+                            Some((_, sound)) => sound,
+                            None => false,
+                        };
                     }
                     revision::Class::Tree { task: name, path } if name == task.as_ref() => {
                         if entry.mode == Mode::Submodule {

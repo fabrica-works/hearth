@@ -253,3 +253,17 @@ fn a_binary_file_answers_binary_with_no_hunk_line() {
     let stdout = std::str::from_utf8(&rendered.stdout).expect("JSON");
     assert!(stdout.contains("\"hunks\":{\"binary\":true,\"left_out\":0,\"lines\":[]}"));
 }
+
+#[test]
+fn a_task_json_out_of_shape_prints_its_fault_and_fails_its_targets() {
+    let repository = Repository::make("miskeyed", &fixtures::thin_with(fixtures::MISKEYED));
+    assert_eq!(
+        String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout),
+        "tasks/motd/task.json:1:2: motd: no such key in a declaration\n"
+    );
+}
+#[test]
+fn a_task_json_out_of_shape_exits_with_configuration_failure() {
+    let repository = Repository::make("miskeyed-exit", &fixtures::thin_with(fixtures::MISKEYED));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
