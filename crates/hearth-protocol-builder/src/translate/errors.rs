@@ -400,6 +400,8 @@ pub fn type_name(name: target::TypeName) -> records::errors::TypeName {
 #[must_use]
 pub fn repository(why: target::Repository) -> records::errors::Repository {
     match why {
+        target::Repository::NoTemplate => records::errors::Repository::NoTemplate,
+        target::Repository::Unused => records::errors::Repository::Unused,
         target::Repository::NoTree => records::errors::Repository::NoTree,
         target::Repository::LinkTarget => records::errors::Repository::LinkTarget,
         target::Repository::Stray => records::errors::Repository::Stray,

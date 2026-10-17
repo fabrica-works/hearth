@@ -240,12 +240,13 @@ impl Side {
                     self.refused.insert(oid.clone(), ()).expect("listing capacity");
                     for entry in &self.entries {
                         let asked = match revision::class(&entry.path) {
-                            revision::Class::Tree { task, .. } => self.needs(task),
+                            revision::Class::Tree { task, .. } | revision::Class::Template { task, .. } => {
+                                self.needs(task)
+                            }
                             revision::Class::Fleet
                             | revision::Class::Environment { .. }
                             | revision::Class::Host { .. }
                             | revision::Class::Declaration { .. }
-                            | revision::Class::Template { .. }
                             | revision::Class::Script { .. }
                             | revision::Class::Readme { .. }
                             | revision::Class::Refused { .. }
@@ -306,7 +307,7 @@ impl Side {
         self.cached = Map::with_capacity(capacity);
         self.templates = Map::with_capacity(capacity);
         self.refused = Map::with_capacity(capacity);
-        self.sizes = Map::with_capacity(self.size_capacity());
+        self.sizes = Map::with_capacity(capacity);
         let mut blobs = List::with_capacity(capacity);
         let mut paths = List::with_capacity(capacity);
         for entry in &self.entries {
@@ -328,12 +329,12 @@ impl Side {
                 {
                     Some((task, As::Template, limits.template))
                 }
+                revision::Class::Template { task, .. } => Some((task, As::Template, limits.template)),
                 revision::Class::Declaration { .. }
                 | revision::Class::Fleet
                 | revision::Class::Environment { .. }
                 | revision::Class::Host { .. }
                 | revision::Class::Tree { .. }
-                | revision::Class::Template { .. }
                 | revision::Class::Script { .. }
                 | revision::Class::Readme { .. }
                 | revision::Class::Refused { .. }
@@ -398,6 +399,7 @@ impl Side {
         true
     }
     pub fn fail(&mut self, outcome: Outcome) {
+        self.rendering = None;
         self.targets = Box::new([]);
         self.files = true;
         let mut failed = Map::with_capacity(self.made.capacity());
@@ -513,7 +515,7 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
-            let capacity = files::capacity(&plans);
+            let capacity = self.plan_capacity(&plans);
             self.rendering = Some(templates::Target::new(
                 meta,
                 containers,

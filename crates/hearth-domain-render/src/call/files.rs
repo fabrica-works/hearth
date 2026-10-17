@@ -1,4 +1,5 @@
 //! Concrete files plans, with each fault placed at its task declaration.
+mod sources;
 use super::Side;
 use crate::{
     entries::{self, Expansion},
@@ -12,7 +13,7 @@ use crate::{
 use alloc::boxed::Box;
 use skein_lib::{List, Map as Ordered, Writer, bytes::copy_of};
 impl Side {
-    pub(super) fn plans(
+    pub(crate) fn plans(
         &self,
         meta: &Meta,
         checked: &Validated,
@@ -80,7 +81,9 @@ impl Side {
                 }
             }
             let dropped = files::dropped(declaration, selected.as_slice());
-            let plan = files::plan(&task.name, tree.as_slice(), selected.as_slice(), &dropped, &mut faults);
+            valid &= self.unused(&task.name, declaration, meta, errors);
+            let mut plan = files::plan(&task.name, tree.as_slice(), selected.as_slice(), &dropped, &mut faults);
+            self.sources(&mut plan, &mut faults);
             for fault in faults.into_boxed() {
                 valid = false;
                 let also = self.destination(&task.name, selected.as_slice(), &fault);
@@ -118,12 +121,23 @@ impl Side {
             if !self.defaults.sound(&task.name) {
                 return false;
             }
-            for entry in &self.entries {
-                let revision::Class::Tree { task: name, path } = revision::class(&entry.path) else {
-                    continue;
+            for (index, entry) in self.entries.iter().enumerate() {
+                let (name, path) = match revision::class(&entry.path) {
+                    revision::Class::Tree { task, path } | revision::Class::Template { task, path } => (task, path),
+                    revision::Class::Fleet
+                    | revision::Class::Environment { .. }
+                    | revision::Class::Host { .. }
+                    | revision::Class::Declaration { .. }
+                    | revision::Class::Script { .. }
+                    | revision::Class::Readme { .. }
+                    | revision::Class::Refused { .. }
+                    | revision::Class::Other => continue,
                 };
                 if name != task.name.as_ref() {
                     continue;
+                }
+                if self.invalid.get(index) == Some(&true) {
+                    return false;
                 }
                 if self.refused.contains_key(&entry.oid) {
                     return false;

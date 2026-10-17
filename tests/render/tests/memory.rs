@@ -36,6 +36,7 @@ fn running_templates_at_the_limits_holds_no_more_than_the_worst_case() {
         let rendered = evaluate::template::run(
             &template,
             &roots.context(),
+            None,
             &limits::SHIPPED,
             u64::from(limits::SHIPPED.rendered_file),
         );

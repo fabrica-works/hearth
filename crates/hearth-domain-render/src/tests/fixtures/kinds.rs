@@ -68,3 +68,6 @@ pub fn template_plans(entries: &[crate::revision::Entry]) -> Box<[Plan]> {
     }
     Box::new([files::plan(b"motd", tree.as_slice(), &[], &[], &mut List::with_capacity(0))])
 }
+
+mod sources;
+pub use sources::*;

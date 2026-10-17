@@ -46,7 +46,7 @@ pub fn run(roots: &super::Roots, template: &Template) -> Result<Box<[u8]>, Fault
 }
 pub fn run_at(roots: &super::Roots, template: &Template, limits: &Limits) -> Result<Box<[u8]>, Fault> {
     let context: Context<'_> = roots.context();
-    template::run(template, &context, limits, u64::from(limits.rendered_file))
+    template::run(template, &context, None, limits, u64::from(limits.rendered_file))
 }
 
 pub fn keeping_templates() -> (crate::Render, skein_lib::Env<Limits>, skein_lib::Queue<crate::vocabulary::Output>) {
@@ -67,17 +67,10 @@ pub fn keeping_templates() -> (crate::Render, skein_lib::Env<Limits>, skein_lib:
             }]),
         },
         super::Roots::x1_prod().debian,
-        crate::call::templates::Prepared {
-            live: crate::parts::live::Live { paths: Box::new([]) },
-            plans: super::kinds::template_plans(&side.entries),
-            packages: super::thin_packages(),
-            expansion: crate::entries::Expansion { tasks: Box::new([]) },
-            secrets: crate::parts::secrets::Secrets {
-                files: Box::new([]),
-                passwords: Box::new([]),
-                identity: Box::new([]),
-            },
-        },
+        template_prepared(
+            super::kinds::template_plans(&side.entries),
+            crate::entries::Expansion { tasks: Box::new([]) },
+        ),
         5,
     ));
     side.targets = Box::new([]);
@@ -101,4 +94,21 @@ pub fn target_limited_answers() -> Box<[crate::vocabulary::Answer]> {
     let Some(Output::Request(Request::Keep { request, sha256, .. })) = out.pop() else { panic!("first keep") };
     crate::step(&mut render, &env, Event::Kept { request, sha256 }, &mut out);
     super::finish_render(&mut render, &env, &mut out)
+}
+
+pub fn template_prepared(
+    plans: Box<[crate::kinds::files::Plan]>,
+    expansion: crate::entries::Expansion,
+) -> crate::call::templates::Prepared {
+    crate::call::templates::Prepared {
+        plans,
+        expansion,
+        secrets: crate::parts::secrets::Secrets {
+            files: Box::new([]),
+            passwords: Box::new([]),
+            identity: Box::new([]),
+        },
+        packages: super::thin_packages(),
+        live: crate::parts::live::Live { paths: Box::new([]) },
+    }
 }

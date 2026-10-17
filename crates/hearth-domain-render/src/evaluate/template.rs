@@ -36,11 +36,17 @@ use super::{Bindings, Budget, Context, Evaluator, Fault, FaultKind, Written, exp
 use crate::{limits::Limits, revision::Position};
 use skein_lib::List;
 /// Runs a flat program, bounded by the total instructions and iterations.
-pub fn run<'c>(template: &'c Template, context: &Context<'c>, limits: &Limits, room: u64) -> Result<Box<[u8]>, Fault> {
+pub fn run<'c>(
+    template: &'c Template,
+    context: &Context<'c>,
+    element: Option<(super::Operand<'c>, super::Operand<'c>)>,
+    limits: &Limits,
+    room: u64,
+) -> Result<Box<[u8]>, Fault> {
     let mut runner = Runner {
         evaluator: Evaluator::new(limits),
         bindings: Bindings::with_capacity(
-            limits.template.saturating_div(11).saturating_add(limits.statements.saturating_mul(3)),
+            limits.template.saturating_div(11).saturating_add(limits.statements.saturating_mul(3)).saturating_add(2),
         ),
         frames: skein_lib::Stack::with_capacity(limits.statements),
         budget: Budget::new(limits),
@@ -48,6 +54,10 @@ pub fn run<'c>(template: &'c Template, context: &Context<'c>, limits: &Limits, r
         bytes: List::with_capacity(4096.min(limits.rendered_file)),
         room: room.min(u64::from(limits.rendered_file)),
     };
+    if let Some((key, value)) = element {
+        located(frame::push(&mut runner.bindings, b"key", key), 0)?;
+        located(frame::push(&mut runner.bindings, b"value", value), 0)?;
+    }
     let mut pc = 0_usize;
     let steps = template
         .instructions
@@ -192,7 +202,7 @@ fn located<T>(result: Result<T, FaultKind>, at: u32) -> Result<T, Fault> {
 /// Returns `None` when the bound does not fit a `u64`.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    let bindings = limits.template.checked_div(11)?.checked_add(limits.statements.checked_mul(3)?)?;
+    let bindings = limits.template.checked_div(11)?.checked_add(limits.statements.checked_mul(3)?)?.checked_add(2)?;
     let output = u64::from(limits.rendered_file);
     // The preceding doubling allocation is half the next power of two.
     // This is 1.5 times the shipped file cap, including its replacement.

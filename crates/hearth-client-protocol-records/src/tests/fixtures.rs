@@ -399,3 +399,11 @@ pub fn links_and_directories() -> Box<Spec> {
 }
 mod packages;
 pub use packages::*;
+
+pub fn repository_error(why: crate::errors::Repository) -> crate::errors::Error {
+    let mut error = duplicate();
+    error.kind = crate::errors::Kind::Repository(why);
+    error.at = None;
+    error.also = None;
+    error
+}

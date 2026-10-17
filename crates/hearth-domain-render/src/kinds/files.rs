@@ -29,7 +29,14 @@ pub enum Make {
     Static { sha256: Digest, mode: u16 },
     Link { target: Box<[u8]> },
     Directory { mode: u16 },
-    Rendered { template: Box<[u8]>, mode: u16 },
+    Rendered { template: Box<[u8]>, via: Option<Via>, mode: u16 },
+    Copied { source: Box<[u8]>, mode: u16 },
+}
+/// The concrete entry and element retained by expansion.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Via {
+    pub entry: u32,
+    pub element: Option<u32>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct TreeFile {
@@ -87,7 +94,7 @@ pub fn plan(
         }
         let make = match &file.source {
             Source::Static { sha256 } => Make::Static { sha256: *sha256, mode: file.mode },
-            Source::Template { path, .. } => Make::Rendered { template: path.clone(), mode: file.mode },
+            Source::Template { path, .. } => Make::Rendered { template: path.clone(), via: None, mode: file.mode },
             Source::Link { target } => Make::Link { target: target.clone() },
         };
         installs
@@ -97,11 +104,11 @@ pub fn plan(
             )
             .expect("plan capacity");
     }
-    for row in files {
+    for (index, row) in files.iter().enumerate() {
         if row.task != task || excluded(&row.entry.key, dropped) {
             continue;
         }
-        match install(row.entry, tree) {
+        match install(row.entry, tree, u32::try_from(index).expect("expansion bound")) {
             Ok(install) => {
                 installs.insert(install.path.clone(), install).expect("plan capacity");
             }
@@ -140,25 +147,14 @@ fn owner(path: &[u8], rows: &[Located<'_>], field: Name) -> Box<[u8]> {
     }
     copy_of(value)
 }
-fn install(entry: &Concrete, tree: &[TreeFile]) -> Result<Install, Fault> {
+fn install(entry: &Concrete, tree: &[TreeFile], index: u32) -> Result<Install, Fault> {
     let path = entry.key.as_ref();
     let directory = path.ends_with(b"/");
     let checked = if directory { path.strip_suffix(b"/").expect("suffix") } else { path };
     if !forms::check(Format::Path, checked) {
         return Err(schema(Schema::Malformed { format: Format::Path }, entry.at));
     }
-    let mut source = None;
-    for field in &entry.fields {
-        if [Name::Template, Name::Copy, Name::Link, Name::Directory].contains(&field.name) {
-            if directory {
-                return Err(undeclared(field.name, field.at));
-            }
-            if let Some(first) = source {
-                return Err(schema(Schema::Source { first, second: field.name }, field.at));
-            }
-            source = Some(field.name);
-        }
-    }
+    let source = source(entry, directory)?;
     let mut tree_file = None;
     let mut subtree = false;
     for file in tree {
@@ -184,7 +180,14 @@ fn install(entry: &Concrete, tree: &[TreeFile]) -> Result<Install, Fault> {
             }
             Make::Link { target: copy_of(target) }
         }
-        Some(Name::Copy | Name::Template) => return Err(repository(Repository::NoTree, entry.at)),
+        Some(Name::Template) => Make::Rendered {
+            template: copy_of(entry.text(Name::Template).expect("typed template")),
+            via: Some(Via { entry: index, element: entry.element }),
+            mode: mode(entry, 0o644)?,
+        },
+        Some(Name::Copy) => {
+            Make::Copied { source: copy_of(entry.text(Name::Copy).expect("typed copy")), mode: mode(entry, 0o644)? }
+        }
         Some(
             Name::Action
             | Name::Age
@@ -226,7 +229,7 @@ fn install(entry: &Concrete, tree: &[TreeFile]) -> Result<Install, Fault> {
                 Make::Static { sha256: *sha256, mode: mode(entry, *default)? }
             }
             Some(TreeFile { source: Source::Template { path, .. }, mode: default, .. }) => {
-                Make::Rendered { template: path.clone(), mode: mode(entry, *default)? }
+                Make::Rendered { template: path.clone(), via: None, mode: mode(entry, *default)? }
             }
             Some(TreeFile { source: Source::Link { target }, .. }) => {
                 if let Some(field) = field(entry, Name::Mode) {
@@ -289,4 +292,20 @@ fn field(entry: &Concrete, name: Name) -> Option<&crate::entries::Made> {
 
 fn field_at(entry: &Concrete, name: Name) -> Position {
     field(entry, name).expect("present field").at
+}
+
+fn source(entry: &Concrete, directory: bool) -> Result<Option<Name>, Fault> {
+    let mut source = None;
+    for field in &entry.fields {
+        if [Name::Template, Name::Copy, Name::Link, Name::Directory].contains(&field.name) {
+            if directory {
+                return Err(undeclared(field.name, field.at));
+            }
+            if let Some(first) = source {
+                return Err(schema(Schema::Source { first, second: field.name }, field.at));
+            }
+            source = Some(field.name);
+        }
+    }
+    Ok(source)
 }

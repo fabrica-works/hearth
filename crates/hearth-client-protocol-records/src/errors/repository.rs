@@ -3,6 +3,8 @@ use super::{Box, Encoder, Lines, field};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Repository {
     NoTree,
+    NoTemplate,
+    Unused,
     LinkTarget,
     Stray,
     Environment { env: Box<[u8]> },
@@ -39,6 +41,8 @@ pub enum Ended {
 impl Repository {
     pub(super) fn text(&self, lines: &mut Lines) {
         match self {
+            Self::NoTemplate => lines.put(b"no template at this path"),
+            Self::Unused => lines.put(b"a template no entry names"),
             Self::NoTree => lines.put(b"no tree entry at this path"),
             Self::LinkTarget => lines.put(b"a symbolic link target out of form"),
             Self::Stray => lines.put(b"a path format.md 2.1 does not allow"),
@@ -63,6 +67,8 @@ impl Repository {
                 field(json, b"env", env);
                 json.object_end();
             }
+            Self::NoTemplate => json.string(b"no_template"),
+            Self::Unused => json.string(b"unused"),
             Self::NoTree => json.string(b"no_tree"),
             Self::LinkTarget => json.string(b"link_target"),
             Self::Stray => json.string(b"stray"),

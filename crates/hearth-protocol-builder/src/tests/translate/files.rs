@@ -13,6 +13,8 @@ fn each_node_translates_to_the_records_and_back() {
     }
 }
 const FAULTS: &[(errors::Repository, records::errors::Repository)] = &[
+    (errors::Repository::NoTemplate, records::errors::Repository::NoTemplate),
+    (errors::Repository::Unused, records::errors::Repository::Unused),
     (errors::Repository::NoTree, records::errors::Repository::NoTree),
     (errors::Repository::LinkTarget, records::errors::Repository::LinkTarget),
 ];

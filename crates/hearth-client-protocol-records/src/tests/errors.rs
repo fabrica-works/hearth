@@ -576,3 +576,5 @@ fn a_collision_prints_its_json_kind_and_key() {
         form::print(Form::JsonLines, &Record::Error(fixtures::key_collision()), Some(Type::Error), &limits::SHIPPED);
     assert_eq!(printed.as_deref(), Ok(b"{\"record\":\"error\",\"kind\":\"collision\",\"collision\":{\"key\":\"ops\",\"kind\":\"key\"},\"class\":\"configuration\",\"at\":{\"column\":14,\"line\":1,\"path\":\"envs/lab.json\"},\"also\":{\"column\":2,\"line\":1,\"path\":\"envs/lab.json\"}}\n".as_slice()));
 }
+
+mod templates;

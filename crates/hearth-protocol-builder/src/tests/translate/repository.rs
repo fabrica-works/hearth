@@ -4,6 +4,8 @@ use crate::render::revision as target;
 
 fn repository_back(why: record_errors::Repository) -> render_errors::Repository {
     match why {
+        record_errors::Repository::NoTemplate => render_errors::Repository::NoTemplate,
+        record_errors::Repository::Unused => render_errors::Repository::Unused,
         record_errors::Repository::NoTree => render_errors::Repository::NoTree,
         record_errors::Repository::LinkTarget => render_errors::Repository::LinkTarget,
         record_errors::Repository::Stray => render_errors::Repository::Stray,
@@ -17,6 +19,8 @@ fn repository_back(why: record_errors::Repository) -> render_errors::Repository 
     }
 }
 const REPOSITORY: &[render_errors::Repository] = &[
+    render_errors::Repository::NoTemplate,
+    render_errors::Repository::Unused,
     render_errors::Repository::NoTree,
     render_errors::Repository::LinkTarget,
     render_errors::Repository::Stray,

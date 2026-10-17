@@ -157,3 +157,5 @@ fn tree_etc_x_j2_j2_renders_to_etc_x_j2() {
     let plan = plan(&tree, &[], &[]).expect("template plan");
     assert_eq!(fixtures::only(&plan.installs).path.as_ref(), b"/etc/x.j2");
 }
+
+mod sources;

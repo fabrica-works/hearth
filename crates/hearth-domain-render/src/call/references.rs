@@ -11,7 +11,17 @@ impl Side {
     pub(super) fn check_template(&mut self, oid: &Oid, template: &Template) {
         for index in 0..self.entries.len() {
             let entry = self.entries.get(index).expect("listing cursor");
-            let revision::Class::Tree { task, path } = revision::class(&entry.path) else { continue };
+            let (task, path) = match revision::class(&entry.path) {
+                revision::Class::Tree { task, path } | revision::Class::Template { task, path } => (task, path),
+                revision::Class::Fleet
+                | revision::Class::Environment { .. }
+                | revision::Class::Host { .. }
+                | revision::Class::Declaration { .. }
+                | revision::Class::Script { .. }
+                | revision::Class::Readme { .. }
+                | revision::Class::Refused { .. }
+                | revision::Class::Other => continue,
+            };
             if &entry.oid != oid || !path.ends_with(b".j2") || !self.needs(task) {
                 continue;
             }

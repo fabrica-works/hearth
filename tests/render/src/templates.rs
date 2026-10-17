@@ -117,9 +117,15 @@ pub fn run(tree: &Tree, roots: &Roots, limits: &Limits) -> Result<Vec<u8>, &'sta
     let compiled = hearth_protocol_template::template::compile(&bytes, &hearth_protocol_template::limits::SHIPPED)
         .unwrap_or_else(|error| panic!("generated template {}: {error:?}", String::from_utf8_lossy(&bytes)));
     let template = hearth_protocol_builder::translate::instructions::template(compiled);
-    hearth_domain_render::evaluate::template::run(&template, &roots.context(), limits, u64::from(limits.rendered_file))
-        .map(<[u8]>::into_vec)
-        .map_err(|fault| crate::fixtures::kind(fault.kind))
+    hearth_domain_render::evaluate::template::run(
+        &template,
+        &roots.context(),
+        None,
+        limits,
+        u64::from(limits.rendered_file),
+    )
+    .map(<[u8]>::into_vec)
+    .map_err(|fault| crate::fixtures::kind(fault.kind))
 }
 pub(super) fn loop_value(index: usize, length: usize) -> Value {
     use hearth_domain_render::evaluate::Entry;

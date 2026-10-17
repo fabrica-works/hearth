@@ -1,5 +1,5 @@
 //! One template per resume, retaining each target's validated task context.
-use super::Side;
+use super::{Side, files};
 use crate::kinds::files::{Make, Plan};
 use crate::{
     errors::{Error, Kind, Place},
@@ -78,7 +78,7 @@ impl Target {
                         owner: install.owner.clone(),
                         group: install.group.clone(),
                     },
-                    Make::Rendered { .. } => continue,
+                    Make::Rendered { .. } | Make::Copied { .. } => continue,
                 };
                 if !tree.contains_key(&install.path) {
                     tree.insert(install.path.clone(), TreeEntry { path: install.path.clone(), node })
@@ -108,6 +108,10 @@ impl Target {
         }
     }
     fn run(&mut self, side: &mut Side) -> bool {
+        if let Some(request) = side.copies(&self.plans) {
+            self.request = Some(request);
+            return true;
+        }
         for _ in 0..=self.tasks.len() {
             let Some(task) = self.tasks.get_mut(self.task) else { return false };
             if self.roots.is_none() {
@@ -122,22 +126,25 @@ impl Target {
             let plan = self.plans.get(self.task).expect("task plan");
             for install in plan.installs.get(self.entry..).expect("plan cursor") {
                 self.entry = self.entry.saturating_add(1);
-                let (path, mode) = match &install.make {
-                    Make::Rendered { template, mode } => (template, *mode),
+                let (path, via, mode) = match &install.make {
+                    Make::Rendered { template, via, mode } => (template, via, *mode),
+                    Make::Copied { source, mode } => {
+                        self.tree
+                            .insert(install.path.clone(), copied(side, install, source, *mode))
+                            .expect("plan capacity");
+                        continue;
+                    }
                     Make::Static { .. } | Make::Link { .. } | Make::Directory { .. } => continue,
                 };
-                let mut listed = None;
-                for entry in &side.entries {
-                    if &entry.path == path {
-                        listed = Some(entry);
-                        break;
-                    }
-                }
-                let entry = listed.expect("planned template listed");
-                let Some(template) = side.templates.get(&entry.oid) else { continue };
+                let oid = side.listed_entry(path).expect("planned template listed").oid.clone();
+                let Some(template) = side.templates.get(&oid) else { continue };
+                let context = self.roots.as_ref().expect("task roots").context();
+                let element =
+                    element(&self.expansion, &side.documents, &task.name, via.as_ref(), &context, &side.limits);
                 match template::run(
                     template,
-                    &self.roots.as_ref().expect("task roots").context(),
+                    &context,
+                    element,
                     &side.limits,
                     side.limits.rendered_target.saturating_sub(self.rendered),
                 ) {
@@ -160,12 +167,8 @@ impl Target {
                             },
                         };
                         self.keeping = Some(file);
-                        self.request = Some(Request::Keep {
-                            request: Token::new(4),
-                            path: entry.path.clone(),
-                            sha256: digest,
-                            bytes,
-                        });
+                        self.request =
+                            Some(Request::Keep { request: Token::new(4), path: path.clone(), sha256: digest, bytes });
                         side.ready = false;
                     }
                     Err(fault) => {
@@ -175,7 +178,7 @@ impl Target {
                             kind: Kind::Evaluation(fault.kind),
                             class: Class::Configuration,
                             at: Some(Place {
-                                path: entry.path.clone(),
+                                path: path.clone(),
                                 position: Some(template::place(&template.lines, fault.at)),
                             }),
                             also: None,
@@ -221,32 +224,25 @@ impl Side {
         }
         self.ready = true;
     }
-    pub(super) fn size_capacity(&self) -> u32 {
-        let mut capacity = u32::try_from(self.entries.len()).expect("listing count");
-        for settings in &self.settings {
-            for task in &settings.tasks {
-                for entry in &self.entries {
-                    match revision::class(&entry.path) {
-                        revision::Class::Tree { task: name, path }
-                            if name == task.name.as_ref() && path.ends_with(b".j2") =>
-                        {
-                            capacity = capacity.saturating_add(1);
-                        }
-                        revision::Class::Fleet
-                        | revision::Class::Environment { .. }
-                        | revision::Class::Host { .. }
-                        | revision::Class::Declaration { .. }
-                        | revision::Class::Tree { .. }
-                        | revision::Class::Template { .. }
-                        | revision::Class::Script { .. }
-                        | revision::Class::Readme { .. }
-                        | revision::Class::Refused { .. }
-                        | revision::Class::Other => {}
-                    }
+    pub(super) fn plan_capacity(&mut self, plans: &[Plan]) -> u32 {
+        let tree_capacity = files::capacity(plans);
+        let mut capacity = self.sizes.capacity();
+        for plan in plans {
+            for install in &plan.installs {
+                if let Make::Rendered { .. } = install.make {
+                    capacity = capacity.saturating_add(1);
                 }
             }
         }
-        capacity
+        if capacity == self.sizes.capacity() {
+            return tree_capacity;
+        }
+        let mut sizes = Map::with_capacity(capacity);
+        for (digest, size) in &self.sizes {
+            sizes.insert(*digest, *size).expect("rendered count");
+        }
+        self.sizes = sizes;
+        tree_capacity
     }
     pub(super) fn template(&mut self) -> Option<Answer> {
         let mut target = self.rendering.take().expect("target prepared");
@@ -283,5 +279,59 @@ impl Side {
             commit: self.commit.clone().expect("listed commit"),
             parts,
         }))
+    }
+}
+
+fn element<'c>(
+    expansion: &crate::entries::Expansion,
+    documents: &revision::Documents,
+    task: &[u8],
+    via: Option<&crate::kinds::files::Via>,
+    context: &crate::evaluate::Context<'c>,
+    limits: &crate::limits::Limits,
+) -> Option<(crate::evaluate::Operand<'c>, crate::evaluate::Operand<'c>)> {
+    let via = via?;
+    let index = via.element?;
+    let mut at = None;
+    for expanded in &expansion.tasks {
+        if expanded.task.as_ref() != task {
+            continue;
+        }
+        for group in &expanded.groups {
+            if group.map == revision::declaration::Map::Files {
+                at = Some(
+                    group.entries.get(usize::try_from(via.entry).expect("entry index")).expect("retained entry").at,
+                );
+            }
+        }
+    }
+    let (_, Some(declaration)) = documents.declaration(task).expect("task declaration") else {
+        unreachable!("validated declaration")
+    };
+    let mut declared = None;
+    for group in &declaration.entries {
+        if group.map != revision::declaration::Map::Files {
+            continue;
+        }
+        for entry in &group.entries {
+            if Some(entry.key.at()) == at {
+                declared = Some(entry);
+            }
+        }
+    }
+    let entry = declared.expect("retained declaration");
+    Some(crate::entries::element(entry, index, context, limits).expect("retained element"))
+}
+
+fn copied(side: &Side, install: &crate::kinds::files::Install, source: &[u8], mode: u16) -> TreeEntry {
+    let entry = side.listed_entry(source).expect("checked copy");
+    TreeEntry {
+        path: install.path.clone(),
+        node: parts::config::Node::File {
+            content_digest: *side.cached.get(&entry.oid).expect("copy read before rendering"),
+            mode,
+            owner: install.owner.clone(),
+            group: install.group.clone(),
+        },
     }
 }

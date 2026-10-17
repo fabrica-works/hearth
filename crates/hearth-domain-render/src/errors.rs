@@ -339,6 +339,8 @@ pub enum TypeName {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Repository {
     NoTree,
+    NoTemplate,
+    Unused,
     LinkTarget,
     Stray,
     Environment { env: Box<[u8]> },
