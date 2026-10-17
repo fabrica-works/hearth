@@ -77,13 +77,18 @@ Needs: hearth 08 (`testing/repos/test/`, pin), hearth 17.2 (`inputs`), hearth 33
 Files: render new `src/keys.rs`, `src/{lib, vocabulary, call, parts,
 limits}.rs`, `src/tests/{fixtures, keys}.rs` (new `keys.rs`); root `src/{lib,
 vocabulary}.rs`, new `src/resolution.rs`, `src/tests.rs`,
-`src/tests/fixtures.rs` (its `Spec` literal, :18, gains `resolution: None`);
+`src/tests/fixtures.rs` (its `Spec` literal, `spec()`, :12, gains `resolution: None`);
 store `src/{lib, vocabulary, resolutions, scan}.rs`, `src/{start, enter}.rs`
 (their `Event` matches, :51 and :56, gain `Find`), `src/tests/{fixtures,
 scan}.rs`, new `src/tests/find.rs`; protocol `src/store.rs`, `src/lib.rs` (the
 `Request` match at :267 gains `Find`), `src/translate/{store, answers}.rs`,
-`src/tests/store.rs`, a module under `src/tests/translate/`; `tests/render/src/parent.rs`
-(its matches at :55, :70 and :91 gain `Find`, `Found` and `Absent`);
+`src/tests/store.rs`, a module under `src/tests/translate/`, and the `Spec`
+literals of `src/tests/fixtures.rs` (`spec()`, :251) and `src/tests/translate.rs`
+(:153, :177); render `src/call/templates.rs` (its `Answer::Spec(parts::Spec {`
+literal); `tests/render/src/parent.rs` (its matches at :53, :67, :87 and :95
+gain `Find`, `Found` and `Absent`); the text goldens that gain 24.1's
+`resolution … needed` line, and their users: `tests/builder/src/fixtures.rs`'s
+`THIN_TEXT` (:163) and `BROKEN_LAB_TEXT` (:439), `tests/builder/tests/real.rs:734`;
 `tests/builder/{Cargo.toml (dev: hearth-test-mirror), src/fixtures.rs}`, new
 `tests/builder/tests/resolution.rs`. `tests/builder/src/fixtures.rs` gains
 `Laid::Resolution(..)` (23-store.md named it; hearth 23 landed `Laid` with
@@ -165,14 +170,19 @@ Files: render `src/{vocabulary, call, errors, limits, lib}.rs`, new
 `crates/hearth/src/{lib, argv, tests}.rs`, `crates/hearth/tests/end_to_end.rs`;
 `tests/builder/{Cargo.toml, src/fixtures.rs}`, new
 `tests/builder/tests/conformance_render.rs`; the `resolve: false` the `Call`
-and `Event::Render` literals gain: domain-builder `src/tests.rs:137`,
+and `Event::Render` literals gain: domain-builder `src/tests.rs:133`,
 `src/tests/fixtures.rs:9`, service-builder `src/tests/fixtures.rs:9`,
-`tests/render/src/parent.rs:36`; mmdebstrap `src/limits.rs` (`Limits` derives
+protocol `src/tests/fixtures.rs:25`, `tests/render/src/parent.rs:36`, whose
+matches (:53, :67, :87, :95) gain `Resolve` and each `Answer` 24.2 adds; mmdebstrap `src/limits.rs` (`Limits` derives
 `Hash`, as the protocol's `Limits` that holds it does); `Cargo.lock`. Records:
 `Command::Mmdebstrap` and `Ended::Timeout` go in `src/errors/repository.rs`
-(`Command` :21, `Ended` :28, their arms :72 to :133), in place of
+(`Command` :23, `Ended` :30, their arms :96 to :114 in text and :123 to :139
+in JSON), in place of
 `src/form/{text, json}.rs`, which hold no error kind. Reverse tests: protocol
-`src/tests/translate/{errors, repository}.rs`.
+`src/tests/translate/{errors, repository}.rs`: `Limit::Closure` beside :55,
+since 24.2's `TooLarge { limit: Closure }` uses it (24.2 adds `Limit::Closure`
+and its arms), and `Command::Mmdebstrap` and `Ended::Timeout` beside :38 and
+:48.
 Shape: the sketches. With `--resolve`, render sets `deadline = now +
 Limits::resolve` and resolves each absent key (targets in name order, each key
 at its first holder), one at a time, a failure not stopping the rest, each holder given the error (render.md 5.7);
@@ -266,10 +276,12 @@ Needs: hearth 38.1 (`packages`, `lists`); nothing else beyond 24.2.
 Files: render `src/{resolution, keys, errors, vocabulary}.rs`,
 `src/tests/{fixtures, resolution, keys}.rs`; protocol `src/{resolve, lib}.rs`,
 new `src/indices.rs`, `src/translate/{resolution, errors}.rs`,
-`src/tests/translate/errors.rs` (`Limit::Closure`, beside :55 and :241), new
+`src/tests/translate/errors.rs` (`Kind::Resolution`, beside :241; `Limit::Closure`
+is 24.2's), new
 `src/tests/indices.rs`; records `src/errors.rs` and a new
 `src/errors/resolution.rs` beside `errors/repository.rs` (`Kind::Resolution`),
-`src/tests/errors.rs`;
+`src/tests/errors.rs`; `tests/render/src/declarations.rs` (its `Kind` match,
+:223, gains `| Kind::Resolution(_)`);
 `tests/builder/{src/fixtures.rs, tests/conformance_render.rs}`.
 Shape: the sketches. Lists: `OpenDirectory` of the scratch's
 `root/var/lib/apt/lists`, `ListPage`, `lists::listed` per name against
@@ -327,7 +339,7 @@ these added.
 // crates/hearth-domain-render/src/keys.rs (24.1; closure 24.3): resolution(&Inputs) -> Digest, closure(&[Package]) -> Digest
 // (render.md 4.5), layers(&Digest × 4) -> Keys, part(&Spec, &[u8]) -> Digest; `Limits` gains `closure: u32` (8,192), `resolve: skein_lib::Duration` (600 s; clippy.toml:74 disallows `core::time::Duration`)
 pub struct Keys { pub packages: Digest, pub software: Digest, pub config: Digest }
-pub enum Resolution { Needed { key: Digest }, Known { key: Digest, keys: Keys } } // `Spec.resolution: Option<Box<Resolution>>`: unboxed, `Answer::Spec` grows to 336 bytes and `Output` (vocabulary.rs:39) trips `large_enum_variant`
+pub enum Resolution { Needed { key: Digest }, Known { key: Digest, keys: Keys } } // `Spec.resolution: Option<Box<Resolution>>`: boxed, `Spec` is 208 bytes, not 336
 // crates/hearth-domain-render/src/vocabulary.rs; `Event::Render` gains `resolve: bool` (24.2)
 pub enum Event {
     Found { request: Token, digest: Digest },                 // Find: the closure's digest (31.1 widens it to `resolution: resolution::Record`)
