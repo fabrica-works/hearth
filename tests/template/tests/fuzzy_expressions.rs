@@ -24,3 +24,24 @@ fn cut_and_mutated_texts_compile_as_the_reference_compiles_them() {
     }
     fixtures::assert_fell(&fell);
 }
+
+#[test]
+fn texts_at_the_limits_cut_and_mutated_compile_as_the_reference_does() {
+    let cases = fixtures::at_the_limits();
+    for round in 0..500_u64 {
+        let mut rng = Rng::new(0x0037_F000 + round);
+        let index = usize::try_from(rng.below(cases.len() as u64)).expect("fixture index");
+        let (valid, what, _) = &cases[index];
+        let text = if rng.below(2) == 0 { generate::cut(&mut rng, valid) } else { generate::mutate(&mut rng, valid) };
+        let got = expression::compile(&text, &fixtures::LIMITS);
+        let want = reference::compile(&text, &fixtures::LIMITS);
+        assert_eq!(
+            got.as_ref().map_err(|error| error.at),
+            want.as_ref().map_err(|at| *at),
+            "round {round}: {what}: {text:?}"
+        );
+        if let Ok(expression) = got {
+            check::invariants(&expression, &text);
+        }
+    }
+}

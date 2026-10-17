@@ -108,6 +108,7 @@ name = "hearth-template-world"
 version = "0.0.0"
 dependencies = [
  "hearth-protocol-template",
+ "skein-heap",
  "skein-lib",
 ]
 

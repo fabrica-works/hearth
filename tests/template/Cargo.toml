@@ -9,6 +9,9 @@ publish.workspace = true
 skein-lib.workspace = true
 hearth-protocol-template.workspace = true
 
+[dev-dependencies]
+skein-heap.workspace = true
+
 [lints.rust]
 unsafe_code = "forbid"
 elided_lifetimes_in_paths = "deny"

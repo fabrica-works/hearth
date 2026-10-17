@@ -13,6 +13,16 @@ fn generated_expressions_compile_as_the_reference_compiles_them() {
 }
 
 #[test]
+fn texts_at_the_limits_compile_as_the_reference_does() {
+    for (text, what, outcome) in fixtures::at_the_limits() {
+        let got = expression::compile(&text, &fixtures::LIMITS);
+        let want = reference::compile(&text, &fixtures::LIMITS);
+        assert_eq!(got.as_ref().map(|_| ()).map_err(|error| error.at), outcome, "{what}");
+        assert_eq!(got.as_ref().map_err(|error| error.at), want.as_ref().map_err(|at| *at), "{what}");
+    }
+}
+
+#[test]
 fn a_filter_after_a_test_is_refused_at_its_pipe() {
     const CASES: &[(&[u8], u32)] = &[(b"not (\t5892802747607251180  is defined | replace('a', 'b') | length())", 38)];
     for (text, at) in CASES {
