@@ -362,6 +362,17 @@ the closing repins (Repin). The increments of each session are in its file.
   never as `let [a, b] = ..`; a digest written in two tests is a `const`
   of the crate's fixtures (`ABC_SHA256_HEX`, beside builder's `ABC`). An
   increment that edits a test file first fixes the repeats in it.
+- **A table row holds its expected value** (ruling 176; the checks of
+  16:24, 17:12 and 23:26 saw a computed label three times): a row
+  carries the expected value itself (a `Kind`, a `Class`, a place), and
+  the body compares it whole with `assert_eq!`, never through a label a
+  `match`, `if` or `unreachable!` computes from the result. A list of
+  results is asserted whole against a literal, or its length first;
+  never only by an assertion inside a `for` over it, which passes on an
+  empty list. A token, a queue capacity, a size or a count in a test is
+  a named constant of the crate's fixtures, its derivation beside it,
+  never `Token::new(7)` or `with_capacity(3)`. An increment that edits a
+  test file first fixes these in it.
 - **A round trip's expected value is its input** (ruling 144): a test
   named `…_and_back` asserts `assert_eq!(back, input, "row {row}: …")`.
   Its input table holds two or more rows: a `const` slice when its

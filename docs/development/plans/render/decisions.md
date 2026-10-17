@@ -957,6 +957,9 @@ None yet.
 
      What stays unchanged: ruling 174's `entry` field; the other three `Owns` arms and the six other `Why` arms; the Proof's two lines; 19.4's Size, under the README's four-times rule. A `Why::OneId` of another `Owns`, or `Owns::User` with another `Why`, is no state render makes; the test `a_package_user_with_one_id_alone_is_an_ids_fault` asserts the one above.
 
+176. **A table row holds its expected value** (steer of 2026-10-17T23:39:34Z).
+     The README gains a standing rule, "A table row holds its expected value", from the check of 2026-10-17T23:26:53Z (development.md 14.4: a point seen a second time becomes a standing rule). It covers three findings in render `src/tests/resolution.rs` on main 6d6ce80: an eleven-arm `match` that computes a label to compare with a row (:79-91, `panic!("run error kind")` at :91), the third such sighting after the checks of 16:24 and 17:12; assertions only inside `for error in side.errors.errors()` (:58, :79, :284), against ruling 159's "an expanded list is asserted whole"; and bare `Token::new(6)` (:113), `Token::new(7)` (:252), `Queue::with_capacity(1)` (:29, :265), `List::with_capacity(3)` (:264) and `stanza.size = 42` (:171), past ruling 159's named limits. Ruling 159's bullet and its other rules stay as they are. The steer of this check sends the rule to the sessions, with ruling 159's repeats in the same file.
+
 ## For the user
 
 The long-term choices the user may veto:
