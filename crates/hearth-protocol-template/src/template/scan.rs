@@ -36,6 +36,7 @@ pub(super) struct Tag {
     pub end: usize,
     pub after: usize,
     pub kind: u8,
+    pub close: Option<u8>,
 }
 pub(super) fn tag(text: &[u8], at: usize) -> Result<Tag, Error> {
     let kind = *text.get(at.saturating_add(1)).expect("opening kind");
@@ -75,7 +76,8 @@ pub(super) fn tag(text: &[u8], at: usize) -> Result<Tag, Error> {
         }
         let before = end.saturating_sub(1);
         let body_end = if end > start && marker(text.get(before).copied(), kind) { before } else { end };
-        return Ok(Tag { start, end: body_end, after: end.saturating_add(2), kind });
+        let close = if body_end < end { text.get(body_end).copied() } else { None };
+        return Ok(Tag { start, end: body_end, after: end.saturating_add(2), kind, close });
     }
     Err(match quote {
         Some(_) => Error { at: offset(quote_at), kind: ErrorKind::Unterminated },

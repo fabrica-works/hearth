@@ -95,17 +95,105 @@ impl Parser<'_> {
         }
         Ok(value)
     }
+    fn edge_after(&self, at: usize, kind: u8, marker: Option<u8>) -> usize {
+        let rest = std::str::from_utf8(&self.text[at..]).expect("validated text");
+        match marker {
+            Some(b'-') => self.text.len() - rest.trim_start_matches(char::is_whitespace).len(),
+            Some(b'+') => at,
+            _ => at + usize::from(kind != b'{' && rest.starts_with('\n')),
+        }
+    }
+    fn edge_before(&self, start: usize, at: usize, kind: u8, marker: Option<u8>, raw: bool) -> usize {
+        let rest = std::str::from_utf8(&self.text[start..at]).expect("validated text");
+        if marker == Some(b'-') {
+            return start + rest.trim_end_matches(char::is_whitespace).len();
+        }
+        if kind == b'{' || marker == Some(b'+') {
+            return at;
+        }
+        let prefix_start = if raw { start } else { 0 };
+        let prefix = std::str::from_utf8(&self.text[prefix_start..at]).expect("validated prefix");
+        let trimmed = prefix.trim_end_matches(|c: char| c.is_whitespace() && c != '\n' && c != '\r');
+        if trimmed.is_empty() || trimmed.ends_with('\n') {
+            start + rest.trim_end_matches(|c: char| c.is_whitespace() && c != '\n' && c != '\r').len()
+        } else {
+            at
+        }
+    }
+    fn raw_head(&self, at: usize) -> usize {
+        let mut at = at + 2;
+        if self.text.get(at).is_some_and(|b| b"-+".contains(b)) {
+            at += 1;
+        }
+        while self.text.get(at).is_some_and(u8::is_ascii_whitespace) {
+            at += 1;
+        }
+        at
+    }
+    fn basic_end(&self, mut at: usize) -> Option<(usize, Option<u8>)> {
+        while self.text.get(at).is_some_and(u8::is_ascii_whitespace) {
+            at += 1;
+        }
+        let marker = self.text.get(at).copied().filter(|b| b"-+".contains(b));
+        at += usize::from(marker.is_some());
+        self.text[at..].starts_with(b"%}").then_some((at + 2, marker))
+    }
+    fn raw(&mut self, at: usize, out: &mut Vec<Instruction>) -> Result<bool, u32> {
+        let head = self.raw_head(at);
+        if self.text.get(at + 1) != Some(&b'%') || !self.text[head..].starts_with(b"raw") {
+            return Ok(false);
+        }
+        let next = head + 3;
+        if self.text.get(next).is_some_and(|b| b.is_ascii_alphanumeric() || *b == b'_') {
+            return Ok(false);
+        }
+        let mut expected = next;
+        while self.text.get(expected).is_some_and(u8::is_ascii_whitespace) {
+            expected += 1;
+        }
+        let (after, marker) = self.basic_end(next).ok_or(pos(expected))?;
+        let start = self.edge_after(after, b'%', marker);
+        for close in after..self.text.len().saturating_sub(1) {
+            if !self.text[close..].starts_with(b"{%") {
+                continue;
+            }
+            let head = self.raw_head(close);
+            if !self.text[head..].starts_with(b"endraw") {
+                continue;
+            }
+            let Some((after, marker)) = self.basic_end(head + 6) else {
+                continue;
+            };
+            let start = start.min(close);
+            let end = self.edge_before(start, close, b'%', self.text.get(close + 2).copied(), true);
+            if end > start {
+                out.push(Instruction { at: pos(start), does: Does::Text(self.text[start..end].into()) });
+            }
+            self.cursor = self.edge_after(after, b'%', marker);
+            return Ok(true);
+        }
+        Err(pos(at))
+    }
     fn next(&mut self, out: &mut Vec<Instruction>) -> Result<Option<Tag>, u32> {
         while self.cursor < self.text.len() {
             let at = (self.cursor..self.text.len().saturating_sub(1))
                 .find(|&i| self.text[i] == b'{' && b"{%#".contains(&self.text[i + 1]))
                 .unwrap_or(self.text.len());
-            if at > self.cursor {
-                out.push(Instruction { at: pos(self.cursor), does: Does::Text(self.text[self.cursor..at].into()) });
+            let kind = self.text.get(at + 1).copied().unwrap_or(b'{');
+            let end = if at < self.text.len() {
+                self.edge_before(self.cursor, at, kind, self.text.get(at + 2).copied(), false)
+            } else {
+                at
+            };
+            if end > self.cursor {
+                out.push(Instruction { at: pos(self.cursor), does: Does::Text(self.text[self.cursor..end].into()) });
             }
             if at == self.text.len() {
                 self.cursor = at;
                 return Ok(None);
+            }
+            if self.raw(at, out)? {
+                continue;
             }
             let kind = self.text[at + 1];
             let marker = |b| b == b'-' || (kind != b'{' && b == b'+');
@@ -135,8 +223,9 @@ impl Parser<'_> {
                 }
                 end += 1;
             }
-            self.cursor = end + 2;
-            let end = end - usize::from(end > start && marker(self.text[end - 1]));
+            let closing = (end > start).then(|| self.text[end - 1]).filter(|&b| marker(b));
+            self.cursor = self.edge_after(end + 2, kind, closing);
+            let end = end - usize::from(closing.is_some());
             if kind == b'{' {
                 out.push(Instruction { at: pos(at), does: Does::Output(self.expr(start, end, false)?) });
             } else if kind == b'%' {

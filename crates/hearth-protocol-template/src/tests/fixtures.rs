@@ -59,3 +59,26 @@ pub fn binding(head: &[u8], name: &[u8], tail: &[u8]) -> Box<[u8]> {
     }
     bytes.into_boxed()
 }
+
+pub fn branch(at: u32, condition: Expression, over: u32) -> crate::Instruction {
+    crate::Instruction { at, does: crate::Does::Branch { condition, over } }
+}
+pub fn text_bytes(compiled: &crate::Template) -> Box<[u8]> {
+    let mut out = skein_lib::List::with_capacity(SHIPPED.template);
+    for instruction in &compiled.instructions {
+        match &instruction.does {
+            crate::Does::Text(text) => {
+                for &byte in text {
+                    out.push(byte).expect("text fits template");
+                }
+            }
+            crate::Does::Output(_)
+            | crate::Does::Branch { .. }
+            | crate::Does::Jump { .. }
+            | crate::Does::Enter { .. }
+            | crate::Does::Advance { .. }
+            | crate::Does::Set { .. } => {}
+        }
+    }
+    out.into_boxed()
+}

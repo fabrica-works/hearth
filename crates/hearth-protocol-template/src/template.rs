@@ -1,6 +1,8 @@
 //! Templates compiled left to right to flat instructions (format.md, 7.2; render.md, 8.3).
+mod raw;
 mod scan;
 mod statement;
+pub(crate) mod whitespace;
 use crate::{Does, Error, Expression, Instruction, Template, expression, limits::Limits};
 use skein_lib::{List, bytes};
 /// Compiles a whole template, or gives its first refusal at a template offset.
@@ -24,14 +26,28 @@ pub fn compile(text: &[u8], limits: &Limits) -> Result<Template, Error> {
             search = at.saturating_add(1);
         }
         let at = next.unwrap_or(text.len());
-        if at > cursor {
-            let kept = text.get(cursor..at).expect("text run within template");
+        let kind = text.get(at.saturating_add(1)).copied().unwrap_or(b'{');
+        let marker = text.get(at.saturating_add(2)).copied();
+        let end = if at < text.len() { whitespace::before(text, cursor, at, kind, marker) } else { at };
+        if end > cursor {
+            let kept = text.get(cursor..end).expect("text run within template");
             out.push(Instruction { at: scan::offset(cursor), does: Does::Text(bytes::copy_of(kept)) })
                 .expect("counted runs");
         }
         if at == text.len() {
             statements.finish()?;
             return Ok(Template { instructions: out.into_boxed(), lines });
+        }
+        if let Some((start, end, tag)) = raw::read(text, at)? {
+            if end > start {
+                out.push(Instruction {
+                    at: scan::offset(start),
+                    does: Does::Text(bytes::copy_of(text.get(start..end).expect("raw body"))),
+                })
+                .expect("counted raw body");
+            }
+            cursor = whitespace::after(text, tag.after, tag.kind, tag.close);
+            continue;
         }
         let tag = scan::tag(text, at)?;
         match tag.kind {
@@ -43,7 +59,7 @@ pub fn compile(text: &[u8], limits: &Limits) -> Result<Template, Error> {
             b'%' => statements.read(text, at, &tag, &mut out, limits)?,
             _ => unreachable!("opening kinds checked"),
         }
-        cursor = tag.after;
+        cursor = whitespace::after(text, tag.after, tag.kind, tag.close);
     }
     unreachable!("each tag advances the cursor")
 }
