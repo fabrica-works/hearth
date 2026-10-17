@@ -82,3 +82,27 @@ fn a_record_past_its_limit_is_refused_too_long() {
         "shipped admission"
     );
 }
+
+#[test]
+fn a_known_resolution_prints_the_keys_line_last() {
+    let spec = fixtures::with_resolution(fixtures::x1_prod(), fixtures::known());
+    let printed = form::print(Form::Text, &Record::Spec(spec), None, &limits::SHIPPED).expect("valid spec");
+    let expected = concat!(
+        "target       x1-prod   base x1   environment prod\n",
+        "placement    metal efi 7th-gen\n",
+        "spec         9a0c5e1f2b3d\n",
+        "config       part e7c2a0d95b13\n",
+        "  /etc/hostname            file 0644 root:root 3f1c2ab07e44\n",
+        "keys         packages 111111111111   software 222222222222   config 333333333333\n",
+    );
+    assert_eq!(&*printed, expected.as_bytes(), "known layer keys are the last line");
+}
+#[test]
+fn a_needed_resolution_prints_no_keys_line() {
+    let spec = fixtures::with_resolution(
+        fixtures::x1_prod(),
+        crate::records::Resolution::Needed { key: fixtures::digest([0x0c, 0x7d, 0x9e, 0x41, 0xc0, 0xd2]) },
+    );
+    let printed = form::print(Form::Text, &Record::Spec(spec), None, &limits::SHIPPED);
+    assert_eq!(printed.as_deref(), Ok(fixtures::X1_PROD_TEXT.as_bytes()), "needed resolution adds no keys line");
+}

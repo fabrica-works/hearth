@@ -28,6 +28,7 @@ pub fn x1_prod() -> Box<Spec> {
                 on: None,
             },
         },
+        resolution: None,
         meta_digest: digest([0xc4, 0xd3, 0xa0, 0xb1, 0xe2, 0xf5]),
         commit: copy_of(b"1a2b3c4d00000000000000000000000000000000"),
         digest: digest([0x9a, 0x0c, 0x5e, 0x1f, 0x2b, 0x3d]),
@@ -54,3 +55,14 @@ pub const X1_PROD_TEXT: &str = concat!(
     "config       part e7c2a0d95b13\n",
     "  /etc/hostname            file 0644 root:root 3f1c2ab07e44\n",
 );
+
+pub fn with_resolution(mut spec: Box<Spec>, resolution: crate::records::Resolution) -> Box<Spec> {
+    spec.resolution = Some(resolution);
+    spec
+}
+pub fn known() -> crate::records::Resolution {
+    crate::records::Resolution::Known {
+        key: digest([0x0c, 0x7d, 0x9e, 0x41, 0xc0, 0xd2]),
+        keys: crate::records::Keys { packages: [0x11; 32], software: [0x22; 32], config: [0x33; 32] },
+    }
+}

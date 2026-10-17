@@ -50,3 +50,20 @@ fn a_path_that_is_not_utf8_is_refused_as_text() {
         "JSON paths must be UTF-8"
     );
 }
+
+#[test]
+fn json_gives_the_resolution_and_its_keys_whole() {
+    let spec = fixtures::with_resolution(fixtures::x1_prod(), fixtures::known());
+    let printed = form::print(Form::JsonLines, &Record::Spec(spec), None, &limits::SHIPPED).expect("valid spec");
+    let expected = concat!(
+        r#"{"record":"version","client":1}"#,
+        "\n",
+        r#"{"record":"spec","target":"x1-prod","commit":"1a2b3c4d00000000000000000000000000000000","digest":"9a0c5e1f2b3d0000000000000000000000000000000000000000000000000000","resolution":{"key":"0c7d9e41c0d20000000000000000000000000000000000000000000000000000","keys":{"config":"3333333333333333333333333333333333333333333333333333333333333333","packages":"1111111111111111111111111111111111111111111111111111111111111111","software":"2222222222222222222222222222222222222222222222222222222222222222"},"kind":"known"}}"#,
+        "\n",
+        r#"{"record":"part","target":"x1-prod","name":"meta","digest":"c4d3a0b1e2f50000000000000000000000000000000000000000000000000000","meta":{"base":"x1","environment":"prod","placement":{"firmware":"efi","hardware":"7th-gen","kind":"metal"},"target":"x1-prod"}}"#,
+        "\n",
+        r#"{"record":"part","target":"x1-prod","name":"config","digest":"e7c2a0d95b130000000000000000000000000000000000000000000000000000","config":{"tree":{"/etc/hostname":{"content_digest":"3f1c2ab07e440000000000000000000000000000000000000000000000000000","group":"root","kind":"file","mode":"0644","owner":"root"}}}}"#,
+        "\n",
+    );
+    assert_eq!(&*printed, expected.as_bytes(), "resolution key, state and layer keys whole");
+}

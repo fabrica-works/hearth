@@ -92,6 +92,22 @@ fn render(lines: &mut Lines, record: &Record, after: Option<Type>) {
                 lines.put(b"\n");
                 part.record.text(lines);
             }
+            if let Some(resolution) = &spec.resolution {
+                match resolution {
+                    crate::records::Resolution::Needed { .. } => {}
+                    crate::records::Resolution::Known { keys, .. } => {
+                        lines.put(b"keys");
+                        lines.pad_to(column);
+                        lines.put(b"packages ");
+                        lines.hex12(&keys.packages);
+                        lines.put(b"   software ");
+                        lines.hex12(&keys.software);
+                        lines.put(b"   config ");
+                        lines.hex12(&keys.config);
+                        lines.put(b"\n");
+                    }
+                }
+            }
         }
         Record::Terminal(_) => {}
     }

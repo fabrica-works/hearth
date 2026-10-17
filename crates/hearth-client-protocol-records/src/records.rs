@@ -31,6 +31,7 @@ pub struct Spec {
     pub commit: Box<[u8]>,
     pub digest: [u8; 32],
     pub parts: Box<[Part]>,
+    pub resolution: Option<Resolution>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Part {
@@ -61,4 +62,17 @@ impl PartRecord {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Terminal {
     pub outcome: Outcome,
+}
+
+/// The resolution key and, when known, its layer keys (render.md, 4.5).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Resolution {
+    Needed { key: [u8; 32] },
+    Known { key: [u8; 32], keys: Keys },
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Keys {
+    pub packages: [u8; 32],
+    pub software: [u8; 32],
+    pub config: [u8; 32],
 }

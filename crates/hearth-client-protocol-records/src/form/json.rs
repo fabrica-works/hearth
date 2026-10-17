@@ -82,6 +82,10 @@ fn line(json: &mut Encoder, record: &Record, index: usize) {
                     field(json, b"commit", &spec.commit);
                     json.key(b"digest");
                     digest(json, &spec.digest);
+                    if let Some(value) = &spec.resolution {
+                        json.key(b"resolution");
+                        resolution(json, value);
+                    }
                 } else {
                     field(json, b"record", b"part");
                     field(json, b"target", &spec.meta.target);
@@ -114,4 +118,31 @@ pub(crate) fn digest(json: &mut Encoder, value: &[u8; 32]) {
         }
     }
     json.string(&digits);
+}
+
+fn resolution(json: &mut Encoder, resolution: &crate::records::Resolution) {
+    use crate::records::Resolution;
+    json.object_start();
+    match resolution {
+        Resolution::Needed { key } => {
+            json.key(b"key");
+            digest(json, key);
+            field(json, b"kind", b"needed");
+        }
+        Resolution::Known { key, keys } => {
+            json.key(b"key");
+            digest(json, key);
+            json.key(b"keys");
+            json.object_start();
+            json.key(b"config");
+            digest(json, &keys.config);
+            json.key(b"packages");
+            digest(json, &keys.packages);
+            json.key(b"software");
+            digest(json, &keys.software);
+            json.object_end();
+            field(json, b"kind", b"known");
+        }
+    }
+    json.object_end();
 }
