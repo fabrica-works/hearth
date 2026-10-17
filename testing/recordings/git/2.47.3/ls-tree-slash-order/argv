@@ -1,0 +1,8 @@
+/usr/bin/git
+--git-dir=/scratch/slash
+ls-tree
+-r
+-l
+-z
+--full-tree
+db651ceddeb57e8d81f369490b1bc8b0851303dc

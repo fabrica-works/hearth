@@ -8,12 +8,28 @@ use hearth_protocol_git::{
 use std::fmt::Write;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expected {
+    Failed(Failure),
     Revision(Resolved),
     Hunks(hearth_protocol_git::hunks::Hunks),
     Listing(Box<[Entry]>),
     Blobs(Box<[Blob]>),
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Failure {
+    Exit(hearth_protocol_git::invocation::Exit),
+    Decoder(Box<str>),
+}
 pub const CASE_NAMES: &[&str] = &[
+    "rev-parse-head",
+    "rev-parse-prefix",
+    "rev-parse-no-repository",
+    "ls-tree-slash-order",
+    "ls-tree-absent-commit",
+    "diff-6-apart",
+    "diff-7-apart",
+    "diff-equal",
+    "diff-missing-side",
+    "diff-unreadable-side",
     "rev-parse-branch",
     "rev-parse-commit",
     "rev-parse-tag",
@@ -60,6 +76,17 @@ pub fn decode(bytes: &[u8]) -> Expected {
     for line in text.lines() {
         let words: Vec<_> = line.split(' ').collect();
         match words[0] {
+            "failed" => {
+                return Expected::Failed(match words[1] {
+                    "exit" => {
+                        Failure::Exit(hearth_protocol_git::invocation::Exit::Code(words[2].parse().expect("exit byte")))
+                    }
+                    "signal" => {
+                        Failure::Exit(hearth_protocol_git::invocation::Exit::Signal(words[2].parse().expect("signal")))
+                    }
+                    error => Failure::Decoder(error.into()),
+                });
+            }
             "line" => hunks.push(hearth_protocol_git::hunks::Line {
                 kind: kind(words[1]),
                 text: unhex(words[2]).into_boxed_slice(),
@@ -114,6 +141,15 @@ fn mode(text: &str) -> Mode {
 pub fn encode(expected: &Expected) -> Vec<u8> {
     let mut text = String::new();
     match expected {
+        Expected::Failed(failure) => match failure {
+            Failure::Exit(hearth_protocol_git::invocation::Exit::Code(code)) => {
+                writeln!(text, "failed exit {code}").expect("String write");
+            }
+            Failure::Exit(hearth_protocol_git::invocation::Exit::Signal(signal)) => {
+                writeln!(text, "failed signal {signal}").expect("String write");
+            }
+            Failure::Decoder(error) => writeln!(text, "failed {error}").expect("String write"),
+        },
         Expected::Hunks(hunks) => {
             if hunks.binary {
                 text.push_str("binary\n");

@@ -85,6 +85,8 @@ dependencies = [
 name = "hearth-conformance-world"
 version = "0.0.0"
 dependencies = [
+ "hearth-fake-git",
+ "hearth-fake-machine",
  "hearth-git-world",
  "hearth-protocol-git",
  "hearth-protocol-mmdebstrap",

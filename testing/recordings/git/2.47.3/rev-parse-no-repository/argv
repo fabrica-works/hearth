@@ -1,0 +1,6 @@
+/usr/bin/git
+--git-dir=/scratch/absent
+rev-parse
+--verify
+--quiet
+main^{commit}

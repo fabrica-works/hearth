@@ -1,5 +1,19 @@
 //! Scenario data shared with fake git (testing.md, 5.2).
 use hearth_protocol_git::hunks::Kind as LineKind;
+pub const IDENTITY: &[(&str, &str)] = &[
+    ("GIT_AUTHOR_NAME", "hearth"),
+    ("GIT_AUTHOR_EMAIL", "hearth@hearth.invalid"),
+    ("GIT_AUTHOR_DATE", "1700000000 +0000"),
+    ("GIT_COMMITTER_NAME", "hearth"),
+    ("GIT_COMMITTER_EMAIL", "hearth@hearth.invalid"),
+    ("GIT_COMMITTER_DATE", "1700000000 +0000"),
+];
+pub const COMMIT_MESSAGE: &[u8] = b"scenario\n";
+pub const SUBMODULE_MESSAGE: &[u8] = b"submodule\n";
+pub const BRANCH: &str = "refs/heads/main";
+pub const TAG: &str = "v1";
+pub const TAG_MESSAGE: &str = "scenario tag";
+
 #[derive(Clone, Copy, Debug)]
 pub struct File {
     pub path: &'static str,
@@ -34,10 +48,27 @@ pub const REPOSITORIES: &[Repository] = &[
         format: "sha256",
         files: &[File { path: "file", mode: "100644", contents: b"sha256\n", length: 7 }],
     },
+    Repository {
+        name: "slash",
+        format: "sha1",
+        files: &[
+            File { path: "a-b", mode: "100644", contents: b"hyphen\n", length: 7 },
+            File { path: "a.b", mode: "100644", contents: b"dot\n", length: 4 },
+            File { path: "a/x", mode: "100644", contents: b"slash\n", length: 6 },
+            File { path: "a0", mode: "100644", contents: b"zero\n", length: 5 },
+        ],
+    },
 ];
 #[derive(Clone, Copy, Debug)]
 pub enum Kind {
     Revision(&'static str),
+    Head,
+    Prefix,
+    NoRepository,
+    AbsentCommit,
+    DiffEqual,
+    DiffMissing,
+    DiffDenied,
     Commit,
     Tree,
     Listing,
@@ -58,6 +89,16 @@ impl Case {
     }
 }
 pub const CASES: &[Case] = &[
+    Case { name: "rev-parse-head", repository: 0, kind: Kind::Head },
+    Case { name: "rev-parse-prefix", repository: 0, kind: Kind::Prefix },
+    Case { name: "rev-parse-no-repository", repository: 0, kind: Kind::NoRepository },
+    Case { name: "ls-tree-slash-order", repository: 3, kind: Kind::Listing },
+    Case { name: "ls-tree-absent-commit", repository: 0, kind: Kind::AbsentCommit },
+    Case { name: "diff-6-apart", repository: 0, kind: Kind::Diff(&SIX) },
+    Case { name: "diff-7-apart", repository: 0, kind: Kind::Diff(&SEVEN) },
+    Case { name: "diff-equal", repository: 0, kind: Kind::DiffEqual },
+    Case { name: "diff-missing-side", repository: 0, kind: Kind::DiffMissing },
+    Case { name: "diff-unreadable-side", repository: 0, kind: Kind::DiffDenied },
     Case { name: "rev-parse-branch", repository: 0, kind: Kind::Revision("main") },
     Case { name: "rev-parse-commit", repository: 0, kind: Kind::Commit },
     Case { name: "rev-parse-tag", repository: 0, kind: Kind::Revision("v1") },
@@ -348,3 +389,69 @@ const MANY:Change=Change {before:b"a\na\na\na\na\na\na\na\na\na\na\na\na\na\na\n
  (LineKind::Added,b"b"),
  (LineKind::Added,b"b"),
 ],left_out:3,binary:false };
+
+/// The additional file cases use the same two cache names as the recorded changes.
+#[must_use]
+pub fn change(case: &Case) -> Option<&'static Change> {
+    match case.kind {
+        Kind::Diff(change) => Some(change),
+        Kind::DiffEqual | Kind::DiffMissing | Kind::DiffDenied => Some(&CHANGED),
+        Kind::Revision(_)
+        | Kind::Head
+        | Kind::Prefix
+        | Kind::NoRepository
+        | Kind::AbsentCommit
+        | Kind::Commit
+        | Kind::Tree
+        | Kind::Listing
+        | Kind::Blobs
+        | Kind::Missing => None,
+    }
+}
+const SIX: Change = Change {
+    before: b"a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\n",
+    after: b"a\nB\nc\nd\ne\nf\ng\nh\nI\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\n",
+    lines: &[
+        (LineKind::Hunk, b"@@ -1,12 +1,12 @@"),
+        (LineKind::Context, b"a"),
+        (LineKind::Removed, b"b"),
+        (LineKind::Added, b"B"),
+        (LineKind::Context, b"c"),
+        (LineKind::Context, b"d"),
+        (LineKind::Context, b"e"),
+        (LineKind::Context, b"f"),
+        (LineKind::Context, b"g"),
+        (LineKind::Context, b"h"),
+        (LineKind::Removed, b"i"),
+        (LineKind::Added, b"I"),
+        (LineKind::Context, b"j"),
+        (LineKind::Context, b"k"),
+        (LineKind::Context, b"l"),
+    ],
+    left_out: 0,
+    binary: false,
+};
+const SEVEN: Change = Change {
+    before: b"a\nb\nc\nd\ne\nf\ng\nh\ni\nj\nk\nl\nm\nn\no\np\nq\nr\ns\nt\n",
+    after: b"a\nB\nc\nd\ne\nf\ng\nh\ni\nJ\nk\nl\nm\nn\no\np\nq\nr\ns\nt\n",
+    lines: &[
+        (LineKind::Hunk, b"@@ -1,5 +1,5 @@"),
+        (LineKind::Context, b"a"),
+        (LineKind::Removed, b"b"),
+        (LineKind::Added, b"B"),
+        (LineKind::Context, b"c"),
+        (LineKind::Context, b"d"),
+        (LineKind::Context, b"e"),
+        (LineKind::Hunk, b"@@ -7,7 +7,7 @@ f"),
+        (LineKind::Context, b"g"),
+        (LineKind::Context, b"h"),
+        (LineKind::Context, b"i"),
+        (LineKind::Removed, b"j"),
+        (LineKind::Added, b"J"),
+        (LineKind::Context, b"k"),
+        (LineKind::Context, b"l"),
+        (LineKind::Context, b"m"),
+    ],
+    left_out: 0,
+    binary: false,
+};

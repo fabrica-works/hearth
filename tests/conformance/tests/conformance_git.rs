@@ -103,3 +103,19 @@ fn real_git_s_hunks_are_the_unique_shortest_diff_of_each_change() {
         }
     }
 }
+
+#[test]
+fn each_git_case_prints_on_the_fake_what_real_git_prints() {
+    use hearth_conformance_world::fake_git::{self, ALLOWED};
+    let scenario = Scenario::new();
+    for case in git::CASES {
+        let real = scenario.run(case);
+        if !ALLOWED.iter().any(|allowed| allowed.case == case.name) {
+            let fake = fake_git::run(case.name, &real.captured);
+            fake_git::assert_same(case.name, &fake.captured, &real.captured);
+        }
+        if hearth_recordings::recording_on() {
+            hearth_recordings::write("git", &scenario.version, case.name, &real.captured);
+        }
+    }
+}
