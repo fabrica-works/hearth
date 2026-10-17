@@ -87,7 +87,8 @@ of 09's `Refused`, `Bound`, `Limit` and `Order`: render.md 7.2 names them as one
 configuration.
 Test shape: unit under 20 ms: render
 `a_closed_closure_is_asked_recorded_with_its_digest_and_inputs`,
-`once_recorded_every_target_holding_the_key_is_known`,
+`once_recorded_every_target_holding_the_key_is_known`, and 24.2's
+`a_failed_key_leaves_the_later_keys_resolved` then asserts B `known` (ruling 167),
 `a_closure_past_its_limit_is_never_recorded`; store
 `a_record_is_written_then_indexed`,
 `a_record_past_the_resolution_limit_is_declined_and_not_written` (`resolutions:

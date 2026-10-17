@@ -155,8 +155,9 @@ Removes: 33.2's `translate::store::{inputs, closed}` and `Event::Resolution {
 key, inputs, closure, digest }` (now whole).
 ### 24.2 `--resolve`: the run, its timers and its failures
 Scope: `--resolve` (argv, `Call`, `Event::Render`); render's `Resolve`; the
-protocol layer's run (`src/resolve.rs`); the `tool` kind;
-`Configuration::proxy`.
+protocol layer's run (`src/resolve.rs`); the `tool` kind; the `resolution`
+kind, with the four variants the run gives: `Unknown`, `Unsatisfiable`,
+`Absent` and `TooMany` (ruling 167); `Configuration::proxy`.
 Needs: hearth 07 (`vector`, `output`, `tail`); hearth 32.2 (the binary's usage
 line); hearth 34.1 (the `conformance` profile); hearth 41.1 (the recordings,
 `simulate`); hearth 42.1 (`Failure`, `Tool`).
@@ -179,11 +180,15 @@ matches (:53, :67, :87, :95) gain `Resolve` and each `Answer` 24.2 adds; mmdebst
 `Command::Mmdebstrap` and `Ended::Timeout` go in `src/errors/repository.rs`
 (`Command` :23, `Ended` :30, their arms :96 to :114 in text and :123 to :139
 in JSON), in place of
-`src/form/{text, json}.rs`, which hold no error kind. Reverse tests: protocol
+`src/form/{text, json}.rs`, which hold no error kind; `Kind::Resolution` in
+records `src/errors.rs` (its `Kind` matches, text :81 and JSON :137) and a new
+`src/errors/resolution.rs` beside `errors/repository.rs`, with its four
+variants' messages from 24.3's list; `tests/render/src/declarations.rs` (its
+`Kind` match, :223, gains `| Kind::Resolution(_)`). Reverse tests: protocol
 `src/tests/translate/{errors, repository}.rs`: `Limit::Closure` beside :55,
 since 24.2's `TooLarge { limit: Closure }` uses it (24.2 adds `Limit::Closure`
-and its arms), and `Command::Mmdebstrap` and `Ended::Timeout` beside :38 and
-:48.
+and its arms), `Kind::Resolution`'s four variants in `errors.rs`, and
+`Command::Mmdebstrap` and `Ended::Timeout` beside :38 and :48.
 Shape: the sketches. With `--resolve`, render sets `deadline = now +
 Limits::resolve` and resolves each absent key (targets in name order, each key
 at its first holder), one at a time, a failure not stopping the rest, each holder given the error (render.md 5.7);
@@ -198,8 +203,13 @@ env, root: store.fd, dir: b"", pipes: [1 Out, 2 Out] }`, with `deadline` and
 }` (render never retries, 5.5); exit 0 → (transitional) `Resolved { lines: [] }`, else `tail::failure`
 → `Failed { class: cause.class(), failure: Run { tool, cause } }`; the scratch
 is walked away at each ending (33.2's walk). render: `Failed` → an error per
-target holding the key; records print `mmdebstrap exited 1`, `… timed out`, `…
-could not start`, the tail.
+target holding the key, of the kind `tail::Cause::kind()` gives
+(mmdebstrap `tail.rs:37`): `resolution` for `Unknown`, `Unsatisfiable` and
+`Absent`, else `tool`; `TooLarge { limit: Closure, max }` → `resolution`
+`TooMany { max }`. `Resolved` leaves its key `needed`, with no error, and
+render builds no `Known` from it (ruling 167): 24.3 keeps it so, and 31.1's
+`Recorded` makes it `Known`. Records print `mmdebstrap exited 1`, `… timed
+out`, `… could not start`, the tail, and the four `resolution` messages.
 Test shape: unit under 20 ms; `fixtures::resolve(key, names)` is a render
 `Resolve` (forky, amd64, `main`, `20261001T030405Z`, no pocket, `Apt`, no
 recommends), `KEY` `01…01`. Reference, `src/tests/resolve.rs`:
@@ -231,7 +241,8 @@ names the second's `uri`; one that names none takes the first),
 (`insts: 2`), `the_scratch_is_walked_away_before_the_terminal`,
 `a_resolve_of_test_min_translates_to_41_1s_simulate` (for 08.2); render:
 `needed_keys_are_resolved_one_at_a_time_in_target_order`,
-`a_failed_key_leaves_the_later_keys_resolved` (A fails, B `known`),
+`a_failed_key_leaves_the_later_keys_resolved` (A fails; B's `Resolve` is
+asked after A's `Failed`, and B has no error and stays `needed`: ruling 167),
 `without_resolve_no_key_is_resolved`,
 `a_failed_run_is_an_error_of_each_target_holding_its_key` (`at: None`),
 `a_run_too_large_is_the_resolution_error_too_many`,
@@ -243,7 +254,9 @@ names the second's `uri`; one that names none takes the first),
 `the_shipped_limits_hold_8192_packages_and_600_s`,
 `a_resolve_carries_the_deadline_now_plus_600_s`; records:
 `mmdebstraps_timeout_prints_as_timed_out`,
-`mmdebstraps_refused_start_prints_as_could_not_start`; argv:
+`mmdebstraps_refused_start_prints_as_could_not_start`,
+`each_resolution_message_prints_as_worded` (a `const` table of the four
+variants' strings; 24.3 adds three rows); argv:
 `render_takes_resolve`; process, `end_to_end.rs`: `end_to_end_render_resolve` (a
 laid record, no network: `known`, exit 0). Real loop:
 `resolve_with_its_key_recorded_runs_no_mmdebstrap` (a laid record, a dead proxy:
@@ -267,22 +280,22 @@ mmdebstrap fails on an unreachable mirror, exit 75, the scratch gone. Bound: 10
 s; unit, in the gate,
 `a_resolve_makes_its_scratch_writes_sources_list_then_spawns_mmdebstrap`, 0.02
 s.
-Don't: run mmdebstrap in the gate; retry; keep a proxy in any key.
-Size: at most 300 lines.
+Don't: run mmdebstrap in the gate; retry; keep a proxy in any key; build a
+closure digest or a `Known` from `Resolved { lines: [] }`.
+Size: at most 340 lines (was 300: ruling 167 moves the `resolution` kind here).
 Removes: 32.2's usage line for `--resolve`; 24.1's "`--resolve` refused".
 ### 24.3 The indices read, and the closure matched
 Scope: apt's lists read, stanzas up, hashed in the same pass; `Resolved`'s
-lines; render's `Closure` (5.3); the `resolution` kind.
+lines; render's `Closure` (5.3); the `resolution` kind's `Missing`,
+`Unmatched` and `Disagree` (24.2 adds the kind and its other four: ruling 167).
 Needs: hearth 38.1 (`packages`, `lists`); nothing else beyond 24.2.
 Files: render `src/{resolution, keys, errors, vocabulary}.rs`,
 `src/tests/{fixtures, resolution, keys}.rs`; protocol `src/{resolve, lib}.rs`,
 new `src/indices.rs`, `src/translate/{resolution, errors}.rs`,
-`src/tests/translate/errors.rs` (`Kind::Resolution`, beside :241; `Limit::Closure`
-is 24.2's), new
-`src/tests/indices.rs`; records `src/errors.rs` and a new
-`src/errors/resolution.rs` beside `errors/repository.rs` (`Kind::Resolution`),
-`src/tests/errors.rs`; `tests/render/src/declarations.rs` (its `Kind` match,
-:223, gains `| Kind::Resolution(_)`);
+`src/tests/translate/errors.rs` (the three variants, beside 24.2's
+`Kind::Resolution` rows; `Limit::Closure` is 24.2's), new
+`src/tests/indices.rs`; records `src/errors/resolution.rs` (24.2's: the three
+variants and their messages), `src/tests/errors.rs`;
 `tests/builder/{src/fixtures.rs, tests/conformance_render.rs}`.
 Shape: the sketches. Lists: `OpenDirectory` of the scratch's
 `root/var/lib/apt/lists`, `ListPage`, `lists::listed` per name against
@@ -318,8 +331,8 @@ and `all`), `a_packages_filename_and_size_enter_the_record_and_not_the_digest`,
 `names_that_are_no_index_are_skipped`; `src/tests/translate.rs`:
 `a_resolved_line_holds_the_sources_uri_suite_components_and_indices`; records:
 `a_resolution_error_names_its_package`,
-`each_resolution_message_prints_as_worded` (a `const` table over the seven
-strings). Live:
+`each_resolution_message_prints_as_worded` (24.2's table, with the three
+rows added: seven strings). Live:
 `an_unknown_package_fails_its_resolution_naming_it_and_exits_2` (test-min
 requesting `hearth-absent`, `tasks/absent/task.json` and
 `hosts/test/test-min.json` `{"absent": {}}`: `test-min: apt cannot locate
@@ -330,7 +343,7 @@ package is the `resolution` error, exit 2; unit, in the gate,
 Bound: 15 s a test, as nextest prints it.
 Don't: hold more than one `ReadAt` and one demand; decompress; match in the
 protocol layer.
-Size: at most 300 lines.
+Size: at most 260 lines (was 300: ruling 167 moves the `resolution` kind to 24.2).
 Removes: 24.2's "a run that succeeds reads no index".
 
 ## Interface sketches
@@ -366,6 +379,7 @@ pub struct Costs { pub fetched: u64, pub took: skein_lib::Duration }
 // crates/hearth-domain-render/src/errors.rs: hearth 12's and 42.1's, these added
 pub enum Kind { Resolution(Resolution) }
 /// 7.2's `resolution`: configuration but `Unmatched` and `Disagree`, operational (render.md 5.3).
+/// 24.2 adds the kind with `Unknown`, `Unsatisfiable`, `Absent` and `TooMany`; 24.3 adds `Missing`, `Unmatched`, `Disagree` (ruling 167).
 pub enum Resolution {
     Unknown { package: B }, Unsatisfiable { package: Option<B> }, Missing { package: B },
     Absent { uri: B, suite: B }, // the archive lacks the suite: the source line (5.5)
