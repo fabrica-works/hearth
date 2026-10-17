@@ -120,6 +120,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-tree-world"
+version = "0.0.0"
+dependencies = [
+ "hearth-lib",
+ "hearth-protocol-tree",
+ "skein-heap",
+ "skein-lib",
+]
+
+[[package]]
 name = "io-uring"
 version = "0.7.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
