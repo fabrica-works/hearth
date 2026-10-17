@@ -543,7 +543,10 @@ merge(target, patch):
   it:** an integer from 0 to 999, default 500. Entries sort by order,
   then key, then task name. It is used by `customize.sh` and
   `software.sh` fragments (5.8) and by boot parameters (5.4), where the
-  last `console=` names the kernel's primary console.
+  last `console=` names the kernel's primary console. Out of that range,
+  an `order` is a decode error in `scripts`, which is decoded as written
+  (5.8), and a schema error in a boot parameter, an entry whose `order`
+  may be an expression (5.2).
 
 ### 4.4 Presence, defaults and removal
 
@@ -1109,7 +1112,10 @@ nothing.
 
   A declared script must exist in the task directory as `NAME` or
   `NAME.j2`, and a script file that is not declared is an error. Its
-  keys are those two alone (2.1): any other is a schema error.
+  keys are those two alone (2.1), each an object of an optional `order`
+  (4.3). `scripts` is not a map of entries (5.2): it is decoded as
+  written, so a third key is a decode error at the key, and an `order`
+  that is not an integer from 0 to 999 one at its value (render.md, 7.2).
 - **`customize.sh`** runs in the config layer, after its files and users
   are in place (build.md, section 7). **`software.sh`** runs in the
   software layer, after every download is placed at its declared path

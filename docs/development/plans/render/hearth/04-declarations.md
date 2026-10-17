@@ -82,7 +82,7 @@ route a task's `task.json` through the thin story's protocol layer.
   other field but `uid`, `gid`, `if` and `for_each`"; the mail task's
   `"postfix": { "from": "package", "uid": 107, "gid": 113 }`).
 - **`checks` and a download's `artifact` are refused at their key**
-  (`Declared::Later`: a schema error at its key until M5 or M6,
+  (`Declared::Later`: a decode error at its key until M5 or M6,
   format.md 2.2); the keys a later increment
   decodes (the 14 maps until 04.2, then `settings` and `exports`, hearth
   35's) are refused as `Declared::Undecoded`, removed by hearth 35.2.

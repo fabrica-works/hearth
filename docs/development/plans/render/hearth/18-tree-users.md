@@ -290,16 +290,17 @@ Enum`) and required (`MissingField`); `mode` `Format::Mode`; the rest as
 written. `scripts`: each declared name must exist as `NAME` or `NAME.j2`
 (`Repository::NoScript` at its key), each script file declared (42's
 `Repository::Stray`, at its path), for `customize.sh` and `software.sh`;
-`software.sh` is checked and its row dropped (19.2 digests it); a third name is `Schema::Enum` (5.8); `order`
-default 500, 0 to 999 (`Below`, `Above`); `customize.sh` is read (`As::Cached`,
+`software.sh` is checked and its row dropped (19.2 digests it); a third name and
+an `order` outside 0 to 999 are 04.1's decode errors (`Declared::Name` at the key,
+`Declared::Order` at the value; format.md 5.8), so render takes each `Script`'s
+`fragment` and `order` (500 when absent) as decoded, and refuses neither; `customize.sh` is read (`As::Cached`,
 or `As::Template` then `Keep`, origin `Rendered`) and its row `{task, order,
 content_digest}` sorts by order, then task (format.md 4.3). A template script
 (`customize.sh.j2`, `software.sh.j2`) runs 16.4's `references::template`.
 Test shape: under 20 ms: `a_preset_takes_enable_or_disable`,
 `a_tmpfiles_line_needs_its_type_and_checks_its_mode`,
 `a_declared_script_with_no_file_is_a_repository_error`,
-`a_third_script_name_is_an_enum_fault`, `a_preset_without_action_is_missing`,
-`script_order_defaults_to_500_and_ranges_over_0_to_999`,
+`a_preset_without_action_is_missing`, `script_order_defaults_to_500`,
 `customize_sh_j2_is_digested_as_rendered`,
 `a_script_file_nothing_declares_is_stray`, `scripts_sort_by_order_then_task`,
 `a_software_script_is_checked_not_digested`,
@@ -324,7 +325,8 @@ Proof: process, `hearth_diff_names_a_preset_a_tmpfiles_line_and_a_script`, bound
   config   ~ tmpfiles /var/log/journal              d 0755 root systemd-journal
   config   ~ scripts                                motd 300 4b1f03482366
 ```
-Don't: refuse a reserved line (21) or digest `software.sh` (19).
+Don't: refuse a reserved line (21), digest `software.sh` (19), or change
+`hearth-protocol-config`'s `scripts` decoding or its tests (04.1's).
 Size: at most 250 lines.
 Removes: nothing.
 
