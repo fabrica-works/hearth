@@ -16,6 +16,7 @@ publish = false
 [workspace.dependencies]
 skein-lib = { git = "https://github.com/forgetic/skein.git" }
 hearth-protocol-git = { path = "crates/hearth-protocol-git" }
+skein-json = { git = "https://github.com/forgetic/skein.git" }
 
 # Panics are fail-stop and overflow traps, in every profile. (The test harness
 # needs unwinding, so cargo ignores `panic` for test targets.)

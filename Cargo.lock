@@ -3,6 +3,14 @@
 version = 4
 
 [[package]]
+name = "hearth-client-protocol-records"
+version = "0.0.0"
+dependencies = [
+ "skein-json",
+ "skein-lib",
+]
+
+[[package]]
 name = "hearth-lib"
 version = "0.0.0"
 dependencies = [
@@ -12,6 +20,14 @@ dependencies = [
 [[package]]
 name = "hearth-protocol-git"
 version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
+name = "skein-json"
+version = "0.0.0"
+source = "git+https://github.com/forgetic/skein.git#2733882d9c3a1fab4aeda744273b08c606c0bdb1"
 dependencies = [
  "skein-lib",
 ]
