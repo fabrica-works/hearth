@@ -690,6 +690,9 @@ None yet.
 
      The plan's README gains this as a rule for every session's `…_and_back` tests (hearth 11, 12, 13, 15, 17, 21, 23, 25, 31 name such tests). Unchanged: one-way tests state literal expected values; 43.2's Files, Shape, Proof and Size.
 
+145. **hearth-12.s1: a document's null inside a list** (steer of 2026-10-17T19:02:09Z).
+     A supplement step, `hearth-12.s1` (hearth/12.s1-list-null.md), hearth 12's, needing 12.2 (landed, 0aa2743): a document's `null` inside a list becomes the decode error format.md 4.1 names ("one inside a list (`[1, null]`, `[{"a": null}]`), which replaces whole, is a `decode` error in a document (render.md, 7.2) and a bad default in a `task.json` (6.5)"). hearth 12's re-check (check/recheck-12.md, point 3) found no owner: config's `document` (`document.rs:27`) keeps it, render's `Decode` (`errors.rs:25`) has no variant, and builder `translate/documents.rs:73` maps a json `Null` to the document's `Null`. The `task.json` half stays hearth 13.3's (`Null`, "null in a default"). The step adds `Shape::ListNull` (config), `Decode::ListNull` (render and records: message `null inside a list`, code `list_null`) and their translations. Nothing else changes.
+
 ## For the user
 
 The long-term choices the user may veto:
