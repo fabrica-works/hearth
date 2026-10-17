@@ -18,8 +18,8 @@ the machine world `tests/config`; nothing calls `declaration` until hearth
   sketches: its names and fixtures are taken as written);
   `hearth/03-json.md` (its world); `code-organization.md`, 3, 4, 6;
   `decisions.md`, 9, 10; `findings/skein-testing.md`, 3 and 7.
-- skein's `crates/skein-lib/src/stack.rs` (`with_capacity` :20, `push`
-  :48) and `list.rs` (`with_capacity` :21, `push` :55, `into_boxed` :104);
+- skein's `crates/skein-lib/src/stack.rs` (`with_capacity` :22, `push`
+  :50) and `list.rs` (`with_capacity` :21, `push` :55, `into_boxed` :104);
   `programming-model.md`: 3, 6.3, 7, 8, 10; `testing-strategy.md`: 2.1,
   2.4, 3, 8 (by number only).
 
@@ -78,13 +78,15 @@ Scope: `settings` (6.1, 6.2): specs, types, `doc`, `default`,
 Needs: hearth 04 (the session's start): `declaration`, `Text`, `Number`,
 `Declared`, `fixtures::{at, text, declaration}`, `examples::task`,
 `world::declare`.
-Files: `src/{schema,declaration,error,limits,lib}.rs`,
-`src/tests/{schema,declaration}.rs`; the users of `Limits`, found by `git
-grep -n -e 'Limits {' -- crates tests`, run in the worktree and its
-matches listed in the report (in 03's draft: `src/limits.rs`,
-`tests/config/src/world.rs`'s `world::limits`,
-`tests/config/tests/memory.rs`), each given `settings` and nothing else;
-`tests/config/examples/tasks/{locale,boot,hearth,users}.json`,
+Files: `src/{schema,declaration,error,limits,lib}.rs`, `src/tests.rs` (`mod
+schema;`), `src/tests/{schema,declaration}.rs`; the users of `Limits`, found
+by `git grep -n -e 'Limits {' -- crates tests`, run in the worktree and its
+matches listed in the report (on main: `src/limits.rs`, `world::limits`'s two
+literals, `tests/config/src/world.rs:59` and `:65`,
+`tests/config/tests/world.rs:27`, `tests/config/tests/memory.rs:10`), each
+given `settings` and nothing else;
+`tests/config/examples/tasks/{locale,boot,hearth,users}.json`, with a row
+each in `tests/config/src/examples.rs`'s `TASKS` (`:32`),
 `tests/config/tests/declarations.rs`.
 Shape: `Limits::settings` (512); `Declaration::{types, settings}`. At most
 `Limits::settings` settings (`Settings` at the next key), each an
@@ -156,8 +158,9 @@ sweep (testing-strategy.md, 2.4, 3; decisions.md, 10).
 Needs: nothing beyond 35.1.
 Files: `src/{schema,declaration,error}.rs`,
 `src/tests/{schema,declaration}.rs`; `tests/config/src/{generate,
-fixtures}.rs`, `tests/config/examples/tasks/{vpn,backup-peer}.json` (8.6, 8.7),
-`tests/config/tests/{declarations,fuzzy_declarations}.rs`.
+fixtures, world, examples}.rs`, `tests/config/src/fixtures/metered.rs`,
+`tests/config/examples/tasks/{vpn,backup-peer}.json` (8.6, 8.7; a `TASKS` row
+each), `tests/config/tests/{declarations,fuzzy_declarations,memory}.rs`.
 Shape: `Declaration::exports`: export names identifiers (format.md 2.4, 8.1); keys `type`,
 `doc`, `optional`, `value` (else `Unknown { of: Export }`); `type`, `doc`
 and `value` required; the type read by 35.1's walk into `types`, then
@@ -167,8 +170,12 @@ refused (`Secret`, at that type) where it or any of its elements is
 `Value` is still held, so 03's `json::worst_case` does not cover it:
 `declaration::worst_case(&Limits) -> Option<u64>` is `json::worst_case`'s
 plus `document / 2 + 1` entries of the largest of `Type`, `Spec`, `Export`
-(`size_of`, `checked_mul`), and `tests/memory.rs` meters `declaration` on
-`at_the_limits`' cases against it.
+(`size_of`, `checked_mul`), the walk's `Stack` of `depth` frames, and each
+list at its capacity; `tests/memory.rs` meters `declaration` against it on
+declarations at the limits (a new `fixtures::declarations_at_the_limits(&Limits)`:
+the most settings, types and exports they allow; `metered.rs` meters
+`declaration` on the decoded `Value`): `at_the_limits`' documents are
+refused at their first unknown key, before any `Type`, `Spec` or `Export`.
 Test shape: `src/tests/schema.rs`:
 `an_export_hands_up_its_type_and_value_text`,
 `an_export_whose_type_holds_secret_is_refused_at_that_type`,
@@ -180,7 +187,11 @@ declaration of every key but `checks`, each `Text` recorded with the
 position it wrote; `generate::break_once(rng, &Written) -> Broken { bytes,
 at, fault }` breaks one place (it may write `checks` or an `artifact`, so
 `Later` falls), its fault and position the generator's;
-`fixtures::Tally` records the faults that fell. `tests/declarations.rs`
+`fixtures::Tally` records the faults that fell; `world::declaring(rng) ->
+Limits` gives limits that hold a declaration of every key, `world::limits`'
+roomy values (`world.rs:65`) with `settings` drawn below `keys`, so that
+`Settings` falls before the JSON's `keys` (the tiny branch, `world.rs:59`,
+holds none, and its JSON faults come first). `tests/declarations.rs`
 gains `every_task_example_decodes_as_a_declaration_cut_anywhere` (the 23)
 and `generated_declarations_hand_up_each_string_where_it_was_written` (32
 seeds, under 0.5 s); `tests/fuzzy_declarations.rs`, about 2 s: `const ROUNDS:
@@ -191,7 +202,7 @@ u64` is chosen once so that `heavy cargo nextest run -p hearth-config-world
 fn generated_declarations_broken_once_fail_at_the_break() {
     let mut tally = Tally::default();
     for seed in FIRST_SEED..FIRST_SEED + ROUNDS {
-        let mut rng = Rng::new(seed); let limits = world::limits(&mut rng);
+        let mut rng = Rng::new(seed); let limits = world::declaring(&mut rng);
         let written = generate::declaration(&mut rng, &limits);
         let broken = generate::break_once(&mut rng, &written);
         let outcome = world::declare(&broken.bytes, &Settings::calm(&mut rng, limits), seed);
@@ -202,7 +213,8 @@ fn generated_declarations_broken_once_fail_at_the_break() {
 }
 ```
 `EVERY_DECLARED`: each `Declared` variant, with `Unknown` of each
-`Object`.
+`Object` but `Type`, whose unknown key is `Wrong { expected: Type }` at its
+`{` (35.1).
 Proof: world,
 `every_task_example_decodes_as_a_declaration_cut_anywhere`: format.md's 23
 task.json blocks, delivered in random pieces, are declarations, vpn's with
@@ -237,7 +249,8 @@ pub struct Declaration {
 }
 
 // hearth_protocol_config::schema (format.md, 6.1, 6.2, 8.1)
-use crate::{declaration::{Number, Text}, json::Value};
+use alloc::boxed::Box;
+use crate::{declaration::{Number, Text}, json::Value, Position};
 /// A type, at its name's quote or its object's `{`.
 pub struct Type { pub at: Position, pub form: Form }
 /// 6.2's types; an index names a later type of `Declaration::types`.

@@ -595,6 +595,19 @@ None yet.
      9. `Decoder::Interpolated`'s `length` is at most 03's `Limits::document` (`hearth-protocol-config/src/limits.rs:4`, 1,048,576); neither the template crate nor its world depends on `hearth-protocol-config`, so the memory test passes `SHIPPED`'s `template`, the same value.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+134. **hearth 35's Shapes against main** (ready check of hearth-35.1).
+     hearth 35's ready check, against hearth e22d0e9 to d14d0dc (04.1 at cc68d36) and skein 841f487 (clippy clean with `settings` given to the `Limits` literals; default 513, fuzzy 13; the schema, 35.1 test and 35.2 fuzzy sketches compiled under clippy at e22d0e9 with stand-ins for what 35 adds), corrects 35-schema-exports.md:
+     1. skein's `Stack::with_capacity` is `stack.rs:22` and `push` `:50`. 14's and 16's lines are given at f981746, as they say, and stand.
+     2. The `Limits {` literals on main are `src/limits.rs`, `world::limits`'s two (`tests/config/src/world.rs:59` and `:65`), `tests/config/tests/world.rs:27` and `tests/config/tests/memory.rs:10`: each takes `settings`, or fails with E0063.
+     3. 35.1's Files gain `src/tests.rs` (`mod schema;`).
+     4. `TASKS` (`tests/config/src/examples.rs:32`) is a static `include_bytes!` table: each new example takes a row, `locale`, `boot`, `hearth` and `users` in 35.1, `vpn` and `backup-peer` in 35.2, and `examples.rs` joins both Files.
+     5. The schema sketch takes `alloc::boxed::Box` and `crate::Position` (`lib.rs:13`).
+     6. `at_the_limits`' documents (`tests/config/src/fixtures.rs:42`) are refused at their first unknown key, before any `Type`, `Spec` or `Export`: 35.2 meters `declaration` on a new `fixtures::declarations_at_the_limits(&Limits)`, the most settings, types and exports the limits allow, with `metered.rs` (`tests/config/src/fixtures/metered.rs:12`) metering `declaration` on the decoded `Value`; `metered.rs` and `tests/memory.rs` join 35.2's Files. `declaration::worst_case` counts the walk's `Stack` of `depth` frames too, and each list at its capacity.
+     7. No rule gives `Unknown { of: Type }`: a type object's unknown key is `Wrong { expected: Type }` at its `{` (35.1), so `EVERY_DECLARED` takes `Unknown` of each `Object` but `Type`.
+     8. `world::limits`' tiny branch (`world.rs:59`: document below 200, depth and keys below 5) holds no declaration of every key, and its JSON faults come first; its roomy one (`:65`) has `keys: 32`, below 512 settings. The sweep draws a new `world::declaring(rng) -> Limits`, the roomy values with `settings` drawn below `keys`, so that `Settings` falls; `world.rs` joins 35.2's Files.
+     9. `Declared` is `Copy` already (`src/error.rs:24`), as the fuzzy sketch needs.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
