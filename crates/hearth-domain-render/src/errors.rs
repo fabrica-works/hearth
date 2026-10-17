@@ -314,6 +314,8 @@ pub enum Format {
     Key,
     Timestamp,
     Debian,
+    Preseed,
+    Module,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

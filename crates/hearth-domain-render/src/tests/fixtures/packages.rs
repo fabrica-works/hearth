@@ -80,3 +80,38 @@ pub fn packages_root(components: &[(&[u8], bool)], security: bool, timestamp: &[
     .0
     .expect("valid fixed schema")
 }
+pub const MIN_MODULE_NAME: usize = 1;
+pub const MAX_MODULE_NAME: usize = 55;
+pub const MODULE_NAME_BYTES: &[u8; MAX_MODULE_NAME + 1] = &[b'a'; MAX_MODULE_NAME + 1];
+pub fn preseed(question: &[u8], fields: &[(Name, &[u8])]) -> Concrete {
+    let expansion = super::concrete_expansion(Map::Preseeds, &[(question, fields)]);
+    super::only(&super::only(&super::only(&expansion.tasks).groups).entries).clone()
+}
+pub fn module(name: &[u8]) -> Concrete {
+    let expansion = super::concrete_expansion(Map::Initramfs, &[(name, &[])]);
+    super::only(&super::only(&super::only(&expansion.tasks).groups).entries).clone()
+}
+pub fn preseed_answer() -> Preseed {
+    Preseed {
+        question: copy_of(b"tzdata/Areas"),
+        owner: copy_of(b"tzdata"),
+        kind: PreseedKind::Select,
+        value: copy_of(b"Europe"),
+    }
+}
+pub fn declarations_packages(
+    expansion: &Expansion,
+    kind: crate::revision::Runs,
+) -> Result<Packages, Box<[crate::errors::Error]>> {
+    let mut placement = super::containers::placement(None);
+    placement.kind = kind;
+    build(&super::checked_debian(), &placement, expansion, None)
+}
+pub fn module_expansion() -> Expansion {
+    let mut expansion = super::concrete_expansion(Map::Initramfs, &[(b"nvme", &[]), (b"btrfs", &[])]);
+    let task = super::only(&expansion.tasks).clone();
+    expansion.tasks = Box::new([task.clone(), Expanded { task: copy_of(b"other"), groups: task.groups }]);
+    expansion
+}
+
+pub const PRESEED_FIELDS: &[(Name, &[u8])] = &[(Name::Type, b"select"), (Name::Value, b"Europe")];

@@ -10,6 +10,8 @@ pub enum Format {
     Key,
     Timestamp,
     Debian,
+    Preseed,
+    Module,
 }
 impl Format {
     pub(super) fn name(self) -> &'static [u8] {
@@ -23,6 +25,8 @@ impl Format {
             Self::Key => b"key",
             Self::Timestamp => b"timestamp",
             Self::Debian => b"debian",
+            Self::Preseed => b"preseed",
+            Self::Module => b"module",
         }
     }
 }

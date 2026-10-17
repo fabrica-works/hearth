@@ -751,3 +751,24 @@ fn a_component_debian_does_not_enable_exits_with_configuration_failure() {
     let repository = fixtures::packages_repository("component-off-exit", false);
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
+#[test]
+fn preseeds_and_modules_reach_the_packages_part() {
+    let repository = Repository::make("preseeded", &fixtures::thin_with(fixtures::PRESEEDED));
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(
+            &rendered.stdout,
+            &["packages ", "  sources", "  request", "  variant", "  preseed", "  initramfs", "  microcode", "  apt"]
+        ),
+        concat!(
+            "packages     part 552be03a9eec\n",
+            "  sources    forky amd64 main 20261001T030405Z\n",
+            "  request    curl tzdata\n",
+            "  variant    apt\n",
+            "  preseed    tzdata/Areas select Europe\n",
+            "  initramfs  btrfs nvme\n",
+            "  microcode  generic\n",
+            "  apt        install_recommends false\n"
+        )
+    );
+}

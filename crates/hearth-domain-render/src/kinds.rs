@@ -14,3 +14,4 @@ pub fn required(entry: &Concrete, name: Name) -> Result<(), Schema> {
 }
 
 pub mod packages;
+pub mod preseeds;

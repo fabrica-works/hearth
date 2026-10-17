@@ -615,6 +615,8 @@ pub fn format(format: target::Format) -> records::errors::Format {
         target::Format::Key => records::errors::Format::Key,
         target::Format::Timestamp => records::errors::Format::Timestamp,
         target::Format::Debian => records::errors::Format::Debian,
+        target::Format::Preseed => records::errors::Format::Preseed,
+        target::Format::Module => records::errors::Format::Module,
     }
 }
 

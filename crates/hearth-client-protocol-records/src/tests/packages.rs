@@ -61,3 +61,8 @@ fn a_component_error_names_the_package_and_the_component() {
     let text = fixtures::print_error(Form::Text, error).expect("component error");
     assert_eq!(text.as_ref(), b"tasks/boot/task.json:22:7: carbon-lab: boot: firmware-linux needs component non-free-firmware, which debian.components does not enable\n");
 }
+#[test]
+fn preseeds_and_modules_print_as_render_md_9_2_shows() {
+    let text = fixtures::packages_text(fixtures::preseeded_spec());
+    assert!(skein_lib::bytes::find(&text, b"  variant    apt\n  preseed    a/answer string word\n  preseed    tzdata/Areas select Europe owner other\n  initramfs  btrfs nvme\n  microcode  generic\n").is_some());
+}

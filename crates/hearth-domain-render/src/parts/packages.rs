@@ -6,6 +6,7 @@ use hearth_lib::{
 };
 use skein_lib::{List, bytes};
 mod build;
+mod declarations;
 pub use build::{build, read};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Packages {

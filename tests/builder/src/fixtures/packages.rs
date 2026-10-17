@@ -24,3 +24,7 @@ pub fn packages_repository(name: &str, enabled: bool) -> Repository {
     }
     Repository::make(name, &files)
 }
+pub const PRESEEDED: &[File] = &[
+    File { path: "tasks/base/task.json", body: br#"{"packages": {"curl": {}, "tzdata": {}}, "preseeds": {"tzdata/Areas": {"type": "select", "value": "Europe"}}, "initramfs": {"btrfs": {}, "nvme": {}}}"#, mode: 0o644 },
+    COMPONENT_OFF,
+];

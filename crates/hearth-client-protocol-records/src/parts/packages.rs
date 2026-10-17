@@ -131,7 +131,29 @@ impl Packages {
         lines.put(b"  variant    ");
         lines.put(self.variant.name());
         lines.put(b"\n");
+        for preseed in &self.preseeds {
+            lines.put(b"  preseed    ");
+            lines.put(&preseed.question);
+            lines.put(b" ");
+            lines.put(preseed.kind.name());
+            lines.put(b" ");
+            lines.put(&preseed.value);
+            if !preseed.question.starts_with(&preseed.owner) || preseed.question.get(preseed.owner.len()) != Some(&b'/')
+            {
+                lines.put(b" owner ");
+                lines.put(&preseed.owner);
+            }
+            lines.put(b"\n");
+        }
         if let Some(initramfs) = &self.initramfs {
+            if !initramfs.modules.is_empty() {
+                lines.put(b"  initramfs ");
+                for module in &initramfs.modules {
+                    lines.put(b" ");
+                    lines.put(module);
+                }
+                lines.put(b"\n");
+            }
             lines.put(b"  microcode  ");
             lines.put(initramfs.microcode.name());
             lines.put(b"\n");

@@ -219,3 +219,6 @@ fn a_component_the_target_does_not_enable_keeps_its_setting_place() {
         })
     );
 }
+
+#[path = "packages/preseeds.rs"]
+mod preseeds;

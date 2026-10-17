@@ -104,9 +104,19 @@ pub fn build(
         revision::Runs::Vm => (Variant::Apt, Some(Initramfs { modules: Box::new([]), microcode: Microcode::None })),
         revision::Runs::Container => (Variant::Container, None),
     };
-    Ok(Packages { sources, request: request.into_boxed(), variant, preseeds: Box::new([]), initramfs, apt })
+    let (preseeds, modules) = super::declarations::build(expansion, initramfs.is_some())?;
+    let mut initramfs = initramfs;
+    if let Some(initramfs) = &mut initramfs {
+        initramfs.modules = modules;
+    }
+    Ok(Packages { sources, request: request.into_boxed(), variant, preseeds, initramfs, apt })
 }
-fn error(schema: Schema, task: Option<&[u8]>, position: Option<revision::Position>, also: Option<Place>) -> Error {
+pub(super) fn error(
+    schema: Schema,
+    task: Option<&[u8]>,
+    position: Option<revision::Position>,
+    also: Option<Place>,
+) -> Error {
     let mut at = None;
     let mut name = None;
     if let Some(task) = task {
