@@ -4,5 +4,6 @@ pub mod generate;
 pub mod world;
 
 pub mod expect;
+mod hunks;
 pub mod mutate;
 mod replay;

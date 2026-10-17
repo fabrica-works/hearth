@@ -90,3 +90,23 @@ fn random_recordings_cut_mutated_ended_and_failed_settle() {
         drop(world::replay(&damaged, &expected, &fixtures::SHIPPED, &settings));
     }
 }
+
+#[test]
+fn random_hunks_cut_ended_failed_and_closed_settle() {
+    use hearth_git_world::mutate;
+    for seed in 0..256 {
+        let mut rng = Rng::new(seed);
+        for (input, _) in fixtures::HUNKS {
+            let stdout = generate::hunks(&mut rng, input);
+            for damaged in mutate::all(&stdout) {
+                let settings = Settings {
+                    end: Some(usize::try_from(rng.between(0, damaged.len() as u64)).expect("end")),
+                    fail: rng.chance(250),
+                    close: Some(u32::try_from(rng.below(48)).expect("close step")),
+                    ..Settings::cut(seed)
+                };
+                drop(world::diff(&damaged, &fixtures::SMALL, &settings));
+            }
+        }
+    }
+}

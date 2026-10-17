@@ -66,3 +66,26 @@ pub fn batched(stdout: &[u8], requests: &[crate::batch::Request], limits: &Limit
     }
     unreachable!("bounded batch settles")
 }
+
+pub fn hunked(stdout: &[u8], limits: &Limits) -> crate::hunks::Event {
+    use crate::hunks::{self, Diff, Request};
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
+    let mut machine = Diff::new(limits);
+    let mut held = Held::new(bytes::copy_of(stdout));
+    let mut above = Queue::with_capacity(1);
+    let mut below = Queue::with_capacity(1);
+    hunks::down(&mut machine, &env, Request::Read, &mut above, &mut below);
+    for _ in 0..stdout.len().saturating_mul(3).saturating_add(20) {
+        if let Some(event) = above.pop() {
+            return event;
+        }
+        match below.pop().expect("outstanding demand") {
+            Down::Demand { read, room: 0 } => {
+                let event = held.answer(read).expect("held answers demand");
+                hunks::up(&mut machine, &env, event, &mut above, &mut below);
+            }
+            Down::Demand { .. } | Down::Send(_) | Down::Finish => unreachable!("read only"),
+        }
+    }
+    unreachable!("bounded diff settles")
+}

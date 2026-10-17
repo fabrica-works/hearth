@@ -148,6 +148,15 @@ impl Scenario {
             Kind::Revision(_) | Kind::Commit => Expected::Revision(Resolved::Commit(repo.commit)),
             Kind::Listing => Expected::Listing(repo.entries.clone()),
             Kind::Blobs => Expected::Blobs(repo.blobs.clone()),
+            Kind::Diff(change) => Expected::Hunks(hearth_protocol_git::hunks::Hunks {
+                lines: change
+                    .lines
+                    .iter()
+                    .map(|(kind, text)| hearth_protocol_git::hunks::Line { kind: *kind, text: (*text).into() })
+                    .collect(),
+                left_out: change.left_out,
+                binary: change.binary,
+            }),
             Kind::Missing => {
                 Expected::Blobs(Box::new([Blob { oid: Oid::parse(MISSING).expect("missing oid"), bytes: None }]))
             }
@@ -161,11 +170,12 @@ impl Scenario {
             Kind::Revision(name) => name.as_bytes(),
             Kind::Commit => repo.commit.hex(),
             Kind::Tree => repo.tree.hex(),
-            Kind::Listing | Kind::Blobs | Kind::Missing => b"main",
+            Kind::Listing | Kind::Blobs | Kind::Missing | Kind::Diff(_) => b"main",
         };
         let revision = invocation::revision(revision).expect("fixture revision");
         let command = match case.kind {
             Kind::Revision(_) | Kind::Commit | Kind::Tree => Command::RevParse { repository, revision: &revision },
+            Kind::Diff(_) => Command::Diff { store: b".", before: &git::BEFORE, after: &git::AFTER },
             Kind::Listing => Command::LsTree { repository, commit: repo.commit },
             Kind::Blobs | Kind::Missing => Command::CatFile { repository },
         };
@@ -176,8 +186,18 @@ impl Scenario {
                     .flat_map(|b| hearth_protocol_git::batch::request_line(b.oid).into_vec())
                     .collect::<Vec<_>>(),
             ),
-            Expected::Listing(_) | Expected::Revision(_) => None,
+            Expected::Listing(_) | Expected::Revision(_) | Expected::Hunks(_) => None,
         };
+        if let Kind::Diff(change) = case.kind {
+            let names = invocation::arguments(command);
+            for (path, contents) in names.iter().rev().take(2).rev().zip([change.before, change.after]) {
+                std::fs::write(
+                    self.store.join(std::ffi::OsStr::new(core::str::from_utf8(path).expect("cache path"))),
+                    contents,
+                )
+                .expect("cache content");
+            }
+        }
         let args: Vec<_> = invocation::arguments(command).iter().map(|b| b.to_vec()).collect();
         let mut run = run::git(&args, &self.store, stdin.as_deref(), &[]);
         run.captured.version = self.version.clone();

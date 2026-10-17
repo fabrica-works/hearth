@@ -23,5 +23,7 @@ pub fn all(stdout: &[u8]) -> Vec<Vec<u8>> {
         }
     }
     result.push(stdout[..stdout.len().saturating_sub(1)].to_vec());
+    result.sort();
+    result.dedup();
     result
 }

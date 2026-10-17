@@ -81,3 +81,12 @@ pub fn batch(rng: &mut Rng, limits: &Limits) -> Batch {
     }
     Batch { stdout, requests: requests.into_boxed_slice(), blobs: blobs.into_boxed_slice() }
 }
+
+/// Vary pre-hunk headers independently of the literal change under test.
+#[must_use]
+pub fn hunks(rng: &mut skein_lib::Rng, change: &[u8]) -> Vec<u8> {
+    let mut stdout =
+        format!("diff --git a/{} b/{}\n--- a/file\n+++ b/file\n", rng.below(1000), rng.below(1000)).into_bytes();
+    stdout.extend_from_slice(change);
+    stdout
+}

@@ -1,0 +1,12 @@
+/usr/bin/git
+--git-dir=/dev/null
+diff
+--no-index
+--no-color
+--no-ext-diff
+--no-textconv
+--diff-algorithm=myers
+--unified=3
+--
+./cache/1111111111111111111111111111111111111111111111111111111111111111
+./cache/2222222222222222222222222222222222222222222222222222222222222222

@@ -8,6 +8,10 @@ use hearth_recordings::Recording;
 #[must_use]
 pub fn replay(recording: &Recording, expected: &Expected, limits: &Limits, settings: &Settings) -> Option<Expected> {
     match expected {
+        Expected::Hunks(_) => match world::diff(&recording.stdout, limits, settings) {
+            world::DiffOutcome::Done(hunks) => Some(Expected::Hunks(hunks)),
+            world::DiffOutcome::Failed(_) | world::DiffOutcome::Closed => None,
+        },
         Expected::Revision(_) => {
             rev_parse::decode(&recording.stdout, exit(&recording.exit)).ok().map(Expected::Revision)
         }

@@ -67,6 +67,13 @@ const EXIT_CASES: &[(&str, hearth_protocol_git::invocation::Exit)] = &[
     ("ls-tree-sha256", hearth_protocol_git::invocation::Exit::Code(0)),
     ("cat-file-blobs", hearth_protocol_git::invocation::Exit::Code(0)),
     ("cat-file-missing", hearth_protocol_git::invocation::Exit::Code(0)),
+    ("diff-line-changed", hearth_protocol_git::invocation::Exit::Code(1)),
+    ("diff-line-added", hearth_protocol_git::invocation::Exit::Code(1)),
+    ("diff-line-removed", hearth_protocol_git::invocation::Exit::Code(1)),
+    ("diff-lines-appended", hearth_protocol_git::invocation::Exit::Code(1)),
+    ("diff-no-newline", hearth_protocol_git::invocation::Exit::Code(1)),
+    ("diff-binary", hearth_protocol_git::invocation::Exit::Code(1)),
+    ("diff-past-200-lines", hearth_protocol_git::invocation::Exit::Code(1)),
 ];
 #[test]
 fn each_real_git_case_exits_as_its_operation_requires() {
@@ -75,5 +82,24 @@ fn each_real_git_case_exits_as_its_operation_requires() {
         let case = git::CASES.iter().find(|case| case.name == *name).expect("named case");
         let run = scenario.run(case);
         assert_eq!(run.exit, *expected, "{name}: {}", run.stderr_text());
+    }
+}
+
+#[test]
+fn real_git_s_hunks_are_the_unique_shortest_diff_of_each_change() {
+    let scenario = Scenario::new();
+    for case in git::CASES {
+        if let git::Kind::Diff(change) = case.kind {
+            let run = scenario.run(case);
+            let world::DiffOutcome::Done(hunks) =
+                world::diff(&run.recording().stdout, &limits::SHIPPED, &Settings::whole())
+            else {
+                panic!("{}: {}", case.name, run.stderr_text())
+            };
+            let lines: Vec<_> = hunks.lines.iter().map(|line| (line.kind, line.text.as_ref())).collect();
+            assert_eq!(lines.as_slice(), change.lines, "{}", case.name);
+            assert_eq!(hunks.left_out, change.left_out, "{}", case.name);
+            assert_eq!(hunks.binary, change.binary, "{}", case.name);
+        }
     }
 }

@@ -1,7 +1,7 @@
 use hearth_protocol_git::limits::{self, Limits};
 pub const SHIPPED: Limits = limits::SHIPPED;
 /// Small enough to exercise every limit without a shipped-size allocation.
-pub const SMALL: Limits = Limits { entries: 8, path: 32, paths_total: 256, chunk: 16 };
+pub const SMALL: Limits = Limits { entries: 8, path: 32, paths_total: 256, chunk: 16, hunk_lines: 8, hunk_file: 64 };
 
 #[derive(Debug)]
 pub struct Case {
@@ -72,5 +72,56 @@ pub fn at_the_limits(limits: &Limits) -> Vec<Case> {
             requests: Box::new([Request::Read { oid, size: 0, max: 0 }]),
         });
     }
+    for (lines, length, what) in [
+        (limits.hunk_lines, 1, "hunk count at limit"),
+        (limits.hunk_lines + 1, 1, "hunk count one past"),
+        (1, limits.hunk_file - 1, "hunk file at limit"),
+        (1, limits.hunk_file, "hunk file one past"),
+    ] {
+        let mut stdout = b"@@ -1 +1 @@\n".to_vec();
+        for _ in 0..lines {
+            stdout.push(b'+');
+            stdout.extend(std::iter::repeat_n(b'x', usize::try_from(length).expect("line size")));
+            stdout.push(b'\n');
+        }
+        cases.push(Case { what, decoder: Decoder::Diff, stdout, requests: Box::new([]) });
+    }
     cases
+}
+
+use hearth_protocol_git::hunks::Kind;
+pub type HunkRow = (&'static [u8], &'static [(Kind, &'static [u8])]);
+pub const HUNKS: &[HunkRow] = &[
+    (b"@@ -1 +1 @@\n-a\n+b\n", &[(Kind::Hunk, b"@@ -1 +1 @@"), (Kind::Removed, b"a"), (Kind::Added, b"b")]),
+    (
+        b"@@ -1 +1 @@\n x\n+\n\\ No newline at end of file\n",
+        &[
+            (Kind::Hunk, b"@@ -1 +1 @@"),
+            (Kind::Context, b"x"),
+            (Kind::Added, b""),
+            (Kind::NoNewline, b" No newline at end of file"),
+        ],
+    ),
+];
+
+/// Recorded files and header paths are below 512 bytes; keep the 200-line limit.
+pub const RECORDED: Limits = Limits { hunk_file: 512, ..SHIPPED };
+
+/// The mutation sweep is split over seed batches to stay below the focused ceiling.
+pub fn check_recording_mutations(seeds: &[u64]) {
+    use crate::{
+        expect, mutate,
+        world::{self, Settings},
+    };
+    for (case, mut recording) in hearth_recordings::all("git") {
+        let expected = expect::decode(recording.expect.as_ref().expect("recorded expectation"));
+        for stdout in mutate::all(&recording.stdout) {
+            recording.stdout = stdout;
+            for seed in seeds {
+                if let Some(decoded) = world::replay(&recording, &expected, &RECORDED, &Settings::cut(*seed)) {
+                    assert_eq!(decoded, expected, "{case}, seed {seed}");
+                }
+            }
+        }
+    }
 }

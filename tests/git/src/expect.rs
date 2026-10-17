@@ -9,6 +9,7 @@ use std::fmt::Write;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expected {
     Revision(Resolved),
+    Hunks(hearth_protocol_git::hunks::Hunks),
     Listing(Box<[Entry]>),
     Blobs(Box<[Blob]>),
 }
@@ -24,6 +25,13 @@ pub const CASE_NAMES: &[&str] = &[
     "ls-tree-sha256",
     "cat-file-blobs",
     "cat-file-missing",
+    "diff-line-changed",
+    "diff-line-added",
+    "diff-line-removed",
+    "diff-lines-appended",
+    "diff-no-newline",
+    "diff-binary",
+    "diff-past-200-lines",
 ];
 #[must_use]
 pub fn hex(bytes: &[u8]) -> String {
@@ -48,9 +56,28 @@ pub fn decode(bytes: &[u8]) -> Expected {
     let text = std::str::from_utf8(bytes).expect("expected UTF-8");
     let mut entries = Vec::new();
     let mut blobs = Vec::new();
+    let mut hunks = Vec::new();
     for line in text.lines() {
         let words: Vec<_> = line.split(' ').collect();
         match words[0] {
+            "line" => hunks.push(hearth_protocol_git::hunks::Line {
+                kind: kind(words[1]),
+                text: unhex(words[2]).into_boxed_slice(),
+            }),
+            "hunks" => {
+                return Expected::Hunks(hearth_protocol_git::hunks::Hunks {
+                    lines: hunks.into_boxed_slice(),
+                    left_out: words[1].parse().expect("left out"),
+                    binary: false,
+                });
+            }
+            "binary" => {
+                return Expected::Hunks(hearth_protocol_git::hunks::Hunks {
+                    lines: Box::new([]),
+                    left_out: 0,
+                    binary: true,
+                });
+            }
             "resolved" => return Expected::Revision(Resolved::Commit(oid(words[1]))),
             "unresolved" => return Expected::Revision(Resolved::Unresolved),
             "entry" => entries.push(Entry {
@@ -87,6 +114,23 @@ fn mode(text: &str) -> Mode {
 pub fn encode(expected: &Expected) -> Vec<u8> {
     let mut text = String::new();
     match expected {
+        Expected::Hunks(hunks) => {
+            if hunks.binary {
+                text.push_str("binary\n");
+            } else {
+                for line in &hunks.lines {
+                    let kind = match line.kind {
+                        hearth_protocol_git::hunks::Kind::Hunk => "hunk",
+                        hearth_protocol_git::hunks::Kind::Context => "context",
+                        hearth_protocol_git::hunks::Kind::Removed => "removed",
+                        hearth_protocol_git::hunks::Kind::Added => "added",
+                        hearth_protocol_git::hunks::Kind::NoNewline => "no-newline",
+                    };
+                    writeln!(text, "line {kind} {}", hex(&line.text)).expect("String write");
+                }
+                writeln!(text, "hunks {}", hunks.left_out).expect("String write");
+            }
+        }
         Expected::Revision(Resolved::Commit(oid)) => {
             writeln!(text, "resolved {}", String::from_utf8_lossy(oid.hex())).expect("String write");
         }
@@ -119,4 +163,16 @@ pub fn encode(expected: &Expected) -> Vec<u8> {
         }
     }
     text.into_bytes()
+}
+
+fn kind(text: &str) -> hearth_protocol_git::hunks::Kind {
+    use hearth_protocol_git::hunks::Kind;
+    match text {
+        "hunk" => Kind::Hunk,
+        "context" => Kind::Context,
+        "removed" => Kind::Removed,
+        "added" => Kind::Added,
+        "no-newline" => Kind::NoNewline,
+        other => panic!("line kind {other}"),
+    }
 }

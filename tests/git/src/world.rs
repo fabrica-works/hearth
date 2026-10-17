@@ -194,6 +194,8 @@ pub struct Stepped {
     decoder: hearth_protocol_git::limits::Decoder,
     listing: Option<Listing>,
     batch: Option<hearth_protocol_git::batch::Batch>,
+    diff: Option<hearth_protocol_git::hunks::Diff>,
+    diff_events: Queue<hearth_protocol_git::hunks::Event>,
     held: skein_lib::stream::Held,
     requests: std::vec::IntoIter<hearth_protocol_git::batch::Request>,
     listing_events: Queue<Event>,
@@ -205,6 +207,7 @@ pub struct Stepped {
 }
 #[derive(Debug)]
 enum Action {
+    Diff,
     List,
     Batch(hearth_protocol_git::batch::Request),
     Up(Up),
@@ -218,6 +221,8 @@ impl Stepped {
             decoder: case.decoder,
             listing: None,
             batch: None,
+            diff: None,
+            diff_events: Queue::with_capacity(1),
             held: skein_lib::stream::Held::new(case.stdout.clone().into_boxed_slice()),
             requests: Vec::from(case.requests.clone()).into_iter(),
             listing_events: Queue::with_capacity(1),
@@ -231,6 +236,10 @@ impl Stepped {
     pub fn open(&mut self) {
         use hearth_protocol_git::{batch::Batch, limits::Decoder};
         match self.decoder {
+            Decoder::Diff => {
+                self.diff = Some(hearth_protocol_git::hunks::Diff::new(&self.env.limits));
+                self.action = Some(Action::Diff);
+            }
             Decoder::Listing => {
                 self.listing = Some(Listing::new(&self.env.limits));
                 self.action = Some(Action::List);
@@ -255,6 +264,20 @@ impl Stepped {
         use hearth_protocol_git::{batch, limits::Decoder};
         let action = self.action.take().expect("prepared call");
         match self.decoder {
+            Decoder::Diff => {
+                use hearth_protocol_git::hunks::{self, Request};
+                let machine = self.diff.as_mut().expect("open diff");
+                match action {
+                    Action::Diff => {
+                        hunks::down(machine, &self.env, Request::Read, &mut self.diff_events, &mut self.below);
+                    }
+                    Action::Close => {
+                        hunks::down(machine, &self.env, Request::Close, &mut self.diff_events, &mut self.below);
+                    }
+                    Action::Up(up) => hunks::up(machine, &self.env, up, &mut self.diff_events, &mut self.below),
+                    Action::List | Action::Batch(_) => unreachable!("diff driver"),
+                }
+            }
             Decoder::Listing => {
                 let machine = self.listing.as_mut().expect("open listing");
                 match action {
@@ -265,7 +288,7 @@ impl Stepped {
                         listing::down(machine, &self.env, Request::Close, &mut self.listing_events, &mut self.below);
                     }
                     Action::Up(up) => listing::up(machine, &self.env, up, &mut self.listing_events, &mut self.below),
-                    Action::Batch(_) => unreachable!("listing driver"),
+                    Action::Batch(_) | Action::Diff => unreachable!("listing driver"),
                 }
             }
             Decoder::Batch => {
@@ -278,13 +301,22 @@ impl Stepped {
                         batch::down(machine, &self.env, batch::Request::Close, &mut self.batch_events, &mut self.below);
                     }
                     Action::Up(up) => batch::up(machine, &self.env, up, &mut self.batch_events, &mut self.below),
-                    Action::List => unreachable!("batch driver"),
+                    Action::List | Action::Diff => unreachable!("batch driver"),
                 }
             }
         }
     }
     pub fn drop_events(&mut self) {
         use hearth_protocol_git::batch;
+        if let Some(event) = self.diff_events.pop() {
+            match event {
+                hearth_protocol_git::hunks::Event::Hunks(_) | hearth_protocol_git::hunks::Event::Failed(_) => {
+                    self.action = Some(Action::Close);
+                }
+                hearth_protocol_git::hunks::Event::Closed => self.closed = true,
+            }
+            drop(event);
+        }
         if let Some(event) = self.listing_events.pop() {
             match event {
                 Event::Listed(_) | Event::Failed(_) => self.action = Some(Action::Close),
@@ -321,12 +353,38 @@ impl Stepped {
 pub use crate::replay::replay;
 
 #[derive(Debug)]
-enum Source {
+pub(crate) enum Source {
     Cut(Wire),
-    Whole { held: skein_lib::stream::Held, demand: Option<Read> },
+    Quiet {
+        input: skein_lib::Intake,
+        pending: Box<[u8]>,
+        cursor: usize,
+        rng: skein_lib::Rng,
+        demand: Option<Read>,
+        ended: bool,
+    },
+    Whole {
+        held: skein_lib::stream::Held,
+        demand: Option<Read>,
+    },
 }
 impl Source {
-    fn new(stdout: &[u8], settings: &Settings) -> Self {
+    pub(crate) fn quiet(stdout: &[u8], settings: &Settings) -> Self {
+        if settings.whole {
+            return Self::new(stdout, settings);
+        }
+        let bytes = &stdout[..settings.end.unwrap_or(stdout.len()).min(stdout.len())];
+        Self::Quiet {
+            input: skein_lib::Intake::with_capacity(32768),
+            pending: bytes.into(),
+            cursor: 0,
+            rng: skein_lib::Rng::new(settings.seed),
+            demand: None,
+            ended: false,
+        }
+    }
+
+    pub(crate) fn new(stdout: &[u8], settings: &Settings) -> Self {
         let bytes = &stdout[..settings.end.unwrap_or(stdout.len()).min(stdout.len())];
         if settings.whole {
             Self::Whole { held: skein_lib::stream::Held::new(bytes.into()), demand: None }
@@ -337,9 +395,19 @@ impl Source {
             Self::Cut(wire)
         }
     }
-    fn take(&mut self, down: skein_lib::stream::Down) {
+    pub(crate) fn take(&mut self, down: skein_lib::stream::Down) {
         match self {
             Self::Cut(wire) => wire.take(down),
+            Self::Quiet { demand, .. } => match down {
+                skein_lib::stream::Down::Demand { read: Read::Nothing, room: 0 } => *demand = None,
+                skein_lib::stream::Down::Demand { read, room: 0 } => {
+                    assert!(demand.is_none(), "one demand");
+                    *demand = Some(read);
+                }
+                skein_lib::stream::Down::Demand { .. }
+                | skein_lib::stream::Down::Send(_)
+                | skein_lib::stream::Down::Finish => unreachable!("read-only quiet source"),
+            },
             Self::Whole { demand, .. } => match down {
                 skein_lib::stream::Down::Demand { read: Read::Nothing, room: 0 } => *demand = None,
                 skein_lib::stream::Down::Demand { read, room: 0 } => *demand = Some(read),
@@ -349,10 +417,30 @@ impl Source {
             },
         }
     }
-    fn answer(&mut self) -> Option<Up> {
+    pub(crate) fn answer(&mut self) -> Option<Up> {
         match self {
             Self::Cut(wire) => wire.answer(),
+            Self::Quiet { input, pending, cursor, rng, demand, ended } => {
+                if *cursor < pending.len() && rng.chance(700) {
+                    let count =
+                        usize::try_from(rng.between(1, 31)).expect("small fragment").min(pending.len() - *cursor);
+                    input.append(&pending[*cursor..*cursor + count]).expect("bounded intake");
+                    *cursor += count;
+                }
+                let read = (*demand)?;
+                if let Some(bytes) = input.meet(read) {
+                    *demand = None;
+                    Some(Up::Bytes(bytes))
+                } else if *cursor == pending.len() && !*ended {
+                    *ended = true;
+                    Some(Up::End)
+                } else {
+                    None
+                }
+            }
             Self::Whole { held, demand } => demand.take().and_then(|read| held.answer(read)),
         }
     }
 }
+
+pub use crate::hunks::{DiffOutcome, diff};
