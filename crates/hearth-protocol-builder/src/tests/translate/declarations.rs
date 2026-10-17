@@ -84,6 +84,9 @@ fn schema_back(schema: crate::records::errors::Schema) -> render::errors::Schema
         }
         crate::records::errors::Schema::File { path } => render::errors::Schema::File { path },
         crate::records::errors::Schema::Large { path, max } => render::errors::Schema::Large { path, max },
+        crate::records::errors::Schema::Component { package, component } => {
+            render::errors::Schema::Component { package, component }
+        }
         crate::records::errors::Schema::Main => render::errors::Schema::Main,
         crate::records::errors::Schema::Security => render::errors::Schema::Security,
         crate::records::errors::Schema::Undeclared { setting, declared } => {

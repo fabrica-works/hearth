@@ -7,7 +7,7 @@ pub(super) fn check(
     merge: &mut compose::Merge,
     errors: &mut errors::Collector,
     target: &Target,
-) -> Option<Value> {
+) -> Option<(Value, Option<errors::Place>)> {
     let composed = compose::debian(target, documents, merge);
     let mut faults = List::with_capacity(16);
     let value = schema::debian(composed.as_ref(), target.base_document.unwrap_or(target.base_env), &mut faults);
@@ -22,5 +22,16 @@ pub(super) fn check(
             task: None,
         });
     }
-    value
+    let mut set = None;
+    if let Some(compose::Composed { kind: compose::Composite::Map(pairs), from: _ }) = &composed {
+        for pair in pairs {
+            if pair.key.as_ref() == b"components" && pair.from.layer != compose::Layer::Defaults {
+                set = Some(errors::Place {
+                    path: bytes::copy_of(documents.path(pair.from.document)),
+                    position: Some(pair.from.at),
+                });
+            }
+        }
+    }
+    Some((value?, set))
 }

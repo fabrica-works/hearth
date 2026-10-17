@@ -16,7 +16,7 @@ fn a_targets_meta_is_its_names_and_the_base_envs_placement() {
         assert_eq!(spec.meta, fixtures::x1_prod_meta(), "render.md, 4.4: the target's meta");
         assert_eq!(
             spec.digest,
-            fixtures::digest("829eb3fc4903f1afb4bbb31de793bd21f014aabd7dd4d006418879170da9e442"),
+            fixtures::digest("8f143fd36a9227dd82674e8fc2c0890d7c0300ac2635acde31c49668bc7ecd03"),
             "seed {seed}"
         );
         assert_eq!(run.outcome, Outcome::Done, "seed {seed}");

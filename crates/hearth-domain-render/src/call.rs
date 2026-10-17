@@ -2,6 +2,7 @@
 mod debian;
 mod files;
 pub(crate) mod guards;
+mod packages;
 mod references;
 mod secrets;
 pub(crate) mod templates;
@@ -459,7 +460,7 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             }
-            let meta = compose::metadata(target, p);
+            let meta = compose::metadata(target, p.clone());
             let meta_digest = meta::digest(&meta);
             let settings = self.settings.get(self.next.saturating_sub(1)).expect("target settings");
             let names = validation::targets(&self.targets, &target.environment);
@@ -483,8 +484,7 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
-            let Some(debian) = debian::check(&self.documents, &mut self.merge, &mut self.errors, target) else {
-                self.outcome = self.outcome.worst(Outcome::Failed);
+            let Some((debian, set)) = debian::check(&self.documents, &mut self.merge, &mut self.errors, target) else {
                 continue;
             };
             let Some(expansion) = guards::contained(
@@ -496,7 +496,9 @@ impl Side {
                 &containers,
                 &debian,
             ) else {
-                self.outcome = self.outcome.worst(Outcome::Failed);
+                continue;
+            };
+            let Some(packages) = packages::build(&debian, &p, &expansion, set.as_ref(), &meta, &mut self.errors) else {
                 continue;
             };
             let Some(secrets) = secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome) else {
@@ -518,7 +520,7 @@ impl Side {
                 meta_digest,
                 checked,
                 debian,
-                templates::Prepared { plans, expansion, secrets },
+                templates::Prepared { plans, expansion, secrets, packages },
                 capacity,
             ));
             return self.template();

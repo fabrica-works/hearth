@@ -21,7 +21,7 @@ fn json_lines_give_the_version_first_and_the_outcome_last() {
         Some("{\"record\":\"outcome\",\"outcome\":\"done\",\"left_out\":0}"),
         "terminal last"
     );
-    assert_eq!(lines.len(), 6, "version, spec, config, secrets, meta and outcome");
+    assert_eq!(lines.len(), 7, "version, spec, packages, config, secrets, meta and outcome");
 }
 #[test]
 fn an_unknown_target_exits_64_after_the_listing() {
@@ -721,3 +721,33 @@ fn a_secret_without_a_path_exits_with_configuration_failure() {
 
 #[path = "real/files.rs"]
 mod files;
+#[test]
+fn a_target_prints_its_packages_part_from_debian_and_its_tasks() {
+    let repository = fixtures::packages_repository("packages", true);
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(
+            &rendered.stdout,
+            &["packages ", "  sources", "  request", "  variant", "  microcode", "  apt"]
+        ),
+        concat!(
+            "packages     part 51cab42f8d2b\n",
+            "  sources    forky amd64 main non-free-firmware 20261001T030405Z\n",
+            "  request    curl firmware-linux tzdata\n",
+            "  variant    apt\n",
+            "  microcode  generic\n",
+            "  apt        install_recommends false\n"
+        )
+    );
+}
+#[test]
+fn a_component_debian_does_not_enable_prints_the_package_and_the_component() {
+    let repository = fixtures::packages_repository("component-off", false);
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(rendered.stdout, b"tasks/base/task.json:1:60: x1-prod: base: firmware-linux needs component non-free-firmware, which debian.components does not enable\n");
+}
+#[test]
+fn a_component_debian_does_not_enable_exits_with_configuration_failure() {
+    let repository = fixtures::packages_repository("component-off-exit", false);
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}

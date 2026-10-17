@@ -54,12 +54,8 @@ impl Schema {
                 lines.put(path);
                 lines.put(b" at this revision");
             }
-            Self::Large { path, max } => {
-                lines.put(path);
-                lines.put(b" past ");
-                lines.decimal(*max);
-                lines.put(b" bytes");
-            }
+            Self::Large { path, max } => large_text(lines, path, *max),
+            Self::Component { package, component } => component_text(lines, package, component),
             Self::Main => lines.put(b"debian.components must keep main on"),
             Self::Security => lines.put(b"debian.snapshot.security is required with its pocket"),
 
@@ -148,6 +144,7 @@ impl Schema {
                 json.unsigned(*max);
                 field(json, b"path", path);
             }
+            Self::Component { package, component } => component_json(json, package, component),
             Self::Main => field(json, b"kind", b"main"),
             Self::Security => field(json, b"kind", b"security"),
 
@@ -290,4 +287,22 @@ fn unread_text(lines: &mut Lines, task: &[u8], setting: &[u8], declared: &[Box<[
             lines.put(name);
         }
     }
+}
+fn component_text(lines: &mut Lines, package: &[u8], component: &[u8]) {
+    lines.put(package);
+    lines.put(b" needs component ");
+    lines.put(component);
+    lines.put(b", which debian.components does not enable");
+}
+fn large_text(lines: &mut Lines, path: &[u8], max: u64) {
+    lines.put(path);
+    lines.put(b" past ");
+    lines.decimal(max);
+    lines.put(b" bytes");
+}
+
+fn component_json(json: &mut Encoder, package: &[u8], component: &[u8]) {
+    field(json, b"component", component);
+    field(json, b"kind", b"component");
+    field(json, b"package", package);
 }

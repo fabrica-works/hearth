@@ -354,6 +354,7 @@ pub fn schema(schema: target::Schema) -> records::errors::Schema {
         target::Schema::Target { name, environment } => records::errors::Schema::Target { name, environment },
         target::Schema::File { path } => records::errors::Schema::File { path },
         target::Schema::Large { path, max } => records::errors::Schema::Large { path, max },
+        target::Schema::Component { package, component } => records::errors::Schema::Component { package, component },
         target::Schema::Main => records::errors::Schema::Main,
         target::Schema::Security => records::errors::Schema::Security,
         target::Schema::Undeclared { setting, declared } => records::errors::Schema::Undeclared { setting, declared },

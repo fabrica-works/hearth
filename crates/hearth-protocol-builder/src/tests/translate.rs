@@ -138,6 +138,7 @@ fn spec_back(spec: records::records::Spec) -> Option<render::parts::Spec> {
                 render::parts::PartRecord::Config(config::config_back(config))
             }
             records::records::PartRecord::Secrets(value) => render::parts::PartRecord::Secrets(secrets::back(value)),
+            records::records::PartRecord::Packages(value) => packages::part_back(value),
         };
         translated.push(render::parts::Part { digest: hearth_lib::encode::Digest(digest), record }).expect("part room");
     }
@@ -795,3 +796,4 @@ mod config;
 mod secrets;
 
 mod files;
+mod packages;

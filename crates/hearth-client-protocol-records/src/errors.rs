@@ -653,6 +653,7 @@ pub enum Schema {
     Large { path: Box<[u8]>, max: u64 },
     Main,
     Security,
+    Component { package: Box<[u8]>, component: Box<[u8]> },
 }
 
 mod schema;

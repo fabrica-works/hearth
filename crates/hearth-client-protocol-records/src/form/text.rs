@@ -107,6 +107,21 @@ fn render(lines: &mut Lines, record: &Record, after: Option<Type>) {
                 lines.pad_to(column);
                 lines.put(b"part ");
                 lines.hex12(&part.digest);
+                if let crate::records::PartRecord::Packages(_) = &part.record
+                    && let Some(resolution) = &spec.resolution
+                {
+                    lines.put(b"   resolution ");
+                    match resolution {
+                        crate::records::Resolution::Needed { key } => {
+                            lines.hex12(key);
+                            lines.put(b" needed");
+                        }
+                        crate::records::Resolution::Known { key, keys: _ } => {
+                            lines.hex12(key);
+                            lines.put(b" known");
+                        }
+                    }
+                }
                 lines.put(b"\n");
                 part.record.text(lines);
             }

@@ -23,6 +23,7 @@ pub(crate) struct Prepared {
     pub plans: Box<[Plan]>,
     pub expansion: crate::entries::Expansion,
     pub secrets: parts::secrets::Secrets,
+    pub packages: parts::packages::Packages,
 }
 #[derive(Debug)]
 pub(crate) struct Target {
@@ -33,6 +34,7 @@ pub(crate) struct Target {
     debian: Value,
     pub(crate) expansion: crate::entries::Expansion,
     secrets: parts::secrets::Secrets,
+    packages: parts::packages::Packages,
     task: usize,
     rendered: u64,
     entry: usize,
@@ -53,7 +55,7 @@ impl Target {
         prepared: Prepared,
         capacity: u32,
     ) -> Self {
-        let Prepared { plans, expansion, secrets } = prepared;
+        let Prepared { plans, expansion, secrets, packages } = prepared;
         let mut tree = Map::with_capacity(capacity);
         for plan in &plans {
             for install in &plan.installs {
@@ -90,6 +92,7 @@ impl Target {
             debian,
             expansion,
             secrets,
+            packages,
             task: 0,
             rendered: 0,
             entry: 0,
@@ -258,6 +261,10 @@ impl Side {
         }
         let config = Config { tree: files.into_boxed() };
         let parts = Box::new([
+            parts::Part {
+                digest: parts::packages::digest(&target.packages),
+                record: parts::PartRecord::Packages(target.packages),
+            },
             parts::Part { digest: parts::config::digest(&config), record: parts::PartRecord::Config(config) },
             parts::Part {
                 digest: parts::secrets::digest(&target.secrets),

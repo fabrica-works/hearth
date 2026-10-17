@@ -368,7 +368,7 @@ pub fn config_mut(spec: &mut Spec) -> &mut Config {
     for part in &mut spec.parts {
         match &mut part.record {
             PartRecord::Config(config) => return config,
-            PartRecord::Secrets(_) => {}
+            PartRecord::Secrets(_) | PartRecord::Packages(_) => {}
         }
     }
     panic!("config part")
@@ -395,3 +395,5 @@ pub fn links_and_directories() -> Box<Spec> {
     ]);
     spec
 }
+mod packages;
+pub use packages::*;

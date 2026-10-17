@@ -55,7 +55,7 @@ pub fn config_part(parts: &[crate::parts::Part]) -> &crate::parts::config::Confi
     for part in parts {
         match &part.record {
             crate::parts::PartRecord::Config(config) => return config,
-            crate::parts::PartRecord::Secrets(_) => {}
+            crate::parts::PartRecord::Secrets(_) | crate::parts::PartRecord::Packages(_) => {}
         }
     }
     panic!("config part")
