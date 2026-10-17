@@ -71,11 +71,12 @@ version, in `[workspace.dependencies]`); render `src/{lib, limits, vocabulary, r
 (shared), new `src/parts/config.rs`, `src/tests/{revision, parts}.rs`,
 `tests/render/{src/fixtures.rs, src/parent.rs, tests/thin.rs}`; protocol `src/{lib,
 read}.rs`, new `src/cache.rs`, `src/translate/{documents, answers}.rs`,
-new `src/translate/parts.rs`, `src/translate/parts/config.rs`,
+`src/translate.rs` (`pub mod parts;`), new `src/translate/parts.rs`,
+`src/translate/parts/config.rs`,
 `src/tests/{cache, translate}.rs`; the service's `src/{lib, limits}.rs`
 (completions tagged for io or files, as smith's `crates/smith-agent-
 service/src/service.rs:968` does); `crates/hearth/{Cargo.toml (libc),
-src/lib.rs}` (the umask; `cache/` made 0700 and opened at startup);
+clippy.toml, src/lib.rs}` (the umask; `cache/` made 0700 and opened at startup);
 `tests/builder/{Cargo.toml (libc), src/fixtures.rs, tests/real.rs}`.
 Shape: the sketches. A tree entry's path is `/` and what follows
 `tasks/<t>/tree/`; mode 0o644, or 0o755 for `Mode::Executable`; owner and
@@ -189,8 +190,8 @@ names only this one):
 fn end_to_end_render() {
     let repository = Repository::make("end-to-end", fixtures::THIN);
     fs::write(repository.work_tree().join("tasks/motd/tree/etc/motd"), "not committed\n").expect("an edit");
-    let xdg = repository.scratch().join("xdg");
-    let environment = [("XDG_CACHE_HOME", xdg.as_os_str()), ("HOME", repository.scratch().as_os_str())];
+    let xdg = repository.scratch().path().join("xdg");
+    let environment = [("XDG_CACHE_HOME", xdg.as_os_str()), ("HOME", repository.scratch().path().as_os_str())];
     let ended = fixtures::binary(env!("CARGO_BIN_EXE_hearth").as_ref(), &["render".as_ref()], &environment, repository.work_tree());
     assert_eq!(String::from_utf8_lossy(&ended.stdout), fixtures::THIN_TEXT, "3.1: what is not committed is not rendered");
     assert_eq!(ended.exit, Some(Exit::Code(0)), "stderr: {}", String::from_utf8_lossy(&ended.stderr));

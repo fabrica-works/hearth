@@ -616,6 +616,13 @@ None yet.
      4. `ROUNDS` is chosen so that `fuzzy_declarations` alone takes about 2 s (`-E 'binary(fuzzy_declarations)'`); `fuzzy_documents` takes 0.5 to 0.8 s of the profile already.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+136. **hearth 32.1 lands at its count** (plan defect, hearth 32's block of 2026-10-17T18:27:09Z).
+     hearth-32.1 lands as prepared at 84ce356, at 956 production additions against its Size of 285 (README, Rules: "Past three times its Size, or with a counted file outside its Files, it still stops on a question before landing"). The plan's count was low, not the increment's scope: the re-check of 32 at hearth 992ff01 found Files that 32.1's text missed, and no counted file passes 443 lines.
+     1. 32.1's Files gain the two counted files they missed: protocol `src/translate.rs` (`pub mod parts;`) and `crates/hearth/clippy.toml` (its comment: `unsafe` in the ring adapter only).
+     2. 32.2's test sketch reads the scratch's path: `repository.scratch().path().join("xdg")` and `repository.scratch().path().as_os_str()` (`Scratch::path`, skein's `testing/skein-scratch/src/lib.rs:52`).
+     3. 32.1's commit body gives the count by file and names ruling 136.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
