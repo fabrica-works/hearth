@@ -119,3 +119,6 @@ pub fn render_at(repository: &Repository, at: &str, targets: &[&[u8]], form: For
 }
 
 pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         9970fb4d8f97\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\n";
+
+mod binary;
+pub use binary::{Ended, binary};

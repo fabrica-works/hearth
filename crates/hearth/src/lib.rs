@@ -1,5 +1,7 @@
 //! The shipped builder host and its startup directories (shell.md, 6).
 
+pub mod argv;
+pub use hearth_client_protocol_records as records;
 pub use hearth_service_builder as service;
 use service::{Configuration, Roots, Service};
 pub use service::{Limits, domain::vocabulary::Call, protocol::Form};
@@ -113,3 +115,12 @@ pub fn umask(mask: u16) {
 pub const fn limits() -> Limits {
     service::limits::SHIPPED
 }
+
+/// Draw the cache temporary generator's seed at process startup (store.md, 2.1).
+pub fn seed() -> Result<u64, records::startup::Startup> {
+    skein_shell::seed().map_err(|error| {
+        argv::unopened(records::startup::Opened::Store, None, std::io::Error::from_raw_os_error(error))
+    })
+}
+#[cfg(test)]
+mod tests;

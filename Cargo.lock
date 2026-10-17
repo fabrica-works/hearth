@@ -66,10 +66,14 @@ dependencies = [
 name = "hearth"
 version = "0.0.0"
 dependencies = [
+ "hearth-builder-world",
+ "hearth-client-protocol-records",
+ "hearth-protocol-git",
  "hearth-service-builder",
  "libc",
  "skein-io",
  "skein-lib",
+ "skein-scratch",
  "skein-shell",
 ]
 
@@ -79,8 +83,10 @@ version = "0.0.0"
 dependencies = [
  "hearth",
  "skein-io",
+ "skein-lib",
  "skein-scratch",
  "skein-shell",
+ "skein-world",
 ]
 
 [[package]]

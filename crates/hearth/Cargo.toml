@@ -10,6 +10,11 @@ skein-lib.workspace = true
 skein-io.workspace = true
 skein-shell.workspace = true
 hearth-service-builder.workspace = true
+hearth-client-protocol-records.workspace = true
+hearth-protocol-git.workspace = true
+[dev-dependencies]
+hearth-builder-world = { path = "../../tests/builder" }
+skein-scratch.workspace = true
 [lints.rust]
 unsafe_code = "deny"                  # allowed in the ring adapter module only
 unsafe_op_in_unsafe_fn = "deny"
