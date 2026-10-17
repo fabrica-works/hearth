@@ -858,6 +858,15 @@ None yet.
 
      A further counted file outside the Files takes a line in the commit body, with its count.
 
+169. **hearth 18.4 goes on without its two script refusals until the designer answers** (design gap, interim, hearth-18.4's block of 2026-10-17T22:53:11Z).
+     **hearth 18.4 goes on without its two script refusals until the designer answers** (design gap, interim; hearth-18.4's block of 2026-10-17T22:53:11Z).
+
+     Whether a `scripts` key other than `customize.sh` and `software.sh`, and an `order` outside 0 to 999, stay the `decode` errors hearth 04.1 landed (cc68d36: `Declared::Name` at the key, `Declared::Order` at the value) or become the `schema` errors 18.4's Shape names (`Schema::Enum`; `Below`, `Above`) is what a term of the design means: format.md 5.8 says "any other is a schema error", and render.md 7.2's `decode` row "a declaration not of its shape". It goes to the designer (`question.md`, 2026-10-17T22:58:00Z). Until the answer's ruling:
+
+     1. 18.4 goes on with all that does not rest on it: presets, tmpfiles, the declared scripts' files (`Repository::NoScript`, `Repository::Stray`), `customize.sh`'s digest and row, `software.sh` checked and dropped, the order's default 500 and the sort by order then task, the template script, and the real test and Proof.
+     2. It leaves `a_third_script_name_is_an_enum_fault` and the range half of `script_order_defaults_to_500_and_ranges_over_0_to_999` (its default half goes on), and changes nothing in `hearth-protocol-config`'s `scripts` decoding or its tests.
+     3. It does not land before the answer's ruling: once all else is done, it reports and waits.
+
 ## For the user
 
 The long-term choices the user may veto:
