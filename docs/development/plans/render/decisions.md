@@ -582,6 +582,19 @@ None yet.
      8. The hosted fakes wrap git's `face::{check, Run}` and mmdebstrap's `face::{check, print}` over its `Simulate` (`testing/hearth-fake-mmdebstrap/src/face.rs:7, 45, 145`); mmdebstrap's face has no `Run`.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+133. **hearth 36's Shapes against main** (ready check of hearth-36.1).
+     hearth 36's ready check, with `check/findings-36.md`'s points, against hearth 3cbd5d1 to cc68d36 and skein 841f487, its expected texts against MiniJinja 2.20.0 with render.md 9.5's settings (clippy clean with the corrections; the template crate and its world 74 run, 72 passed, the 2 failing only for 36.1's and 36.2's code; fuzzy 3; memory 1), corrects 36-template-whitespace.md:
+     1. skein's `worst_case` is `tokenizer.rs:107`.
+     2. 36.1's Files gain `src/tests.rs` (`mod whitespace;`) and `src/tests/fixtures.rs`, with a new `branch(at, condition, over)` as the sketch calls it; 36.2's gain `src/tests.rs` (`mod interpolation;`), and its world's `kind()` (`tests/template/src/fixtures.rs:50`, an exhaustive match) gains `ErrorKind::Interpolation => "interpolation"`.
+     3. Inside the `raw` and `endraw` tags, whitespace is `u8::is_ascii_whitespace`'s, as MiniJinja's `skip_basic_tag` (lexer.rs:254) takes it: `{%\x0craw\x0c%}x{%\x0cendraw\x0c%}` is `x`, and a VT before `raw`, or a U+00A0 before `endraw`, makes no raw tag. Elsewhere it stays `White_Space`. The oracle run checks `\r` there with the other expected texts.
+     4. A raw body empty as written, or after its edges' rules (`x{% raw %}  {% endraw %}z` is `xz`), gives no `Text`: `check.rs:79` forbids an empty one.
+     5. A template's trailing newline is kept after text or `}}`; after an unmarked `%}` or `#}`, trim_blocks takes it (`a{# c #}\n` is `a`), so `trailing_newlines_are_kept_as_written` ends its templates in text or `}}`.
+     6. A lone `-` between an opening and its closing marks the opening alone: `{#-#}`'s closing is unmarked, and trim_blocks takes the `\n` after it; `{{-}}` is an error, an output with no expression.
+     7. In an interpolated string, only a `-` beside `{{` or `}}` is a marker, and `Interpolation` at it; a `+` there is no marker (36.1's rule), so `{{+ a }}` is `Expected(Operand)` at 2 and `{{ a +}}` at 6, as in a template. `ErrorKind::Interpolation`'s comment drops the `+`.
+     8. 36.3's `lines` holds one `u32` per newline plus one (`scan.rs:9`), at most the text's length plus one.
+     9. `Decoder::Interpolated`'s `length` is at most 03's `Limits::document` (`hearth-protocol-config/src/limits.rs:4`, 1,048,576); neither the template crate nor its world depends on `hearth-protocol-config`, so the memory test passes `SHIPPED`'s `template`, the same value.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

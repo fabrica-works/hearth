@@ -16,7 +16,7 @@ hearth's format.md, 7.2, 7.3 (`raw`), 5.2 and 2.3; render.md, 2.3, 8.1,
 and `hearth/03-json.md`'s sketches (`Value`, `Kind::String`: "UTF-8,
 unescaped"). decisions.md, 9 and 10; `findings/skein-testing.md`, 2, 3
 and 7. skein's `crates/skein-lib/src/bytes.rs` (`find_from`:40) and
-`crates/skein-json/src/{tokenizer.rs:96, document.rs:196}` (a worst case
+`crates/skein-json/src/{tokenizer.rs:107, document.rs:196}` (a worst case
 per entry point). The definition 7.2 names, in the cargo registry (the
 first landing's `cargo fetch` puts it there):
 `~/.cargo/registry/src/*/minijinja-2.20.0/src/compiler/lexer.rs`
@@ -70,9 +70,12 @@ Scope: 7.2's rules, as MiniJinja 2's lexer applies them with
 Needs: hearth 06 (06.2).
 Files: new `src/template/whitespace.rs` (the rules and the `White_Space`
 table) and `src/template/raw.rs`; `src/{template, template/scan}.rs`; new
-`src/tests/whitespace.rs`; the world's `src/{generate,
-reference}/template.rs`, `src/fixtures.rs`.
-Shape, the rules (whitespace: `White_Space`, newlines included):
+`src/tests/whitespace.rs`, `src/tests.rs` (`mod whitespace;`),
+`src/tests/fixtures.rs` (a new `branch(at, condition, over)`, as the sketch
+calls it); the world's `src/{generate, reference}/template.rs`,
+`src/fixtures.rs`.
+Shape, the rules (whitespace: `White_Space`, newlines included; inside the
+`raw` and `endraw` tags, ASCII's, below):
 - `-` after an opening removes the whitespace ending the text before it;
   `-` before a closing, the whitespace starting the text after it;
 - **trim_blocks:** one `\n` directly after an unmarked `%}` or `#}` is
@@ -84,14 +87,24 @@ Shape, the rules (whitespace: `White_Space`, newlines included):
   trim_blocks; `{{+` and `+}}` are errors, `+` not being a marker beside an
   output tag: 05 refuses it as `Expected(Operand)` (format.md 7.2);
 - **`raw`** (7.3): a `{%` whose head is `raw` then the tag's end; anything
-  else after `raw` is `Expected(TagEnd)`. Its body, one `Text`, runs to
+  else after `raw` is `Expected(TagEnd)`. Inside the `raw` and `endraw`
+  tags, whitespace is `u8::is_ascii_whitespace`'s, as MiniJinja's
+  `skip_basic_tag` (lexer.rs:254) takes it: `{%\x0craw\x0c%}x{%\x0cendraw\x0c%}`
+  is `x`, and a VT before `raw`, or a U+00A0 before `endraw`, makes no raw
+  tag. Its body, one `Text` (none when it is empty, as written or after
+  its edges' rules: `check.rs:79` forbids an empty `Text`), runs to
   the first `{%` that opens `endraw` (a marker, whitespace, `endraw`,
   whitespace, a marker, `%}`), else `Unclosed` at the `raw`'s `{`. The
   body's start loses one `\n` (unmarked `%}`) or its leading whitespace
   (`-`). Its end loses its trailing whitespace (`{%-` endraw), or,
   unmarked, its trailing whitespace but `\n` when what remains is empty
   or ends in `\n` (`lstrip_block`). After endraw's `%}`, the rules above;
-- nothing else removes a byte: a template's trailing newline is kept.
+- a lone `-` between an opening and its closing marks the opening alone:
+  `{#-#}`'s closing is unmarked, so trim_blocks takes the `\n` after it;
+  `{{-}}` is an error, an output with no expression;
+- nothing else removes a byte: a template's trailing newline is kept after
+  text or `}}`; after an unmarked `%}` or `#}`, trim_blocks takes it
+  (`a{# c #}\n` is `a`).
 
 Test shape: in `src/tests/whitespace.rs`, each under 20 ms:
 `a_statement_alone_on_its_line_leaves_nothing_behind`,
@@ -99,7 +112,8 @@ Test shape: in `src/tests/whitespace.rs`, each under 20 ms:
 `lstrip_blocks_removes_indentation_only_at_the_start_of_a_line`,
 `a_minus_marker_strips_all_whitespace_on_its_side` (U+00A0, U+3000, VT
 and `\n` among it), `a_plus_marker_keeps_what_trim_and_lstrip_would_remove`
-(7.2's `grub.cfg` line among it), `trailing_newlines_are_kept_as_written`,
+(7.2's `grub.cfg` line among it), `trailing_newlines_are_kept_as_written`
+(templates ending in text or `}}`, then `\n`; `a{# c #}\n` is `a`),
 `a_plus_beside_an_output_tag_is_an_error` (`{{+ a }}`, `Expected(Operand)`
 at 2; `{{ a +}}`, at 6),
 `raw_outputs_its_body_with_its_tags_whitespace_rules`,
@@ -141,9 +155,11 @@ Scope: `interpolation::compile` for a declaration's keys and string
 fields (5.2), as hearth 03 decodes them: UTF-8 and unescaped.
 Needs: nothing beyond 36.1.
 Files: new `src/interpolation.rs` and `src/tests/interpolation.rs`;
-`src/{lib, error}.rs`, `src/tests/fixtures.rs`. The world's
+`src/{lib, error}.rs`, `src/tests.rs` (`mod interpolation;`),
+`src/tests/fixtures.rs`. The world's
 `src/generate/template.rs` (`string`), `src/reference/template.rs`
-(`interpolate`), `src/fixtures.rs` (`STRING_KINDS`), `tests/{templates,
+(`interpolate`), `src/fixtures.rs` (`STRING_KINDS`; `kind()`'s exhaustive match, `:50`, gains
+`ErrorKind::Interpolation => "interpolation"`), `tests/{templates,
 fuzzy_templates}.rs`.
 Shape: `Interpolated`; `ErrorKind::Interpolation`.
 - A text with no `{` followed by `{`, `%` or `#` is `Plain`. Otherwise
@@ -152,7 +168,8 @@ Shape: `Interpolated`; `ErrorKind::Interpolation`.
   template, its offsets in the string.
 - There is no pass 1: the string is UTF-8 by 03, and a `\r` is text.
 - `{%` is `Interpolation` at its `{` (5.2), and so are `{#`, at its `{`,
-  and a `-` or `+` marker, at the marker; `${{ '{#' }}a[@]}` writes a
+  and a `-` marker beside `{{` or `}}`, at the marker (a `+` there is no
+  marker, 36.1: `{{+ a }}` is `Expected(Operand)` at 2, as in a template); `${{ '{#' }}a[@]}` writes a
   shell's `${#a[@]}`. `{{` with no end is `Unclosed`.
   "One `{{ expr }}`" is `Parts` holding one `Output` alone, which the
   domain types by the field (hearth 16).
@@ -197,7 +214,7 @@ interpolation}.rs`; the world's `src/fixtures.rs`
 Shape: the worst case counts these at once: the text's openings at three
 instructions each (06's `3 × openings + 1`), one operation per byte of
 expression, the bytes of texts, names and strings (at most the text's length), `lines` (one `u32`
-per byte at most), the block stack and the jump list, and
+per newline, plus one, as `scan.rs:9` sizes it: at most the text's length plus one), the block stack and the jump list, and
 `worst_case(Decoder::Expression, limits)` for the expression compiled.
 `templates_at_the_limits()` gives 1 MiB of text, 1 MiB of `{{a}}`, 1 MiB
 of `\n`, 32 nested `if`s and `for`s, a 4,096-byte expression in a tag,
@@ -234,7 +251,7 @@ pub enum Decoder {
     Expression,
     /// `template::compile` (06.1).
     Template,
-    /// `interpolation::compile`, for a text of at most `length` bytes (03's `Limits::document`; the memory test passes `SHIPPED`'s).
+    /// `interpolation::compile`, for a text of at most `length` bytes (at most 03's `Limits::document`, 1 MiB; neither the template crate nor its world depends on `hearth-protocol-config`, so the memory test passes `SHIPPED`'s `template`, the same 1,048,576).
     Interpolated { length: u32 },
 }
 
@@ -252,7 +269,7 @@ pub enum Interpolated {
 
 // crates/hearth-protocol-template/src/error.rs (`ErrorKind` as 06's sketch gives it, and this)
 pub enum ErrorKind {
-    /// 36.2: a `{%`, a `{#` or a `-` or `+` marker in an interpolated text (5.2).
+    /// 36.2: a `{%`, a `{#` or a `-` marker in an interpolated text (5.2).
     Interpolation,
 }
 ```
