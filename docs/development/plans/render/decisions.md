@@ -626,6 +626,18 @@ None yet.
 137. **Fields, not an array read by constant index** (steer of 18:24).
      The hourly check of 2026-10-17T18:24:28Z saw a fixed array read by a constant index a second time, after the 17:12 steer's Pass on text had reached the sessions: hearth 14.1's `tests/render/src/expressions.rs:19` (`pub values: [Value; 5]`, read as `values[0]` to `[4]` there and in `reference.rs:32-36`), and the one-row tables left in fake-machine `src/tests/files.rs` by 27.2 (`CREATED[0]` :11, `DENIED[0]` :54, `ROOT[0]` :138, `CONTENTS[0]` :182, `LOCKS[0]` to `[3]` :147-151). The plan's README, Rules, gains "No fixed array read by a constant index" (development.md, 14.4): a test or a world names fixed elements as struct fields, or asserts the value as a literal; an increment that edits a test file first fixes its one-row tables and constant-index reads. Landed files stay until an increment edits them.
 
+138. **hearth 12's Shapes against main** (ready check of hearth-12.1).
+     hearth 12's ready check, against hearth 992ff01 to d0df92f and skein 841f487 (clippy clean with the corrections; default 601 of 601, fuzzy 13 of 13; the six render, builder and records packages 95 of 95 once the fixtures below take the new shape; real git's `a_broken_document_prints_its_error_after_the_specs_that_rendered` gives the plan's stdout and exit 2), corrects 12-compose.md, its names grepped again at hearth 1dc5d6f:
+     1. skein's `tokenizer::Error` is `tokenizer.rs:232`, and `Stack` is `stack.rs:15`.
+     2. Errors are answered one a `resume`, then `Rendered`: render's `MAX_OUT_RESUME` is 1 (`lib.rs:16`), and the output queue holds one.
+     3. `depth: 32` is on main already (render `limits.rs:6`, `SHIPPED` `:15`, 14.1's): 12.1 adds only `decoded`.
+     4. 12.1's Files gain render `src/tests.rs` (`mod compose;`). 12.2's gain render `src/tests.rs` (`mod errors;`); the root's `src/lib.rs`, whose `forward` (`:35`) matches render's `Answer` exhaustively; protocol `Cargo.toml` (`skein-json`, for the tokenizer's variants), `src/translate.rs` (`pub mod errors;`), `src/client.rs` (`:107`'s match takes `Answer::Error`) and `src/tests/read.rs` (`:84`'s `Decoded::Refused` takes `fault: Missing { field: Kind }, also: None`).
+     5. In `tests/render/tests/thin.rs`, the `Decoded::Refused` fixtures (`:87`, `:140`) take `fault` and `also`, the match at `:104` takes an `Answer::Error` arm, and `a_document_above_its_limit_fails_only_its_targets_before_reading` (`:115`) answers `[Spec, Error]`.
+     6. `translate::errors::fault` takes `config::limits::Limits` (config `lib.rs:10`), and gives `None` for `Fault::Declaration` (`error.rs:21`; 13.1's `Decode::Declaration` replaces the arm) and for `Fault::Json(tokenizer::Error::Stream(_))`, which config's `json.rs:146` makes `Fault::Stream`, as well as for `Fault::Stream`.
+     7. Done-when 2 runs `-p hearth-domain-builder` too.
+     8. `Option::map` is a disallowed method (`clippy.toml:106`), and a hand-written `match` that rewraps `Some` trips `manual_map`: a helper that uses `?` passes.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

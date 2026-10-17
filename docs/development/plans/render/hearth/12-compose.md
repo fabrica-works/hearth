@@ -14,8 +14,8 @@ refusals, git's `tool`, members, names, the composition rules.
 - This plan: `hearth/11-thin-story.md` whole; `hearth/03-json.md`'s
   sketches, 03.3, 03.4; `hearth/10-client.md`'s "Who adds what";
   `hearth/40-client-diff-errors.md`'s 40.2 and `errors.rs` sketch.
-- skein: `crates/skein-json/src/tokenizer.rs:221` (`Error`, which
-  render's `Decode` mirrors); `crates/skein-lib/src/stack.rs:13`,
+- skein: `crates/skein-json/src/tokenizer.rs:232` (`Error`, which
+  render's `Decode` mirrors); `crates/skein-lib/src/stack.rs:15`,
   `list.rs:14`. `programming-model.md`: 3, 4.4, 6.3, 7, 8;
   `testing-strategy.md`: 2.1, 2.2, 2.8 (by number only).
 
@@ -44,7 +44,8 @@ refusals, git's `tool`, members, names, the composition rules.
   limits fail the call is render.md 7.2's rows.
 - **Errors are held as found, answered after the specs:** each whole, in
   a `List` starting at 16 and doubling, never past `Limits::errors` (22's;
-  256), all in one `resume` before `Rendered`; hearth
+  256), one a `resume` (`MAX_OUT_RESUME = 1`, render `lib.rs:16`: the
+  output queue holds one), then `Rendered`; hearth
   22 sorts, keeps 256 and counts, changing none. render folds the
   outcome: configuration at least `Failed`, operational `TryAgain`.
 - **A document's error is the file's:** once, no `target`, its targets
@@ -90,12 +91,12 @@ keys; settings restricted to the present tasks.
 Needs: hearth 11 (the thin story), hearth 32.1 (presence, the cache),
 hearth 03 (`json::Value`, `Task`).
 Files: render `src/{limits, revision, compose, call, lib}.rs`,
-`src/tests/fixtures.rs`, new `src/tests/compose.rs`;
+`src/tests.rs` (`mod compose;`), `src/tests/fixtures.rs`, new `src/tests/compose.rs`;
 `tests/render/{src/fixtures.rs, tests/thin.rs}`, new
 `tests/render/tests/compose.rs`; protocol `src/translate/documents.rs`,
 `src/tests/translate.rs`; `tests/builder/{src/fixtures.rs, tests/real.rs}`.
-Shape: the sketches. `limits::SHIPPED` gains `decoded: 67_108_864` and
-`depth: 32` (12.1 owns `depth`; 14.1 uses it); `translate::documents::value` walks on a `Stack`. After
+Shape: the sketches. `limits::SHIPPED` gains `decoded: 67_108_864`
+(`depth: 32` is 14.1's, `limits.rs:6` and `:15`); `translate::documents::value` walks on a `Stack`. After
 `Listed`, one `Read` of every configuration document, each
 `Budget::take`n first; a refusal answers `Rendered { Failed }` (12.2
 adds its error). `compose::compose`: presence, the keys the base's and
@@ -163,9 +164,14 @@ a document or `task.json` past 1 MiB, the documents past 64 MiB, a
 static file past 64 MiB (2.3).
 Needs: hearth 40.2 (the records' `Error`, `Place`, `Class`, its line).
 Files: render new `src/errors.rs`, `src/{vocabulary, revision, call,
-lib}.rs`, new `src/tests/errors.rs`; root `src/vocabulary.rs`; protocol
-new `src/translate/errors.rs`, `src/translate/answers.rs`, `src/read.rs`,
-`src/tests/translate.rs`; records `src/errors.rs`, `src/form/{text,
+lib}.rs`, `src/tests.rs` (`mod errors;`), new `src/tests/errors.rs`; root
+`src/vocabulary.rs`, `src/lib.rs` (`forward`'s match, `:35`, gains
+`Answer::Error`); protocol `Cargo.toml` (`skein-json`, for the tokenizer's
+variants), `src/translate.rs` (`pub mod errors;`), new
+`src/translate/errors.rs`, `src/translate/answers.rs`, `src/read.rs`,
+`src/client.rs` (`:107`'s match gains `Answer::Error`),
+`src/tests/translate.rs`, `src/tests/read.rs` (`:84`'s `Decoded::Refused`
+takes `fault: Missing { field: Kind }, also: None`); records `src/errors.rs`, `src/form/{text,
 json}.rs`, `src/tests/{errors, fixtures}.rs`; `tests/render/{src/
 parent.rs, tests/thin.rs}`, new `tests/render/tests/errors.rs`;
 `tests/builder/{src/fixtures.rs, tests/real.rs}`.
@@ -200,7 +206,14 @@ reference, under 20 ms):
 over one broken document: one error). 11.1's
 `a_refused_document_fails_its_targets_and_spares_the_rest` and 32.1's
 `a_malformed_task_json_fails_the_targets_that_have_the_task` gain their
-errors among the answers.
+errors among the answers; in `tests/render/tests/thin.rs`, the
+`Decoded::Refused` fixtures (`:87`, `:140`) take `fault` and `also`,
+`targets_are_answered_in_name_order_each_once`'s match (`:104`) an
+`Answer::Error` arm, and
+`a_document_above_its_limit_fails_only_its_targets_before_reading`
+(`:115`) answers `[Spec, Error]`. Lint: `Option::map` is a disallowed
+method (`clippy.toml:106`), and a hand-written `match` that rewraps
+`Some` trips `manual_map`: write a helper that uses `?`.
 Proof: process, bound 0.5 s (and
 `a_broken_task_json_prints_its_error_with_its_task`, on `BROKEN_TASK`,
 `tasks/motd/task.json` `{"a": 1, "a": 2}`: stdout is exactly
@@ -252,7 +265,7 @@ impl Documents { #[must_use] pub fn path(&self, document: u32) -> &[u8]; #[must_
 pub struct Budget { /* held, max */ }
 impl Budget { #[must_use] pub fn new(limits: &Limits) -> Budget; #[must_use] pub fn take(&mut self, size: u64) -> bool; }
 
-// crates/hearth-domain-render/src/compose.rs (12.1; targets hearth 42.2); limits gain decoded, depth
+// crates/hearth-domain-render/src/compose.rs (12.1; targets hearth 42.2); limits gain decoded
 /// format.md 3.2's layers in order; hearth 13 adds `Defaults` first.
 pub enum Layer { Fleet, Base, Member, Environment, BaseEnv, BaseEnvMember }
 /// render.md 3.2's provenance: layer, document (a `Documents` index), where the value starts.
@@ -309,8 +322,10 @@ pub enum Limit { Document, Decoded, Static }
 pub enum Answer { Spec(render::Spec), Error(render::errors::Error) }
 
 // crates/hearth-protocol-builder/src/translate/errors.rs (12.2; hearth 42 extends); reverses in src/tests/translate.rs
-/// config's fault to render's, a duplicate's first key its `also`; `None` for `Fault::Stream`.
-#[must_use] pub fn fault(fault: config::Fault, limits: &config::Limits) -> Option<(render::errors::Decode, Option<render::revision::Position>)>;
+/// config's fault to render's, a duplicate's first key its `also`; `None` for `Fault::Stream`,
+/// `Fault::Declaration` (13.1's `Decode::Declaration` replaces this arm) and
+/// `Fault::Json(tokenizer::Error::Stream(_))` (config's `json.rs:146` makes it `Fault::Stream`).
+#[must_use] pub fn fault(fault: config::Fault, limits: &config::limits::Limits) -> Option<(render::errors::Decode, Option<render::revision::Position>)>;
 #[must_use] pub fn error(error: render::errors::Error) -> records::Error;
 
 // crates/hearth-client-protocol-records/src/errors.rs (40.2's; 12.2)
@@ -326,8 +341,8 @@ None.
 
 1. `git log origin/main --grep='^Plan: render$' --format='%(trailers:key=Step,valueonly)' | sort -u | grep -c -x -E 'hearth-12\.[1-2]'` prints 2.
 2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest
-   run -p hearth-domain-render -p hearth-render-world -p
-   hearth-builder-world -p hearth-protocol-builder -p
+   run -p hearth-domain-render -p hearth-domain-builder -p
+   hearth-render-world -p hearth-builder-world -p hearth-protocol-builder -p
    hearth-client-protocol-records` passes.
 3. `git -C ~/src/rust/hearth ls-tree --name-only origin/main
    crates/hearth-protocol-builder/src/translate/` lists `errors.rs`, and
