@@ -295,3 +295,13 @@ pub fn composition_error(why: crate::errors::Composition) -> crate::errors::Erro
         task: None,
     }
 }
+
+pub fn composition_on(host: crate::errors::Host) -> crate::errors::Error {
+    composition_error(crate::errors::Composition::On { on: copy_of(b"rhi-lab"), host })
+}
+pub fn missing_task() -> crate::errors::Error {
+    let mut error = composition_error(crate::errors::Composition::Task);
+    error.target = None;
+    error.task = Some(copy_of(b"motd"));
+    error
+}

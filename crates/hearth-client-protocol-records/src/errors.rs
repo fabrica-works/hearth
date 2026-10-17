@@ -61,7 +61,9 @@ impl Error {
             lines.put(target);
             lines.put(b": ");
         }
-        if let Some(task) = &self.task {
+        if let Some(task) = &self.task
+            && self.kind != Kind::Composition(Composition::Task)
+        {
             lines.put(task);
             lines.put(b": ");
         }
@@ -70,7 +72,7 @@ impl Error {
             Kind::Decode(decode) => decode.text(lines),
             Kind::Repository(why) => why.text(lines),
             Kind::Tool(tool) => tool.text(lines),
-            Kind::Composition(why) => why.text(lines, self.target.as_deref()),
+            Kind::Composition(why) => why.text(lines, self.target.as_deref(), self.task.as_deref()),
             Kind::Schema(schema) => schema.text(lines, self.task.as_deref()),
             Kind::Evaluation(kind) => lines.put(kind.message()),
             Kind::Guard(guard) => {
@@ -121,7 +123,7 @@ impl Error {
             Kind::Composition(why) => {
                 field(json, b"kind", b"composition");
                 json.key(b"composition");
-                json.string(why.name());
+                why.json(json);
             }
             Kind::Tool(tool) => {
                 field(json, b"kind", b"tool");
@@ -790,4 +792,4 @@ pub use repository::{Command, Ended, Repository, Tool};
 pub mod syntax;
 pub use syntax::Syntax;
 mod composition;
-pub use composition::Composition;
+pub use composition::{Composition, Host};

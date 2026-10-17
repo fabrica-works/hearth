@@ -633,3 +633,25 @@ pub const USERS: &[File] = &[
     File { path: "tasks/users/task.json", mode: 0o644, body: br#"{"settings":{"accounts":{"type":{"map":{"object":{"uid":{"type":"int","min":1000,"max":59999,"doc":"The account's id."},"shell":{"type":"path","default":"/bin/bash","doc":"The login shell."},"groups":{"type":{"list":"string"},"default":[],"doc":"Supplementary groups."},"password":{"type":"secret","optional":true,"doc":"The password."}}}},"default":{},"doc":"Accounts, by user name."}}}"# },
     File { path: "hosts/x1/x1.json", mode: 0o644, body: b"{\"motd\": {}, \"users\": {\"accounts\": {\n\"ann\": {\"uid\": \"1000\"},\n\"bob\": {\"uid\": 1001, \"shel\": \"/bin/sh\"},\n\"cy\": {}}}}" },
 ];
+
+pub const CONTAINERS: &[File] = &[
+    File { path: "envs/prod.json", body: b"{}", mode: 0o644 },
+    File { path: "envs/lab.json", body: b"{}", mode: 0o644 },
+    File { path: "hosts/rhi/rhi.json", body: b"{}", mode: 0o644 },
+    File {
+        path: "hosts/rhi/rhi-prod.json",
+        body: br#"{"placement":{"kind":"vm","firmware":"bios","hardware":"serverhino"}}"#,
+        mode: 0o644,
+    },
+    File {
+        path: "hosts/rhi/rhi-lab.json",
+        body: br#"{"placement":{"kind":"vm","firmware":"efi","hardware":"incus"}}"#,
+        mode: 0o644,
+    },
+    File { path: "hosts/chat/chat.json", body: b"{}", mode: 0o644 },
+    File {
+        path: "hosts/chat/chat-prod.json",
+        body: br#"{"placement": {"kind": "container", "on": "rhi-lab"}}"#,
+        mode: 0o644,
+    },
+];

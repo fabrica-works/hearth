@@ -233,6 +233,12 @@ pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
             oid: host.clone(),
             size: 2,
         },
+        crate::revision::Entry {
+            path: bytes::copy_of(b"tasks/motd/task.json"),
+            mode: crate::revision::Mode::File,
+            oid: Oid(bytes::copy_of(b"declaration")),
+            size: 2,
+        },
     ]);
     call.documents = crate::revision::Documents::new(&call.entries);
     call.documents.set(
@@ -241,14 +247,7 @@ pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
             members: None,
             at,
             layer: Layer {
-                placement: Some(crate::revision::Placement {
-                    at,
-                    kind: Runs::Metal,
-                    firmware: Some(Firmware::Efi),
-                    hardware: None,
-                    on: None,
-                    mutable: false,
-                }),
+                placement: None,
                 tasks: Box::new([Task { name: bytes::copy_of(b"motd"), at, value: composition::map(at, &[]) }]),
             },
         },
@@ -685,20 +684,12 @@ pub fn hunk_failure() -> crate::vocabulary::Event {
 
 pub fn template_call(path: &[u8], mode: crate::revision::Mode, size: u64, limits: limits::Limits) -> crate::call::Side {
     let (mut call, target) = removed_task();
-    let at = composition::at(1, 1);
-    call.documents.set(
-        &crate::revision::Oid(bytes::copy_of(b"host")),
-        crate::revision::Document {
-            at,
-            members: None,
-            layer: crate::revision::Layer { tasks: Box::new([]), placement: None },
-        },
-    );
+    retain_task(&mut call);
     call.targets = Box::new([target]);
     call.commit = Some(crate::revision::Oid(bytes::copy_of(b"commit")));
-    let mut entries = skein_lib::List::with_capacity(3);
+    let mut entries = skein_lib::List::with_capacity(4);
     for entry in call.entries {
-        entries.push(entry).expect("three entries");
+        entries.push(entry).expect("four entries");
     }
     entries
         .push(crate::revision::Entry {
@@ -707,7 +698,7 @@ pub fn template_call(path: &[u8], mode: crate::revision::Mode, size: u64, limits
             oid: crate::revision::Oid(bytes::copy_of(b"template")),
             size,
         })
-        .expect("third entry");
+        .expect("fourth entry");
     call.entries = entries.into_boxed();
     let mut out = skein_lib::Queue::with_capacity(1);
     call.files(limits, &mut out);
@@ -716,9 +707,9 @@ pub fn template_call(path: &[u8], mode: crate::revision::Mode, size: u64, limits
 
 pub fn shared_template_call() -> crate::call::Side {
     let mut call = template_call(b"tasks/motd/tree/etc/issue.j2", crate::revision::Mode::File, 20, limits::SHIPPED);
-    let mut entries = skein_lib::List::with_capacity(4);
+    let mut entries = skein_lib::List::with_capacity(5);
     for entry in call.entries {
-        entries.push(entry).expect("four entries");
+        entries.push(entry).expect("five entries");
     }
     entries
         .push(crate::revision::Entry {
@@ -727,7 +718,7 @@ pub fn shared_template_call() -> crate::call::Side {
             oid: crate::revision::Oid(bytes::copy_of(b"template")),
             size: 20,
         })
-        .expect("fourth entry");
+        .expect("fifth entry");
     call.entries = entries.into_boxed();
     call
 }
@@ -775,4 +766,6 @@ pub fn failed_diff(bound: u32, count: u32) -> Box<[crate::vocabulary::Answer]> {
 }
 
 mod discovery;
-pub use discovery::{member_documents, member_layers, members, with_document};
+pub use discovery::{
+    container_documents, member_documents, member_layers, members, retain_task, rule_document, with_document,
+};

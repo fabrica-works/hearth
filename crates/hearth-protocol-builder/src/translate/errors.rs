@@ -547,6 +547,19 @@ pub fn composition(why: target::Composition) -> records::errors::Composition {
     match why {
         target::Composition::Duplicate => records::errors::Composition::Duplicate,
         target::Composition::Long => records::errors::Composition::Long,
+        target::Composition::Placement => records::errors::Composition::Placement,
+        target::Composition::Members => records::errors::Composition::Members,
+        target::Composition::Unplaced => records::errors::Composition::Unplaced,
+        target::Composition::Null => records::errors::Composition::Null,
+        target::Composition::Task => records::errors::Composition::Task,
+        target::Composition::On { on, host } => records::errors::Composition::On {
+            on,
+            host: match host {
+                target::Host::Unknown => records::errors::Host::Unknown,
+                target::Host::Container => records::errors::Host::Container,
+                target::Host::Elsewhere { environment } => records::errors::Host::Elsewhere { environment },
+            },
+        },
     }
 }
 

@@ -34,10 +34,11 @@ fn render_lists_once_then_reads_every_configuration_document_once() {
 #[test]
 fn fleet_and_environment_keys_never_add_a_task() {
     for seed in 0..8 {
-        let mut repository = fixtures::x1_prod();
+        let mut repository = fixtures::with_task();
+        fixtures::set_document(&mut repository, b'2', fixtures::document(None));
         repository.entries.push(fixtures::entry(b"fleet.json", b'5'));
         repository.documents.push((fixtures::oid(b'5'), fixtures::tasks(&[(b"motd", false)], None)));
-        fixtures::set_document(&mut repository, b'1', fixtures::tasks(&[(b"issue", false)], None));
+        fixtures::set_document(&mut repository, b'1', fixtures::tasks(&[(b"motd", false)], None));
         repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
         let run = parent::run(&repository, &[], seed);
         let Answer::Spec(spec) = only(&run.answers) else { panic!("spec") };
@@ -118,4 +119,40 @@ fn a_named_target_a_refused_base_hides_is_no_usage() {
         Decoded::Refused { at: Position { line: 1, column: 2 }, fault: Decode::Unexpected, also: None },
     );
     assert_eq!(parent::run(&repository, &[b"x1-1-prod"], 0).outcome, Outcome::Failed);
+}
+#[test]
+fn a_container_whose_host_failed_is_left_out_without_an_error() {
+    use hearth_domain_render::{errors::Decode, revision::Position, vocabulary::Decoded};
+    let mut repository = fixtures::containers();
+    fixtures::set_document(
+        &mut repository,
+        b'4',
+        Decoded::Refused { at: Position { line: 1, column: 2 }, fault: Decode::Unexpected, also: None },
+    );
+    for seed in 0..8 {
+        let run = parent::run(&repository, &[], seed);
+        let Answer::Error(error) = only(&run.answers) else { panic!("host error") };
+        assert_eq!(error.kind, hearth_domain_render::errors::Kind::Decode(Decode::Unexpected), "seed {seed}");
+        assert_eq!(run.outcome, Outcome::Failed, "seed {seed}");
+    }
+}
+#[test]
+fn a_selected_container_uses_its_unselected_host() {
+    let repository = fixtures::containers();
+    for seed in 0..8 {
+        let run = parent::run(&repository, &[b"x1-prod"], seed);
+        let Answer::Spec(spec) = only(&run.answers) else { panic!("selected container") };
+        assert_eq!(spec.meta.target.as_ref(), b"x1-prod", "seed {seed}");
+        assert_eq!(spec.meta.placement.on.as_deref(), Some(b"a-b-prod".as_slice()), "seed {seed}");
+        assert_eq!(run.outcome, Outcome::Done, "seed {seed}");
+    }
+}
+#[test]
+fn a_container_whose_unselected_host_s_settings_failed_is_left_out_without_an_error() {
+    let repository = fixtures::container_with_unsound_host();
+    for seed in 0..8 {
+        let run = parent::run(&repository, &[b"x1-prod"], seed);
+        assert_eq!(run.answers, [], "seed {seed}");
+        assert_eq!(run.outcome, Outcome::Failed, "seed {seed}");
+    }
 }

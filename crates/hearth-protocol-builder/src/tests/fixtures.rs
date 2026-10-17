@@ -772,3 +772,23 @@ pub fn evaluation_back(kind: crate::records::errors::Evaluation) -> render::eval
         Evaluation::Limit => render::evaluate::FaultKind::Limit,
     }
 }
+
+#[must_use]
+pub fn composition_kinds() -> [render::errors::Composition; 10] {
+    use crate::render::errors::{Composition, Host};
+    [
+        Composition::Duplicate,
+        Composition::Long,
+        Composition::Placement,
+        Composition::Members,
+        Composition::Unplaced,
+        Composition::Null,
+        Composition::Task,
+        Composition::On { on: Box::from(b"host-lab".as_slice()), host: Host::Unknown },
+        Composition::On { on: Box::from(b"host-lab".as_slice()), host: Host::Container },
+        Composition::On {
+            on: Box::from(b"host-lab".as_slice()),
+            host: Host::Elsewhere { environment: Box::from(b"lab".as_slice()) },
+        },
+    ]
+}

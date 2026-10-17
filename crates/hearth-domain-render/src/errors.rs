@@ -386,8 +386,20 @@ pub enum Step {
 pub mod syntax;
 pub use syntax::Syntax;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Composition {
     Duplicate,
     Long,
+    Placement,
+    Members,
+    Unplaced,
+    On { on: Box<[u8]>, host: Host },
+    Null,
+    Task,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Host {
+    Unknown,
+    Elsewhere { environment: Box<[u8]> },
+    Container,
 }

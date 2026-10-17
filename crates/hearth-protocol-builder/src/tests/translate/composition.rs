@@ -1,13 +1,25 @@
 use crate::{records::errors as records, render::errors as render};
-const COMPOSITION: &[render::Composition] = &[render::Composition::Duplicate, render::Composition::Long];
 #[test]
 fn each_composition_kind_translates_and_back() {
-    for (row, input) in COMPOSITION.iter().enumerate() {
-        let back = match crate::translate::errors::composition(*input) {
+    for (row, input) in crate::tests::fixtures::composition_kinds().into_iter().enumerate() {
+        let back = match crate::translate::errors::composition(input.clone()) {
             records::Composition::Duplicate => render::Composition::Duplicate,
             records::Composition::Long => render::Composition::Long,
+            records::Composition::Placement => render::Composition::Placement,
+            records::Composition::Members => render::Composition::Members,
+            records::Composition::Unplaced => render::Composition::Unplaced,
+            records::Composition::Null => render::Composition::Null,
+            records::Composition::Task => render::Composition::Task,
+            records::Composition::On { on, host } => render::Composition::On {
+                on,
+                host: match host {
+                    records::Host::Unknown => render::Host::Unknown,
+                    records::Host::Container => render::Host::Container,
+                    records::Host::Elsewhere { environment } => render::Host::Elsewhere { environment },
+                },
+            },
         };
-        assert_eq!(back, *input, "row {row}: composition kind through records and back");
+        assert_eq!(back, input, "row {row}: composition kind through records and back");
     }
 }
 #[test]

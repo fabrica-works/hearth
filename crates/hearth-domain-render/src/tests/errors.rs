@@ -109,11 +109,11 @@ fn the_budget_s_error_names_the_path_that_passed_it() {
 }
 #[test]
 fn a_static_file_past_its_limit_errs_and_no_read_asks_it() {
-    let (mut call, mut target) = fixtures::removed_task();
-    target.base_env = target.environment_document;
+    let (mut call, target) = fixtures::removed_task();
+    fixtures::retain_task(&mut call);
     call.targets = Box::new([target]);
     call.commit = Some(Oid(copy_of(b"commit")));
-    let mut entries = skein_lib::List::with_capacity(3);
+    let mut entries = skein_lib::List::with_capacity(4);
     for entry in call.entries.clone() {
         entries.push(entry).expect("fixture");
     }

@@ -544,7 +544,7 @@ fn layers<'a>(target: &Target, documents: &'a Documents) -> [Option<(u32, &'a re
 pub fn placement(target: &Target, documents: &Documents) -> Option<revision::Placement> {
     let mut placement = None;
     for (_, source, kind) in layers(target, documents).into_iter().flatten() {
-        if kind != Layer::Member
+        if [Layer::Environment, Layer::BaseEnv, Layer::BaseEnvMember].contains(&kind)
             && let Some(value) = &source.placement
         {
             placement = Some(value.clone());
@@ -578,4 +578,133 @@ pub fn present(target: &Target, documents: &Documents) -> Box<[Box<[u8]>]> {
         names.push(pair.key).expect("task count");
     }
     names.into_boxed()
+}
+
+/// Rules applied once to documents and to composed placements.
+pub(crate) fn rules(documents: &Documents, errors: &mut crate::errors::Collector) -> Box<[bool]> {
+    let mut invalid = List::with_capacity(u32::try_from(documents.entries().len()).expect("document count"));
+    for (index, entry) in documents.entries().iter().enumerate() {
+        let mut refused = false;
+        if let Some(document) = documents.get(u32::try_from(index).expect("document index")) {
+            let class = revision::class(&entry.path);
+            let mut default = class == Class::Fleet;
+            if let Class::Environment { .. } = class {
+                default = true;
+            }
+            let mut base = false;
+            if let Class::Host { base: name, name: host } = class {
+                base = name == host;
+            }
+            if default && let Some(members) = &document.members {
+                errors.push(error(&entry.path, Some(members.at), crate::errors::Composition::Members, None, None));
+                refused = true;
+            }
+            refused |=
+                document_layer(&document.layer, documents, &entry.path, default, base || class == Class::Fleet, errors);
+            if let Some(members) = &document.members {
+                for member in &members.each {
+                    if let Some(source) = &member.layer {
+                        refused |= document_layer(source, documents, &entry.path, false, base, errors);
+                    }
+                }
+            }
+        }
+        invalid.push(refused).expect("document count");
+    }
+    invalid.into_boxed()
+}
+fn document_layer(
+    source: &revision::Layer,
+    documents: &Documents,
+    path: &[u8],
+    default: bool,
+    base: bool,
+    errors: &mut crate::errors::Collector,
+) -> bool {
+    let mut refused = false;
+    if base && let Some(placement) = &source.placement {
+        errors.push(error(path, Some(placement.at), crate::errors::Composition::Placement, None, None));
+        refused = true;
+    }
+    for task in &source.tasks {
+        if default && task.name.as_ref() != b"hearth" && task.value.kind == Kind::Null {
+            errors.push(error(path, Some(task.at), crate::errors::Composition::Null, None, Some(task.name.clone())));
+            refused = true;
+        }
+        let declared = documents.declaration(&task.name).is_some();
+        if !declared && task.name.as_ref() != b"hearth" {
+            errors.push(error(path, Some(task.at), crate::errors::Composition::Task, None, Some(task.name.clone())));
+        }
+    }
+    refused
+}
+pub(crate) fn placed(
+    target: &Target,
+    documents: &Documents,
+    targets: &[Target],
+) -> Result<revision::Placement, Box<crate::errors::Error>> {
+    let Some(placement) = placement(target, documents) else {
+        return Err(Box::new(error(
+            documents.path(target.base_env),
+            None,
+            crate::errors::Composition::Unplaced,
+            Some(target.name.clone()),
+            None,
+        )));
+    };
+    if placement.kind != revision::Runs::Container {
+        return Ok(placement);
+    }
+    let on = placement.on.as_ref().expect("decoded container on");
+    if let Some(host) = host(target, &on.target, documents, targets) {
+        let mut document = target.base_env;
+        for (index, source, kind) in layers(target, documents).into_iter().flatten() {
+            if [Layer::Environment, Layer::BaseEnv, Layer::BaseEnvMember].contains(&kind) && source.placement.is_some()
+            {
+                document = index;
+            }
+        }
+        return Err(Box::new(error(
+            documents.path(document),
+            Some(on.at),
+            crate::errors::Composition::On { on: on.target.clone(), host },
+            Some(target.name.clone()),
+            None,
+        )));
+    }
+    Ok(placement)
+}
+fn host(target: &Target, on: &[u8], documents: &Documents, targets: &[Target]) -> Option<crate::errors::Host> {
+    for host in targets {
+        if host.name.as_ref() != on {
+            continue;
+        }
+        if host.environment != target.environment {
+            return Some(crate::errors::Host::Elsewhere { environment: host.environment.clone() });
+        }
+        if let Some(placement) = placement(host, documents)
+            && placement.kind == revision::Runs::Container
+        {
+            return Some(crate::errors::Host::Container);
+        }
+        return None;
+    }
+    Some(crate::errors::Host::Unknown)
+}
+fn error(
+    path: &[u8],
+    position: Option<Position>,
+    why: crate::errors::Composition,
+    target: Option<Box<[u8]>>,
+    task: Option<Box<[u8]>>,
+) -> crate::errors::Error {
+    crate::errors::Error {
+        side: None,
+        kind: crate::errors::Kind::Composition(why),
+        class: crate::errors::Class::Configuration,
+        at: Some(crate::errors::Place { path: bytes::copy_of(path), position }),
+        also: None,
+        target,
+        task,
+    }
 }

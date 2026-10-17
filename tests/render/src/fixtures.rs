@@ -352,3 +352,36 @@ pub fn unused_object_typo() -> Repository {
     });
     repository
 }
+
+#[must_use]
+pub fn containers() -> Repository {
+    let mut repository = two_targets();
+    container_on_host(&mut repository);
+    repository
+}
+
+#[must_use]
+pub fn container_with_unsound_host() -> Repository {
+    use hearth_domain_render::revision::Kind;
+    let mut repository = with_int_setting();
+    container_on_host(&mut repository);
+    repository.entries.push(entry(b"hosts/a-b/a-b-prod.json", b'5'));
+    let Decoded::Document(mut host) = task_patch(b"motd", b"x", Kind::String(Box::from(b"bad".as_slice()))) else {
+        panic!("document")
+    };
+    host.layer.placement = Some(placement());
+    repository.documents.push((oid(b'5'), Decoded::Document(host)));
+    repository
+}
+
+fn container_on_host(repository: &mut Repository) {
+    let mut placed = placement();
+    placed.kind = Runs::Container;
+    placed.firmware = None;
+    placed.hardware = None;
+    placed.on = Some(hearth_domain_render::revision::On {
+        target: Box::from(b"a-b-prod".as_slice()),
+        at: Position { line: 1, column: 43 },
+    });
+    set_document(repository, b'3', document(Some(placed)));
+}

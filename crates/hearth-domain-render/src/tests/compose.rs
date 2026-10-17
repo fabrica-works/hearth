@@ -263,3 +263,115 @@ fn a_nulled_field_gets_its_default_back() {
     }
     assert_eq!(shell, Some(&V::String(skein_lib::bytes::copy_of(b"/bin/bash"))));
 }
+
+const DEFAULTS: &[&[u8]] = &[b"fleet.json", b"envs/lab.json"];
+#[test]
+fn null_for_a_task_in_a_default_is_refused_at_its_key() {
+    use super::fixtures;
+    for (row, path) in DEFAULTS.iter().enumerate() {
+        let documents = fixtures::rule_document(path, b"motd", true, false, false);
+        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+        crate::compose::rules(&documents, &mut errors);
+        let errors = errors.finish().0;
+        assert_eq!(only(&errors).kind, crate::errors::Kind::Composition(crate::errors::Composition::Null), "row {row}");
+        assert_eq!(only(&errors).at.as_ref().expect("key").position, Some(at(1, 2)), "row {row}");
+        assert_eq!(only(&errors).task.as_deref(), Some(b"motd".as_slice()), "row {row}");
+    }
+}
+#[test]
+fn a_null_hearth_is_no_compose_error() {
+    let documents = super::fixtures::rule_document(b"fleet.json", b"hearth", true, false, false);
+    let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+    crate::compose::rules(&documents, &mut errors);
+    assert_eq!(errors.finish().0.as_ref(), []);
+}
+const BASE_PLACEMENTS: &[(&[u8], bool)] =
+    &[(b"fleet.json", false), (b"hosts/stoa/stoa.json", false), (b"hosts/stoa/stoa.json", true)];
+#[test]
+fn placement_in_fleet_json_or_a_base_is_refused() {
+    for (row, &(path, member)) in BASE_PLACEMENTS.iter().enumerate() {
+        let documents = super::fixtures::rule_document(path, b"", false, true, member);
+        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+        crate::compose::rules(&documents, &mut errors);
+        let errors = errors.finish().0;
+        let error = only(&errors);
+        assert_eq!(error.kind, crate::errors::Kind::Composition(crate::errors::Composition::Placement), "row {row}");
+        assert_eq!(error.at.as_ref().expect("placement").position, Some(at(1, 2)), "row {row}");
+    }
+}
+#[test]
+fn members_in_fleet_json_or_an_environment_is_refused() {
+    for (row, path) in DEFAULTS.iter().enumerate() {
+        let documents = super::fixtures::rule_document(path, b"", false, false, true);
+        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+        crate::compose::rules(&documents, &mut errors);
+        let errors = errors.finish().0;
+        assert_eq!(
+            only(&errors).kind,
+            crate::errors::Kind::Composition(crate::errors::Composition::Members),
+            "row {row}"
+        );
+        assert_eq!(only(&errors).at.as_ref().expect("members").position, Some(at(1, 11)), "row {row}");
+    }
+}
+#[test]
+fn a_target_without_placement_fails_with_its_error() {
+    let documents = super::fixtures::member_documents(None, None);
+    let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+    let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
+    let error =
+        crate::compose::placed(only(&discovered.targets), &documents, &discovered.targets).expect_err("unplaced");
+    assert_eq!(error.kind, crate::errors::Kind::Composition(crate::errors::Composition::Unplaced));
+    assert_eq!(error.at.expect("base-env").path.as_ref(), b"hosts/stoa/stoa-lab.json");
+}
+type HostCase = (&'static [u8], (&'static str, Option<&'static [u8]>));
+const HOSTS: &[HostCase] = &[
+    (b"absent-lab", ("unknown", None)),
+    (b"rhi-prod", ("elsewhere", Some(b"prod"))),
+    (b"chat-lab", ("container", None)),
+];
+#[test]
+fn a_container_s_on_names_a_non_container_of_its_environment() {
+    for (row, (on, expected)) in HOSTS.iter().enumerate() {
+        let documents = super::fixtures::container_documents(on);
+        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+        let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
+        let mut target = None;
+        for each in &discovered.targets {
+            if each.name.as_ref() == b"stoa-lab" {
+                target = Some(each);
+            }
+        }
+        let target = target.expect("container");
+        let error = crate::compose::placed(target, &documents, &discovered.targets).expect_err("invalid host");
+        let crate::errors::Kind::Composition(crate::errors::Composition::On { on: name, host }) = &error.kind else {
+            panic!("on error")
+        };
+        assert_eq!(name.as_ref(), *on, "row {row}");
+        let host = match host {
+            crate::errors::Host::Unknown => ("unknown", None),
+            crate::errors::Host::Container => ("container", None),
+            crate::errors::Host::Elsewhere { environment } => ("elsewhere", Some(environment.as_ref())),
+        };
+        assert_eq!(&host, expected, "row {row}");
+        assert_eq!(error.at.expect("on").position, Some(at(1, 43)), "row {row}");
+    }
+}
+const TASK_DOCUMENTS: &[(&[u8], bool)] = &[
+    (b"fleet.json", false),
+    (b"envs/lab.json", false),
+    (b"hosts/stoa/stoa.json", false),
+    (b"hosts/stoa/stoa.json", true),
+];
+#[test]
+fn a_task_named_that_does_not_exist_is_refused_at_its_key() {
+    for (row, &(path, member)) in TASK_DOCUMENTS.iter().enumerate() {
+        let documents = super::fixtures::rule_document(path, b"missing", false, false, member);
+        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+        crate::compose::rules(&documents, &mut errors);
+        let errors = errors.finish().0;
+        assert_eq!(only(&errors).kind, crate::errors::Kind::Composition(crate::errors::Composition::Task), "row {row}");
+        assert_eq!(only(&errors).at.as_ref().expect("task").position, Some(at(1, 2)), "row {row}");
+        assert_eq!(only(&errors).task.as_deref(), Some(b"missing".as_slice()), "row {row}");
+    }
+}

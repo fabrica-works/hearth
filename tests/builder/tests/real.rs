@@ -414,3 +414,22 @@ fn an_account_s_faults_exit_with_configuration_failure() {
     let repository = Repository::make("users-schema-exit", &fixtures::thin_with(fixtures::USERS));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
+
+#[test]
+fn a_container_on_another_environment_s_target_prints_its_error() {
+    let repository = Repository::make("containers", fixtures::CONTAINERS);
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["target ", "hosts/"]),
+        concat!(
+            "target       rhi-lab   base rhi   environment lab\n",
+            "target       rhi-prod   base rhi   environment prod\n",
+            "hosts/chat/chat-prod.json:1:43: chat-prod: placement's on names rhi-lab, a target of lab\n",
+        )
+    );
+}
+#[test]
+fn a_container_on_another_environment_s_target_exits_two() {
+    let repository = Repository::make("containers-exit", fixtures::CONTAINERS);
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}

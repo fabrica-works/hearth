@@ -481,27 +481,82 @@ fn a_diff_error_leads_its_line_with_the_revision_side() {
 const COMPOSITION_LINES: &[(crate::errors::Composition, &[u8], &[u8])] = &[
     (crate::errors::Composition::Duplicate, b"stoa-1-lab: two targets are named stoa-1-lab\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":\"duplicate\",\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
     (crate::errors::Composition::Long, b"stoa-1-lab: a target name past 63 bytes\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":\"long\",\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
+    (crate::errors::Composition::Placement, b"stoa-1-lab: placement in fleet.json, a base or its member\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":\"placement\",\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
+    (crate::errors::Composition::Members, b"stoa-1-lab: members in fleet.json or an environment\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":\"members\",\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
+    (crate::errors::Composition::Unplaced, b"stoa-1-lab: no placement once composed\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":\"unplaced\",\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
+    (crate::errors::Composition::Null, b"stoa-1-lab: null for a task in a default\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":\"null\",\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
+
 ];
 #[test]
 fn each_composition_error_prints_its_text() {
-    for (row, &(why, text, _)) in COMPOSITION_LINES.iter().enumerate() {
-        assert_eq!(print(&Record::Error(fixtures::composition_error(why))).as_deref(), Ok(text), "row {row}");
+    for (row, (why, text, _)) in COMPOSITION_LINES.iter().enumerate() {
+        assert_eq!(print(&Record::Error(fixtures::composition_error(why.clone()))).as_deref(), Ok(*text), "row {row}");
     }
 }
 #[test]
 fn each_composition_error_prints_its_json_fields() {
-    for (row, &(why, _, json)) in COMPOSITION_LINES.iter().enumerate() {
+    for (row, (why, _, json)) in COMPOSITION_LINES.iter().enumerate() {
         assert_eq!(
             form::print(
                 Form::JsonLines,
-                &Record::Error(fixtures::composition_error(why)),
+                &Record::Error(fixtures::composition_error(why.clone())),
                 Some(Type::Error),
                 &limits::SHIPPED
             )
             .as_deref(),
-            Ok(json),
+            Ok(*json),
             "row {row}"
         );
     }
 }
 mod validation;
+const ON_LINES: &[(crate::errors::Host, &[u8], &[u8])] = &[
+    (crate::errors::Host::Unknown, b"stoa-1-lab: placement's on names rhi-lab, no discovered target\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":{\"kind\":\"on\",\"on\":\"rhi-lab\",\"host\":\"unknown\"},\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
+    (crate::errors::Host::Container, b"stoa-1-lab: placement's on names rhi-lab, a container\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":{\"kind\":\"on\",\"on\":\"rhi-lab\",\"host\":\"container\"},\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
+];
+#[test]
+fn an_on_error_prints_its_text() {
+    for (row, (host, text, _)) in ON_LINES.iter().enumerate() {
+        assert_eq!(print(&Record::Error(fixtures::composition_on(host.clone()))).as_deref(), Ok(*text), "row {row}");
+    }
+}
+#[test]
+fn an_on_error_prints_its_json_fields() {
+    for (row, (host, _, json)) in ON_LINES.iter().enumerate() {
+        assert_eq!(
+            form::print(
+                Form::JsonLines,
+                &Record::Error(fixtures::composition_on(host.clone())),
+                Some(Type::Error),
+                &limits::SHIPPED
+            )
+            .as_deref(),
+            Ok(*json),
+            "row {row}"
+        );
+    }
+}
+#[test]
+fn an_on_elsewhere_error_prints_its_text() {
+    let error = fixtures::composition_on(crate::errors::Host::Elsewhere { environment: Box::from(b"lab".as_slice()) });
+    assert_eq!(
+        print(&Record::Error(error)).as_deref(),
+        Ok(b"stoa-1-lab: placement's on names rhi-lab, a target of lab\n".as_slice())
+    );
+}
+#[test]
+fn an_on_elsewhere_error_prints_its_json_fields() {
+    let error = fixtures::composition_on(crate::errors::Host::Elsewhere { environment: Box::from(b"lab".as_slice()) });
+    assert_eq!(form::print(Form::JsonLines, &Record::Error(error), Some(Type::Error), &limits::SHIPPED).as_deref(), Ok(b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":{\"kind\":\"on\",\"on\":\"rhi-lab\",\"host\":{\"kind\":\"elsewhere\",\"environment\":\"lab\"}},\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n".as_slice()));
+}
+#[test]
+fn a_missing_task_error_names_its_task_in_text() {
+    assert_eq!(
+        print(&Record::Error(fixtures::missing_task())).as_deref(),
+        Ok(b"no task motd under tasks/\n".as_slice())
+    );
+}
+#[test]
+fn a_missing_task_error_names_its_task_in_json() {
+    assert_eq!(form::print(Form::JsonLines, &Record::Error(fixtures::missing_task()), Some(Type::Error), &limits::SHIPPED).as_deref(), Ok(b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":\"task\",\"class\":\"configuration\",\"task\":\"motd\"}\n".as_slice()));
+}
