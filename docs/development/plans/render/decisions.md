@@ -896,6 +896,17 @@ None yet.
 
      Nothing is deferred, so `later.md` gains no row.
 
+171. **hearth 18.4 lands at its count, its settings modules renamed** (plan defect, hearth-18.4's block of 2026-10-17T23:08:30Z).
+     **hearth 18.4 lands at its count, once its `settings` modules take another name** (plan defect, hearth-18.4's block of 2026-10-17T23:08:30Z).
+
+     Yes: hearth-18.4 lands as prepared (abb25d4), at 1,320 production additions against its Size of 250, past the four times that ruling 168's README rule lets land unasked. The plan's count was low, not the increment's scope: 532 of the 1,320 are the records' mirror (408) and the protocol's translation (124) of the three kinds, which the README's meeting point requires and 18.4's Files did not name; render's own 788 is 3.2 times the Size. The tests the Test shape names are there (`a_tmpfiles_line_needs_its_type_and_checks_its_mode` as two, `a_tmpfiles_line_needs_its_type` and `a_tmpfiles_line_checks_its_mode`), the Proof passed in 0.043 s, and no file passes 800 lines once rebased (the largest, protocol `src/tests/fixtures.rs`, about 795).
+
+     1. **Before landing, the modules and items 18.4 names `settings` take a name that is no term of the design.** format.md 6 is "The schema", whose "`settings` in `task.json` is a map from setting name to its spec", and render's code reads a task's settings under that name; 18.4 names its presets, tmpfiles and scripts group `settings` in twelve files (records `src/diff/settings.rs`, `src/parts/config/settings.rs`, `src/tests/settings.rs`, `src/tests/fixtures/settings.rs`; render `src/parts/config/{settings, settings_changes}.rs`, `src/tests/kinds/settings.rs`, `src/tests/fixtures/kinds/settings.rs`; protocol `src/translate/parts/config/settings.rs`, `src/translate/changes/settings_changes.rs`, `src/tests/translate/settings.rs`, `src/tests/fixtures/settings.rs`). Rename them, and the items so named, to one name of what the group holds (as 18.3 named users and groups `accounts`), by the session's choice, a rename only: every test's name, body and expected value kept. The commit body names the new name.
+     2. 18.4's Files gain the counted files they missed, under that name: records `src/diff.rs`, new `src/diff/<group>.rs`, `src/errors/repository.rs`, `src/parts/config.rs`, new `src/parts/config/<group>.rs`; render `src/call/{files, references, scripts, templates}.rs`, new `src/call/templates/scripts.rs`, `src/parts/config/accounts.rs`, new `src/parts/config/{<group>, <group>_changes}.rs`, `src/schema/debian.rs`; protocol `src/translate/{changes, errors}.rs`, `src/translate/parts/config.rs`, new `src/translate/changes/<group>_changes.rs`, `src/translate/parts/config/<group>.rs`.
+     3. 18.4's commit body gives the count by file (`logs/hearth-18/18.4-size.txt`, counted again after the rebase and the rename) and names ruling 171. Nothing is trimmed to fit.
+
+     The README's rule stays at four times: a further increment past it stops on a question, as this one did. A further counted file outside the Files takes a line in the commit body, with its count.
+
 ## For the user
 
 The long-term choices the user may veto:

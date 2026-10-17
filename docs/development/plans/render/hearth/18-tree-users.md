@@ -284,7 +284,17 @@ Files: render new `src/kinds/{presets, tmpfiles, scripts}.rs`, `src/kinds.rs`,
 render `src/revision/declaration.rs` (`Declaration` gains `scripts`) and each
 `Declaration` literal, which gains it as 16.1's gained `requires` (`git grep
 -n 'requires: ' -- crates tests`); protocol `src/translate/declarations.rs`
-(its `scripts: _`, `:16`, translates them) and `src/tests/translate/declarations.rs`.
+(its `scripts: _`, `:16`, translates them) and `src/tests/translate/declarations.rs`;
+and, as the work needed them (ruling 171; `<group>` the name it gives the three
+kinds together): records `src/diff.rs`, new `src/diff/<group>.rs`,
+`src/errors/repository.rs`, `src/parts/config.rs`, new
+`src/parts/config/<group>.rs`; render `src/call/{files, references, scripts,
+templates}.rs`, new `src/call/templates/scripts.rs`,
+`src/parts/config/accounts.rs`, new `src/parts/config/{<group>,
+<group>_changes}.rs`, `src/schema/debian.rs`; protocol
+`src/translate/{changes, errors}.rs`, `src/translate/parts/config.rs`, new
+`src/translate/changes/<group>_changes.rs` and
+`src/translate/parts/config/<group>.rs`.
 Shape: `action` is `enable` or `disable`; `type` one of 14 letters (`Schema::
 Enum`) and required (`MissingField`); `mode` `Format::Mode`; the rest as
 written. `scripts`: each declared name must exist as `NAME` or `NAME.j2`
@@ -327,7 +337,7 @@ Proof: process, `hearth_diff_names_a_preset_a_tmpfiles_line_and_a_script`, bound
 ```
 Don't: refuse a reserved line (21), digest `software.sh` (19), or change
 `hearth-protocol-config`'s `scripts` decoding or its tests (04.1's).
-Size: at most 250 lines.
+Size: at most 250 lines; it lands at 1320 (ruling 171).
 Removes: nothing.
 
 ### 18.5 The `data` part
