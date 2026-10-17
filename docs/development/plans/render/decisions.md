@@ -178,6 +178,37 @@ None yet.
      `heavy` tasks on this machine all ended with at least 4.0 GB available.
      The coordinator logs each memory check beside its disk check, as now.
 
+102. **skein-02.s1: the replay bound's fixture, and skein's gate passed as written** (plan defect, skein 02's block of 2026-10-17T15:57:15Z).
+     A plan defect: 02.1's Files say "`size_of::<tokenizer::Tokenizer>()`
+     (`crates/skein-llm/src/openai/common.rs:69`) grows and is computed", and
+     miss `tests/llm/tests/replay_total.rs:19-20`, whose literal totals
+     include it. skein 089ed83 landed with that test failing: its gate script
+     had no `set -e`, and the focused suite ran 543 of its 2484 tests. The
+     repair is a step not in the plan, skein-02.s1
+     (`skein/02.s1-replay-total.md`), skein 02's, landed before 02.2 and
+     before any other skein landing:
+     - each provider's `parent` and `fixed` advance by what
+       `client::worst_case` now computes over the old value (32 for
+       `OpenAiCodex`: 53,130,181 against 53,130,149); `removed`, `receiving`
+       and the other assertions stay; the test keeps its name and inputs.
+       Literals, as the file has them, not a `size_of` in the test.
+     - it lands with `land --gate` and the README's skein gate passed as
+       written, in single quotes, its commands joined by `&&`; never a script
+       or file of the session's own (the corrected `land.sh` in `logs/`
+       included). The README now says so for every skein session.
+     - its commit body says, in one line, that 089ed83's `Gate-Result` is
+       invalid (focused: 543/2484 run, 1 failed;
+       `logs/20261017T155536-7.log`), and that this commit's gate ran the
+       whole suite.
+     - a further failure among the 1941 tests that did not run on 089ed83,
+       where 02.1's Shape explains it, is fixed in the same landing under
+       implementer.md's "A failure the Shape explains"; any other failure
+       stops the step with a report.
+
+     Refresh any further copy of a total that includes
+     `size_of::<tokenizer::Tokenizer>()`, in skein or at a downstream repin,
+     to what the code computes, and list it in the commit body.
+
 ## For the user
 
 The long-term choices the user may veto:

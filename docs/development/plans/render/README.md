@@ -184,7 +184,10 @@ the closing repins (Repin). The increments of each session are in its file.
   land --gate 'cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo check --target wasm32-unknown-unknown -p skein-lib -p skein-codec -p skein-http && cargo clippy --target wasm32-unknown-unknown -p skein-ui -p skein-ui-web -p skein-ui-example-view -p skein-ui-example-shell-web -- -D warnings && scripts/taste.sh crates/skein-tls tests/tls && cargo check -p skein-tls && export NEXTEST_DOUBLE_SPAWN=0 && cargo nextest run --workspace && cargo nextest run --workspace --profile fuzzy && cargo build --target wasm32-unknown-unknown -p skein-ui-example-shell-web && cargo run -p skein-ui-bundle -- --module target/wasm32-unknown-unknown/debug/skein_ui_example_shell_web.wasm --name skein_ui_example_shell_web --prefix /bundle/ --stylesheet examples/ui/shell-web/notes.css --out target/ui-example-bundle --noscript "Notes needs WebAssembly and scripts." && cargo build -p skein-ui-example-server && export SKEIN_UI_EXAMPLE_BUNDLE="$(pwd)/target/ui-example-bundle" && cargo nextest run --workspace --profile browser -E "not test(=a_page_of_another_origin_is_opened_by_its_step)"'
   ```
 
-  The browser suite needs `SKEIN_TEST_CHROMIUM` in the environment; the
+  Each skein session passes this command to `land --gate` as written, in
+  single quotes, its commands joined by `&&`, never a script or file of
+  its own (ruling 102: 089ed83 landed on a gate script without `set -e`,
+  its focused suite failed). The browser suite needs `SKEIN_TEST_CHROMIUM` in the environment; the
   coordinator checks it at the start (Prerequisites). Where
   skein's `scripts/check.sh` differs from these commands once the run
   starts, check.sh's commands win, with the same filter.
