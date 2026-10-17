@@ -474,6 +474,18 @@ None yet.
      6. 04.1's Files add, where 03.2's world names every `Fault` (`Seen::EVERY_FAULT_AND_ENDING`, `tests/fuzzy_documents.rs`, `src/reference.rs`), `Fault::Declaration`.
      One design question goes to the designer in question.md: the form of a guard's name (format.md 2.4 gives none; 5.9). Interim, until its answer reaches session 04: 04.1 decodes a guard's name as a `Text` at its key and checks no form, no test asserts one, and a 04.1 ready to land before the answer blocks, kind design, naming the question. A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+125. **hearth 41's Shapes against main** (ready check of hearth-41.1).
+     hearth 41's ready check, against hearth a6d270f to c00ac09 and skein aaddf88 to 6141021, its suites on 9ec5519 with hearth 34.1 landed (`scripts/check.sh` through `heavy --gate` passes: default 358, fuzzy 10; conformance 13 of 13, resolve 8 of 8, under `HEARTH_RECORD=1` and again compared equal), corrects 41-resolve-recordings.md:
+     1. The forky index the Choices describe is the pin's, `20261017T143929Z` (`testing/mirror/pin`), not `20260928T022309Z`; its facts on test-boot's names, both MTAs and `hearth-absent` hold there.
+     2. What `--skip=cleanup/apt/lists` leaves is quoted from render.md 10 (:1366-1368): "leaves `InRelease` and the decompressed `Packages` files in the scratch directory, as the recordings show (9.6)".
+     3. An `Inst` line's architecture is the `[…]` that closes its parenthesis, before the `)`: apt ends every `Inst` line with a further ` []`, so "the last `[…]`" fails test-min's stanza lookup.
+     4. `unsatisfiable` gets past no closure: chrootless mmdebstrap installs the essential set first, so apt prints its `Inst` lines (56 at the pin), none naming postfix or exim4, then `E: Unable to correct problems`, exit 25; its test is `conflicting_requests_fail_after_the_essential_set_naming_neither_mta`, and asserts those.
+     5. `Recording`'s `lists` and `stanzas` are `Option<Vec<u8>>`, as its other fields are, and `resolve::stanzas` returns `Result<Vec<u8>, Box<[u8]>>`.
+     6. `Run` is 34.1's `{ exit: hearth_protocol_git::invocation::Exit, captured: Recording }` (`tests/conformance/src/run.rs:10`), `Exit` imported from there; `Recording::exit` is its text ("0", "signal 9"); `Run::recording()` is unmasked, so `Resolved::recording` masks it with `Mask::recording(&mut Recording)` (`testing/hearth-recordings/src/lib.rs:135`).
+     7. The users of `Recording {` are `testing/hearth-recordings/src/lib.rs:48` (`read_at`, which reads the optional `lists` and `stanzas` files, as `write_at` writes them), `src/tests.rs:25` and `tests/conformance/src/run.rs:56`; `tests.rs:55`'s `..original` needs none.
+     8. `tests/conformance`'s own `[lints]` keep pedantic (`Cargo.toml:22`), so each `pub fn` returning a `Result` has `# Errors`, and each other one returning a value `#[must_use]`.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

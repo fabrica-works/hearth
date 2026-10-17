@@ -33,8 +33,9 @@ in the gate reads the cache or reaches past loopback.
   terminal), its stdout, its stderr and its exit"; "Captured, never written
   by hand"; "A new version is re-recorded". 5.5: in M1 the profile needs
   "git, mmdebstrap and the mirror's indexes", and "refuses to start,
-  naming what is missing". render.md 10: what `--skip=cleanup/apt/lists`
-  leaves "depends on a recording of each".
+  naming what is missing". render.md 10 (:1366-1368): `--skip=cleanup/apt/lists`
+  "leaves `InRelease` and the decompressed `Packages` files in the scratch
+  directory, as the recordings show (9.6)".
 - **testing.md 2.10:** real tiers "refuse to start, rather than skip".
 - **The vector** (render.md, 5.2): `/usr/bin/mmdebstrap`, "spawned by
   its path"; the environment "given whole"; the proxy as
@@ -50,12 +51,15 @@ in the gate reads the cache or reaches past loopback.
   (test-min's inputs, request `hearth-absent`); `no-candidate` (request
   `mail-transport-agent` alone, virtual: "has no installation candidate");
   `unsatisfiable` (request `exim4-daemon-light` and `postfix`, each
-  providing and conflicting with `mail-transport-agent`);
+  providing and conflicting with `mail-transport-agent`: chrootless
+  mmdebstrap installs the essential set first, so apt prints its `Inst`
+  lines, 56 at the pin, none naming postfix or exim4, then `E: Unable to
+  correct problems`, exit 25);
   `unreachable-mirror` (test-min's, the proxy a loopback port nothing
   listens on); `absent-snapshot` (test-min's, the timestamp
   `20000101T000000Z`, older than any snapshot.debian.org holds: the
   proxy's `InRelease` 404: render.md 5.5's `resolution`, configuration,
-  since a timestamp's archive never changes). x1's local forky index of `20260928T022309Z` holds test-boot's
+  since a timestamp's archive never changes). The forky index of the pin's `20261017T143929Z` (`testing/mirror/pin`) holds test-boot's
   ten names, both MTAs with those fields, twelve providers of
   `mail-transport-agent` and no package of that name, and no
   `hearth-absent`. Then test-boot split: under `Limits { include: 32, ..
@@ -75,7 +79,8 @@ in the gate reads the cache or reaches past loopback.
   prints `E:` and `W:`, not `Error:`, render.md 5.5), `lists` and
   `stanzas`; the rest carries times (5.3).
 - **`Inst` lines are read by the world, not by hearth 07.2's reader** (the
-  name, the version after `(`, the architecture in the last `[…]`), into no
+  name, the version after `(`, the architecture in the `[…]` that closes the parenthesis, before its
+  `)`: apt ends every `Inst` line with a further ` []`), into no
   type of its own: a real line 07.2 misreads cannot block the recordings
   hearth 38.2 corrects it by.
 - **The proxy is the test's configuration** (client/README.md, 3.5): the
@@ -110,8 +115,10 @@ Files: `tests/conformance/`: `Cargo.toml` (`hearth-protocol-mmdebstrap`,
 `hearth-test-mirror`), `src/{lib.rs, run.rs (mmdebstrap), resolve.rs
 (new)}`, `tests/conformance_resolve.rs` (new);
 `testing/hearth-recordings/src/{lib.rs, tests.rs}`; users of `Recording {`
-(`git grep -n -F 'Recording {' -- testing tests`), given `lists: None,
-stanzas: None`; `testing/recordings/mmdebstrap/<version>/` (shared,
+(`git grep -n -F 'Recording {' -- testing tests`): `testing/hearth-recordings/src/lib.rs:48`,
+whose `read_at` reads the optional `lists` and `stanzas` files as `write_at`
+writes them, `src/tests.rs:25` and `tests/conformance/src/run.rs:56`, given
+`lists: None, stanzas: None` (`tests.rs:55`'s `..original` needs none); `testing/recordings/mmdebstrap/<version>/` (shared,
 captured; `<version>` is `<mmdebstrap>-apt<apt>`, from each tool's
 `--version`, x1's `1.5.7-apt3.3.3`; testing.md 4.5); root `Cargo.toml`,
 `Cargo.lock`.
@@ -134,7 +141,9 @@ Test shape: `tests/conformance/tests/conformance_resolve.rs`, each under
 the checked index),
 `an_unknown_package_fails_naming_it`,
 `a_virtual_package_alone_fails_with_no_installation_candidate`,
-`conflicting_requests_fail_with_no_closure`,
+`conflicting_requests_fail_after_the_essential_set_naming_neither_mta`
+(exit 25, `E: Unable to correct problems`, no `Inst` line naming postfix or
+exim4),
 `an_unreachable_mirror_fails_with_no_closure`,
 `a_snapshot_the_mirror_lacks_fails_on_its_inrelease_not_found` (the proxy
 logged a 404 for that timestamp's `InRelease`, and no `Inst` line); each
@@ -188,14 +197,17 @@ hearth 46 runs `CASES` on its fake, and 38.2 reads the recordings.
 pub struct Recording {
     // 34.1's fields as it lands them: argv, env, dir, stdin, stdout, stderr, exit, expect.
     /// `lists`: what the run left in apt's lists directory, `file <size> <name>` or `directory <name>`, by name.
-    pub lists: Option<Box<[u8]>>,
+    pub lists: Option<Vec<u8>>,
     /// `stanzas`: the `Packages` stanzas of the run's closure, cut from apt's own list.
-    pub stanzas: Option<Box<[u8]>>,
+    pub stanzas: Option<Vec<u8>>,
 }
 impl Mask { /// One more literal masked, after the scratch's: the proxy's port.
     pub fn also(self, from: &[u8], to: &[u8]) -> Mask; }
 
-// tests/conformance/src/resolve.rs (41.1)
+// tests/conformance/src/resolve.rs (41.1): `Run` is 34.1's `{ exit: hearth_protocol_git::invocation::Exit, captured: Recording }`,
+// `Exit` imported from there (`Code(u8)`, `Signal(u32)`; `Recording::exit` is its text, "0" or "signal 9");
+// the crate's own `[lints]` keep pedantic's `missing_errors_doc` and `must_use_candidate`: each `pub fn`
+// returning a `Result` has `# Errors`, and each other one returning a value `#[must_use]`.
 /// One resolve case: a pinned target's inputs, its request or timestamp replaced or not, the mirror reached or not.
 pub struct Case { pub name: &'static str, pub target: &'static str, pub request: Option<&'static [&'static str]>, pub archive: Option<&'static str>, pub reach: Reach }
 /// The harness's proxy; or a loopback port nothing listens on.
@@ -226,11 +238,15 @@ impl Resolved {
     pub fn inst_lines(&self) -> Vec<&[u8]>;
     /// apt's list `…_<component>_binary-<architecture>_Packages` in the scratch, whole; none if apt left none.
     pub fn list(&self, component: &str) -> Option<Vec<u8>>;
-    /// 34.1's recording of the run, masked, with `lists`.
+    /// 34.1's `Run::recording()` (unmasked), masked by `Mask::recording(&mut Recording)` with `also`'s port, with `lists`.
     pub fn recording(&self) -> Recording;
 }
 /// Each stanza of `list` an `Inst` line names, whole, in the list's order; the first line with none is the error.
-pub fn stanzas(list: &[u8], insts: &[&[u8]]) -> Result<Box<[u8]>, Box<[u8]>>;
+///
+/// # Errors
+///
+/// The first `Inst` line `list` has no stanza for.
+pub fn stanzas(list: &[u8], insts: &[&[u8]]) -> Result<Vec<u8>, Box<[u8]>>;
 
 // tests/conformance/src/run.rs (hearth 34.1's; 41.1 adds)
 /// `sources_list` written to `<scratch>/sources.list`; `PROGRAM` spawned by its path, the environment cleared then `env`, stdin empty, both pipes read to their end.
