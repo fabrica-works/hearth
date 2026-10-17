@@ -1,5 +1,6 @@
 //! Printed units (render.md, 3.8 and 4).
 use crate::{
+    diff::{Change, Tally},
     form::text::Lines,
     outcome::Outcome,
     parts::{config::Config, meta::Meta},
@@ -9,11 +10,13 @@ use alloc::boxed::Box;
 pub enum Record {
     Spec(Box<Spec>),
     Terminal(Terminal),
+    Change(Change),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Type {
     Spec,
     Terminal,
+    Change,
 }
 impl Record {
     #[must_use]
@@ -21,6 +24,7 @@ impl Record {
         match self {
             Self::Spec(_) => Type::Spec,
             Self::Terminal(_) => Type::Terminal,
+            Self::Change(_) => Type::Change,
         }
     }
 }
@@ -62,6 +66,7 @@ impl PartRecord {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Terminal {
     pub outcome: Outcome,
+    pub diff: Option<Tally>,
 }
 
 /// The resolution key and, when known, its layer keys (render.md, 4.5).

@@ -87,7 +87,7 @@ impl Machine {
     }
 }
 fn terminal() -> Record {
-    Record::Terminal(Terminal { outcome: Outcome::Done })
+    Record::Terminal(Terminal { outcome: Outcome::Done, diff: None })
 }
 #[test]
 fn a_record_goes_down_in_pieces_of_at_most_a_chunk() {

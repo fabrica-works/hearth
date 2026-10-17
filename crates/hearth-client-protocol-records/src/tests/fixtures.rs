@@ -66,3 +66,50 @@ pub fn known() -> crate::records::Resolution {
         keys: crate::records::Keys { packages: [0x11; 32], software: [0x22; 32], config: [0x33; 32] },
     }
 }
+
+pub fn wg0_changed() -> crate::diff::Change {
+    use crate::diff::{
+        Change, ConfigChange, EntryChange, HunkLine, Hunks, LineKind, PartChange, Rebuild, Sizes, TargetChange,
+    };
+    const LINES: [(LineKind, &[u8]); 7] = [
+        (LineKind::Header, b"@@ -9,5 +9,5 @@ ListenPort=51820"),
+        (LineKind::Context, b"[WireGuardPeer]"),
+        (LineKind::Context, "PublicKey=m3NY8…=".as_bytes()),
+        (LineKind::Context, b"AllowedIPs=10.0.0.1/32"),
+        (LineKind::Removed, b"Endpoint=194.164.162.157:51820"),
+        (LineKind::Added, b"Endpoint=194.164.162.158:51820"),
+        (LineKind::Context, b"PersistentKeepalive=25"),
+    ];
+    let mut lines = skein_lib::List::with_capacity(7);
+    for (kind, text) in LINES {
+        lines.push(HunkLine { kind, text: copy_of(text) }).expect("seven hunk lines");
+    }
+    Change {
+        target: copy_of(b"carbon-prod"),
+        change: TargetChange::Changed {
+            rebuild: Rebuild::FromConfig,
+            parts: Box::new([PartChange::Config(ConfigChange {
+                tree: Box::new([EntryChange::Changed {
+                    path: copy_of(b"/etc/systemd/network/wg0.netdev"),
+                    before: file([0x11; 32]),
+                    after: file([0x22; 32]),
+                    sizes: Some(Sizes { before: 268, after: 268 }),
+                    hunks: Some(Hunks { lines: lines.into_boxed(), left_out: 0, binary: false }),
+                }]),
+            })]),
+        },
+    }
+}
+pub fn file(content_digest: [u8; 32]) -> Node {
+    Node::File { content_digest, mode: 0o644, owner: copy_of(b"root"), group: copy_of(b"root") }
+}
+pub const WG0_TEXT: &str = concat!(
+    "carbon-prod                                         rebuild from config\n",
+    "  config   ~ /etc/systemd/network/wg0.netdev        0644 root:root\n",
+    "               @@ -9,5 +9,5 @@ ListenPort=51820\n                [WireGuardPeer]\n",
+    "                PublicKey=m3NY8…=\n                AllowedIPs=10.0.0.1/32\n",
+    "               -Endpoint=194.164.162.157:51820\n               +Endpoint=194.164.162.158:51820\n                PersistentKeepalive=25\n",
+);
+pub fn tally(targets: u32, changed: u32, unchanged: u32) -> crate::diff::Tally {
+    crate::diff::Tally { from: copy_of(b"main"), to: copy_of(b"HEAD"), targets, changed, unchanged }
+}

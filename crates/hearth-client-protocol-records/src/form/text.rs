@@ -46,6 +46,9 @@ impl Lines {
             self.put(&[hex(byte >> 4), hex(byte & 15)]);
         }
     }
+    pub(crate) fn decimal(&mut self, number: u64) {
+        self.put(skein_lib::Decimal::of(number).as_bytes());
+    }
     pub(crate) fn mode(&mut self, mode: u16) {
         for shift in [9_u32, 6, 3, 0] {
             self.put(&[b'0'.saturating_add(u8::try_from((mode >> shift) & 7).expect("octal digit"))]);
@@ -109,6 +112,11 @@ fn render(lines: &mut Lines, record: &Record, after: Option<Type>) {
                 }
             }
         }
-        Record::Terminal(_) => {}
+        Record::Change(change) => change.text(lines),
+        Record::Terminal(terminal) => {
+            if let Some(tally) = &terminal.diff {
+                tally.text(lines);
+            }
+        }
     }
 }

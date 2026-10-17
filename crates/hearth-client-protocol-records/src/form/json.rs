@@ -13,7 +13,7 @@ pub(crate) fn print(record: &Record, after: Option<Type>, most: u32) -> Result<B
     let limits = Limits { depth: DEPTH, length: most };
     let count = match record {
         Record::Spec(spec) => spec.parts.len().checked_add(3),
-        Record::Terminal(_) => Some(2),
+        Record::Terminal(_) | Record::Change(_) => Some(2),
     }
     .ok_or(Refusal::TooLong)?;
     let start = usize::from(after.is_some());
@@ -49,7 +49,7 @@ pub(crate) fn print(record: &Record, after: Option<Type>, most: u32) -> Result<B
     }
     Ok(writer.finish())
 }
-fn field(json: &mut Encoder, key: &[u8], value: &[u8]) {
+pub(crate) fn field(json: &mut Encoder, key: &[u8], value: &[u8]) {
     json.key(key);
     json.string(value);
 }
@@ -61,6 +61,7 @@ fn line(json: &mut Encoder, record: &Record, index: usize) {
         json.unsigned(u64::from(CLIENT_VERSION));
     } else {
         match record {
+            Record::Change(change) => change.json(json),
             Record::Terminal(terminal) => {
                 field(json, b"record", b"outcome");
                 field(
@@ -74,6 +75,9 @@ fn line(json: &mut Encoder, record: &Record, index: usize) {
                         Outcome::TryAgain => b"try_again",
                     },
                 );
+                if let Some(tally) = &terminal.diff {
+                    tally.json(json);
+                }
             }
             Record::Spec(spec) => {
                 if index == 1 {

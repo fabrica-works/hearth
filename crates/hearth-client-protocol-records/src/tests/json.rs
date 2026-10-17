@@ -32,7 +32,7 @@ fn the_terminal_record_gives_its_outcome_by_name() {
     for (outcome, expected) in ROWS {
         let printed = form::print(
             Form::JsonLines,
-            &Record::Terminal(Terminal { outcome }),
+            &Record::Terminal(Terminal { outcome, diff: None }),
             Some(crate::records::Type::Spec),
             &limits::SHIPPED,
         );
