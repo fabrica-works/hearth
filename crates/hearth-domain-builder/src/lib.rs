@@ -98,7 +98,12 @@ pub fn step(builder: &mut Builder, env: &Env<Limits>, ev: Event, out: &mut Queue
                     if builder.remaining != 0 {
                         return;
                     }
-                    RenderEvent::Failed { request: *request, class: render::vocabulary::Class::Operational }
+                    RenderEvent::Failed {
+                        request: *request,
+                        class: render::vocabulary::Class::Operational,
+                        at: None,
+                        failure: render::vocabulary::Failure::Store,
+                    }
                 } else {
                     event
                 }
@@ -152,7 +157,12 @@ fn store_forward(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Reque
                     step(
                         builder,
                         env,
-                        Event::Render(RenderEvent::Failed { request, class: render::vocabulary::Class::Operational }),
+                        Event::Render(RenderEvent::Failed {
+                            request,
+                            class: render::vocabulary::Class::Operational,
+                            at: None,
+                            failure: render::vocabulary::Failure::Store,
+                        }),
                         out,
                     );
                 }

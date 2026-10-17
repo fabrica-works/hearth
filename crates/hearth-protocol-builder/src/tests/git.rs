@@ -96,15 +96,28 @@ fn the_commit_rev_parse_names_is_listed_with_git_s_entries() {
         "git entries reach render"
     );
 }
-const FAILED_EXITS: &[Exit] = &[Exit::Code(2), Exit::Code(128), Exit::Signal(9)];
+const FAILED_EXITS: &[(Exit, crate::render::errors::Ended)] = &[
+    (Exit::Code(2), crate::render::errors::Ended::Exit(2)),
+    (Exit::Code(128), crate::render::errors::Ended::Exit(128)),
+    (Exit::Signal(9), crate::render::errors::Ended::Signal(9)),
+];
 #[test]
 fn git_exiting_past_its_success_fails_the_request_as_operational() {
-    for exit in FAILED_EXITS {
+    for (exit, ended) in FAILED_EXITS {
         let mut layer = Layer::new();
         layer.list();
         assert_eq!(
             layer.run(b"", *exit),
-            RootEvent::Render(Event::Failed { request: REQUEST, class: crate::render::vocabulary::Class::Operational }),
+            RootEvent::Render(Event::Failed {
+                request: REQUEST,
+                class: crate::render::vocabulary::Class::Operational,
+                at: None,
+                failure: crate::render::vocabulary::Failure::Tool(crate::render::errors::Tool {
+                    command: crate::render::errors::Command::RevParse,
+                    ended: ended.clone(),
+                    tail: Box::new([])
+                })
+            }),
             "exit {exit:?}"
         );
     }
@@ -125,7 +138,13 @@ fn a_failed_spawn_waits_for_closed_before_answering_operational() {
         layer.told(),
         Some(RootEvent::Render(Event::Failed {
             request: REQUEST,
-            class: crate::render::vocabulary::Class::Operational
+            class: crate::render::vocabulary::Class::Operational,
+            at: None,
+            failure: crate::render::vocabulary::Failure::Tool(crate::render::errors::Tool {
+                command: crate::render::errors::Command::RevParse,
+                ended: crate::render::errors::Ended::Start,
+                tail: Box::new([])
+            })
         })),
         "spawn failed"
     );
@@ -156,15 +175,29 @@ fn a_hunks_request_spawns_gits_diff_beneath_the_stores_root() {
         ]
     );
 }
-const DIFF_FAILED_EXITS: &[Exit] = &[Exit::Code(0), Exit::Code(2), Exit::Code(128), Exit::Signal(9)];
+const DIFF_FAILED_EXITS: &[(Exit, crate::render::errors::Ended)] = &[
+    (Exit::Code(0), crate::render::errors::Ended::Exit(0)),
+    (Exit::Code(2), crate::render::errors::Ended::Exit(2)),
+    (Exit::Code(128), crate::render::errors::Ended::Exit(128)),
+    (Exit::Signal(9), crate::render::errors::Ended::Signal(9)),
+];
 #[test]
 fn diff_exiting_0_or_past_1_fails_the_request_as_operational() {
-    for exit in DIFF_FAILED_EXITS {
+    for (exit, ended) in DIFF_FAILED_EXITS {
         let mut layer = Layer::new();
         layer.hunks();
         assert_eq!(
             layer.run(b"@@ -1 +1 @@\n-old\n+new\n", *exit),
-            RootEvent::Render(Event::Failed { request: REQUEST, class: crate::render::vocabulary::Class::Operational }),
+            RootEvent::Render(Event::Failed {
+                request: REQUEST,
+                class: crate::render::vocabulary::Class::Operational,
+                at: None,
+                failure: crate::render::vocabulary::Failure::Tool(crate::render::errors::Tool {
+                    command: crate::render::errors::Command::Diff,
+                    ended: ended.clone(),
+                    tail: Box::new([])
+                })
+            }),
             "{exit:?}"
         );
     }
@@ -232,4 +265,120 @@ fn hunks_wait_for_the_childs_exit_after_stdout_ends() {
             hunks: crate::render::diff::Hunks { lines: Box::new([]), left_out: 0, binary: true }
         })
     );
+}
+
+#[test]
+fn git_s_failure_answers_its_exit_and_standard_error_s_tail() {
+    let mut layer = Layer::new();
+    layer.list();
+    assert_eq!(
+        layer.run_stderr(b"", b"fatal: not a repository\n", Exit::Code(128)),
+        RootEvent::Render(Event::Failed {
+            request: REQUEST,
+            class: crate::render::vocabulary::Class::Operational,
+            at: None,
+            failure: crate::render::vocabulary::Failure::Tool(crate::render::errors::Tool {
+                command: crate::render::errors::Command::RevParse,
+                ended: crate::render::errors::Ended::Exit(128),
+                tail: Box::new([bytes::copy_of(b"fatal: not a repository")])
+            })
+        })
+    );
+}
+#[test]
+fn a_run_that_exits_zero_holds_no_tail() {
+    let mut layer = Layer::new();
+    let Asked::Io(io::Request::Spawn { owner, .. }) = layer.resolve() else { panic!("listing spawn") };
+    layer.spawned(owner, false, Exit::Code(0));
+    assert_eq!(
+        layer.run_stderr(b"", b"warning discarded\n", Exit::Code(0)),
+        RootEvent::Render(Event::Listed { request: REQUEST, commit: super::fixtures::oid(), entries: Box::new([]) })
+    );
+}
+
+#[test]
+fn a_listing_past_its_entries_fails_as_configuration_at_its_path() {
+    let mut layer = Layer::new();
+    let Asked::Io(io::Request::Spawn { owner, .. }) = layer.resolve() else { panic!("listing spawn") };
+    layer.spawned(owner, false, Exit::Code(0));
+    layer.listing_error(crate::git_machine::listing::Error::TooMany { path: bytes::copy_of(b"x") });
+    assert_eq!(
+        layer.run(b"", Exit::Code(0)),
+        RootEvent::Render(Event::Failed {
+            request: REQUEST,
+            class: crate::render::vocabulary::Class::Configuration,
+            at: Some(bytes::copy_of(b"x")),
+            failure: crate::render::vocabulary::Failure::TooLarge {
+                limit: crate::render::errors::Limit::Entries,
+                max: 65_536
+            }
+        })
+    );
+}
+#[test]
+fn a_4_097_byte_path_fails_as_configuration_at_its_prefix() {
+    let mut layer = Layer::new();
+    let Asked::Io(io::Request::Spawn { owner, .. }) = layer.resolve() else { panic!("listing spawn") };
+    layer.spawned(owner, false, Exit::Code(0));
+    assert_eq!(
+        layer.run(&super::fixtures::listing(&[b'x'; 4_097], 1), Exit::Code(0)),
+        RootEvent::Render(Event::Failed {
+            request: REQUEST,
+            class: crate::render::vocabulary::Class::Configuration,
+            at: Some(bytes::copy_of(&[b'x'; 4_096])),
+            failure: crate::render::vocabulary::Failure::TooLarge {
+                limit: crate::render::errors::Limit::Path,
+                max: 4_096
+            }
+        })
+    );
+}
+#[test]
+fn paths_past_the_total_fail_as_configuration_at_the_last_path() {
+    let limits = crate::limits::Limits {
+        git: crate::git_machine::limits::Limits { paths_total: 64, ..crate::git_machine::limits::SHIPPED },
+        ..crate::limits::SHIPPED
+    };
+    let mut layer = Layer::with_form(crate::Form::Text, limits);
+    let Asked::Io(io::Request::Spawn { owner, .. }) = layer.resolve() else { panic!("listing spawn") };
+    layer.spawned(owner, false, Exit::Code(0));
+    assert_eq!(
+        layer.run(&super::fixtures::listing(b"a-path-that-is-thirty-bytes-long", 3), Exit::Code(0)),
+        RootEvent::Render(Event::Failed {
+            request: REQUEST,
+            class: crate::render::vocabulary::Class::Configuration,
+            at: Some(bytes::copy_of(b"a-path-that-is-thirty-bytes-long")),
+            failure: crate::render::vocabulary::Failure::TooLarge {
+                limit: crate::render::errors::Limit::Paths,
+                max: 64
+            }
+        })
+    );
+}
+
+#[test]
+fn a_git_exit_waits_for_the_stdout_demand_already_in_flight() {
+    use super::fixtures::{ERROR, OUTPUT};
+    use skein_lib::stream::{Down, Read, Up};
+    let mut layer = Layer::new();
+    layer.list();
+    let Some(Asked::Io(io::Request::Spawn { owner, .. })) = layer.asked() else { panic!("spawn") };
+    layer.spawn_pending(owner, false);
+    assert_eq!(
+        layer.asked(),
+        Some(Asked::Io(io::Request::Stream {
+            stream: OUTPUT,
+            down: Down::Demand { read: Read::Arrived { max: 66 }, room: 0 }
+        }))
+    );
+    layer.up(io::Event::Exited { owner, exit: Exit::Code(128) });
+    assert_eq!(
+        layer.asked(),
+        Some(Asked::Io(io::Request::Stream {
+            stream: ERROR,
+            down: Down::Demand { read: Read::Arrived { max: 16384 }, room: 0 }
+        }))
+    );
+    layer.up(io::Event::Stream { owner: ERROR, up: Up::End });
+    assert_eq!(layer.asked(), None, "the existing stdout demand owns its completion");
 }

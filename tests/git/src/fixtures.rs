@@ -1,7 +1,16 @@
 use hearth_protocol_git::limits::{self, Limits};
 pub const SHIPPED: Limits = limits::SHIPPED;
 /// Small enough to exercise every limit without a shipped-size allocation.
-pub const SMALL: Limits = Limits { entries: 8, path: 32, paths_total: 256, chunk: 16, hunk_lines: 8, hunk_file: 64 };
+pub const SMALL: Limits = Limits {
+    entries: 8,
+    path: 32,
+    paths_total: 256,
+    chunk: 16,
+    hunk_lines: 8,
+    hunk_file: 64,
+    tail_lines: 2,
+    tail_line: 8,
+};
 
 #[derive(Debug)]
 pub struct Case {
@@ -86,6 +95,12 @@ pub fn at_the_limits(limits: &Limits) -> Vec<Case> {
         }
         cases.push(Case { what, decoder: Decoder::Diff, stdout, requests: Box::new([]) });
     }
+    let mut stdout = Vec::new();
+    for _ in 0..=limits.tail_lines {
+        stdout.extend(std::iter::repeat_n(b'x', usize::try_from(limits.tail_line + 1).expect("small tail")));
+        stdout.push(b'\n');
+    }
+    cases.push(Case { what: "tail at both limits", decoder: Decoder::Tail, stdout, requests: Box::new([]) });
     cases
 }
 

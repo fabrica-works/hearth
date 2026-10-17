@@ -43,7 +43,13 @@ fn a_failed_git_waits_for_the_inflight_cache_open_and_close() {
         layer.run(b"", skein_io::kernel::Exit::Code(1)),
         crate::builder::vocabulary::Event::Render(crate::render::vocabulary::Event::Failed {
             request: fixtures::REQUEST,
-            class: crate::render::vocabulary::Class::Operational
+            class: crate::render::vocabulary::Class::Operational,
+            at: None,
+            failure: crate::render::vocabulary::Failure::Tool(crate::render::errors::Tool {
+                command: crate::render::errors::Command::CatFile,
+                ended: crate::render::errors::Ended::Exit(1),
+                tail: Box::new([])
+            })
         })
     );
 }

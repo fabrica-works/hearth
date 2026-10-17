@@ -106,6 +106,7 @@ pub(crate) struct Read {
     began: Time,
     arrival: Arrival,
     terminal: Option<builder::vocabulary::Event>,
+    ended: render::errors::Ended,
 }
 impl Read {
     pub fn new(request: Token, blobs: Box<[Blob]>, env: &Env<Limits>, root: skein_io::kernel::Fd, seed: u64) -> Self {
@@ -130,6 +131,7 @@ impl Read {
             began: env.now,
             arrival: Arrival::Streaming,
             terminal: None,
+            ended: render::errors::Ended::Stream,
         };
         read.start(env);
         read
@@ -225,11 +227,15 @@ impl Read {
         }
         false
     }
-    pub fn cache_pending(&self) -> bool {
-        match &self.cache {
-            Some(cache) => !cache.closing() || cache.work_pending() || cache.done() || cache.failed(),
-            None => true,
+    pub fn cache_work_pending(&self) -> Option<bool> {
+        let cache = self.cache.as_ref()?;
+        if cache.done() || cache.failed() {
+            return None;
         }
+        Some(!cache.closing() || cache.work_pending())
+    }
+    pub fn ended(&self) -> render::errors::Ended {
+        self.ended.clone()
     }
     pub fn failed(&self) -> bool {
         self.failed
@@ -354,7 +360,23 @@ impl Read {
                         ));
                     }
                 }
-                batch::Event::Missing { .. } | batch::Event::Failed(_) => self.failed = true,
+                batch::Event::Missing { oid } => {
+                    self.failed = true;
+                    self.ended = render::errors::Ended::Missing {
+                        oid: render::revision::Oid(skein_lib::bytes::copy_of(oid.hex())),
+                    };
+                }
+                batch::Event::Failed(error) => {
+                    self.failed = true;
+                    self.ended = match error {
+                        batch::Error::Stream(_) => render::errors::Ended::Stream,
+                        batch::Error::Malformed
+                        | batch::Error::Other { .. }
+                        | batch::Error::Size { .. }
+                        | batch::Error::TooLarge { .. }
+                        | batch::Error::Truncated => render::errors::Ended::Output,
+                    };
+                }
                 batch::Event::Closed => unreachable!("batch is not closed"),
             }
         } else if (self.decoded.is_some()

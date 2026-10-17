@@ -90,19 +90,27 @@ fn a_document_config_refuses_answers_refused_at_its_position() {
         "configuration refusal retains its position"
     );
 }
-const BAD_BATCH: &[&[u8]] = &[
-    b"0123456789abcdef0123456789abcdef01234567 missing\n",
-    b"0123456789abcdef0123456789abcdef01234567 blob 3\n{}\n",
-    b"garbled\n",
+const BAD_BATCH: &[(&[u8], crate::render::errors::Ended)] = &[
+    (b"0123456789abcdef0123456789abcdef01234567 blob 3\n{}\n", crate::render::errors::Ended::Output),
+    (b"garbled\n", crate::render::errors::Ended::Output),
 ];
 #[test]
 fn a_batch_machine_failure_answers_operational() {
-    for stdout in BAD_BATCH {
+    for (stdout, ended) in BAD_BATCH {
         let mut layer = Layer::new();
         layer.read(Box::new([fixtures::blob(b"{}")]));
         assert_eq!(
             layer.run(stdout, Exit::Code(0)),
-            RootEvent::Render(Event::Failed { request: REQUEST, class: crate::render::vocabulary::Class::Operational }),
+            RootEvent::Render(Event::Failed {
+                request: REQUEST,
+                class: crate::render::vocabulary::Class::Operational,
+                at: None,
+                failure: crate::render::vocabulary::Failure::Tool(crate::render::errors::Tool {
+                    command: crate::render::errors::Command::CatFile,
+                    ended: ended.clone(),
+                    tail: Box::new([])
+                })
+            }),
             "batch {stdout:?}"
         );
     }
@@ -145,10 +153,19 @@ fn a_batch_failure_closes_the_child_without_waiting_for_exit() {
     let Some(Asked::Io(io::Request::Spawn { owner, .. })) = layer.asked() else {
         panic!("spawn");
     };
-    layer.spawn_pending(owner, true);
+    layer.spawned(owner, true, Exit::Code(0));
     assert_eq!(
         layer.run(b"garbled\n", Exit::Code(0)),
-        RootEvent::Render(Event::Failed { request: REQUEST, class: crate::render::vocabulary::Class::Operational }),
+        RootEvent::Render(Event::Failed {
+            request: REQUEST,
+            class: crate::render::vocabulary::Class::Operational,
+            at: None,
+            failure: crate::render::vocabulary::Failure::Tool(crate::render::errors::Tool {
+                command: crate::render::errors::Command::CatFile,
+                ended: crate::render::errors::Ended::Output,
+                tail: Box::new([])
+            })
+        }),
         "a failed batch closes immediately"
     );
 }
@@ -193,6 +210,89 @@ fn a_declaration_config_refuses_answers_refused_with_its_fault() {
                 }),
                 also: None
             }
+        })
+    );
+}
+
+#[test]
+fn a_missing_object_answers_operational_with_its_oid() {
+    let mut layer = Layer::new();
+    layer.read(Box::new([fixtures::blob(b"{}")]));
+    assert_eq!(
+        layer.run(b"0123456789abcdef0123456789abcdef01234567 missing\n", Exit::Code(0)),
+        RootEvent::Render(Event::Failed {
+            request: REQUEST,
+            class: crate::render::vocabulary::Class::Operational,
+            at: None,
+            failure: crate::render::vocabulary::Failure::Tool(crate::render::errors::Tool {
+                command: crate::render::errors::Command::CatFile,
+                ended: crate::render::errors::Ended::Missing {
+                    oid: crate::render::revision::Oid(bytes::copy_of(b"0123456789abcdef0123456789abcdef01234567"))
+                },
+                tail: Box::new([])
+            })
+        })
+    );
+}
+
+#[test]
+fn a_read_delivers_each_document_before_finishing_its_child() {
+    let mut layer = Layer::new();
+    layer.read(Box::new([fixtures::blob(b"{}"), fixtures::blob(b"{}")]));
+    let response = fixtures::batch(b"{}");
+    let mut writer = skein_lib::Writer::new(response.len().saturating_mul(2));
+    writer.put(&response).expect("first response");
+    writer.put(&response).expect("second response");
+    let mut held = Held::new(writer.finish());
+    let mut count = 0_u32;
+    for _ in 0_u32..256 {
+        if layer.told().is_some() {
+            count = count.saturating_add(1);
+        }
+        let Some(request) = layer.asked() else {
+            if layer.told().is_some() {
+                count = count.saturating_add(1);
+                continue;
+            }
+            break;
+        };
+        layer.answer(request, &mut held, Exit::Code(0));
+    }
+    assert_eq!(count, 2);
+}
+
+#[test]
+fn a_read_waiting_for_stderr_end_allows_its_completion_through() {
+    let mut layer = Layer::new();
+    layer.read(Box::new([crate::render::vocabulary::Blob {
+        kind: crate::render::vocabulary::As::Declaration,
+        ..fixtures::blob(b"{}")
+    }]));
+    let Some(Asked::Io(io::Request::Spawn { owner, .. })) = layer.asked() else { panic!("spawn") };
+    layer.spawned(owner, true, Exit::Code(0));
+    let mut held = Held::new(fixtures::batch(b"{}"));
+    for _ in 0_u32..64 {
+        let Some(request) = layer.asked() else {
+            break;
+        };
+        if let Asked::Io(io::Request::Stream { stream: fixtures::ERROR, .. }) = request {
+            continue;
+        }
+        layer.answer(request, &mut held, Exit::Code(0));
+    }
+    assert_eq!(layer.told(), None, "stderr still owes its end");
+    layer.up(io::Event::Stream { owner: fixtures::ERROR, up: skein_lib::stream::Up::End });
+    assert_eq!(
+        layer.run(b"", Exit::Code(0)),
+        RootEvent::Render(Event::Read {
+            request: REQUEST,
+            oid: fixtures::oid(),
+            read: Decoded::Declaration(crate::render::revision::declaration::Declaration {
+                at: Position { line: 1, column: 1 },
+                types: Box::new([]),
+                settings: Box::new([]),
+                reads: Box::new([])
+            })
         })
     );
 }

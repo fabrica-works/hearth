@@ -185,3 +185,19 @@ fn schema_names(names: &[&[u8]]) -> Box<[Box<[u8]>]> {
     }
     copied.into_boxed()
 }
+
+pub fn git_failure(command: crate::errors::Command, code: u8) -> crate::errors::Error {
+    use crate::errors::{Class, Ended, Error, Kind, Tool};
+    Error {
+        kind: Kind::Tool(Tool {
+            command,
+            ended: Ended::Exit(code),
+            tail: Box::new([copy_of(b"fatal: not a tree object")]),
+        }),
+        class: Class::Operational,
+        at: None,
+        also: None,
+        target: None,
+        task: None,
+    }
+}

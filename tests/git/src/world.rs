@@ -195,8 +195,10 @@ pub struct Stepped {
     listing: Option<Listing>,
     batch: Option<hearth_protocol_git::batch::Batch>,
     diff: Option<hearth_protocol_git::hunks::Diff>,
+    tail: Option<hearth_protocol_git::tail::Tail>,
     diff_events: Queue<hearth_protocol_git::hunks::Event>,
     held: skein_lib::stream::Held,
+    feed: Box<[u8]>,
     requests: std::vec::IntoIter<hearth_protocol_git::batch::Request>,
     listing_events: Queue<Event>,
     batch_events: Queue<hearth_protocol_git::batch::Event>,
@@ -208,6 +210,7 @@ pub struct Stepped {
 #[derive(Debug)]
 enum Action {
     Diff,
+    Feed,
     List,
     Batch(hearth_protocol_git::batch::Request),
     Up(Up),
@@ -222,8 +225,10 @@ impl Stepped {
             listing: None,
             batch: None,
             diff: None,
+            tail: None,
             diff_events: Queue::with_capacity(1),
             held: skein_lib::stream::Held::new(case.stdout.clone().into_boxed_slice()),
+            feed: case.stdout.clone().into_boxed_slice(),
             requests: Vec::from(case.requests.clone()).into_iter(),
             listing_events: Queue::with_capacity(1),
             batch_events: Queue::with_capacity(1),
@@ -236,6 +241,10 @@ impl Stepped {
     pub fn open(&mut self) {
         use hearth_protocol_git::{batch::Batch, limits::Decoder};
         match self.decoder {
+            Decoder::Tail => {
+                self.tail = Some(hearth_protocol_git::tail::Tail::new(&self.env.limits));
+                self.action = Some(Action::Feed);
+            }
             Decoder::Diff => {
                 self.diff = Some(hearth_protocol_git::hunks::Diff::new(&self.env.limits));
                 self.action = Some(Action::Diff);
@@ -264,6 +273,10 @@ impl Stepped {
         use hearth_protocol_git::{batch, limits::Decoder};
         let action = self.action.take().expect("prepared call");
         match self.decoder {
+            Decoder::Tail => {
+                self.tail.as_mut().expect("open tail").admit(&self.feed);
+                self.closed = true;
+            }
             Decoder::Diff => {
                 use hearth_protocol_git::hunks::{self, Request};
                 let machine = self.diff.as_mut().expect("open diff");
@@ -275,7 +288,7 @@ impl Stepped {
                         hunks::down(machine, &self.env, Request::Close, &mut self.diff_events, &mut self.below);
                     }
                     Action::Up(up) => hunks::up(machine, &self.env, up, &mut self.diff_events, &mut self.below),
-                    Action::List | Action::Batch(_) => unreachable!("diff driver"),
+                    Action::Feed | Action::List | Action::Batch(_) => unreachable!("diff driver"),
                 }
             }
             Decoder::Listing => {
@@ -288,7 +301,7 @@ impl Stepped {
                         listing::down(machine, &self.env, Request::Close, &mut self.listing_events, &mut self.below);
                     }
                     Action::Up(up) => listing::up(machine, &self.env, up, &mut self.listing_events, &mut self.below),
-                    Action::Batch(_) | Action::Diff => unreachable!("listing driver"),
+                    Action::Feed | Action::Batch(_) | Action::Diff => unreachable!("listing driver"),
                 }
             }
             Decoder::Batch => {
@@ -301,7 +314,7 @@ impl Stepped {
                         batch::down(machine, &self.env, batch::Request::Close, &mut self.batch_events, &mut self.below);
                     }
                     Action::Up(up) => batch::up(machine, &self.env, up, &mut self.batch_events, &mut self.below),
-                    Action::List | Action::Diff => unreachable!("batch driver"),
+                    Action::Feed | Action::List | Action::Diff => unreachable!("batch driver"),
                 }
             }
         }

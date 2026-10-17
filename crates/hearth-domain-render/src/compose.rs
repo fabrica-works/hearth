@@ -25,15 +25,29 @@ pub fn targets(entries: &[Entry]) -> Result<Box<[Target]>, TooMany> {
     let capacity = u32::try_from(entries.len()).expect("listing's configured capacity");
     let mut environments = Map::with_capacity(capacity);
     for entry in entries {
+        if documents.find(&entry.path).is_none() {
+            continue;
+        }
         match revision::class(&entry.path) {
             Class::Environment { env } => {
                 environments.insert(bytes::copy_of(env), entry).expect("listing capacity");
             }
-            Class::Fleet | Class::Host { .. } | Class::Declaration { .. } | Class::Tree { .. } | Class::Other => {}
+            Class::Fleet
+            | Class::Host { .. }
+            | Class::Declaration { .. }
+            | Class::Tree { .. }
+            | Class::Template { .. }
+            | Class::Script { .. }
+            | Class::Readme { .. }
+            | Class::Refused { .. }
+            | Class::Other => {}
         }
     }
     let mut discovered = Map::with_capacity(SHIPPED.targets);
     for entry in entries {
+        if documents.find(&entry.path).is_none() {
+            continue;
+        }
         match revision::class(&entry.path) {
             Class::Host { base, name } => {
                 if name == base {
@@ -66,6 +80,10 @@ pub fn targets(entries: &[Entry]) -> Result<Box<[Target]>, TooMany> {
             | Class::Environment { .. }
             | Class::Declaration { .. }
             | Class::Tree { .. }
+            | Class::Template { .. }
+            | Class::Script { .. }
+            | Class::Readme { .. }
+            | Class::Refused { .. }
             | Class::Other => {}
         }
     }
@@ -84,6 +102,10 @@ fn base_document(documents: &Documents, base: &[u8]) -> Option<u32> {
             | Class::Host { .. }
             | Class::Declaration { .. }
             | Class::Tree { .. }
+            | Class::Template { .. }
+            | Class::Script { .. }
+            | Class::Readme { .. }
+            | Class::Refused { .. }
             | Class::Other => {}
         }
     }
@@ -301,4 +323,120 @@ pub fn compose(target: &Target, documents: &Documents, merge: &mut Merge) -> Set
         }
     }
     Settings { tasks: tasks.into_boxed() }
+}
+
+/// Listing rules apply once to the revision (format.md, 2.1 to 2.4).
+pub(crate) fn listing(
+    entries: &[Entry],
+    limits: &Limits,
+    errors: &mut crate::errors::Collector,
+) -> Result<Box<[bool]>, ()> {
+    use crate::errors::{self, Repository};
+    let capacity = u32::try_from(entries.len()).expect("bounded listing");
+    let mut tasks = Map::with_capacity(capacity);
+    let mut destinations: Map<Box<[u8]>, Box<[u8]>> = Map::with_capacity(capacity);
+    let mut ordered = Map::with_capacity(capacity);
+    let mut invalid = List::with_capacity(capacity);
+    for (index, entry) in entries.iter().enumerate() {
+        invalid.push(false).expect("listing capacity");
+        ordered
+            .insert(entry.path.clone(), (u32::try_from(index).expect("bounded listing"), entry))
+            .expect("listing capacity");
+    }
+    for (_, (index, entry)) in &ordered {
+        let class = revision::class(&entry.path);
+        let task = revision::task(&entry.path);
+        if let Some(task) = task {
+            tasks.insert(bytes::copy_of(task), (entry.path.clone(), *index)).expect("listing capacity");
+        }
+        let why = listing_refusal(entry, &class, entries);
+        if let Some(why) = why {
+            *invalid.get_mut(*index).expect("listed index") = true;
+            errors::push(errors, errors::repository(&entry.path, task, why));
+        }
+        if let Class::Tree { .. } | Class::Script { .. } = class {
+            let destination = entry.path.strip_suffix(b".j2").unwrap_or(&entry.path);
+            if let Some(first) = destinations.get(destination) {
+                let mut error = errors::repository(&entry.path, task, Repository::Destination);
+                error.also = Some(errors::Place { path: first.clone(), position: None });
+                *invalid.get_mut(*index).expect("listed index") = true;
+                errors::push(errors, error);
+            } else {
+                destinations.insert(bytes::copy_of(destination), entry.path.clone()).expect("listing capacity");
+            }
+        }
+    }
+    for (task, (path, index)) in &tasks {
+        let mut declared = false;
+        for entry in entries {
+            if let Some(path) = entry.path.strip_prefix(b"tasks/") {
+                declared |= path.strip_prefix(task.as_ref()) == Some(b"/task.json".as_slice());
+            }
+        }
+        if !declared {
+            *invalid.get_mut(*index).expect("listed index") = true;
+            errors::push(errors, errors::repository(path, Some(task), Repository::Declaration));
+        }
+    }
+    if tasks.len() > limits.tasks {
+        if let Some((_, (path, _))) = tasks.iter().nth(usize::try_from(limits.tasks).expect("u32 fits")) {
+            errors::push(
+                errors,
+                errors::refused(
+                    path,
+                    None,
+                    errors::Decode::TooLarge { limit: errors::Limit::Tasks, max: u64::from(limits.tasks) },
+                    None,
+                ),
+            );
+        }
+        return Err(());
+    }
+    Ok(invalid.into_boxed())
+}
+
+fn listing_refusal(entry: &Entry, class: &Class<'_>, entries: &[Entry]) -> Option<crate::errors::Repository> {
+    use crate::{errors::Repository, revision::Mode};
+    let mut why = match class {
+        Class::Refused { why, .. } => Some(why.clone()),
+        Class::Host { base, name } if name != base => {
+            let env = name.strip_prefix(*base).expect("host prefix").strip_prefix(b"-").expect("environment prefix");
+            let mut found = false;
+            for entry in entries {
+                if let Class::Environment { env: listed } = revision::class(&entry.path) {
+                    found |= listed == env;
+                }
+            }
+            if found { None } else { Some(Repository::Environment { env: bytes::copy_of(env) }) }
+        }
+        Class::Fleet
+        | Class::Environment { .. }
+        | Class::Host { .. }
+        | Class::Declaration { .. }
+        | Class::Tree { .. }
+        | Class::Template { .. }
+        | Class::Script { .. }
+        | Class::Readme { .. }
+        | Class::Other => None,
+    };
+    let reads = entry.path.as_ref() == b"fleet.json"
+        || entry.path.starts_with(b"envs/")
+        || entry.path.starts_with(b"hosts/")
+        || entry.path.starts_with(b"tasks/");
+    if reads && entry.mode == Mode::Submodule {
+        why = Some(Repository::Submodule);
+    } else if entry.mode == Mode::Link
+        && match class {
+            Class::Fleet
+            | Class::Environment { .. }
+            | Class::Host { .. }
+            | Class::Declaration { .. }
+            | Class::Template { .. } => true,
+            Class::Tree { path, .. } | Class::Script { name: path, .. } => path.ends_with(b".j2"),
+            Class::Refused { .. } | Class::Readme { .. } | Class::Other => false,
+        }
+    {
+        why = Some(Repository::Link);
+    }
+    why
 }

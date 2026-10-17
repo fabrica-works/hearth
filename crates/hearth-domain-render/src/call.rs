@@ -26,6 +26,7 @@ pub(crate) struct Side {
     pub budget: Budget,
     pub pending: Box<[Blob]>,
     pub entries: Box<[Entry]>,
+    pub invalid: Box<[bool]>,
     pub cached: Map<Oid, hearth_lib::encode::Digest>,
     pub sizes: Sizes,
     pub files: bool,
@@ -53,6 +54,7 @@ impl Side {
             budget: Budget::new(limits),
             pending: Box::new([]),
             entries: Box::new([]),
+            invalid: Box::new([]),
             cached: Map::with_capacity(0),
             sizes: Map::with_capacity(0),
             files: false,
@@ -66,6 +68,16 @@ impl Side {
     }
     pub fn listed(&mut self, limits: Limits, commit: Oid, entries: &[Entry], out: &mut Queue<Output>) {
         self.commit = Some(commit);
+        self.invalid = match compose::listing(entries, &limits, &mut self.errors) {
+            Ok(invalid) => invalid,
+            Err(()) => {
+                self.fail(Outcome::Failed);
+                return;
+            }
+        };
+        if self.errors.outcome() != Outcome::Done {
+            self.outcome = self.outcome.worst(Outcome::Failed);
+        }
         let targets = match compose::targets(entries) {
             Ok(targets) => targets,
             Err(compose::TooMany) => {
@@ -103,8 +115,11 @@ impl Side {
         }
         self.entries = entries.into();
         self.documents = Documents::new(entries);
-        let mut blobs = List::with_capacity(u32::try_from(entries.len()).expect("listing capacity"));
-        let mut paths = List::with_capacity(u32::try_from(entries.len()).expect("listing capacity"));
+        self.read_documents(limits, out);
+    }
+    fn read_documents(&mut self, limits: Limits, out: &mut Queue<Output>) {
+        let mut blobs = List::with_capacity(u32::try_from(self.entries.len()).expect("listing capacity"));
+        let mut paths = List::with_capacity(u32::try_from(self.entries.len()).expect("listing capacity"));
         for entry in self.documents.entries() {
             if entry.size > u64::from(limits.document) {
                 errors::push(
@@ -140,6 +155,10 @@ impl Side {
                             | revision::Class::Environment { .. }
                             | revision::Class::Host { .. }
                             | revision::Class::Tree { .. }
+                            | revision::Class::Template { .. }
+                            | revision::Class::Script { .. }
+                            | revision::Class::Readme { .. }
+                            | revision::Class::Refused { .. }
                             | revision::Class::Other => As::Document,
                         },
                     })
@@ -247,6 +266,10 @@ impl Side {
                 | revision::Class::Environment { .. }
                 | revision::Class::Host { .. }
                 | revision::Class::Tree { .. }
+                | revision::Class::Template { .. }
+                | revision::Class::Script { .. }
+                | revision::Class::Readme { .. }
+                | revision::Class::Refused { .. }
                 | revision::Class::Other => None,
             };
             if let Some((task, kind, max)) = kind
@@ -330,6 +353,10 @@ impl Side {
                     | revision::Class::Host { .. }
                     | revision::Class::Declaration { .. }
                     | revision::Class::Tree { .. }
+                    | revision::Class::Template { .. }
+                    | revision::Class::Script { .. }
+                    | revision::Class::Readme { .. }
+                    | revision::Class::Refused { .. }
                     | revision::Class::Other => {}
                 }
             }
@@ -344,11 +371,41 @@ impl Side {
         }
         Some(parts::config::Config { tree: files.into_boxed() })
     }
+    fn repository_valid(&self, target: &Target) -> bool {
+        for (entry, invalid) in self.entries.iter().zip(&self.invalid) {
+            if !invalid {
+                continue;
+            }
+            if let Some(task) = revision::task(&entry.path) {
+                if let Some(settings) = self.settings.get(self.next.saturating_sub(1)) {
+                    for present in &settings.tasks {
+                        if present.name.as_ref() == task {
+                            return false;
+                        }
+                    }
+                }
+            } else {
+                if revision::base(&entry.path) == Some(target.base.as_ref()) {
+                    return false;
+                }
+                for index in
+                    [target.fleet, target.base_document, Some(target.environment_document), Some(target.base_env)]
+                        .into_iter()
+                        .flatten()
+                {
+                    if self.documents.path(index) == entry.path.as_ref() {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
     pub fn answer(&mut self) -> Answer {
         for target in self.targets.get(self.next..).expect("answer cursor within targets") {
             self.next = self.next.saturating_add(1);
             let mut placement = None;
-            let mut valid = true;
+            let mut valid = self.repository_valid(target);
             for index in [target.fleet, target.base_document, Some(target.environment_document), Some(target.base_env)]
                 .into_iter()
                 .flatten()

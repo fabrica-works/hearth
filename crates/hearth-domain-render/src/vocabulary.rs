@@ -15,7 +15,7 @@ pub enum Event {
     Read { request: Token, oid: Oid, read: Decoded },
     Cached { request: Token, oid: Oid, size: u64, sha256: Digest },
     Hunks { request: Token, hunks: crate::diff::Hunks },
-    Failed { request: Token, class: Class },
+    Failed { request: Token, class: Class, at: Option<Box<[u8]>>, failure: Failure },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
@@ -71,4 +71,11 @@ impl Outcome {
     pub fn worst(self, other: Outcome) -> Outcome {
         core::cmp::min(self, other)
     }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Failure {
+    Tool(crate::errors::Tool),
+    TooLarge { limit: crate::errors::Limit, max: u64 },
+    Store,
 }

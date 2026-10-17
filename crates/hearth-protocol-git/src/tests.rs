@@ -5,3 +5,5 @@ mod listing;
 mod rev_parse;
 
 mod hunks;
+
+mod tail;

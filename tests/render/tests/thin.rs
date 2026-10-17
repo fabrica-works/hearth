@@ -24,13 +24,29 @@ fn a_targets_meta_is_its_names_and_the_base_envs_placement() {
 }
 
 #[test]
-fn a_base_env_without_its_environment_makes_no_target() {
+fn a_base_env_without_its_environment_is_a_repository_error() {
     for seed in 0..8 {
         let mut repository = fixtures::x1_prod();
         repository.entries.remove(0);
         let run = parent::run(&repository, &[], seed);
-        assert_eq!(run.answers, [], "seed {seed}");
-        assert_eq!(run.outcome, Outcome::Done, "seed {seed}");
+        assert_eq!(
+            only(&run.answers),
+            &Answer::Error(hearth_domain_render::errors::Error {
+                kind: hearth_domain_render::errors::Kind::Repository(
+                    hearth_domain_render::errors::Repository::Environment { env: Box::from(b"prod".as_slice()) }
+                ),
+                class: hearth_domain_render::vocabulary::Class::Configuration,
+                at: Some(hearth_domain_render::errors::Place {
+                    path: Box::from(b"hosts/x1/x1-prod.json".as_slice()),
+                    position: None
+                }),
+                also: None,
+                target: None,
+                task: None
+            }),
+            "seed {seed}"
+        );
+        assert_eq!(run.outcome, Outcome::Failed, "seed {seed}");
     }
 }
 
@@ -165,7 +181,20 @@ fn a_submodule_under_a_present_tasks_tree_fails_its_target() {
     submodule.mode = hearth_domain_render::revision::Mode::Submodule;
     repository.entries.push(submodule);
     let run = parent::run(&repository, &[], 0);
-    assert_eq!(run.answers, []);
+    assert_eq!(
+        only(&run.answers),
+        &Answer::Error(hearth_domain_render::errors::Error {
+            kind: hearth_domain_render::errors::Kind::Repository(hearth_domain_render::errors::Repository::Submodule),
+            class: hearth_domain_render::vocabulary::Class::Configuration,
+            at: Some(hearth_domain_render::errors::Place {
+                path: Box::from(b"tasks/motd/tree/etc/submodule".as_slice()),
+                position: None
+            }),
+            also: None,
+            target: None,
+            task: Some(Box::from(b"motd".as_slice()))
+        })
+    );
     assert_eq!(run.outcome, Outcome::Failed);
 }
 #[test]

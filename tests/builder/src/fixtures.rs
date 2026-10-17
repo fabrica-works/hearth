@@ -89,6 +89,15 @@ impl Repository {
         Self { scratch, work_tree }
     }
     #[must_use]
+    pub fn git(&self, args: &[&str]) -> String {
+        let path = std::env::var_os("PATH").expect("git is required on PATH");
+        String::from_utf8(git_output(&self.work_tree, &path, args)).expect("git text").trim().to_owned()
+    }
+    pub fn remove_object(&self, oid: &str) {
+        let (directory, name) = oid.split_at(2);
+        fs::remove_file(self.work_tree.join(".git/objects").join(directory).join(name)).expect("loose object");
+    }
+    #[must_use]
     pub fn work_tree(&self) -> &Path {
         &self.work_tree
     }
@@ -552,3 +561,4 @@ pub const CLOSURE: hearth::service::domain::render::vocabulary::Digest =
         242, 251, 234, 142, 207, 175, 92, 30, 225, 209, 84, 99, 193, 172, 188, 52, 212, 154, 210, 160, 229, 114, 68,
         15, 124, 191, 52, 95, 192, 174, 126, 227,
     ]);
+pub const STRAY: File = File { path: "tasks/motd/tre/etc/motd", body: b"stray", mode: 0o644 };

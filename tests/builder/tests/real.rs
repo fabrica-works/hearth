@@ -40,6 +40,7 @@ fn a_revision_git_cannot_resolve_exits_64() {
 fn a_directory_that_is_no_repository_exits_75() {
     let repository = Repository::empty("no-repository");
     let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(fixtures::lines_starting(&rendered.stdout, &["git "]), "git rev-parse exited 128\n");
     assert_eq!(rendered.exit, Exit::Code(75), "git failed operationally");
 }
 #[test]
@@ -258,7 +259,7 @@ fn a_binary_file_answers_binary_with_no_hunk_line() {
 
 #[test]
 fn a_task_json_out_of_shape_prints_its_fault_and_fails_its_targets() {
-    let repository = Repository::make("miskeyed", &fixtures::thin_with(&[fixtures::MISKEYED]));
+    let repository = Repository::make("miskeyed", &fixtures::thin_with(core::slice::from_ref(&fixtures::MISKEYED)));
     assert_eq!(
         String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout),
         "tasks/motd/task.json:1:2: motd: no such key in a declaration\n"
@@ -266,7 +267,8 @@ fn a_task_json_out_of_shape_prints_its_fault_and_fails_its_targets() {
 }
 #[test]
 fn a_task_json_out_of_shape_exits_with_configuration_failure() {
-    let repository = Repository::make("miskeyed-exit", &fixtures::thin_with(&[fixtures::MISKEYED]));
+    let repository =
+        Repository::make("miskeyed-exit", &fixtures::thin_with(core::slice::from_ref(&fixtures::MISKEYED)));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
 
@@ -322,4 +324,22 @@ fn a_default_without_its_type_prints_and_fails_its_targets() {
 fn a_default_without_its_type_exits_with_configuration_failure() {
     let repository = Repository::make("mistyped-exit", &fixtures::thin_with(&[fixtures::MISTYPED]));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
+#[test]
+fn a_tree_git_cannot_read_prints_git_s_tail_and_exits_75() {
+    let repository = Repository::make("broken-tree", fixtures::THIN);
+    repository.remove_object(&repository.git(&["rev-parse", "HEAD^{tree}"]));
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(String::from_utf8_lossy(&rendered.stdout), "git ls-tree exited 128\n  fatal: not a tree object\n");
+    assert_eq!(rendered.exit, Exit::Code(75));
+}
+#[test]
+fn a_stray_file_in_a_task_prints_a_repository_error() {
+    let repository = Repository::make("stray", &fixtures::thin_with(core::slice::from_ref(&fixtures::STRAY)));
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        String::from_utf8_lossy(&rendered.stdout),
+        "tasks/motd/tre/etc/motd: motd: a path format.md 2.1 does not allow\n"
+    );
+    assert_eq!(rendered.exit, Exit::Code(2));
 }

@@ -3,6 +3,7 @@
 pub struct Limits {
     pub targets: u32,
     pub errors: u32,
+    pub tasks: u32,
     pub decoded: u64,
     pub document: u32,
     pub depth: u32,
@@ -15,6 +16,7 @@ pub struct Limits {
 pub const SHIPPED: Limits = Limits {
     targets: 1_024,
     errors: 256,
+    tasks: 1_024,
     decoded: 67_108_864,
     document: 1_048_576,
     depth: 32,

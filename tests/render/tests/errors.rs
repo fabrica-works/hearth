@@ -99,3 +99,18 @@ fn three_hundred_broken_documents_answer_256_errors_then_the_count() {
         assert_eq!(errors.last().expect("last error").at.as_ref().expect("place").path.as_ref(), b"envs/e255.json");
     }
 }
+
+#[test]
+fn a_repository_error_left_out_still_fails_its_targets() {
+    let mut repository = fixtures::with_task();
+    repository.entries.push(fixtures::entry(b"tasks/motd/tre/motd", b'7'));
+    let run = parent::run_with(
+        &repository,
+        &[],
+        7,
+        hearth_domain_render::limits::Limits { errors: 0, ..hearth_domain_render::limits::SHIPPED },
+    );
+    assert_eq!(run.answers, []);
+    assert_eq!(run.outcome, Outcome::Failed);
+    assert_eq!(run.left_out, 1);
+}

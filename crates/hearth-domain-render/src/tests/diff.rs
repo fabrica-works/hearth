@@ -195,10 +195,9 @@ fn added_or_removed_files_never_request_hunks() {
 }
 #[test]
 fn a_failed_hunks_request_leaves_the_file_bare_and_the_call_try_again() {
-    use crate::vocabulary::{Answer, Event, Outcome, Output};
-    use skein_lib::Token;
+    use crate::vocabulary::{Answer, Output};
     let (mut render, env, mut out) = fixtures::hunk_call();
-    crate::step(&mut render, &env, Event::Failed { request: Token::new(3), class: Class::Operational }, &mut out);
+    crate::step(&mut render, &env, fixtures::hunk_failure(), &mut out);
     crate::resume(&mut render, &env, &mut out);
     let Some(Output::Answer(Answer::Change(change))) = out.pop() else { panic!("change stands") };
     let mut target_change = change.change;
@@ -223,6 +222,14 @@ fn a_failed_hunks_request_leaves_the_file_bare_and_the_call_try_again() {
             hunks: None,
         }]
     );
+}
+#[test]
+fn a_failed_hunks_request_ends_the_call_try_again() {
+    use crate::vocabulary::{Answer, Outcome, Output};
+    let (mut render, env, mut out) = fixtures::hunk_call();
+    crate::step(&mut render, &env, fixtures::hunk_failure(), &mut out);
+    crate::resume(&mut render, &env, &mut out);
+    drop(out.pop());
     crate::resume(&mut render, &env, &mut out);
     let Some(Output::Answer(Answer::Rendered { outcome, .. })) = out.pop() else { panic!("terminal") };
     assert_eq!(outcome, Outcome::TryAgain);

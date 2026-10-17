@@ -21,6 +21,7 @@ mod walk;
 use hearth_protocol_tree as tree;
 pub mod translate;
 use alloc::boxed::Box;
+use git::Intake;
 use git_machine::{hunks, invocation, listing, oid::Oid, rev_parse};
 use limits::Limits;
 use render::vocabulary::{Class, Event as RenderEvent};
@@ -69,7 +70,7 @@ enum Mode {
         machine: listing::Listing,
         above: Queue<listing::Event>,
         below: Queue<Down>,
-        answer: Option<Result<Box<[listing::Entry]>, ()>>,
+        answer: Option<Result<Box<[listing::Entry]>, listing::Error>>,
     },
     Read(Box<read::Read>),
     Hunks {
@@ -155,40 +156,47 @@ impl Protocol {
         if child.closing {
             return child.work_pending() || child.done();
         }
-        if child.failed
-            && let Some(Mode::Read(read)) = &self.mode
-        {
-            return read.cache_pending();
+        if child.failed && child.process.is_none() {
+            return child.closed;
         }
-        if child.failed || child.done() {
+        let mode = self.mode.as_ref().expect("child has mode");
+        let ready = match mode {
+            Mode::Rev { ended, .. } => *ended,
+            Mode::Listing { answer, .. } => answer.is_some(),
+            Mode::Hunks { answer, .. } => answer.is_some(),
+            Mode::Read(read) => read.ready(),
+        };
+        if child.error.is_some() && child.error_state == Intake::Demand {
             return true;
         }
-        match &self.mode {
-            Some(Mode::Rev { ended, .. }) => *ended && child.exit.is_some(),
-            Some(Mode::Listing { above, below, answer, .. }) => {
-                !above.is_empty()
-                    || (child.output.is_some() && !below.is_empty())
-                    || *answer == Some(Err(()))
-                    || (answer.is_some() && child.exit.is_some())
+        if child.failed || ready {
+            if let Mode::Read(read) = mode
+                && child.failed
+                && let Some(pending) = read.cache_work_pending()
+            {
+                return pending;
             }
-            Some(Mode::Hunks { above, below, answer, .. }) => {
-                !above.is_empty()
-                    || (child.output.is_some() && !below.is_empty())
-                    || *answer == Some(Err(()))
-                    || (answer.is_some() && child.exit.is_some())
-            }
-            Some(Mode::Read(read)) => {
-                read.failed()
-                    || (read.ready() && child.exit.is_some())
-                    || (!read.ready() && child.output.is_some() && read.work_pending())
-            }
-            None => false,
+            return (child.output.is_some()
+                && child.output_state != Intake::Ended
+                && child.output_state != Intake::Draining)
+                || (child.output_state == Intake::Ended && child.error_state == Intake::Ended && child.exit.is_some());
+        }
+        match mode {
+            Mode::Rev { .. } => false,
+            Mode::Listing { above, below, .. } => !above.is_empty() || (child.output.is_some() && !below.is_empty()),
+            Mode::Hunks { above, below, .. } => !above.is_empty() || (child.output.is_some() && !below.is_empty()),
+            Mode::Read(read) => read.failed() || (child.output.is_some() && read.work_pending()),
         }
     }
-    fn spawn(&mut self, command: invocation::Command<'_>, below: &mut Queue<Asked>) {
+    fn spawn(
+        &mut self,
+        command: invocation::Command<'_>,
+        limits: &git_machine::limits::Limits,
+        below: &mut Queue<Asked>,
+    ) {
         let owner = Token::new(self.next);
         self.next = self.next.checked_add(1).expect("bounded commands in one call");
-        self.child = Some(git::Child::spawn(owner, self.roots.store.fd, command, below));
+        self.child = Some(git::Child::spawn(owner, self.roots.store.fd, command, limits, below));
     }
 }
 pub fn down(
@@ -223,8 +231,11 @@ pub fn down(
                         above.push(Event::Render(RenderEvent::Unresolved { request }));
                         return;
                     };
-                    protocol
-                        .spawn(invocation::Command::RevParse { repository: &repository, revision: &revision }, below);
+                    protocol.spawn(
+                        invocation::Command::RevParse { repository: &repository, revision: &revision },
+                        &env.limits.git,
+                        below,
+                    );
                     protocol.mode = Some(Mode::Rev {
                         request,
                         repository,
@@ -234,8 +245,11 @@ pub fn down(
                     });
                 }
                 render::vocabulary::Request::Hunks { request, before, after } => {
-                    protocol
-                        .spawn(invocation::Command::Diff { store: b".", before: &before.0, after: &after.0 }, below);
+                    protocol.spawn(
+                        invocation::Command::Diff { store: b".", before: &before.0, after: &after.0 },
+                        &env.limits.git,
+                        below,
+                    );
                     let mut machine = hunks::Diff::new(&env.limits.git);
                     let mut events = Queue::with_capacity(1);
                     let mut requests = Queue::with_capacity(1);
@@ -250,7 +264,7 @@ pub fn down(
                         Some(Mode::Hunks { request, machine, above: events, below: requests, answer: None });
                 }
                 render::vocabulary::Request::Read { request, repository, commit: _, blobs } => {
-                    protocol.spawn(invocation::Command::CatFile { repository: &repository }, below);
+                    protocol.spawn(invocation::Command::CatFile { repository: &repository }, &env.limits.git, below);
                     protocol.mode = Some(Mode::Read(Box::new(read::Read::new(
                         request,
                         blobs,
@@ -304,9 +318,9 @@ fn io_up(protocol: &mut Protocol, env: &Env<Limits>, event: io::Event, below: &m
             }
         }
         io::Event::Stream { owner, up } => {
-            if child.closing {
+            let Some(up) = stream_up(child, owner, up) else {
                 return;
-            }
+            };
             if child.input == Some(owner) {
                 match up {
                     Up::Room => {
@@ -357,7 +371,7 @@ fn io_up(protocol: &mut Protocol, env: &Env<Limits>, event: io::Event, below: &m
                 child.failed = true;
             }
         }
-        io::Event::Failed { .. } => child.failed = true,
+        io::Event::Failed { .. } => child.refused(),
         io::Event::Closed { owner } => child.closed(owner),
         io::Event::Listening { .. }
         | io::Event::Accepted { .. }
@@ -417,7 +431,7 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
     let ready = match mode {
         Mode::Rev { ended, .. } => *ended,
         Mode::Listing { answer, .. } => {
-            if *answer == Some(Err(())) {
+            if listing_failed(answer.as_ref()) {
                 child.failed = true;
             }
             answer.is_some()
@@ -441,7 +455,38 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
     {
         return;
     }
-    if child.failed || (ready && child.exit.is_some()) {
+    if !child.closing
+        && let Some(stream) = child.error
+        && child.error_state == Intake::Demand
+    {
+        child.error_state = Intake::Waiting;
+        below.push(Asked::Io(io::Request::Stream {
+            stream,
+            down: Down::Demand { read: StreamRead::Arrived { max: env.limits.git.chunk.max(1) }, room: 0 },
+        }));
+        return;
+    }
+    if (child.failed || ready)
+        && child.output_state != Intake::Ended
+        && child.output.is_some()
+        && child.output_state != Intake::Draining
+    {
+        let pending = child.output_state == Intake::Reading;
+        child.output_state = Intake::Draining;
+        if pending {
+            return;
+        }
+        child.stream(Down::Demand { read: StreamRead::Arrived { max: env.limits.git.chunk.max(1) }, room: 0 }, below);
+        return;
+    }
+    if (child.failed || ready)
+        && child.output_state == Intake::Ended
+        && child.error_state == Intake::Ended
+        && child.exit.is_some()
+    {
+        child.closing = true;
+    }
+    if child.process.is_none() && child.closed {
         child.closing = true;
     }
     if child.resume(below) {
@@ -451,16 +496,25 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
         finish(protocol, env, above, below);
         return;
     }
-    if child.closing || child.output.is_none() {
+    if child.closing || child.failed || ready || child.output.is_none() {
         return;
     }
+    resume_mode(mode, child, env, above, below);
+}
+fn resume_mode(
+    mode: &mut Mode,
+    child: &mut git::Child,
+    env: &Env<Limits>,
+    above: &mut Queue<Event>,
+    below: &mut Queue<Asked>,
+) {
     match mode {
         Mode::Rev { .. } => {}
         Mode::Listing { machine: _, above: events, below: requests, answer, .. } => {
             if let Some(event) = events.pop() {
                 *answer = Some(match event {
                     listing::Event::Listed(entries) => Ok(entries),
-                    listing::Event::Failed(_) => Err(()),
+                    listing::Event::Failed(error) => Err(error),
                     listing::Event::Closed => unreachable!("listing is not closed"),
                 });
             } else if let Some(down) = requests.pop() {
@@ -490,6 +544,7 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
 fn finish(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Event>, below: &mut Queue<Asked>) {
     let child = protocol.child.take().expect("closed child");
     let mode = protocol.mode.take().expect("closed mode");
+    let failure = failure(&mode, &child, &env.limits.git);
     let (request, event) = match mode {
         Mode::Rev { request, repository, revision: _, stdout, ended: _ } => {
             if !child.failed {
@@ -501,7 +556,11 @@ fn finish(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Event>, 
                     let mut requests = Queue::with_capacity(1);
                     let git_env = Env { now: env.now, wall: env.wall, limits: env.limits.git };
                     listing::down(&mut machine, &git_env, listing::Request::List, &mut events, &mut requests);
-                    protocol.spawn(invocation::Command::LsTree { repository: &repository, commit }, below);
+                    protocol.spawn(
+                        invocation::Command::LsTree { repository: &repository, commit },
+                        &env.limits.git,
+                        below,
+                    );
                     protocol.mode =
                         Some(Mode::Listing { request, commit, machine, above: events, below: requests, answer: None });
                     return;
@@ -532,7 +591,7 @@ fn finish(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Event>, 
                             entries: translated.into_boxed(),
                         })
                     }
-                    Err(()) => None,
+                    Err(_) => None,
                 }
             };
             (request, event)
@@ -562,8 +621,102 @@ fn finish(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Event>, 
     };
     above.push(Event::Render(match event {
         Some(event) => event,
-        None => RenderEvent::Failed { request, class: Class::Operational },
+        None => {
+            let (class, at, failure) = failure;
+            RenderEvent::Failed { request, class, at, failure }
+        }
     }));
+}
+
+fn failure(
+    mode: &Mode,
+    child: &git::Child,
+    limits: &git_machine::limits::Limits,
+) -> (Class, Option<Box<[u8]>>, render::vocabulary::Failure) {
+    use render::{
+        errors::{Ended, Limit, Tool},
+        vocabulary::Failure,
+    };
+    if let Mode::Listing { answer: Some(Err(error)), .. } = mode {
+        let refused = match error {
+            listing::Error::TooMany { path } => Some((path.clone(), Limit::Entries, limits.entries)),
+            listing::Error::PathTooLong { prefix } => Some((prefix.clone(), Limit::Path, limits.path)),
+            listing::Error::PathsTooLarge { path } => Some((path.clone(), Limit::Paths, limits.paths_total)),
+            listing::Error::Malformed { .. } | listing::Error::Truncated | listing::Error::Stream(_) => None,
+        };
+        if let Some((path, limit, max)) = refused {
+            return (Class::Configuration, Some(path), Failure::TooLarge { limit, max: u64::from(max) });
+        }
+    }
+    let ended = match child.exit {
+        Some(invocation::Exit::Code(code)) if !succeeded(mode, invocation::Exit::Code(code)) => Ended::Exit(code),
+        Some(invocation::Exit::Signal(signal)) => Ended::Signal(signal),
+        Some(invocation::Exit::Code(_)) => match mode {
+            Mode::Read(read) => read.ended(),
+            Mode::Listing { answer: Some(Err(listing::Error::Stream(_))), .. } => Ended::Stream,
+            Mode::Rev { .. } | Mode::Listing { .. } | Mode::Hunks { .. } => match &child.fault {
+                Some(ended) => ended.clone(),
+                None => Ended::Output,
+            },
+        },
+        None => Ended::Start,
+    };
+    (Class::Operational, None, Failure::Tool(Tool { command: child.command, ended, tail: child.tail.lines() }))
 }
 #[cfg(test)]
 mod tests;
+
+fn listing_failed(answer: Option<&Result<Box<[listing::Entry]>, listing::Error>>) -> bool {
+    match answer {
+        Some(Err(_)) => true,
+        Some(Ok(_)) | None => false,
+    }
+}
+fn stream_ended(up: &Up) -> bool {
+    match up {
+        Up::End | Up::Failed(_) => true,
+        Up::Bytes(_) | Up::Room => false,
+    }
+}
+
+fn stream_up(child: &mut git::Child, owner: Token, up: Up) -> Option<Up> {
+    if child.closing {
+        return None;
+    }
+    if let Up::Failed(_) = &up {
+        child.fault = Some(render::errors::Ended::Stream);
+    }
+    if child.error == Some(owner) {
+        match up {
+            Up::Bytes(bytes) => {
+                child.tail.admit(&bytes);
+                child.error_state = Intake::Demand;
+            }
+            Up::End => {
+                child.error_state = Intake::Ended;
+            }
+            Up::Failed(_) => {
+                child.error_state = Intake::Ended;
+                child.failed = true;
+            }
+            Up::Room => unreachable!("read-only stderr"),
+        }
+        return None;
+    }
+    if child.output == Some(owner) && (child.output_state == Intake::Draining || child.failed) {
+        match up {
+            Up::Bytes(_) => child.output_state = Intake::Waiting,
+            Up::End => child.output_state = Intake::Ended,
+            Up::Failed(_) => {
+                child.output_state = Intake::Ended;
+                child.failed = true;
+            }
+            Up::Room => unreachable!("read-only stdout"),
+        }
+        return None;
+    }
+    if child.output == Some(owner) {
+        child.output_state = if stream_ended(&up) { Intake::Ended } else { Intake::Waiting };
+    }
+    Some(up)
+}

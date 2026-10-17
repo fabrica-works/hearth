@@ -68,6 +68,8 @@ pub fn error(error: target::Error) -> records::errors::Error {
     let kind = match kind {
         target::Kind::Schema(fault) => records::errors::Kind::Schema(schema(fault)),
         target::Kind::Decode(fault) => records::errors::Kind::Decode(decode(fault)),
+        target::Kind::Repository(why) => records::errors::Kind::Repository(repository(why)),
+        target::Kind::Tool(value) => records::errors::Kind::Tool(tool(value)),
     };
     let class = match class {
         render::vocabulary::Class::Configuration => records::errors::Class::Configuration,
@@ -134,6 +136,10 @@ pub fn limit(limit: target::Limit) -> records::errors::Limit {
         target::Limit::Document => records::errors::Limit::Document,
         target::Limit::Decoded => records::errors::Limit::Decoded,
         target::Limit::Static => records::errors::Limit::Static,
+        target::Limit::Tasks => records::errors::Limit::Tasks,
+        target::Limit::Paths => records::errors::Limit::Paths,
+        target::Limit::Path => records::errors::Limit::Path,
+        target::Limit::Entries => records::errors::Limit::Entries,
     }
 }
 
@@ -358,4 +364,37 @@ pub fn type_name(name: target::TypeName) -> records::errors::TypeName {
         target::TypeName::Target => records::errors::TypeName::Target,
         target::TypeName::File => records::errors::TypeName::File,
     }
+}
+
+#[must_use]
+pub fn repository(why: target::Repository) -> records::errors::Repository {
+    match why {
+        target::Repository::Stray => records::errors::Repository::Stray,
+        target::Repository::Name => records::errors::Repository::Name,
+        target::Repository::Declaration => records::errors::Repository::Declaration,
+        target::Repository::Static => records::errors::Repository::Static,
+        target::Repository::Destination => records::errors::Repository::Destination,
+        target::Repository::Submodule => records::errors::Repository::Submodule,
+        target::Repository::Link => records::errors::Repository::Link,
+        target::Repository::Environment { env } => records::errors::Repository::Environment { env },
+    }
+}
+#[must_use]
+pub fn tool(tool: target::Tool) -> records::errors::Tool {
+    use records::errors as out;
+    let command = match tool.command {
+        target::Command::RevParse => out::Command::RevParse,
+        target::Command::LsTree => out::Command::LsTree,
+        target::Command::CatFile => out::Command::CatFile,
+        target::Command::Diff => out::Command::Diff,
+    };
+    let ended = match tool.ended {
+        target::Ended::Start => out::Ended::Start,
+        target::Ended::Exit(code) => out::Ended::Exit(code),
+        target::Ended::Signal(signal) => out::Ended::Signal(signal),
+        target::Ended::Output => out::Ended::Output,
+        target::Ended::Missing { oid } => out::Ended::Missing { oid: oid.0 },
+        target::Ended::Stream => out::Ended::Stream,
+    };
+    out::Tool { command, ended, tail: tool.tail }
 }

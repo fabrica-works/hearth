@@ -17,6 +17,7 @@ pub const CLIENT: Token = Token::new(90);
 pub const REQUEST: Token = Token::new(1);
 pub const OUTPUT: Token = Token::new(201);
 pub const INPUT: Token = Token::new(202);
+pub const ERROR: Token = Token::new(203);
 pub const OID: &[u8] = b"0123456789abcdef0123456789abcdef01234567";
 pub const DOCUMENT: &[u8] = b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"}}";
 
@@ -163,7 +164,7 @@ impl Layer {
     }
     pub fn spawn_pending(&mut self, owner: Token, input: bool) {
         self.owner = Some(owner);
-        let pipes: Box<[Token]> = if input { Box::new([OUTPUT, INPUT]) } else { Box::new([OUTPUT]) };
+        let pipes: Box<[Token]> = if input { Box::new([OUTPUT, INPUT, ERROR]) } else { Box::new([OUTPUT, ERROR]) };
         self.up(io::Event::Spawned { owner, child: Token::new(200), pipes });
     }
     pub fn spawned(&mut self, owner: Token, input: bool, exit: Exit) {
@@ -187,14 +188,14 @@ impl Layer {
     pub fn answer(&mut self, request: Asked, held: &mut Held, exit: Exit) {
         let Asked::Io(request) = request else { panic!("git fixture has no cache request") };
         match request {
-            io::Request::Spawn { owner, spawn } => self.spawned(owner, spawn.pipes.len() == 2, exit),
+            io::Request::Spawn { owner, spawn } => self.spawned(owner, spawn.pipes.len() == 3, exit),
             io::Request::Stream { stream, down } => match down {
                 Down::Demand { read: Read::Nothing, room: 0 } | Down::Send(_) | Down::Finish => {}
                 Down::Demand { read: Read::Nothing, room: _ } => {
                     self.up(io::Event::Stream { owner: stream, up: Up::Room });
                 }
                 Down::Demand { read, room: 0 } => {
-                    let up = held.answer(read).expect("active read");
+                    let up = if stream == ERROR { Up::End } else { held.answer(read).expect("active read") };
                     self.up(io::Event::Stream { owner: stream, up });
                 }
                 Down::Demand { .. } => panic!("one stream direction"),
@@ -214,13 +215,27 @@ impl Layer {
             | io::Request::Abort { .. } => panic!("git operations"),
         }
     }
+    pub fn listing_error(&mut self, error: crate::git_machine::listing::Error) {
+        let Some(crate::Mode::Listing { above, .. }) = &mut self.protocol.mode else { panic!("listing phase") };
+        above.push(crate::git_machine::listing::Event::Failed(error));
+    }
     pub fn run(&mut self, stdout: &[u8], exit: Exit) -> builder::vocabulary::Event {
+        self.run_stderr(stdout, b"", exit)
+    }
+    pub fn run_stderr(&mut self, stdout: &[u8], stderr: &[u8], exit: Exit) -> builder::vocabulary::Event {
+        let mut errors = Held::new(bytes::copy_of(stderr));
         let mut held = Held::new(bytes::copy_of(stdout));
-        for _ in 0_u32..4096 {
+        for _ in 0..stdout.len().saturating_mul(10).saturating_add(4096) {
             if let Some(event) = self.told() {
                 return event;
             }
             match self.asked() {
+                Some(Asked::Io(io::Request::Stream { stream: ERROR, down: Down::Demand { read, room: 0 } })) => {
+                    if read != Read::Nothing {
+                        let up = errors.answer(read).expect("stderr demand");
+                        self.up(io::Event::Stream { owner: ERROR, up });
+                    }
+                }
                 Some(request) => self.answer(request, &mut held, exit),
                 None => return self.told().expect("protocol answer"),
             }
@@ -602,3 +617,19 @@ pub fn descending() -> Layer {
 }
 pub const CLOSE_CHILD: Asked = Asked::File(io::file::Request::Close { owner: STORE_OWNER, file: Token::new(89) });
 pub const CLOSE_STAGING: Asked = Asked::File(io::file::Request::Close { owner: STORE_OWNER, file: Token::new(88) });
+pub fn listing(path: &[u8], count: u32) -> Box<[u8]> {
+    let header = b"100644 blob 0123456789abcdef0123456789abcdef01234567       2\t";
+    let mut listing = skein_lib::Writer::new(
+        header
+            .len()
+            .saturating_add(path.len())
+            .saturating_add(1)
+            .saturating_mul(usize::try_from(count).expect("fixture count")),
+    );
+    for _ in 0..count {
+        listing.put(header).expect("record");
+        listing.put(path).expect("path");
+        listing.put(b"\0").expect("terminator");
+    }
+    listing.finish()
+}

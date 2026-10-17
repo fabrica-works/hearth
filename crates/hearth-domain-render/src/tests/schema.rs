@@ -73,7 +73,7 @@ fn a_read_fault_makes_only_its_reading_task_unsound() {
 #[test]
 fn sound_tasks_are_looked_up_in_name_order() {
     let documents = fixtures::declarations(&[
-        (b"a-b", Some(fixtures::declaration(&[], &[]))),
+        (b"a_b", Some(fixtures::declaration(&[], &[]))),
         (b"a", Some(fixtures::declaration(&[], &[]))),
     ]);
     let mut faults = skein_lib::List::with_capacity(4);
@@ -83,7 +83,7 @@ fn sound_tasks_are_looked_up_in_name_order() {
         &mut crate::compose::Merge::new(&crate::limits::SHIPPED),
         &mut faults,
     );
-    assert_eq!((defaults.sound(b"a"), defaults.sound(b"a-b")), (true, true));
+    assert_eq!((defaults.sound(b"a"), defaults.sound(b"a_b")), (true, true));
 }
 
 use super::fixtures::{

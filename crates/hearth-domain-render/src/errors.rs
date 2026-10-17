@@ -1,5 +1,5 @@
 //! Decode errors retain their revision places (render.md, 7.1).
-use crate::revision::{self, Position};
+use crate::revision::{self, Oid, Position};
 pub use crate::vocabulary::Class;
 use alloc::boxed::Box;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -20,6 +20,8 @@ pub struct Place {
 pub enum Kind {
     Schema(Schema),
     Decode(Decode),
+    Repository(Repository),
+    Tool(Tool),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -68,16 +70,24 @@ pub enum Limit {
     Document,
     Decoded,
     Static,
+    Entries,
+    Path,
+    Paths,
+    Tasks,
 }
 
 pub(crate) fn refused(path: &[u8], position: Option<Position>, fault: Decode, also: Option<Position>) -> Error {
     let task = match revision::class(path) {
-        revision::Class::Declaration { task } | revision::Class::Tree { task, .. } => {
-            Some(skein_lib::bytes::copy_of(task))
-        }
+        revision::Class::Declaration { task }
+        | revision::Class::Tree { task, .. }
+        | revision::Class::Template { task, .. }
+        | revision::Class::Script { task, .. }
+        | revision::Class::Readme { task }
+        | revision::Class::Refused { task: Some(task), .. } => Some(skein_lib::bytes::copy_of(task)),
         revision::Class::Fleet
         | revision::Class::Environment { .. }
         | revision::Class::Host { .. }
+        | revision::Class::Refused { task: None, .. }
         | revision::Class::Other => None,
     };
     Error {
@@ -279,4 +289,53 @@ pub enum TypeName {
     Secret,
     Target,
     File,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Repository {
+    Stray,
+    Environment { env: Box<[u8]> },
+    Name,
+    Declaration,
+    Static,
+    Destination,
+    Submodule,
+    Link,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Tool {
+    pub command: Command,
+    pub ended: Ended,
+    pub tail: Box<[Box<[u8]>]>,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Command {
+    RevParse,
+    LsTree,
+    CatFile,
+    Diff,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Ended {
+    Start,
+    Exit(u8),
+    Signal(u32),
+    Output,
+    Missing { oid: Oid },
+    Stream,
+}
+
+pub(crate) fn repository(path: &[u8], task: Option<&[u8]>, why: Repository) -> Error {
+    Error {
+        kind: Kind::Repository(why),
+        class: Class::Configuration,
+        at: Some(Place { path: skein_lib::bytes::copy_of(path), position: None }),
+        also: None,
+        target: None,
+        task: copy_task(task),
+    }
+}
+
+fn copy_task(task: Option<&[u8]>) -> Option<Box<[u8]>> {
+    Some(skein_lib::bytes::copy_of(task?))
 }

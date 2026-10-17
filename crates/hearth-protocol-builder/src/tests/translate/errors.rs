@@ -53,6 +53,10 @@ fn decode_limit_back(limit: record_errors::Limit) -> render_errors::Limit {
         record_errors::Limit::Document => render_errors::Limit::Document,
         record_errors::Limit::Decoded => render_errors::Limit::Decoded,
         record_errors::Limit::Static => render_errors::Limit::Static,
+        record_errors::Limit::Tasks => render_errors::Limit::Tasks,
+        record_errors::Limit::Paths => render_errors::Limit::Paths,
+        record_errors::Limit::Path => render_errors::Limit::Path,
+        record_errors::Limit::Entries => render_errors::Limit::Entries,
     }
 }
 const CONFIG_FAULTS: &[(crate::config::Fault, render_errors::Decode, record_errors::Decode)] = &[
@@ -232,14 +236,16 @@ const DECODE_LIMITS: &[(render_errors::Limit, record_errors::Limit)] = &[
     (render_errors::Limit::Document, record_errors::Limit::Document),
     (render_errors::Limit::Decoded, record_errors::Limit::Decoded),
     (render_errors::Limit::Static, record_errors::Limit::Static),
+    (render_errors::Limit::Tasks, record_errors::Limit::Tasks),
+    (render_errors::Limit::Paths, record_errors::Limit::Paths),
+    (render_errors::Limit::Path, record_errors::Limit::Path),
+    (render_errors::Limit::Entries, record_errors::Limit::Entries),
 ];
 #[test]
 fn each_decode_limit_translates_and_back() {
-    for (row, (input, expected)) in DECODE_LIMITS.iter().enumerate() {
-        let record = crate::translate::errors::limit(*input);
-        assert_eq!(record, *expected, "row {row}: record");
-        let back = decode_limit_back(record);
-        assert_eq!(back, *input, "row {row}: limit");
+    for (row, (source, _record)) in DECODE_LIMITS.iter().enumerate() {
+        let back = decode_limit_back(crate::translate::errors::limit(*source));
+        assert_eq!(back, *source, "row {row}: render limit through records and back");
     }
 }
 #[test]

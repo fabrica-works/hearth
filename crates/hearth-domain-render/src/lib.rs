@@ -2,6 +2,7 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+use alloc::boxed::Box;
 mod call;
 pub mod compose;
 pub mod diff;
@@ -72,10 +73,22 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             assert_eq!(request, Token::new(3), "hunks token");
             render.call.as_mut().expect("active call").hunks(Some(hunks));
         }
-        Event::Failed { request, class } => {
+        Event::Failed { request, class, at, failure } => {
             if request == Token::new(3) {
                 render.call.as_mut().expect("active call").hunks(None);
                 return;
+            }
+            let side = &mut render.call.as_mut().expect("active call").side;
+            let kind = match failure {
+                vocabulary::Failure::Tool(tool) => Some(errors::Kind::Tool(tool)),
+                vocabulary::Failure::TooLarge { limit, max } => {
+                    Some(errors::Kind::Decode(errors::Decode::TooLarge { limit, max }))
+                }
+                vocabulary::Failure::Store => None,
+            };
+            if let Some(kind) = kind {
+                let at = failure_place(at);
+                errors::push(&mut side.errors, errors::Error { kind, class, at, also: None, target: None, task: None });
             }
             let outcome = match class {
                 Class::Configuration => Outcome::Failed,
@@ -95,3 +108,7 @@ pub fn resume(render: &mut Render, env: &Env<Limits>, out: &mut Queue<Output>) {
 }
 #[cfg(test)]
 mod tests;
+
+fn failure_place(path: Option<Box<[u8]>>) -> Option<errors::Place> {
+    Some(errors::Place { path: path?, position: None })
+}

@@ -647,3 +647,36 @@ pub fn check_declarations(documents: &crate::revision::Documents) -> Box<[(Box<[
 }
 
 pub mod schemas;
+
+pub fn listing(
+    paths: &[(&[u8], crate::revision::Mode)],
+    limits: &limits::Limits,
+) -> (bool, Box<[crate::errors::Error]>) {
+    let mut entries = skein_lib::List::with_capacity(u32::try_from(paths.len()).expect("fixture count"));
+    for &(path, mode) in paths {
+        entries
+            .push(crate::revision::Entry {
+                path: bytes::copy_of(path),
+                mode,
+                oid: crate::revision::Oid(bytes::copy_of(path)),
+                size: 2,
+            })
+            .expect("fixture count");
+    }
+    let mut errors = crate::errors::Collector::new(limits);
+    let valid = crate::compose::listing(entries.as_slice(), limits, &mut errors).is_ok();
+    (valid, errors.finish().0)
+}
+
+pub fn hunk_failure() -> crate::vocabulary::Event {
+    crate::vocabulary::Event::Failed {
+        request: skein_lib::Token::new(3),
+        class: crate::vocabulary::Class::Operational,
+        at: None,
+        failure: crate::vocabulary::Failure::Tool(crate::errors::Tool {
+            command: crate::errors::Command::Diff,
+            ended: crate::errors::Ended::Exit(2),
+            tail: Box::new([]),
+        }),
+    }
+}

@@ -1,4 +1,5 @@
 //! The listing and typed documents (format.md, 2.1 and 3.4).
+use crate::errors::Repository;
 use alloc::boxed::Box;
 pub mod declaration;
 use skein_lib::bytes;
@@ -23,57 +24,131 @@ pub struct Position {
     pub line: u32,
     pub column: u32,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Class<'a> {
     Fleet,
     Environment { env: &'a [u8] },
     Host { base: &'a [u8], name: &'a [u8] },
     Declaration { task: &'a [u8] },
     Tree { task: &'a [u8], path: &'a [u8] },
+    Template { task: &'a [u8], path: &'a [u8] },
+    Script { task: &'a [u8], name: &'a [u8] },
+    Readme { task: &'a [u8] },
+    Refused { task: Option<&'a [u8]>, why: Repository },
     Other,
 }
 #[must_use]
 pub fn class(path: &[u8]) -> Class<'_> {
+    for chunk in path.utf8_chunks() {
+        if !chunk.invalid().is_empty() {
+            return Class::Refused { task: task(path), why: Repository::Name };
+        }
+    }
     if path == b"fleet.json" {
         return Class::Fleet;
     }
-    if let Some(rest) = path.strip_prefix(b"envs/")
-        && let Some(env) = rest.strip_suffix(b".json")
-        && !env.is_empty()
-        && bytes::find(env, b"/").is_none()
-    {
-        return Class::Environment { env };
-    }
-    if let Some(rest) = path.strip_prefix(b"hosts/")
-        && let Some(slash) = bytes::find(rest, b"/")
-    {
-        let (base, rest) = rest.split_at_checked(slash).expect("found slash");
-        let rest = rest.strip_prefix(b"/").expect("found slash");
-        if let Some(name) = rest.strip_suffix(b".json")
-            && !base.is_empty()
-            && !name.is_empty()
-            && bytes::find(name, b"/").is_none()
+    if let Some(rest) = path.strip_prefix(b"envs/") {
+        if let Some(env) = rest.strip_suffix(b".json")
+            && name(env)
         {
-            return Class::Host { base, name };
+            return Class::Environment { env };
         }
+        return Class::Refused { task: None, why: Repository::Name };
     }
-    if let Some(rest) = path.strip_prefix(b"tasks/")
-        && let Some(slash) = bytes::find(rest, b"/")
-    {
-        let (task, rest) = rest.split_at_checked(slash).expect("found slash");
-        if !task.is_empty() {
-            if rest == b"/task.json" {
-                return Class::Declaration { task };
-            }
-            if let Some(path) = rest.strip_prefix(b"/tree/")
-                && !path.is_empty()
-            {
-                return Class::Tree { task, path };
-            }
+    if let Some(rest) = path.strip_prefix(b"hosts/") {
+        let Some((base, file)) = split(rest) else {
+            return Class::Refused { task: None, why: Repository::Stray };
+        };
+        if !name(base) {
+            return Class::Refused { task: None, why: Repository::Name };
         }
+        if !file.contains(&b'/')
+            && let Some(host) = file.strip_suffix(b".json")
+        {
+            if host == base || environment(host, base) {
+                return Class::Host { base, name: host };
+            }
+            return Class::Refused { task: None, why: Repository::Stray };
+        }
+        return Class::Other;
+    }
+    if let Some(rest) = path.strip_prefix(b"tasks/") {
+        let Some((task, file)) = split(rest) else {
+            return Class::Refused { task: Some(rest), why: Repository::Declaration };
+        };
+        if !identifier(task) {
+            return Class::Refused { task: Some(task), why: Repository::Name };
+        }
+        if file == b"task.json" {
+            return Class::Declaration { task };
+        }
+        if file == b"README.md" {
+            return Class::Readme { task };
+        }
+        if let Some(path) = file.strip_prefix(b"tree/")
+            && !path.is_empty()
+        {
+            if path == b".j2" || path.ends_with(b"/.j2") {
+                return Class::Refused { task: Some(task), why: Repository::Static };
+            }
+            return Class::Tree { task, path };
+        }
+        if let Some(path) = file.strip_prefix(b"templates/")
+            && path.ends_with(b".j2")
+            && path != b".j2"
+            && !path.ends_with(b"/.j2")
+        {
+            return Class::Template { task, path };
+        }
+        if [b"customize.sh".as_slice(), b"customize.sh.j2", b"software.sh", b"software.sh.j2"].contains(&file) {
+            return Class::Script { task, name: file };
+        }
+        return Class::Refused { task: Some(task), why: Repository::Stray };
     }
     Class::Other
 }
+fn split(path: &[u8]) -> Option<(&[u8], &[u8])> {
+    let (head, tail) = path.split_at_checked(bytes::find(path, b"/")?)?;
+    Some((head, tail.strip_prefix(b"/")?))
+}
+fn environment(host: &[u8], base: &[u8]) -> bool {
+    let Some(suffix) = host.strip_prefix(base) else {
+        return false;
+    };
+    let Some(env) = suffix.strip_prefix(b"-") else {
+        return false;
+    };
+    name(env)
+}
+fn name(name: &[u8]) -> bool {
+    let Some(first) = name.first() else {
+        return false;
+    };
+    if (!first.is_ascii_lowercase() && !first.is_ascii_digit()) || name.ends_with(b"-") {
+        return false;
+    }
+    for byte in name {
+        if !byte.is_ascii_lowercase() && !byte.is_ascii_digit() && *byte != b'-' {
+            return false;
+        }
+    }
+    true
+}
+fn identifier(name: &[u8]) -> bool {
+    let Some(first) = name.first() else {
+        return false;
+    };
+    if !first.is_ascii_lowercase() {
+        return false;
+    }
+    for byte in name {
+        if !byte.is_ascii_lowercase() && !byte.is_ascii_digit() && *byte != b'_' {
+            return false;
+        }
+    }
+    true
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Document {
     pub at: Position,
@@ -151,12 +226,20 @@ impl Documents {
         let mut listed = skein_lib::Map::with_capacity(capacity);
         let mut decoded = skein_lib::List::with_capacity(capacity);
         for entry in entries {
+            if entry.mode == Mode::Link || entry.mode == Mode::Submodule {
+                continue;
+            }
             match class(&entry.path) {
                 Class::Fleet | Class::Environment { .. } | Class::Host { .. } | Class::Declaration { .. } => {
                     listed.insert(entry.path.clone(), entry.clone()).expect("listing capacity");
                     decoded.push(None).expect("listing capacity");
                 }
-                Class::Tree { .. } | Class::Other => {}
+                Class::Tree { .. }
+                | Class::Template { .. }
+                | Class::Script { .. }
+                | Class::Readme { .. }
+                | Class::Refused { .. }
+                | Class::Other => {}
             }
         }
         let mut entries = skein_lib::List::with_capacity(listed.len());
@@ -236,4 +319,18 @@ impl Budget {
         self.held = held;
         true
     }
+}
+
+#[must_use]
+pub fn task(path: &[u8]) -> Option<&[u8]> {
+    let path = path.strip_prefix(b"tasks/")?;
+    Some(match split(path) {
+        Some((task, _)) => task,
+        None => path,
+    })
+}
+
+#[must_use]
+pub fn base(path: &[u8]) -> Option<&[u8]> {
+    Some(split(path.strip_prefix(b"hosts/")?)?.0)
 }

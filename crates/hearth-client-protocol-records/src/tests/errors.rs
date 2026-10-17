@@ -392,3 +392,34 @@ fn each_schema_fault_prints_its_json_fields() {
         );
     }
 }
+
+const TOOL_LINES: &[(crate::errors::Command, u8, &[u8], &[u8])] = &[
+    (crate::errors::Command::LsTree, 128,
+     b"git ls-tree exited 128\n  fatal: not a tree object\n",
+     b"{\"record\":\"error\",\"kind\":\"tool\",\"tool\":{\"command\":\"ls_tree\",\"ended\":{\"code\":128,\"kind\":\"exit\"},\"tail\":[\"fatal: not a tree object\"]},\"class\":\"operational\"}\n"),
+    (crate::errors::Command::Diff, 1,
+     b"git diff exited 1\n  fatal: not a tree object\n",
+     b"{\"record\":\"error\",\"kind\":\"tool\",\"tool\":{\"command\":\"diff\",\"ended\":{\"code\":1,\"kind\":\"exit\"},\"tail\":[\"fatal: not a tree object\"]},\"class\":\"operational\"}\n"),
+];
+#[test]
+fn a_tool_error_prints_its_tail_below_it() {
+    for (row, &(command, code, text, _)) in TOOL_LINES.iter().enumerate() {
+        assert_eq!(print(&Record::Error(fixtures::git_failure(command, code))).as_deref(), Ok(text), "row {row}");
+    }
+}
+#[test]
+fn a_tool_error_prints_its_command_end_and_tail_as_json() {
+    for (row, &(command, code, _, json)) in TOOL_LINES.iter().enumerate() {
+        assert_eq!(
+            form::print(
+                Form::JsonLines,
+                &Record::Error(fixtures::git_failure(command, code)),
+                Some(Type::Error),
+                &limits::SHIPPED
+            )
+            .as_deref(),
+            Ok(json),
+            "row {row}"
+        );
+    }
+}

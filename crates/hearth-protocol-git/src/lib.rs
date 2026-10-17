@@ -20,3 +20,4 @@ pub struct MaxOut {
 pub mod batch;
 
 pub mod hunks;
+pub mod tail;

@@ -16,6 +16,8 @@ pub enum Kind {
     Schema(Schema),
     Guard(Guard),
     Decode(Decode),
+    Repository(Repository),
+    Tool(Tool),
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Guard {
@@ -54,6 +56,8 @@ impl Error {
         match &self.kind {
             Kind::Decode(decode) => decode.text(lines),
             Kind::Schema(schema) => schema.text(lines),
+            Kind::Repository(why) => why.text(lines),
+            Kind::Tool(tool) => tool.text(lines),
             Kind::Guard(guard) => {
                 lines.put(b"requires ");
                 lines.put(&guard.name);
@@ -67,6 +71,13 @@ impl Error {
             lines.put(b")");
         }
         lines.put(b"\n");
+        if let Kind::Tool(tool) = &self.kind {
+            for line in &tool.tail {
+                lines.put(b"  ");
+                lines.put(line);
+                lines.put(b"\n");
+            }
+        }
     }
     pub(crate) fn json(&self, json: &mut Encoder) {
         field(json, b"record", b"error");
@@ -75,6 +86,16 @@ impl Error {
                 field(json, b"kind", b"schema");
                 json.key(b"schema");
                 schema.json(json);
+            }
+            Kind::Repository(why) => {
+                field(json, b"kind", b"repository");
+                json.key(b"repository");
+                why.json(json);
+            }
+            Kind::Tool(tool) => {
+                field(json, b"kind", b"tool");
+                json.key(b"tool");
+                tool.json(json);
             }
             Kind::Decode(decode) => {
                 field(json, b"kind", b"decode");
@@ -183,6 +204,10 @@ pub enum Limit {
     Document,
     Decoded,
     Static,
+    Entries,
+    Path,
+    Paths,
+    Tasks,
 }
 
 impl Decode {
@@ -241,6 +266,10 @@ impl Decode {
                     Limit::Document => b"a document past ",
                     Limit::Decoded => b"decoded documents past ",
                     Limit::Static => b"a static file past ",
+                    Limit::Entries => b"listing entries past ",
+                    Limit::Path => b"a path past ",
+                    Limit::Paths => b"listing paths past ",
+                    Limit::Tasks => b"tasks past ",
                 });
                 lines.decimal(*max);
                 lines.put(b" bytes");
@@ -324,6 +353,10 @@ impl Decode {
                         Limit::Document => b"document",
                         Limit::Decoded => b"decoded",
                         Limit::Static => b"static",
+                        Limit::Entries => b"entries",
+                        Limit::Path => b"path",
+                        Limit::Paths => b"paths",
+                        Limit::Tasks => b"tasks",
                     },
                 );
                 json.key(b"max");
@@ -762,3 +795,6 @@ impl TypeName {
         }
     }
 }
+
+mod repository;
+pub use repository::{Command, Ended, Repository, Tool};
