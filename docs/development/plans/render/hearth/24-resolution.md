@@ -89,7 +89,8 @@ literal); `tests/render/src/parent.rs` (its matches at :53, :67, :87 and :95
 gain `Find`, `Found` and `Absent`); the text goldens that gain 24.1's
 `resolution … needed` line, and their users: `tests/builder/src/fixtures.rs`'s
 `THIN_TEXT` (:163) and `BROKEN_LAB_TEXT` (:439), `tests/builder/tests/real.rs:734`;
-`tests/builder/{Cargo.toml (dev: hearth-test-mirror), src/fixtures.rs}`, new
+`tests/builder/{Cargo.toml (`[dependencies]`: hearth-test-mirror, since
+`src/fixtures.rs` is in the lib target), src/fixtures.rs}`, new
 `tests/builder/tests/resolution.rs`. `tests/builder/src/fixtures.rs` gains
 `Laid::Resolution(..)` (23-store.md named it; hearth 23 landed `Laid` with
 `File` and `Record` alone, :441), `test_min_recorded()`, `TEST_MIN_KEY`,

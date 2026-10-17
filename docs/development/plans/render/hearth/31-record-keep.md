@@ -59,15 +59,27 @@ Files: render `src/{resolution, keys, call, vocabulary, errors}.rs`,
 `src/tests.rs`; store `src/{resolutions, vocabulary, lib}.rs`,
 `src/tests/{fixtures, find}.rs` (`record` tests there); protocol `src/store.rs`,
 `src/translate/{store, errors}.rs`, `src/tests/{store, translate}.rs`; records
-`src/errors.rs` (`Step::Write`); `tests/builder/{Cargo.toml (dev:
-hearth-recordings), src/fixtures.rs, tests/conformance_render.rs}`.
+`src/progress.rs:61` (`Step::Write` and its `name()` arm; `errors.rs:4` only
+re-exports it), `src/errors.rs:251`, `:324`, `:414` (`Limit::Record`);
+`tests/builder/{Cargo.toml (`[dependencies]`: hearth-recordings, since
+`src/fixtures.rs` is in the lib target), src/fixtures.rs,
+tests/conformance_render.rs}`; and the exhaustive matches the new variants
+reach: render `src/lib.rs:45` (`step`) and `:94` (a `Limit::Record` case that
+builds `Resolution::TooLarge`); `tests/render/src/parent.rs:53`, `:67`, `:87`
+(the world answers `Recorded`); protocol `src/lib.rs:267` (`Request::Record`),
+`src/translate/errors.rs:150`, `src/tests/translate/errors.rs:55` and `:244` (a
+`Record` row); store `src/start.rs:9`, `src/enter.rs:17`, `src/scan.rs:78`
+(`Record`, `Room`, `Unwritable`), and `src/lib.rs:54`, where a `Write`
+terminal's `Done` answers `Recorded` and never reaches `start::step`, which
+would call `scan::begin`.
 Shape: the sketches. At `Resolved`, render builds `Record { key, inputs,
 sources: lines, closure, digest: keys::closure, made }` and asks `Record`:
 `Recorded` → `Known` for every target holding the key; `Failed { Store }` →
 `Needed`, `TryAgain`; a closure past `closure` is `TooMany`, no `Record`. Store:
 `Record` and `Room` decline `Unusable` with no index, `Full { Resolutions, most
-}` at `resolutions`; `Record` also `Bound` when `Unwritable` (09's `Refused`:
-Choices); else `Write` (`Store { resolutions.token, <hex>.record, Expect::Any
+}` at `resolutions`; `Record` also `Bound { max }` when `Unwritable { max }` (each
+of 09's `Refused`, `Bound`, `Limit` and `Order`: render.md 7.2 names them as one,
+"a record past its bounds", configuration; Choices); else `Write` (`Store { resolutions.token, <hex>.record, Expect::Any
 }`), indexed, `Recorded`; `Room` writes nothing. Root: `Room` before each
 `Resolve` (Choices), `Record`'s check the backstop; `Declined { Full | Unusable
 }` is 33.3's `store` error once a call and render `Failed { Store }`; `Bound` →
@@ -91,7 +103,8 @@ once, nothing down); protocol `a_written_resolution_reads_back_as_the_stores`,
 `resolution::read` of `TEST_MIN_KEY` equals `fixtures::recorded_closure` (41.1's
 `stanzas`: `Package`, `Architecture`, `Version`, `Filename`, `Size`, `SHA256`;
 `source` 0; sorted by name, architecture), its `sources` line the URI
-`http://snapshot.debian.org/archive/debian/20261016T091523Z/` (08.1's pin),
+`http://snapshot.debian.org/archive/debian/20261017T143929Z/` (the pin,
+`testing/mirror/pin:2`),
 `forky`, `main`; the packages line ends ` known`.
 Proof: live, `binary(=conformance_render)` once: `--resolve test-min` records,
 by key, the closure 41.1 recorded and prints `known`. Bound: 15 s a test, as
@@ -133,7 +146,8 @@ Test shape: unit under 20 ms: protocol
 `resolution_progress_prints_as_text_and_json_lines`. Live:
 `test_mins_indices_enter_the_cache_by_their_digests_with_their_records`: the
 record's `InRelease` holds the pin's `digest`, `main/binary-amd64/Packages` the
-`skein_lib::sha256::digest` of `Mirror::index("main")`; each is `cache/<hex>`,
+`skein_lib::sha256::digest` of the file `Mirror::index("main")` names (a
+`PathBuf`, `testing/hearth-test-mirror/src/mirror.rs:43`: read it first); each is `cache/<hex>`,
 mode 0644 (store.md 2.2: apt's, kept by the rename), beside a kind-5 record
 (09's `cache_file::read`) of origin `Index { resolution: TEST_MIN_KEY }`; and
 `a_resolution_says_on_standard_error_that_it_starts_and_ends` (dead proxy:
@@ -158,15 +172,16 @@ pub struct Record { pub key: Digest, pub inputs: parts::packages::Inputs, pub so
 // crates/hearth-domain-store/src/vocabulary.rs: hearth 23's, 33's and 24's, these added
 pub enum Event {
     Record { resolution: Resolution }, Room, // the root's
-    Unwritable,                              // `Write`: 09's writer refused the record
+    Unwritable { max: u64 },                 // `Write`: 09's writer refused the record
+    // `max`: `tree::frame::Kind::Resolution.bound(&limits.tree)` (tree `frame.rs:31`)
 }
 pub enum Request { Write { resolution: Resolution } } // by `Store`, `Expect::Any`
 pub enum Answer {
     Recorded, // Record
     HasRoom,  // Room: fewer than `resolutions` indexed
 }
-pub enum Decline { Bound } // `Declined` also when `Unwritable`
-pub enum Step { Write }     // `Unusable`'s; the records' `Step` gains it too (31.1)
+pub enum Decline { Bound { max: u64 } } // `Declined` also when `Unwritable`
+pub enum Step { Write }     // `Unusable`'s; the records' `Step` (`progress.rs:61`) gains it too (31.1)
 // crates/hearth-domain-builder/src/vocabulary.rs
 pub enum Event { Index { request: Token, arrival: Token, sha256: Digest, size: u64, took: Duration } } // 31.2
 pub enum Progress { Resolving { key: Digest }, Resolved { key: Digest, took: Duration }, Unresolved { key: Digest } } // 31.2
@@ -187,7 +202,8 @@ None.
 2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run -p
    hearth-domain-render -p hearth-domain-store -p hearth-domain-builder -p
    hearth-protocol-builder -p hearth-client-protocol-records -p
-   hearth-builder-world -p hearth` passes.
+   hearth-builder-world -p hearth-service-builder -p hearth-render-world -p
+   hearth` passes.
 3. Once, on the run's machine, in that worktree: `heavy cargo nextest run -p
    hearth-builder-world --profile conformance -E 'binary(=conformance_render)'`
    passes, its `Summary` naming 5 tests, within the profile's 2 minutes.
