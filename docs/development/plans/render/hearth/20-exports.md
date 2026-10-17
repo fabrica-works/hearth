@@ -156,10 +156,14 @@ Needs: hearth 16, hearth 42.3.
 Files: render new `src/{exports, parts/exports}.rs`, `src/{parts, call,
 errors, limits, lib}.rs`, `src/revision/declaration.rs`,
 `src/schema/references.rs`, new `src/tests/exports.rs`,
-`src/tests/fixtures.rs`; protocol new `src/translate/parts/exports.rs`,
+`src/tests/fixtures.rs`, and, as hearth 20.2 landed them (ruling 161),
+new `src/exports/{conform, value}.rs` and `src/call/exports.rs`,
+`src/call/{templates, validation}.rs`, `src/schema.rs`,
+`src/schema/{debian, forms}.rs`; protocol new
+`src/translate/parts/exports.rs`,
 `src/translate/{declarations, parts, errors}.rs`, `src/tests/translate.rs`;
 records new `src/parts/exports.rs`, `src/{parts, records, errors}.rs`,
-`src/form/{text, json}.rs`, `src/tests/{exports, errors, fixtures}.rs`;
+`src/errors/schema.rs` (ruling 161), `src/form/{text, json}.rs`, `src/tests/{exports, errors, fixtures}.rs`;
 `tests/builder/` fixtures, `real.rs`; `tests/render/` (`hearth-render-world`);
 each `Declaration` literal, which gains `exports` as 16.1's gained
 `requires` (`git grep -n 'requires: ' -- crates tests`); render
