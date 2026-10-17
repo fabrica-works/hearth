@@ -1,8 +1,8 @@
-use super::fixtures::document;
+use super::fixtures::{STOA, document};
 use crate::{
     Fault, Field, Position, Shape,
-    document::{Firmware, On, Placement, Runs},
-    json::{Kind, Value},
+    document::{Firmware, Members, On, Placement, Runs},
+    json::{Entry, Kind, Value},
 };
 #[test]
 fn a_task_value_is_its_settings_object_or_null() {
@@ -49,12 +49,6 @@ fn a_key_that_is_no_task_name_is_refused_at_the_key() {
         assert_eq!(error.at, Position { offset: 1, line: 1, column: 2 });
         assert_eq!(error.fault, Fault::Shape(Shape::Name));
     }
-}
-#[test]
-fn placement_and_members_are_refused_until_they_are_decoded() {
-    let error = document(br#"{"members":{}}"#).expect_err("reserved");
-    assert_eq!(error.at, Position { offset: 1, line: 1, column: 2 });
-    assert_eq!(error.fault, Fault::Shape(Shape::Reserved));
 }
 
 #[test]
@@ -259,4 +253,148 @@ fn a_placement_missing_what_its_kind_needs_is_refused_at_its_brace() {
         assert_eq!(error.at, Position { offset: 13, line: 1, column: 14 });
         assert_eq!(&error.fault, expected, "{input:?}");
     }
+}
+
+#[test]
+fn a_base_s_members_decode_in_name_order_each_a_layer() {
+    const MEMBERS: &[(&[u8], Position, i64)] = &[
+        (b"1", Position { offset: 83, line: 5, column: 5 }, 1),
+        (b"2", Position { offset: 120, line: 6, column: 5 }, 2),
+        (b"3", Position { offset: 157, line: 7, column: 5 }, 3),
+    ];
+    let members = document(STOA).expect("stoa").members.expect("members");
+    assert_eq!(members.at, Position { offset: 77, line: 4, column: 14 });
+    assert_eq!(members.each.len(), 3);
+    for (member, expected) in members.each.iter().zip(MEMBERS) {
+        let layer = member.layer.as_ref().expect("a layer");
+        let [task] = &*layer.tasks else { panic!("one task") };
+        let Kind::Map(settings) = &task.value.kind else { panic!("settings") };
+        let [index] = &**settings else { panic!("one setting") };
+        let Kind::Int(number) = index.value.kind else { panic!("integer") };
+        assert_eq!(task.name.as_ref(), b"stoa");
+        assert_eq!(index.key.as_ref(), b"index");
+        assert_eq!((member.name.as_ref(), member.at, number), *expected);
+    }
+}
+#[test]
+fn a_member_set_to_null_is_removed() {
+    const CASES: &[(&[u8], &[u8])] = &[
+        (br#"{"members":{"1":null}}"#, b"1"),
+        (br#"{"members":{"a-2":null}}"#, b"a-2"),
+        (br#"{"members":{"a--b":null}}"#, b"a--b"),
+        (br#"{"members":{"a":null}}"#, b"a"),
+        (br#"{"members":{"0":null}}"#, b"0"),
+    ];
+    for &(input, expected) in CASES {
+        let members = document(input).expect("members").members.expect("present");
+        let [member] = &*members.each else { panic!("one removal") };
+        assert_eq!(member.name.as_ref(), expected, "{input:?}");
+        assert_eq!(member.at, Position { offset: 12, line: 1, column: 13 });
+        assert_eq!(member.layer, None, "{input:?}");
+    }
+}
+#[test]
+fn a_member_name_out_of_form_is_refused_at_its_key() {
+    const CASES: &[&[u8]] = &[
+        br#"{"members":{"a-":{}}}"#,
+        br#"{"members":{"Stoa":{}}}"#,
+        br#"{"members":{"-a":{}}}"#,
+        br#"{"members":{"a_b":{}}}"#,
+        br#"{"members":{"a.b":{}}}"#,
+        br#"{"members":{"":{}}}"#,
+    ];
+    for input in CASES {
+        let error = document(input).expect_err("member name");
+        assert_eq!(error.at, Position { offset: 12, line: 1, column: 13 });
+        assert_eq!(error.fault, Fault::Shape(Shape::Member), "{input:?}");
+    }
+}
+#[test]
+fn members_inside_a_member_are_refused_at_the_key() {
+    const CASES: &[&[u8]] = &[br#"{"members":{"1":{"members":{}}}}"#, br#"{"members":{"1":{"members":null}}}"#];
+    for input in CASES {
+        let error = document(input).expect_err("no nested members");
+        assert_eq!(error.at, Position { offset: 17, line: 1, column: 18 });
+        assert_eq!(error.fault, Fault::Shape(Shape::Member), "{input:?}");
+    }
+}
+#[test]
+fn a_member_s_value_neither_object_nor_null_is_refused() {
+    const CASES: &[&[u8]] = &[
+        br#"{"members":{"1":false}}"#,
+        br#"{"members":{"1":1}}"#,
+        br#"{"members":{"1":[]}}"#,
+        br#"{"members":{"1":"x"}}"#,
+    ];
+    for input in CASES {
+        let error = document(input).expect_err("member layer or null");
+        assert_eq!(error.at, Position { offset: 16, line: 1, column: 17 });
+        assert_eq!(error.fault, Fault::Shape(Shape::Members), "{input:?}");
+    }
+}
+#[test]
+fn members_that_are_not_an_object_are_refused_at_the_value() {
+    const CASES: &[&[u8]] = &[
+        br#"{"members":null}"#,
+        br#"{"members":1}"#,
+        br#"{"members":false}"#,
+        br#"{"members":[]}"#,
+        br#"{"members":"x"}"#,
+    ];
+    for input in CASES {
+        let error = document(input).expect_err("members object");
+        assert_eq!(error.at, Position { offset: 11, line: 1, column: 12 });
+        assert_eq!(error.fault, Fault::Shape(Shape::Members), "{input:?}");
+    }
+}
+#[test]
+fn a_member_s_layer_holds_its_placement() {
+    let members = document(br#"{"members":{"1":{"placement":{"kind":"container","on":"rhi-prod"}}}}"#)
+        .expect("members")
+        .members
+        .expect("present");
+    let [member] = &*members.each else { panic!("one member") };
+    assert_eq!(
+        member.layer.as_ref().expect("layer").placement,
+        Some(Placement {
+            at: Position { offset: 29, line: 1, column: 30 },
+            kind: Runs::Container,
+            firmware: None,
+            hardware: None,
+            mutable: false,
+            on: Some(On { at: Position { offset: 54, line: 1, column: 55 }, target: b"rhi-prod".as_slice().into() }),
+        })
+    );
+}
+#[test]
+fn a_member_s_layer_holds_its_debian() {
+    let members =
+        document(br#"{"members":{"1":{"debian":{"suite":"forky"}}}}"#).expect("members").members.expect("present");
+    let [member] = &*members.each else { panic!("one member") };
+    let value = member.layer.as_ref().expect("layer").debian.as_ref().expect("debian");
+    assert_eq!(value.at, Position { offset: 26, line: 1, column: 27 });
+    let Kind::Map(entries) = &value.kind else { panic!("debian object") };
+    let [entry] = &**entries else { panic!("suite") };
+    assert_eq!(
+        entry,
+        &Entry {
+            at: Position { offset: 27, line: 1, column: 28 },
+            key: b"suite".as_slice().into(),
+            value: Value {
+                at: Position { offset: 35, line: 1, column: 36 },
+                kind: Kind::String(b"forky".as_slice().into())
+            },
+        }
+    );
+}
+#[test]
+fn an_empty_members_object_stays_present() {
+    assert_eq!(
+        document(br#"{"members":{}}"#).expect("empty cluster").members,
+        Some(Members { at: Position { offset: 11, line: 1, column: 12 }, each: Box::new([]) })
+    );
+}
+#[test]
+fn a_document_without_members_keeps_them_absent() {
+    assert_eq!(document(b"{}").expect("no members").members, None);
 }

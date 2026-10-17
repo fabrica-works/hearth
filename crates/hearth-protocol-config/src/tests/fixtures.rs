@@ -95,3 +95,14 @@ pub fn past_shipped() -> [Box<[u8]>; 3] {
     longest[1_048_576] = b'}';
     [deepest.into_boxed(), keys.into_boxed(), longest]
 }
+
+pub const STOA: &[u8] = br#"{
+  "core": { "hostname": "stoa" },
+  "stoa": { "port": 7000 },
+  "members": {
+    "1": { "stoa": { "index": 1 } },
+    "2": { "stoa": { "index": 2 } },
+    "3": { "stoa": { "index": 3 } }
+  }
+}
+"#;

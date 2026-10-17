@@ -1,7 +1,7 @@
-//! Configuration layers (format.md, 3.1 to 3.4).
+//! Configuration layers (format.md, 3.1 to 3.6).
 use crate::{
     Error, Fault, Field, Position, Shape,
-    json::{Kind, Value},
+    json::{Entry, Kind, Value},
     names,
 };
 use alloc::boxed::Box;
@@ -10,6 +10,7 @@ use skein_lib::List;
 pub struct Document {
     pub at: Position,
     pub layer: Layer,
+    pub members: Option<Members>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Layer {
@@ -30,32 +31,83 @@ pub fn document(value: Value) -> Result<Document, Error> {
             return Err(Error { at: value.at, fault: Fault::NotObject });
         }
     };
+    let mut members = None;
+    let mut layer = empty_layer();
     let mut tasks = List::with_capacity(u32::try_from(entries.len()).expect("document bounded by u32"));
-    let mut debian = None;
-    let mut placement = None;
     for entry in entries {
-        match &*entry.key {
-            b"debian" => debian = Some(entry.value),
-            b"placement" => placement = Some(read_placement(entry.value)?),
-            b"members" => return Err(Error { at: entry.at, fault: Fault::Shape(Shape::Reserved) }),
-            _ => {
-                if !names::identifier(&entry.key) {
-                    return Err(Error { at: entry.at, fault: Fault::Shape(Shape::Name) });
-                }
-                match &entry.value.kind {
-                    Kind::Map(_) | Kind::Null => {}
-                    Kind::Bool(_) | Kind::Int(_) | Kind::List(_) | Kind::String(_) => {
-                        return Err(Error {
-                            at: entry.value.at,
-                            fault: Fault::Shape(Shape::Settings { task: entry.key }),
-                        });
-                    }
-                }
-                tasks.push(Task { name: entry.key, at: entry.at, value: entry.value }).expect("one task per entry");
-            }
+        if &*entry.key == b"members" {
+            members = Some(read_members(entry.value)?);
+        } else {
+            read_field(entry, &mut layer, &mut tasks)?;
         }
     }
-    Ok(Document { at: value.at, layer: Layer { tasks: tasks.into_boxed(), debian, placement } })
+    layer.tasks = tasks.into_boxed();
+    Ok(Document { at: value.at, layer, members })
+}
+fn empty_layer() -> Layer {
+    Layer { tasks: Box::new([]), debian: None, placement: None }
+}
+fn read_layer(entries: Box<[Entry]>) -> Result<Layer, Error> {
+    let mut layer = empty_layer();
+    let mut tasks = List::with_capacity(u32::try_from(entries.len()).expect("document bounded by u32"));
+    for entry in entries {
+        read_field(entry, &mut layer, &mut tasks)?;
+    }
+    layer.tasks = tasks.into_boxed();
+    Ok(layer)
+}
+fn read_field(entry: Entry, layer: &mut Layer, tasks: &mut List<Task>) -> Result<(), Error> {
+    match &*entry.key {
+        b"debian" => layer.debian = Some(entry.value),
+        b"placement" => layer.placement = Some(read_placement(entry.value)?),
+        b"members" => return Err(shape(entry.at, Shape::Member)),
+        _ => {
+            if !names::identifier(&entry.key) {
+                return Err(shape(entry.at, Shape::Name));
+            }
+            match &entry.value.kind {
+                Kind::Map(_) | Kind::Null => {}
+                Kind::Bool(_) | Kind::Int(_) | Kind::List(_) | Kind::String(_) => {
+                    return Err(shape(entry.value.at, Shape::Settings { task: entry.key }));
+                }
+            }
+            tasks.push(Task { name: entry.key, at: entry.at, value: entry.value }).expect("one task per entry");
+        }
+    }
+    Ok(())
+}
+/// Members in name order, at the map's opening brace (format.md, 3.6).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Members {
+    pub at: Position,
+    pub each: Box<[Member]>,
+}
+/// One member's layer, or a removal, at its name.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Member {
+    pub name: Box<[u8]>,
+    pub at: Position,
+    pub layer: Option<Layer>,
+}
+fn read_members(value: Value) -> Result<Members, Error> {
+    let Kind::Map(entries) = value.kind else {
+        return Err(shape(value.at, Shape::Members));
+    };
+    let mut each = List::with_capacity(u32::try_from(entries.len()).expect("members bounded by u32"));
+    for entry in entries {
+        if !names::member(&entry.key) {
+            return Err(shape(entry.at, Shape::Member));
+        }
+        let layer = match entry.value.kind {
+            Kind::Null => None,
+            Kind::Map(entries) => Some(read_layer(entries)?),
+            Kind::Bool(_) | Kind::Int(_) | Kind::List(_) | Kind::String(_) => {
+                return Err(shape(entry.value.at, Shape::Members));
+            }
+        };
+        each.push(Member { name: entry.key, at: entry.at, layer }).expect("one member per entry");
+    }
+    Ok(Members { at: value.at, each: each.into_boxed() })
 }
 
 /// A whole placement, replaced by a later layer (format.md, 3.4).

@@ -123,3 +123,32 @@ fn the_placed_examples_decode_to_their_placements_cut_anywhere() {
         }
     }
 }
+
+const DOCUMENTS: &[(&str, &[&[u8]])] = &[
+    ("ion-prod", &[]),
+    ("chat-prod", &[]),
+    ("stoa", &[b"1", b"2", b"3"]),
+    ("fleet", &[]),
+    ("x1", &[]),
+    ("x1-prod", &[]),
+    ("mail", &[]),
+    ("mail-lab", &[]),
+    ("carbon-lab", &[]),
+];
+#[test]
+fn every_example_decodes_as_a_document_cut_anywhere() {
+    for &(name, expected) in DOCUMENTS {
+        let example = examples::all().iter().find(|example| example.name == name).expect("document example");
+        for seed in 0..8 {
+            let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
+            let run = world::check(example.bytes, &settings, seed);
+            let document = document::document(run.value.expect("decoded")).expect("document");
+            let names: Vec<&[u8]> = document
+                .members
+                .as_ref()
+                .map(|members| members.each.iter().map(|member| member.name.as_ref()).collect())
+                .unwrap_or_default();
+            assert_eq!(names.as_slice(), expected, "{name}, seed {seed}");
+        }
+    }
+}

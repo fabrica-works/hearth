@@ -23,8 +23,9 @@ pub enum Fault {
 pub enum Shape {
     Name,
     Settings { task: Box<[u8]> },
-    Reserved,
     Placement,
+    Members,
+    Member,
     Unknown { field: Box<[u8]> },
     Wrong { field: Field },
     Missing { field: Field },
