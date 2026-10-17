@@ -121,3 +121,187 @@ fn writing_a_cache_file_past_a_limit_is_refused() {
     record.origin = Origin::Rendered { path: bytes::zeroed(4_097) };
     assert_eq!(cache_file::write(&record, &SHIPPED), Err(Refused::Limit(b"path")), "writer checks its path limit");
 }
+
+use super::fixtures::{a_resolution, resolution_items};
+use crate::{
+    limits::{Limits, ResolutionLimits},
+    resolution,
+};
+
+const SMALL: Limits = Limits { resolution: ResolutionLimits { packages: 4, ..SHIPPED.resolution }, ..SHIPPED };
+
+#[test]
+fn a_resolution_reads_back_as_it_was_written_inputs_included() {
+    let record = a_resolution(2);
+    let framed = resolution::write(&record, &SHIPPED).expect("bounded record");
+    assert_eq!(resolution::read(&framed, &SHIPPED), Ok(record), "the key's inputs return item for item");
+}
+
+const PACKAGE_LIMIT: &[(&[u8], u32, Unreadable)] = &[(b"closure", 5, Unreadable::Limit(b"closure"))];
+#[test]
+fn a_closure_past_its_package_limit_is_unreadable() {
+    for (name, packages, expected) in PACKAGE_LIMIT {
+        let record = a_resolution(*packages);
+        assert_eq!(
+            resolution::read(&frame_of(Kind::Resolution, &resolution_items(&record)), &SMALL),
+            Err(*expected),
+            "{name:?}"
+        );
+    }
+}
+const WRITE_PACKAGE_LIMIT: &[(u32, Refused)] = &[(5, Refused::Limit(b"closure"))];
+#[test]
+fn writing_a_closure_past_its_package_limit_is_refused() {
+    for (packages, expected) in WRITE_PACKAGE_LIMIT {
+        assert_eq!(resolution::write(&a_resolution(*packages), &SMALL), Err(*expected), "closure of {packages}");
+    }
+}
+
+type ClosureOrder = (&'static [u8], &'static [u8], &'static [u8], &'static [u8], Unreadable);
+const CLOSURE_ORDER: &[ClosureOrder] = &[
+    (b"b", b"amd64", b"a", b"amd64", Unreadable::Order(b"closure")),
+    (b"a", b"arm64", b"a", b"amd64", Unreadable::Order(b"closure")),
+    (b"a", b"amd64", b"a", b"amd64", Unreadable::Order(b"closure")),
+];
+#[test]
+fn a_closure_out_of_name_then_architecture_order_is_unreadable() {
+    for (first, architecture, second, next_architecture, expected) in CLOSURE_ORDER {
+        let mut record = a_resolution(2);
+        let first_package = record.closure.get_mut(0).expect("first");
+        first_package.name = bytes::copy_of(first);
+        first_package.architecture = bytes::copy_of(architecture);
+        let second_package = record.closure.get_mut(1).expect("second");
+        second_package.name = bytes::copy_of(second);
+        second_package.architecture = bytes::copy_of(next_architecture);
+        let framed = frame_of(Kind::Resolution, &resolution_items(&record));
+        assert_eq!(
+            resolution::read(&framed, &SHIPPED),
+            Err(*expected),
+            "{first:?}/{architecture:?} then {second:?}/{next_architecture:?}"
+        );
+    }
+}
+
+const BAD_SOURCE: &[(u32, Unreadable)] = &[(1, Unreadable::Limit(b"source")), (u32::MAX, Unreadable::Limit(b"source"))];
+#[test]
+fn a_package_whose_source_names_no_line_is_unreadable() {
+    for (source, expected) in BAD_SOURCE {
+        let mut record = a_resolution(2);
+        record.closure.get_mut(0).expect("first").source = *source;
+        assert_eq!(
+            resolution::read(&frame_of(Kind::Resolution, &resolution_items(&record)), &SHIPPED),
+            Err(*expected),
+            "source {source}"
+        );
+    }
+}
+
+const FIELD_LIMITS: &[(&[u8], Unreadable, Refused)] = &[
+    (b"sources", Unreadable::Limit(b"sources"), Refused::Limit(b"sources")),
+    (b"indices", Unreadable::Limit(b"indices"), Refused::Limit(b"indices")),
+    (b"path", Unreadable::Limit(b"path"), Refused::Limit(b"path")),
+    (b"filename", Unreadable::Limit(b"filename"), Refused::Limit(b"filename")),
+    (b"uri", Unreadable::Limit(b"uri"), Refused::Limit(b"uri")),
+    (b"name", Unreadable::Limit(b"name"), Refused::Limit(b"name")),
+    (b"version", Unreadable::Limit(b"version"), Refused::Limit(b"version")),
+    (b"architecture", Unreadable::Limit(b"architecture"), Refused::Limit(b"architecture")),
+    (b"suite", Unreadable::Limit(b"suite"), Refused::Limit(b"suite")),
+    (b"component", Unreadable::Limit(b"component"), Refused::Limit(b"component")),
+];
+#[test]
+fn a_resolution_field_one_past_its_limit_is_unreadable() {
+    for (field, expected, _) in FIELD_LIMITS {
+        let mut record = a_resolution(2);
+        super::fixtures::past_limit(&mut record, field);
+        assert_eq!(
+            resolution::read(&frame_of(Kind::Resolution, &resolution_items(&record)), &SHIPPED),
+            Err(*expected),
+            "field {field:?}"
+        );
+    }
+}
+#[test]
+fn writing_a_resolution_field_one_past_its_limit_is_refused() {
+    for (field, _, expected) in FIELD_LIMITS {
+        let mut record = a_resolution(2);
+        super::fixtures::past_limit(&mut record, field);
+        assert_eq!(resolution::write(&record, &SHIPPED), Err(*expected), "field {field:?}");
+    }
+}
+
+const REQUEST_ORDER: &[(&[u8], &[u8], Unreadable)] =
+    &[(b"b", b"a", Unreadable::Order(b"request")), (b"a", b"a", Unreadable::Order(b"request"))];
+#[test]
+fn a_request_that_is_not_a_set_is_unreadable() {
+    for (first, second, expected) in REQUEST_ORDER {
+        let mut record = a_resolution(2);
+        record.inputs.request = Box::from([Item::List(2), text(first), text(second)]);
+        assert_eq!(
+            resolution::read(&frame_of(Kind::Resolution, &resolution_items(&record)), &SHIPPED),
+            Err(*expected),
+            "request {first:?}, {second:?}"
+        );
+    }
+}
+const WRONG_INPUT: &[(&[u8], Unreadable)] = &[(b"variant", Unreadable::Shape(b"variant"))];
+#[test]
+fn an_input_of_another_kind_than_its_own_is_unreadable() {
+    for (name, expected) in WRONG_INPUT {
+        let mut record = a_resolution(2);
+        record.inputs.variant = Box::from([Item::Uint(1)]);
+        assert_eq!(
+            resolution::read(&frame_of(Kind::Resolution, &resolution_items(&record)), &SHIPPED),
+            Err(*expected),
+            "input {name:?}"
+        );
+    }
+}
+const RESOLUTION_HEADER: &str = "6865617274680072 0004 0001 00000000";
+#[test]
+fn a_resolution_frame_starts_with_kind_4s_header() {
+    let framed = resolution::write(&a_resolution(2), &SHIPPED).expect("bounded record");
+    assert_eq!(framed.get(..16).expect("header"), hex(RESOLUTION_HEADER).as_ref(), "kind 4 version 1");
+    let mut reader = skein_lib::Reader::new(framed.get(16..).expect("length and body"));
+    let length = reader.u64().expect("body length");
+    assert_eq!(length, u64::from(reader.remaining()), "the length names the bytes after the header");
+}
+
+const WRITE_BOUNDS: &[(Kind, u32, u32, Refused)] = &[
+    (Kind::Store, 0, 64, Refused::Limit(b"depth")),
+    (Kind::Store, 8, 5, Refused::Limit(b"key")),
+    (Kind::CacheFile, 1, 64, Refused::Limit(b"depth")),
+    (Kind::CacheFile, 8, 5, Refused::Limit(b"key")),
+    (Kind::Resolution, 4, 64, Refused::Limit(b"depth")),
+    (Kind::Resolution, 8, 9, Refused::Limit(b"key")),
+];
+#[test]
+fn writing_a_record_past_the_decoders_bounds_is_refused() {
+    for (kind, depth, key, expected) in WRITE_BOUNDS {
+        let limits = Limits { depth: *depth, key: *key, ..SHIPPED };
+        let result = match kind {
+            Kind::Store => {
+                store::write(&Store { layout: 1, made: Wall::from_nanos(42), range: None, uid: 1000 }, &limits)
+            }
+            Kind::CacheFile => cache_file::write(&a_cache_file(), &limits),
+            Kind::Resolution => resolution::write(&a_resolution(2), &limits),
+        };
+        assert_eq!(result, Err(*expected), "{kind:?}, depth {depth}, key {key}");
+    }
+}
+const BAD_INPUTS: &[(&[Item], Refused)] = &[
+    (&[Item::Map(1)], Refused::Limit(b"apt")),
+    (&[Item::Map(1), Item::Uint(1), Item::None], Refused::Limit(b"apt")),
+    (&[Item::Map(0), Item::Uint(1)], Refused::Limit(b"apt")),
+];
+#[test]
+fn writing_an_input_that_is_not_one_value_is_refused() {
+    for (items, expected) in BAD_INPUTS {
+        let mut record = a_resolution(2);
+        let mut apt = skein_lib::List::with_capacity(3);
+        for item in *items {
+            apt.push(item.clone()).expect("fixture room");
+        }
+        record.inputs.apt = apt.into_boxed();
+        assert_eq!(resolution::write(&record, &SHIPPED), Err(*expected), "items {items:?}");
+    }
+}

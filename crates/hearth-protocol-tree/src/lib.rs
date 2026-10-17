@@ -8,6 +8,7 @@ pub mod decode;
 mod fields;
 pub mod frame;
 pub mod limits;
+pub mod resolution;
 pub mod store;
 
 #[cfg(test)]

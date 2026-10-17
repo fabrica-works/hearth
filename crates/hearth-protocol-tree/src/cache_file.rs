@@ -56,7 +56,7 @@ fn read_origin(fields: &mut Fields<'_>, limits: &Limits) -> Result<Origin, Unrea
     if fields.key()?.as_ref() != b"kind" {
         return Err(Unreadable::Unknown);
     }
-    let kind = fields.bytes(b"origin", limits.key)?;
+    let kind = fields.bytes(b"origin", u32::MAX)?;
     let (key, name, limit) = match kind.as_ref() {
         b"fetch" => (b"uri".as_slice(), b"uri".as_slice(), limits.cache_file.path),
         b"index" => (b"resolution".as_slice(), b"resolution".as_slice(), 0),
@@ -83,6 +83,16 @@ fn read_origin(fields: &mut Fields<'_>, limits: &Limits) -> Result<Origin, Unrea
     Ok(origin)
 }
 pub fn write(record: &CacheFile, limits: &Limits) -> Result<Box<[u8]>, Refused> {
+    if limits.depth < 2 {
+        return Err(Refused::Limit(b"depth"));
+    }
+    let key = match &record.origin {
+        Origin::Index { .. } => 10,
+        Origin::Fetch { .. } | Origin::Blob { .. } | Origin::Rendered { .. } => 6,
+    };
+    if limits.key < key {
+        return Err(Refused::Limit(b"key"));
+    }
     let (value, limit, name) = match &record.origin {
         Origin::Fetch { uri } => (uri.as_ref(), limits.cache_file.path, b"uri".as_slice()),
         Origin::Index { .. } => (b"".as_slice(), 0, b"resolution".as_slice()),

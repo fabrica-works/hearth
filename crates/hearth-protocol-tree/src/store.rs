@@ -56,6 +56,12 @@ fn read_range(fields: &mut Fields<'_>) -> Result<Range, Unreadable> {
     Ok(Range { base: base.ok_or(Unreadable::Missing(b"base"))?, count: count.ok_or(Unreadable::Missing(b"count"))? })
 }
 pub fn write(record: &Store, limits: &Limits) -> Result<Box<[u8]>, Refused> {
+    if limits.key < 6 {
+        return Err(Refused::Limit(b"key"));
+    }
+    if limits.depth < if record.range.is_some() { 2 } else { 1 } {
+        return Err(Refused::Limit(b"depth"));
+    }
     let mut measure = Encoder::measuring();
     encode(record, &mut measure);
     let mut writer = Encoder::writing(measure.measured());
