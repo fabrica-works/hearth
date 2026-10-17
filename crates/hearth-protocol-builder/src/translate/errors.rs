@@ -38,6 +38,7 @@ pub fn fault(
         config::Fault::Keys => target::Decode::Keys,
         config::Fault::Note => target::Decode::Note,
         config::Fault::Shape(shape) => match shape {
+            config::Shape::ListNull => target::Decode::ListNull,
             config::Shape::Name => target::Decode::Name,
             config::Shape::Placement => target::Decode::Placement,
             config::Shape::Members => target::Decode::Members,
@@ -100,6 +101,7 @@ pub fn decode(fault: target::Decode) -> records::errors::Decode {
         target::Decode::Nul => records::errors::Decode::Nul,
         target::Decode::Keys => records::errors::Decode::Keys,
         target::Decode::Note => records::errors::Decode::Note,
+        target::Decode::ListNull => records::errors::Decode::ListNull,
         target::Decode::Name => records::errors::Decode::Name,
         target::Decode::Placement => records::errors::Decode::Placement,
         target::Decode::Members => records::errors::Decode::Members,

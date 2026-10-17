@@ -71,6 +71,7 @@ pub enum Required {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Shape {
+    ListNull,
     Name,
     Settings { task: Box<[u8]> },
     Placement,

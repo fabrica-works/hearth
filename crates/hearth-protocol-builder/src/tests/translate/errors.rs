@@ -20,6 +20,7 @@ fn decode_back(fault: record_errors::Decode) -> render_errors::Decode {
         record_errors::Decode::Nul => render_errors::Decode::Nul,
         record_errors::Decode::Keys => render_errors::Decode::Keys,
         record_errors::Decode::Note => render_errors::Decode::Note,
+        record_errors::Decode::ListNull => render_errors::Decode::ListNull,
         record_errors::Decode::Name => render_errors::Decode::Name,
         record_errors::Decode::Placement => render_errors::Decode::Placement,
         record_errors::Decode::Members => render_errors::Decode::Members,
@@ -109,6 +110,11 @@ const CONFIG_FAULTS: &[(crate::config::Fault, render_errors::Decode, record_erro
         render_errors::Decode::Truncated,
         record_errors::Decode::Truncated,
     ),
+    (
+        crate::config::Fault::Shape(crate::config::Shape::ListNull),
+        render_errors::Decode::ListNull,
+        record_errors::Decode::ListNull,
+    ),
     (crate::config::Fault::NotObject, render_errors::Decode::NotObject, record_errors::Decode::NotObject),
     (crate::config::Fault::NotInteger, render_errors::Decode::NotInteger, record_errors::Decode::NotInteger),
     (crate::config::Fault::Range, render_errors::Decode::Range, record_errors::Decode::Range),
@@ -139,13 +145,15 @@ const CONFIG_FAULTS: &[(crate::config::Fault, render_errors::Decode, record_erro
 ];
 #[test]
 fn each_config_fault_translates_to_its_decode_and_back() {
-    for (fault, decoded, record) in CONFIG_FAULTS {
+    for (row, (fault, input, expected)) in CONFIG_FAULTS.iter().enumerate() {
         assert_eq!(
             crate::translate::errors::fault(fault.clone(), &crate::config::limits::SHIPPED),
-            Some((decoded.clone(), None))
+            Some((input.clone(), None))
         );
-        assert_eq!(crate::translate::errors::decode(decoded.clone()), *record);
-        assert_eq!(decode_back(record.clone()), *decoded);
+        let record = crate::translate::errors::decode(input.clone());
+        assert_eq!(record, *expected, "row {row}: record");
+        let back = decode_back(record);
+        assert_eq!(back, *input, "row {row}: decode");
     }
 }
 const DECODE_FIELDS: &[(crate::config::Field, render_errors::Field, record_errors::Field)] = &[
@@ -157,16 +165,18 @@ const DECODE_FIELDS: &[(crate::config::Field, render_errors::Field, record_error
 ];
 #[test]
 fn shape_field_faults_translate_each_field_and_back() {
-    for (source, field, record) in DECODE_FIELDS {
+    for (row, (source, input, expected)) in DECODE_FIELDS.iter().enumerate() {
         assert_eq!(
             crate::translate::errors::fault(
                 crate::config::Fault::Shape(crate::config::Shape::Wrong { field: *source }),
                 &crate::config::limits::SHIPPED
             ),
-            Some((render_errors::Decode::Wrong { field: *field }, None))
+            Some((render_errors::Decode::Wrong { field: *input }, None))
         );
-        assert_eq!(crate::translate::errors::field(*field), *record);
-        assert_eq!(decode_field_back(*record), *field);
+        let record = crate::translate::errors::field(*input);
+        assert_eq!(record, *expected, "row {row}: record");
+        let back = decode_field_back(record);
+        assert_eq!(back, *input, "row {row}: field");
     }
 }
 #[test]
@@ -203,16 +213,18 @@ const SHAPE_FAULTS: &[(crate::config::Shape, render_errors::Decode, record_error
 ];
 #[test]
 fn each_shape_field_fault_translates_its_kind_and_back() {
-    for (shape, decoded, record) in SHAPE_FAULTS {
+    for (row, (shape, input, expected)) in SHAPE_FAULTS.iter().enumerate() {
         assert_eq!(
             crate::translate::errors::fault(
                 crate::config::Fault::Shape(shape.clone()),
                 &crate::config::limits::SHIPPED
             ),
-            Some((decoded.clone(), None))
+            Some((input.clone(), None))
         );
-        assert_eq!(crate::translate::errors::decode(decoded.clone()), *record);
-        assert_eq!(decode_back(record.clone()), *decoded);
+        let record = crate::translate::errors::decode(input.clone());
+        assert_eq!(record, *expected, "row {row}: record");
+        let back = decode_back(record);
+        assert_eq!(back, *input, "row {row}: decode");
     }
 }
 const DECODE_LIMITS: &[(render_errors::Limit, record_errors::Limit)] = &[
@@ -222,9 +234,11 @@ const DECODE_LIMITS: &[(render_errors::Limit, record_errors::Limit)] = &[
 ];
 #[test]
 fn each_decode_limit_translates_and_back() {
-    for (source, record) in DECODE_LIMITS {
-        assert_eq!(crate::translate::errors::limit(*source), *record);
-        assert_eq!(decode_limit_back(*record), *source);
+    for (row, (input, expected)) in DECODE_LIMITS.iter().enumerate() {
+        let record = crate::translate::errors::limit(*input);
+        assert_eq!(record, *expected, "row {row}: record");
+        let back = decode_limit_back(record);
+        assert_eq!(back, *input, "row {row}: limit");
     }
 }
 #[test]

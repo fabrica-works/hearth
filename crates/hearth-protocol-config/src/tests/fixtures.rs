@@ -145,3 +145,9 @@ pub fn settings(count: u32) -> Box<[u8]> {
     }
     input.into_boxed()
 }
+
+#[must_use]
+pub fn only<T>(items: &[T]) -> &T {
+    let [item] = items else { panic!("one item") };
+    item
+}

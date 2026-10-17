@@ -1,4 +1,4 @@
-use super::fixtures::{STOA, document};
+use super::fixtures::{STOA, document, only};
 use crate::{
     Fault, Field, Position, Shape,
     document::{Firmware, Members, On, Placement, Runs},
@@ -14,8 +14,10 @@ fn a_task_value_is_its_settings_object_or_null() {
     assert_eq!(doc.layer.tasks.len(), TASKS.len());
     for (task, expected) in doc.layer.tasks.iter().zip(TASKS) {
         assert_eq!((&*task.name, task.at, task.value.at), *expected);
+        if task.name.as_ref() == b"wifi" {
+            assert_eq!(task.value, Value { at: Position { offset: 52, line: 1, column: 53 }, kind: Kind::Null });
+        }
     }
-    assert_eq!(doc.layer.tasks[1].value, Value { at: Position { offset: 52, line: 1, column: 53 }, kind: Kind::Null });
 }
 #[test]
 fn debian_is_kept_as_written_with_its_positions() {
@@ -24,10 +26,11 @@ fn debian_is_kept_as_written_with_its_positions() {
     let Kind::Map(entries) = value.kind else {
         panic!("object kept");
     };
-    assert_eq!(entries[0].key.as_ref(), b"suite");
-    assert_eq!(entries[0].at, Position { offset: 11, line: 1, column: 12 });
+    let entry = only(&entries);
+    assert_eq!(entry.key.as_ref(), b"suite");
+    assert_eq!(entry.at, Position { offset: 11, line: 1, column: 12 });
     assert_eq!(
-        entries[0].value,
+        entry.value,
         Value { at: Position { offset: 19, line: 1, column: 20 }, kind: Kind::String(b"forky".as_slice().into()) }
     );
 }
@@ -267,9 +270,9 @@ fn a_base_s_members_decode_in_name_order_each_a_layer() {
     assert_eq!(members.each.len(), 3);
     for (member, expected) in members.each.iter().zip(MEMBERS) {
         let layer = member.layer.as_ref().expect("a layer");
-        let [task] = &*layer.tasks else { panic!("one task") };
+        let task = only(&layer.tasks);
         let Kind::Map(settings) = &task.value.kind else { panic!("settings") };
-        let [index] = &**settings else { panic!("one setting") };
+        let index = only(settings);
         let Kind::Int(number) = index.value.kind else { panic!("integer") };
         assert_eq!(task.name.as_ref(), b"stoa");
         assert_eq!(index.key.as_ref(), b"index");
@@ -287,7 +290,7 @@ fn a_member_set_to_null_is_removed() {
     ];
     for &(input, expected) in CASES {
         let members = document(input).expect("members").members.expect("present");
-        let [member] = &*members.each else { panic!("one removal") };
+        let member = only(&members.each);
         assert_eq!(member.name.as_ref(), expected, "{input:?}");
         assert_eq!(member.at, Position { offset: 12, line: 1, column: 13 });
         assert_eq!(member.layer, None, "{input:?}");
@@ -353,7 +356,7 @@ fn a_member_s_layer_holds_its_placement() {
         .expect("members")
         .members
         .expect("present");
-    let [member] = &*members.each else { panic!("one member") };
+    let member = only(&members.each);
     assert_eq!(
         member.layer.as_ref().expect("layer").placement,
         Some(Placement {
@@ -370,11 +373,11 @@ fn a_member_s_layer_holds_its_placement() {
 fn a_member_s_layer_holds_its_debian() {
     let members =
         document(br#"{"members":{"1":{"debian":{"suite":"forky"}}}}"#).expect("members").members.expect("present");
-    let [member] = &*members.each else { panic!("one member") };
+    let member = only(&members.each);
     let value = member.layer.as_ref().expect("layer").debian.as_ref().expect("debian");
     assert_eq!(value.at, Position { offset: 26, line: 1, column: 27 });
     let Kind::Map(entries) = &value.kind else { panic!("debian object") };
-    let [entry] = &**entries else { panic!("suite") };
+    let entry = only(entries);
     assert_eq!(
         entry,
         &Entry {
@@ -397,4 +400,17 @@ fn an_empty_members_object_stays_present() {
 #[test]
 fn a_document_without_members_keeps_them_absent() {
     assert_eq!(document(b"{}").expect("no members").members, None);
+}
+
+const LIST_NULLS: &[(&[u8], Position)] = &[
+    (br#"{"z":{"value":[1, null]},"a":{"value":[null]}}"#, Position { offset: 18, line: 1, column: 19 }),
+    (br#"{"z":{"value":[{"a": null}]},"a":{"value":[null]}}"#, Position { offset: 21, line: 1, column: 22 }),
+];
+#[test]
+fn a_null_inside_a_list_is_refused_at_the_null() {
+    for (row, (input, at)) in LIST_NULLS.iter().enumerate() {
+        let error = document(input).expect_err("null below a list");
+        assert_eq!(error.at, *at, "row {row}: {input:?}");
+        assert_eq!(error.fault, Fault::Shape(Shape::ListNull), "row {row}: {input:?}");
+    }
 }

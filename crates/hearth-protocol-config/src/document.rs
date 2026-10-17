@@ -31,6 +31,7 @@ pub fn document(value: Value) -> Result<Document, Error> {
             return Err(Error { at: value.at, fault: Fault::NotObject });
         }
     };
+    refuse_list_null(&entries)?;
     let mut members = None;
     let mut layer = empty_layer();
     let mut tasks = List::with_capacity(u32::try_from(entries.len()).expect("document bounded by u32"));
@@ -43,6 +44,64 @@ pub fn document(value: Value) -> Result<Document, Error> {
     }
     layer.tasks = tasks.into_boxed();
     Ok(Document { at: value.at, layer, members })
+}
+#[derive(Clone, Debug)]
+enum Unread<'a> {
+    List(core::slice::Iter<'a, Value>),
+    Map(core::slice::Iter<'a, Entry>, bool),
+}
+fn refuse_list_null(entries: &[Entry]) -> Result<(), Error> {
+    let mut pending = List::with_capacity(1);
+    pending.push(Unread::Map(entries.iter(), false)).expect("root fits");
+    let mut first: Option<Position> = None;
+    // Each iteration reads a node or closes its container; decoder limits bound both.
+    while !pending.is_empty() {
+        let index = pending.len().checked_sub(1).expect("nonempty stack");
+        let (value, inside) = match pending.get_mut(index).expect("top frame") {
+            Unread::List(values) => {
+                let Some(value) = values.next() else {
+                    pending.truncate(index);
+                    continue;
+                };
+                (value, true)
+            }
+            Unread::Map(entries, inside) => {
+                let Some(entry) = entries.next() else {
+                    pending.truncate(index);
+                    continue;
+                };
+                (&entry.value, *inside)
+            }
+        };
+        let unread = match &value.kind {
+            Kind::Null => {
+                let earlier = match first {
+                    Some(at) => value.at.offset < at.offset,
+                    None => true,
+                };
+                if inside && earlier {
+                    first = Some(value.at);
+                }
+                continue;
+            }
+            Kind::List(values) => Unread::List(values.iter()),
+            Kind::Map(entries) => Unread::Map(entries.iter(), inside),
+            Kind::Bool(_) | Kind::Int(_) | Kind::String(_) => continue,
+        };
+        if pending.room() == 0 {
+            let capacity = pending.capacity().saturating_mul(2);
+            let old = core::mem::replace(&mut pending, List::with_capacity(capacity));
+            for frame in old.into_boxed() {
+                pending.push(frame).expect("doubled stack capacity");
+            }
+        }
+        pending.push(unread).expect("stack room reserved");
+    }
+    // Maps are held in name order, so retain the earliest source position.
+    match first {
+        Some(at) => Err(shape(at, Shape::ListNull)),
+        None => Ok(()),
+    }
 }
 fn empty_layer() -> Layer {
     Layer { tasks: Box::new([]), debian: None, placement: None }

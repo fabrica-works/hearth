@@ -23,6 +23,7 @@ pub enum Kind {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Decode {
+    ListNull,
     Unexpected,
     Trailing,
     TooDeep,

@@ -132,6 +132,7 @@ impl Place {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Decode {
+    ListNull,
     Unexpected,
     Trailing,
     TooDeep,
@@ -196,6 +197,7 @@ impl Decode {
             Self::Nul => lines.put(b"U+0000 is not allowed"),
             Self::Keys => lines.put(b"too many object keys"),
             Self::Note => lines.put(b"_note must be a string"),
+            Self::ListNull => lines.put(b"null inside a list"),
             Self::Name => lines.put(b"invalid task name"),
             Self::Placement => lines.put(b"placement must be an object"),
             Self::Members => lines.put(b"members must be an object or null"),
@@ -255,6 +257,7 @@ impl Decode {
             Self::Nul => json.string(b"nul"),
             Self::Keys => json.string(b"keys"),
             Self::Note => json.string(b"note"),
+            Self::ListNull => json.string(b"list_null"),
             Self::Name => json.string(b"name"),
             Self::Placement => json.string(b"placement"),
             Self::Members => json.string(b"members"),
