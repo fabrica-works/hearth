@@ -504,6 +504,48 @@ None yet.
      6. Done when 1 names at least 74 tests (hearth 26's 39 in hearth-fake-machine, ruling 123; hearth 27's 27; this session's 8).
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+128. **A guard's name is an identifier** (design answer, hearth-04.1's ready check of 17:26).
+     The designer's answer, hearth 180c4a5 ("Name a guard as an identifier"), decides it; ruling 124's interim ends:
+
+
+     A guard's name is an identifier. format.md 2.4's table gains the row:
+
+     > | guard (5.9) | `[a-z]`, then `[a-z0-9_]` | printed in its error, never in an expression |
+
+     and 2.4 gains the bullet:
+
+     > **A guard's name has their form,** though no expression reads it: a
+     > false guard prints it in its error, `boot: requires modules: no
+     > initramfs modules for this hardware` (render.md, 7.3), and a key of any
+     > bytes, a `: ` or a line feed in it, would break that line. A name out
+     > of form is a decode error at its key.
+
+     5.9 now reads: "**`requires`** is a map of guards, each named as 2.4
+     says and with `if` and `message`."
+
+     For hearth 04.1 (04-declarations.md, as landed):
+     - The Shape says: "`requires`: guards, each named by an identifier
+       (`names::identifier`, else `Name` at its key, before its value) and an
+       object of `if` and `message`, strings, both required." So `"Kernel": 5`
+       gives `Declared::Name` at the key, not `Wrong` at the value.
+     - The tests gain `a_guard_named_out_of_form_is_refused_at_its_key`, with
+       the rows `Kernel`, `no-kernel` and `""`. `names::identifier`, on main
+       in `crates/hearth-protocol-config/src/names.rs`, returns false for each.
+     - The `Guard` sketch's comment reads "its name, an identifier (2.4), at
+       its key". `Declared::Name` stands as sketched: "a name out of its form
+       (2.4), or a script 5.8 does not name, at it".
+
+     This replaces ruling 124's interim ("04.1 decodes a guard's name as a
+     `Text` at its key and checks no form, no test asserts one"): 04.1 checks
+     the form and its test asserts it.
+
+     What stays unchanged:
+     - 16-entries.md: its guards `ssh`, `web` and `greeting` are identifiers.
+     - hearth 40's `Guard { name: Box<[u8]>, message }`.
+     - render.md 7.2's decode row ("a declaration not of its shape").
+
+     Nothing is deferred, so `later.md` gains no row.
+
 ## For the user
 
 The long-term choices the user may veto:
