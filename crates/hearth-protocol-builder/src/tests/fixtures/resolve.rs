@@ -227,3 +227,78 @@ pub fn causes() -> [hearth_protocol_mmdebstrap::tail::Cause; 8] {
 }
 
 pub const CLOSURE_LIMIT: u32 = 8_192;
+
+pub struct ResolvedRun {
+    pub events: List<builder::vocabulary::Event>,
+    pub trace: List<&'static str>,
+}
+impl Layer {
+    pub fn resolve_with_indices(&mut self) -> ResolvedRun {
+        let mut run = ResolvedRun { events: List::with_capacity(8), trace: List::with_capacity(8) };
+        let mut content = b"".as_slice();
+        for _ in 0_u32..4096 {
+            if let Some(event) = self.told() {
+                if let builder::vocabulary::Event::Render(render::vocabulary::Event::Resolved { .. }) = &event {
+                    run.trace.push("resolved").expect("trace");
+                }
+                run.events.push(event).expect("events");
+                continue;
+            }
+            let Some(request) = self.asked() else {
+                if self.protocol.resolving.is_none() && self.above.is_empty() {
+                    return run;
+                }
+                continue;
+            };
+            match request {
+                Asked::File(file::Request::OpenDirectory { owner, name, .. }) => {
+                    let lists = name.ends_with(hearth_protocol_mmdebstrap::lists::LISTS);
+                    run.trace.push(if lists { "lists" } else { "scratch" }).expect("trace");
+                    self.file_up(file::Event::Opened {
+                        owner,
+                        file: if lists { super::INDEX_DIRECTORY } else { Token::new(88) },
+                        len: 0,
+                    });
+                }
+                Asked::File(file::Request::ListPage { owner, directory, .. }) => {
+                    let entries: Box<[file::Entry]> = if directory == super::INDEX_DIRECTORY {
+                        super::index_entries(super::RESOLVE_INDEX_NAMES)
+                    } else {
+                        Box::new([])
+                    };
+                    self.file_up(file::Event::Listed { owner, entries });
+                }
+                Asked::File(file::Request::OpenReadNoFollow { owner, name, .. }) => {
+                    content = if name.ends_with(b"_InRelease") {
+                        run.trace.push("InRelease").expect("trace");
+                        b"abc"
+                    } else {
+                        run.trace.push("Packages").expect("trace");
+                        super::INDEX_PACKAGES
+                    };
+                    self.file_up(file::Event::Opened {
+                        owner,
+                        file: super::INDEX_FILE,
+                        len: u64::try_from(content.len()).expect("fixture content"),
+                    });
+                }
+                Asked::File(file::Request::ReadAt { owner, offset, max, .. }) => {
+                    let start = usize::try_from(offset).expect("fixture offset");
+                    let end = start.saturating_add(usize::try_from(max).expect("read bound")).min(content.len());
+                    self.file_up(file::Event::Read {
+                        owner,
+                        bytes: bytes::copy_of(content.get(start..end).expect("read range")),
+                    });
+                }
+                Asked::File(request) => self.resolve_file(request),
+                Asked::Io(io::Request::Close { entity }) => {
+                    let owner = if entity == Token::new(200) { self.owner.expect("owner") } else { entity };
+                    self.up(io::Event::Closed { owner });
+                }
+                Asked::Io(io::Request::Stream { .. }) => {}
+                Asked::Io(_) | Asked::Beneath(_) => panic!("resolve index operations"),
+            }
+        }
+        panic!("bounded resolution with indices settles");
+    }
+}

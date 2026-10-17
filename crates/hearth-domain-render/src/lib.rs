@@ -79,9 +79,13 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             assert_eq!(request, Token::new(1), "listing token");
             render.call.as_mut().expect("active call").side.fail(Outcome::Usage);
         }
-        Event::Inst { request, inst: _ } => {
+        Event::Inst { request, inst } => {
             assert_eq!(request, Token::new(6), "resolve token");
-            render.call.as_mut().expect("active call").side.finding.inst();
+            render.call.as_mut().expect("active call").side.finding.inst(inst);
+        }
+        Event::Stanza { request, line, stanza } => {
+            assert_eq!(request, Token::new(6), "resolve token");
+            render.call.as_mut().expect("active call").side.finding.stanza(line, stanza);
         }
         Event::Resolved { request, lines: _, tools: _, costs: _ } => {
             assert_eq!(request, Token::new(6), "resolve token");

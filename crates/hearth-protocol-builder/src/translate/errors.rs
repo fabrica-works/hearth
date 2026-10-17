@@ -662,6 +662,13 @@ pub fn resolution(fault: target::Resolution) -> records::errors::Resolution {
         target::Resolution::Unknown { package } => Resolution::Unknown { package },
         target::Resolution::Unsatisfiable { package } => Resolution::Unsatisfiable { package },
         target::Resolution::Absent { uri, suite } => Resolution::Absent { uri, suite },
+        target::Resolution::Missing { package } => Resolution::Missing { package },
+        target::Resolution::Unmatched { name, version, architecture } => {
+            Resolution::Unmatched { name, version, architecture }
+        }
+        target::Resolution::Disagree { name, version, architecture } => {
+            Resolution::Disagree { name, version, architecture }
+        }
         target::Resolution::TooMany { max } => Resolution::TooMany { max },
     }
 }

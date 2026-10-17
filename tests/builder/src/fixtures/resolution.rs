@@ -144,3 +144,16 @@ pub fn resolve(repository: &Repository, targets: &[&[u8]], form: Form, proxy: &[
     )
     .rendered
 }
+
+#[must_use]
+pub fn unknown_package_repository() -> Repository {
+    let repository = Repository::make("unknown-package", TEST_REPOSITORY);
+    drop(repository.next(
+        &[
+            File { path: "tasks/absent/task.json", body: br#"{"packages":{"hearth-absent":{}}}"#, mode: 0o644 },
+            File { path: "hosts/test/test-min.json", body: br#"{"absent":{}}"#, mode: 0o644 },
+        ],
+        &[],
+    ));
+    repository
+}

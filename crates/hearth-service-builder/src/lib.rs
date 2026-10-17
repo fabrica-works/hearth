@@ -84,7 +84,8 @@ impl Service {
             file_submissions: Queue::with_capacity(limits.queue),
             io_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.io },
             protocol: Protocol::new(&limits.protocol, call, form, roots, &configuration.store, seed)
-                .with_proxy(configured_proxy(configuration)),
+                .with_proxy(configured_proxy(configuration))
+                .with_file_read(limits.files.read),
             protocol_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.protocol },
             domain: Builder::new(&limits.domain, configuration.uid),
             domain_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.domain },

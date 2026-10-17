@@ -67,3 +67,17 @@ pub fn part(spec: &Spec, name: &[u8]) -> Digest {
     hash.values().list(0);
     hash.finish()
 }
+
+#[must_use]
+pub fn closure(packages: &[crate::resolution::Package]) -> Digest {
+    let mut hash = H::new(b"closure", 1);
+    hash.values().list(u64::try_from(packages.len()).expect("bounded closure"));
+    for package in packages {
+        hash.values().list(4);
+        hash.values().bytes(&package.name);
+        hash.values().bytes(&package.architecture);
+        hash.values().bytes(&package.version);
+        hash.values().digest(&package.sha256);
+    }
+    hash.finish()
+}

@@ -585,6 +585,9 @@ const RESOLUTION_MESSAGES: &[(fixtures::ResolutionInput, &str)] = &[
     (fixtures::ResolutionInput::Unknown, "apt cannot locate package \"apt\"\n"),
     (fixtures::ResolutionInput::Unsatisfiable, "unsatisfiable dependencies of \"apt\"\n"),
     (fixtures::ResolutionInput::Absent, "the archive http://one/ does not have forky\n"),
+    (fixtures::ResolutionInput::Missing, "\"apt\" was requested, and apt installs no package of that name\n"),
+    (fixtures::ResolutionInput::Unmatched, "apt would install apt 3.3.3 amd64, which no Packages index lists\n"),
+    (fixtures::ResolutionInput::Disagree, "the Packages indices disagree on apt 3.3.3 amd64\n"),
     (fixtures::ResolutionInput::TooMany, "a closure past 8192 packages\n"),
 ];
 #[test]
@@ -610,4 +613,12 @@ fn mmdebstraps_refused_start_prints_as_could_not_start() {
         print(&Record::Error(fixtures::mmdebstrap_error(crate::errors::Ended::Start))).as_deref(),
         Ok(b"mmdebstrap could not start\n".as_slice())
     );
+}
+
+#[test]
+fn a_resolution_error_names_its_package() {
+    assert_eq!(form::print(Form::JsonLines,
+        &Record::Error(fixtures::resolution_error(fixtures::ResolutionInput::Missing)),
+        Some(Type::Error), &limits::SHIPPED).as_deref(),
+        Ok(b"{\"record\":\"error\",\"kind\":\"resolution\",\"resolution\":{\"kind\":\"missing\",\"package\":\"apt\"},\"class\":\"configuration\"}\n".as_slice()));
 }

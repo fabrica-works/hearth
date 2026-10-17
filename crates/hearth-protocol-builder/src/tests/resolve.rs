@@ -174,7 +174,7 @@ fn the_scratch_is_walked_away_before_the_terminal() {
     let mut layer = Layer::resolution();
     layer.start_resolve();
     layer.resolve_end();
-    layer.resolve_exit(Exit::Code(0));
+    layer.resolve_exit(Exit::Code(1));
     for _ in 0_u32..5 {
         match layer.asked() {
             Some(Asked::Io(io::Request::Close { entity })) => {
@@ -197,5 +197,5 @@ fn the_scratch_is_walked_away_before_the_terminal() {
         let Some(Asked::File(request)) = layer.asked() else { panic!("scratch walk step") };
         layer.resolve_file(request);
     }
-    assert_eq!(layer.resolve_answers(b"", b"", Exit::Code(0)).len(), 1);
+    assert_eq!(layer.resolve_answers(b"", b"", Exit::Code(1)).len(), 1);
 }

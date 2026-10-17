@@ -554,6 +554,13 @@ fn resolution_back(fault: record_errors::Resolution) -> render_errors::Resolutio
         record_errors::Resolution::Unknown { package } => render_errors::Resolution::Unknown { package },
         record_errors::Resolution::Unsatisfiable { package } => render_errors::Resolution::Unsatisfiable { package },
         record_errors::Resolution::Absent { uri, suite } => render_errors::Resolution::Absent { uri, suite },
+        record_errors::Resolution::Missing { package } => render_errors::Resolution::Missing { package },
+        record_errors::Resolution::Unmatched { name, version, architecture } => {
+            render_errors::Resolution::Unmatched { name, version, architecture }
+        }
+        record_errors::Resolution::Disagree { name, version, architecture } => {
+            render_errors::Resolution::Disagree { name, version, architecture }
+        }
         record_errors::Resolution::TooMany { max } => render_errors::Resolution::TooMany { max },
     }
 }

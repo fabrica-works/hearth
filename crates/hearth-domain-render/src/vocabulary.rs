@@ -12,6 +12,11 @@ pub enum Event {
         request: Token,
         inst: crate::resolution::Inst,
     },
+    Stanza {
+        request: Token,
+        line: u32,
+        stanza: crate::resolution::Stanza,
+    },
     Resolved {
         request: Token,
         lines: Box<[crate::resolution::Line]>,

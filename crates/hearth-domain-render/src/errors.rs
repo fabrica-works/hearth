@@ -498,5 +498,8 @@ pub enum Resolution {
     Unknown { package: Box<[u8]> },
     Unsatisfiable { package: Option<Box<[u8]>> },
     Absent { uri: Box<[u8]>, suite: Box<[u8]> },
+    Missing { package: Box<[u8]> },
+    Unmatched { name: Box<[u8]>, version: Box<[u8]>, architecture: Box<[u8]> },
+    Disagree { name: Box<[u8]>, version: Box<[u8]>, architecture: Box<[u8]> },
     TooMany { max: u32 },
 }

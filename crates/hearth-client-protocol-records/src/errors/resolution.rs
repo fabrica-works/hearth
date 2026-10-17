@@ -5,6 +5,9 @@ pub enum Resolution {
     Unknown { package: Box<[u8]> },
     Unsatisfiable { package: Option<Box<[u8]>> },
     Absent { uri: Box<[u8]>, suite: Box<[u8]> },
+    Missing { package: Box<[u8]> },
+    Unmatched { name: Box<[u8]>, version: Box<[u8]>, architecture: Box<[u8]> },
+    Disagree { name: Box<[u8]>, version: Box<[u8]>, architecture: Box<[u8]> },
     TooMany { max: u32 },
 }
 impl Resolution {
@@ -26,6 +29,19 @@ impl Resolution {
                 lines.put(uri);
                 lines.put(b" does not have ");
                 lines.put(suite);
+            }
+            Self::Missing { package } => {
+                lines.quote(package);
+                lines.put(b" was requested, and apt installs no package of that name");
+            }
+            Self::Unmatched { name, version, architecture } => {
+                lines.put(b"apt would install ");
+                triple(lines, name, version, architecture);
+                lines.put(b", which no Packages index lists");
+            }
+            Self::Disagree { name, version, architecture } => {
+                lines.put(b"the Packages indices disagree on ");
+                triple(lines, name, version, architecture);
             }
             Self::TooMany { max } => {
                 lines.put(b"a closure past ");
@@ -52,6 +68,18 @@ impl Resolution {
                 field(json, b"uri", uri);
                 field(json, b"suite", suite);
             }
+            Self::Missing { package } => {
+                field(json, b"kind", b"missing");
+                field(json, b"package", package);
+            }
+            Self::Unmatched { name, version, architecture } => {
+                field(json, b"kind", b"unmatched");
+                json_triple(json, name, version, architecture);
+            }
+            Self::Disagree { name, version, architecture } => {
+                field(json, b"kind", b"disagree");
+                json_triple(json, name, version, architecture);
+            }
             Self::TooMany { max } => {
                 field(json, b"kind", b"too_many");
                 json.key(b"max");
@@ -60,4 +88,17 @@ impl Resolution {
         }
         json.object_end();
     }
+}
+
+fn triple(lines: &mut Lines, name: &[u8], version: &[u8], architecture: &[u8]) {
+    lines.put(name);
+    lines.put(b" ");
+    lines.put(version);
+    lines.put(b" ");
+    lines.put(architecture);
+}
+fn json_triple(json: &mut Encoder, name: &[u8], version: &[u8], architecture: &[u8]) {
+    field(json, b"name", name);
+    field(json, b"version", version);
+    field(json, b"architecture", architecture);
 }

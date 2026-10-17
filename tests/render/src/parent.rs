@@ -90,7 +90,8 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
             env.now = at;
             let event = schedule.next(at).expect("scheduled event");
             let token = match &event {
-                Event::Inst { request, .. }
+                Event::Stanza { request, .. }
+                | Event::Inst { request, .. }
                 | Event::Resolved { request, .. }
                 | Event::Found { request, .. }
                 | Event::Absent { request }

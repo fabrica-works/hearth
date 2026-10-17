@@ -87,3 +87,30 @@ fn absent_line<'a>(lines: &'a [vector::Line], tail: &[Box<[u8]>]) -> &'a vector:
 fn optional_name(name: Option<vector::Name>) -> Option<Box<[u8]>> {
     Some(bytes::copy_of(name?.as_bytes()))
 }
+
+#[must_use]
+pub fn stanza(stanza: hearth_protocol_mmdebstrap::packages::Stanza) -> resolution::Stanza {
+    resolution::Stanza {
+        package: bytes::copy_of(stanza.package.as_bytes()),
+        version: stanza.version,
+        architecture: bytes::copy_of(stanza.architecture.as_bytes()),
+        filename: stanza.filename,
+        size: stanza.size,
+        sha256: crate::render::vocabulary::Digest(stanza.sha256),
+    }
+}
+#[must_use]
+pub fn line(line: &vector::Line, indices: Box<[resolution::Index]>) -> resolution::Line {
+    let mut components = List::with_capacity(4);
+    for component in &line.components {
+        components
+            .push(bytes::copy_of(match component {
+                vector::Component::Main => b"main",
+                vector::Component::Contrib => b"contrib",
+                vector::Component::NonFree => b"non-free",
+                vector::Component::NonFreeFirmware => b"non-free-firmware",
+            }))
+            .expect("bounded components");
+    }
+    resolution::Line { uri: line.uri.clone(), suite: line.suite.clone(), components: components.into_boxed(), indices }
+}

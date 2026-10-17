@@ -33,6 +33,9 @@ pub(super) struct Resolve {
     name: Box<[u8]>,
     invocation: vector::Invocation,
     lines: Box<[vector::Line]>,
+    architecture: vector::Name,
+    file_read: u32,
+    indices: Option<crate::indices::Indices>,
     output: PipeReader,
     error: PipeReader,
     process: Option<Token>,
@@ -53,6 +56,7 @@ impl Resolve {
         request: Request,
         roots: Roots,
         store: &[u8],
+        file_read: u32,
         proxy: Option<&vector::Proxy>,
         env: &Env<Limits>,
         below: &mut Queue<Asked>,
@@ -85,6 +89,9 @@ impl Resolve {
             name,
             invocation,
             lines,
+            architecture: simulate.sources.architecture,
+            file_read,
+            indices: None,
             output: PipeReader::new(&env.limits.mmdebstrap),
             error: PipeReader::new(&env.limits.mmdebstrap),
             process: None,
@@ -137,7 +144,14 @@ impl Resolve {
         below: &mut Queue<Asked>,
     ) {
         match event {
-            Told::File(event) => self.file_up(event, roots, env, below),
+            Told::File(event) => {
+                if let Some(indices) = &mut self.indices {
+                    self.idle = env.now.saturating_add(env.limits.mmdebstrap.idle);
+                    indices.up(event, env);
+                } else {
+                    self.file_up(event, roots, env, below);
+                }
+            }
             Told::Io(event) => match event {
                 io::Event::Spawned { child, pipes, .. } => {
                     self.process = Some(child);
@@ -304,8 +318,15 @@ impl Resolve {
         });
     }
     pub fn ready(&self) -> bool {
+        if let Some(indices) = &self.indices {
+            return indices.ready();
+        }
         !self.pending.is_empty()
-            || (self.exit.is_some() && self.output.ended && self.error.ended && self.terminal.is_none())
+            || (self.exit.is_some()
+                && self.output.ended
+                && self.error.ended
+                && self.terminal.is_none()
+                && self.indices.is_none())
             || (self.terminal.is_some()
                 && ((!self.closing && self.process.is_some())
                     || (self.output.token.is_some() && !self.output.closing)
@@ -327,6 +348,31 @@ impl Resolve {
             below.push(request);
             return false;
         }
+        if let Some(indices) = &mut self.indices {
+            if self.terminal.is_some() {
+                indices.stop();
+            }
+            match indices.resume(env, above, below) {
+                Some(true) => {
+                    let lines = indices.lines();
+                    self.terminal = Some(RenderEvent::Resolved {
+                        request: self.request,
+                        lines,
+                        tools: render::resolution::Tools { apt: Box::new([]), mmdebstrap: Box::new([]) },
+                        costs: render::resolution::Costs {
+                            fetched: self.fetched,
+                            took: env.now.saturating_since(self.started),
+                        },
+                    });
+                    self.indices = None;
+                }
+                Some(false) => {
+                    self.indices = None;
+                    self.fail(Ended::Output, None);
+                }
+                None => return false,
+            }
+        }
         if self.terminal.is_none()
             && self.output.ended
             && self.error.ended
@@ -334,15 +380,16 @@ impl Resolve {
         {
             match exit {
                 Exit::Code(0) => {
-                    self.terminal = Some(RenderEvent::Resolved {
-                        request: self.request,
-                        lines: Box::new([]),
-                        tools: render::resolution::Tools { apt: Box::new([]), mmdebstrap: Box::new([]) },
-                        costs: render::resolution::Costs {
-                            fetched: self.fetched,
-                            took: env.now.saturating_since(self.started),
-                        },
-                    });
+                    self.indices = Some(crate::indices::Indices::new(
+                        self.request,
+                        roots.staging.fd,
+                        &self.name,
+                        self.lines.clone(),
+                        &self.architecture,
+                        self.file_read,
+                        env,
+                    ));
+                    return false;
                 }
                 Exit::Code(code) => {
                     let failure = tail::failure(&self.error.reader, &self.output.reader);
@@ -397,7 +444,8 @@ enum Scratch {
 }
 impl crate::Protocol {
     pub(super) fn resolve(&mut self, request: Request, env: &Env<Limits>, below: &mut Queue<Asked>) {
-        self.resolving = Some(Resolve::new(request, self.roots, &self.store_path, self.proxy.as_ref(), env, below));
+        self.resolving =
+            Some(Resolve::new(request, self.roots, &self.store_path, self.file_read, self.proxy.as_ref(), env, below));
     }
     pub(super) fn resume_resolve(
         &mut self,

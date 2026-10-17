@@ -157,3 +157,40 @@ pub fn resolving_side_at(now: skein_lib::Time) -> crate::call::Side {
     }
     side
 }
+
+pub const SMALL_CLOSURE: crate::limits::Limits = crate::limits::Limits { closure: 2, ..crate::limits::SHIPPED };
+pub const APT_SHA256: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
+    0xc9, 0xc5, 0x69, 0x7b, 0x1b, 0xfa, 0x54, 0xd5, 0x70, 0x63, 0x72, 0x49, 0xb7, 0x8a, 0xee, 0xd3, 0x75, 0x51, 0x01,
+    0x4f, 0xdf, 0xb6, 0x6d, 0xc4, 0x33, 0x48, 0x27, 0xf7, 0xc9, 0xb5, 0x47, 0x16,
+]);
+pub const APT_CLOSURE: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
+    0x90, 0x8a, 0x3b, 0x8a, 0x1d, 0xdd, 0x78, 0x10, 0x0f, 0x9f, 0x44, 0xb2, 0xd3, 0xe6, 0xb3, 0xf4, 0xed, 0xfd, 0x65,
+    0xb2, 0x26, 0xdf, 0x34, 0x8e, 0x50, 0x21, 0xb5, 0xd6, 0xd3, 0x7f, 0x63, 0x8b,
+]);
+pub fn resolution_inst(name: &[u8], architecture: &[u8]) -> crate::resolution::Inst {
+    crate::resolution::Inst {
+        name: name.into(),
+        architecture: architecture.into(),
+        version: b"3.3.3".as_slice().into(),
+    }
+}
+pub fn resolution_stanza(name: &[u8], architecture: &[u8]) -> crate::resolution::Stanza {
+    crate::resolution::Stanza {
+        package: name.into(),
+        architecture: architecture.into(),
+        version: b"3.3.3".as_slice().into(),
+        filename: b"pool/main/a/apt/apt_3.3.3_amd64.deb".as_slice().into(),
+        size: 1_567_912,
+        sha256: APT_SHA256,
+    }
+}
+pub fn apt_closure() -> crate::resolution::Closure {
+    let mut closure = crate::resolution::Closure::new(&crate::limits::SHIPPED);
+    closure.inst(resolution_inst(b"apt", b"amd64")).expect("installed apt");
+    closure
+}
+pub fn matched_apt_closure() -> crate::resolution::Closure {
+    let mut closure = apt_closure();
+    closure.stanza(0, resolution_stanza(b"apt", b"amd64")).expect("matching apt");
+    closure
+}

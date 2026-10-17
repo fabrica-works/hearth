@@ -16,6 +16,7 @@ mod cache;
 mod client;
 mod events;
 mod git;
+mod indices;
 mod keep;
 mod terminal;
 use events::stream_up;
@@ -117,6 +118,7 @@ pub struct Protocol {
     keeping: Option<keep::Keep>,
     resolving: Option<resolve::Resolve>,
     proxy: Option<Proxy>,
+    file_read: u32,
 }
 impl Protocol {
     #[must_use]
@@ -137,7 +139,14 @@ impl Protocol {
             keeping: None,
             resolving: None,
             proxy: None,
+            file_read: limits.mmdebstrap.chunk.max(1),
         }
+    }
+    #[must_use]
+    pub fn with_file_read(mut self, max: u32) -> Self {
+        assert!(max > 0, "file reads make progress");
+        self.file_read = max;
+        self
     }
     #[must_use]
     pub fn with_proxy(mut self, proxy: Option<Proxy>) -> Self {
