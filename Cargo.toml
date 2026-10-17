@@ -14,6 +14,9 @@ publish = false
 # tag: Cargo.lock pins it, a repin moves it, and skein's `plan` finds it by
 # the source's "/skein.git#" (skein's development.md, sections 5.7 and 9.5):
 [workspace.dependencies]
+hearth-protocol-builder = { path = "crates/hearth-protocol-builder" }
+skein-io = { git = "https://github.com/forgetic/skein.git" }
+hearth-client-protocol-records = { path = "crates/hearth-client-protocol-records" }
 hearth-recordings = { path = "testing/hearth-recordings" }
 hearth-git-world = { path = "tests/git" }
 hearth-fake-git = { path = "testing/hearth-fake-git" }
@@ -22,6 +25,7 @@ hearth-protocol-config = { path = "crates/hearth-protocol-config" }
 hearth-fake-mmdebstrap = { path = "testing/hearth-fake-mmdebstrap" }
 hearth-fake-machine = { path = "testing/hearth-fake-machine" }
 hearth-protocol-tree = { path = "crates/hearth-protocol-tree" }
+hearth-domain-builder = { path = "crates/hearth-domain-builder" }
 hearth-test-mirror = { path = "testing/hearth-test-mirror" }
 skein-scratch = { git = "https://github.com/forgetic/skein.git" }
 hearth-domain-render = { path = "crates/hearth-domain-render" }

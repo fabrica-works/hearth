@@ -1,0 +1,17 @@
+[package]
+name = "hearth-protocol-builder"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-lib.workspace = true
+skein-io.workspace = true
+hearth-domain-builder.workspace = true
+hearth-protocol-git.workspace = true
+hearth-protocol-config.workspace = true
+hearth-client-protocol-records.workspace = true
+
+[lints]
+workspace = true

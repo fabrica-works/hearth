@@ -96,6 +96,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-domain-builder"
+version = "0.0.0"
+dependencies = [
+ "hearth-domain-render",
+ "hearth-lib",
+ "skein-lib",
+]
+
+[[package]]
 name = "hearth-domain-render"
 version = "0.0.0"
 dependencies = [
@@ -154,6 +163,18 @@ dependencies = [
  "skein-heap",
  "skein-lib",
  "skein-world",
+]
+
+[[package]]
+name = "hearth-protocol-builder"
+version = "0.0.0"
+dependencies = [
+ "hearth-client-protocol-records",
+ "hearth-domain-builder",
+ "hearth-protocol-config",
+ "hearth-protocol-git",
+ "skein-io",
+ "skein-lib",
 ]
 
 [[package]]

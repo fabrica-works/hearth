@@ -1,0 +1,68 @@
+//! One client call, routed through render (render.md, 8.1).
+#![cfg_attr(not(test), no_std)]
+#![forbid(unsafe_code)]
+extern crate alloc;
+pub use hearth_domain_render as render;
+pub mod vocabulary;
+use render::vocabulary::{Answer as RenderAnswer, Event as RenderEvent, Output};
+use skein_lib::{Env, Queue, ReplyTo};
+use vocabulary::{Answer, Call, Event, Request};
+pub const MAX_OUT: u32 = 1;
+pub const MAX_OUT_RESUME: u32 = 1;
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Limits {
+    pub render: render::limits::Limits,
+}
+#[derive(Debug)]
+pub struct Builder {
+    render: render::Render,
+    reply: Option<ReplyTo>,
+    output: Queue<Output>,
+}
+impl Builder {
+    #[must_use]
+    pub fn new(limits: &Limits) -> Self {
+        Self { render: render::Render::new(&limits.render), reply: None, output: Queue::with_capacity(1) }
+    }
+    #[must_use]
+    pub fn work_pending(&self) -> bool {
+        self.render.work_pending()
+    }
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.reply.is_none()
+    }
+    fn forward(&mut self, out: &mut Queue<Request>) {
+        if let Some(output) = self.output.pop() {
+            out.push(match output {
+                Output::Request(request) => Request::Render(request),
+                Output::Answer(RenderAnswer::Spec(spec)) => Request::Answer(Answer::Spec(spec)),
+                Output::Answer(RenderAnswer::Rendered { outcome }) => {
+                    Request::Reply { to: self.reply.take().expect("active call owns its reply"), outcome }
+                }
+            });
+        }
+    }
+}
+pub fn step(builder: &mut Builder, env: &Env<Limits>, ev: Event, out: &mut Queue<Request>) {
+    let event = match ev {
+        Event::Call { reply_to, call } => {
+            assert!(builder.reply.is_none(), "one builder call at a time");
+            builder.reply = Some(reply_to);
+            match call {
+                Call::Render { repository, revision, targets } => RenderEvent::Render { repository, revision, targets },
+            }
+        }
+        Event::Render(event) => event,
+    };
+    let render_env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
+    render::step(&mut builder.render, &render_env, event, &mut builder.output);
+    builder.forward(out);
+}
+pub fn resume(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>) {
+    let render_env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
+    render::resume(&mut builder.render, &render_env, &mut builder.output);
+    builder.forward(out);
+}
+#[cfg(test)]
+mod tests;
