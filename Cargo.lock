@@ -82,8 +82,16 @@ name = "hearth-builder-world"
 version = "0.0.0"
 dependencies = [
  "hearth",
+ "hearth-domain-builder",
+ "hearth-domain-render",
  "hearth-domain-store",
+ "hearth-fake-git",
+ "hearth-fake-machine",
+ "hearth-fake-mmdebstrap",
  "hearth-lib",
+ "hearth-protocol-builder",
+ "hearth-protocol-config",
+ "hearth-protocol-template",
  "hearth-protocol-tree",
  "hearth-recordings",
  "hearth-test-mirror",
@@ -91,6 +99,7 @@ dependencies = [
  "skein-lib",
  "skein-scratch",
  "skein-shell",
+ "skein-sim",
  "skein-world",
 ]
 

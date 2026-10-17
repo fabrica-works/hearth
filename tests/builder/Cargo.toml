@@ -6,6 +6,15 @@ rust-version.workspace = true
 publish.workspace = true
 [dependencies]
 hearth.workspace = true
+hearth-domain-builder.workspace = true
+hearth-domain-render.workspace = true
+hearth-protocol-builder.workspace = true
+hearth-protocol-config.workspace = true
+hearth-protocol-template.workspace = true
+hearth-fake-git.workspace = true
+hearth-fake-machine.workspace = true
+hearth-fake-mmdebstrap.workspace = true
+skein-sim.workspace = true
 hearth-lib.workspace = true
 hearth-protocol-tree.workspace = true
 hearth-domain-store.workspace = true

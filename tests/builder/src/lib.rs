@@ -1,2 +1,6 @@
 //! Scratch repositories and the shipped client on the real loop.
 pub mod fixtures;
+
+pub mod domain;
+pub mod files;
+pub mod referee;
