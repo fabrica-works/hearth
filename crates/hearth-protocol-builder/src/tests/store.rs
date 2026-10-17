@@ -178,3 +178,48 @@ fn a_failed_page_closes_its_cursor_without_listing_again() {
     assert_eq!(layer.told(), Some(BuilderEvent::Store(Event::Failed)));
     assert_eq!(layer.asked(), None);
 }
+
+#[test]
+fn a_kept_arrival_is_renamed_then_cache_synced_then_recorded() {
+    use crate::builder::store::vocabulary::Origin;
+    let mut layer = fixtures::arriving();
+    layer.client(BuilderRequest::Store(Request::Keep {
+        arrival: fixtures::CACHE_OWNER,
+        record: fixtures::cache_record(Origin::Blob { oid: fixtures::OID.into() }),
+    }));
+    let Some(Asked::File(file::Request::Rename { owner, from_root, to_root, from, to })) = layer.asked() else {
+        panic!("rename first")
+    };
+    assert_eq!(
+        (owner, from_root, to_root, from.len()),
+        (crate::store::OWNER, skein_io::kernel::Fd::new(4), skein_io::kernel::Fd::new(4), 68)
+    );
+    assert_eq!(&*to, b"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    layer.file_up(file::Event::Renamed { owner });
+    assert_eq!(
+        layer.asked(),
+        Some(Asked::File(file::Request::SyncDirectory { owner, root: skein_io::kernel::Fd::new(4) }))
+    );
+    layer.file_up(file::Event::Synced { owner });
+    let Some(Asked::File(file::Request::Store { path, bytes, root, expected, .. })) = layer.asked() else {
+        panic!("record after sync")
+    };
+    assert_eq!(root, Token::new(32));
+    assert_eq!(expected, file::Expect::Any);
+    assert_eq!(&*path, b"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad.record");
+    assert_eq!(tree::cache_file::read(&bytes, &tree::limits::SHIPPED).expect("kind 5").size, 3);
+    layer.file_up(file::Event::Stored { owner, digest: skein_io::digest::digest(b"record") });
+    assert_eq!(layer.told(), Some(BuilderEvent::Store(Event::Done)));
+}
+#[test]
+fn the_next_blob_waits_for_the_stores_answer() {
+    let mut layer = fixtures::arriving();
+    assert_eq!(layer.asked(), None, "no second temporary while the store decides");
+    layer.client(BuilderRequest::Store(Request::Discard { arrival: fixtures::CACHE_OWNER }));
+    let Some(Asked::File(file::Request::Remove { owner, .. })) = layer.asked() else { panic!("discard temporary") };
+    layer.file_up(file::Event::Removed { owner });
+    assert_eq!(layer.told(), Some(BuilderEvent::Store(Event::Done)));
+    let Some(Asked::File(file::Request::Create { .. })) = layer.asked() else {
+        panic!("next temporary after settlement")
+    };
+}

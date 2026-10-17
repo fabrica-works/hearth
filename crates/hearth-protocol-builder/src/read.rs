@@ -12,7 +12,7 @@ use crate::{
 use alloc::boxed::Box;
 use skein_io as io;
 use skein_lib::{
-    Env, Queue, Token, Writer,
+    Env, Queue, Time, Token, Writer,
     stream::{self, Down, Held, Up},
 };
 #[derive(Debug)]
@@ -79,6 +79,12 @@ impl Decode {
         None
     }
 }
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Arrival {
+    Streaming,
+    Waiting,
+    Settled,
+}
 #[derive(Debug)]
 pub(crate) struct Read {
     root: skein_io::kernel::Fd,
@@ -97,6 +103,9 @@ pub(crate) struct Read {
     decode: Option<Decode>,
     decoded: Option<Decoded>,
     failed: bool,
+    began: Time,
+    arrival: Arrival,
+    terminal: Option<builder::vocabulary::Event>,
 }
 impl Read {
     pub fn new(request: Token, blobs: Box<[Blob]>, env: &Env<Limits>, root: skein_io::kernel::Fd, seed: u64) -> Self {
@@ -118,11 +127,16 @@ impl Read {
             decode: None,
             decoded: None,
             failed: false,
+            began: env.now,
+            arrival: Arrival::Streaming,
+            terminal: None,
         };
         read.start(env);
         read
     }
     fn start(&mut self, env: &Env<Limits>) {
+        self.began = env.now;
+        self.arrival = Arrival::Streaming;
         let blob = self.blobs.get(self.index).expect("current blob");
         match blob.kind {
             render::vocabulary::As::Document | render::vocabulary::As::Declaration => {
@@ -177,7 +191,7 @@ impl Read {
     }
     pub fn work_pending(&self) -> bool {
         if let Some(cache) = &self.cache {
-            if cache.work_pending() || cache.done() {
+            if cache.work_pending() || (cache.done() && (self.arrival != Arrival::Waiting)) {
                 return true;
             }
             if cache.busy() {
@@ -230,7 +244,7 @@ impl Read {
     pub fn ready(&self) -> bool {
         (self.decoded.is_some()
             || (match &self.cache {
-                Some(cache) => cache.done(),
+                Some(cache) => cache.done() && self.arrival == Arrival::Settled,
                 None => false,
             }))
             && self.index.checked_add(1) == Some(self.blobs.len())
@@ -238,7 +252,7 @@ impl Read {
     pub fn take_answer(&mut self) -> render::vocabulary::Event {
         let blob = self.blobs.get(self.index).expect("current blob");
         if match &self.cache {
-            Some(cache) => cache.done(),
+            Some(cache) => cache.done() && self.arrival == Arrival::Settled,
             None => false,
         } {
             return render::vocabulary::Event::Cached {
@@ -253,6 +267,21 @@ impl Read {
             oid: blob.oid.clone(),
             read: self.decoded.take().expect("decoded blob"),
         }
+    }
+    pub fn temporary(&self) -> Box<[u8]> {
+        self.cache.as_ref().expect("arrival temporary").name()
+    }
+    pub fn settle(&mut self, event: builder::vocabulary::Event) -> Option<builder::vocabulary::Event> {
+        self.arrival = Arrival::Settled;
+        if self.index.checked_add(1) == Some(self.blobs.len()) {
+            self.terminal = Some(event);
+            None
+        } else {
+            Some(event)
+        }
+    }
+    pub fn take_terminal(&mut self) -> Option<builder::vocabulary::Event> {
+        self.terminal.take()
     }
     pub fn file_up(&mut self, event: skein_io::file::Event) {
         self.cache.as_mut().expect("cache event").up(event);
@@ -272,7 +301,27 @@ impl Read {
                 self.down(env, batch::Request::Next);
                 return;
             }
-            if !cache.readable() && !cache.done() {
+            if cache.done() {
+                if self.arrival == Arrival::Streaming {
+                    let blob = self.blobs.get(self.index).expect("arriving blob");
+                    above.push(builder::vocabulary::Event::Arrived {
+                        request: self.request,
+                        oid: blob.oid.clone(),
+                        size: blob.size,
+                        last: self.index.checked_add(1) == Some(self.blobs.len()),
+                        arrival: Token::new(10),
+                        sha256: cache.digest(),
+                        took: env.now.saturating_since(self.began),
+                    });
+                    self.arrival = Arrival::Waiting;
+                } else if self.arrival == Arrival::Settled && !self.ready() {
+                    self.cache = None;
+                    self.index = self.index.checked_add(1).expect("bounded blobs");
+                    self.start(env);
+                }
+                return;
+            }
+            if !cache.readable() {
                 return;
             }
         }
@@ -310,7 +359,7 @@ impl Read {
             }
         } else if (self.decoded.is_some()
             || (match &self.cache {
-                Some(cache) => cache.done(),
+                Some(cache) => cache.done() && self.arrival == Arrival::Settled,
                 None => false,
             }))
             && !self.ready()
@@ -320,4 +369,8 @@ impl Read {
             self.start(env);
         }
     }
+}
+
+pub(super) fn current(mode: &mut Option<crate::Mode>) -> Option<&mut Read> {
+    if let Some(crate::Mode::Read(read)) = mode { Some(read) } else { None }
 }

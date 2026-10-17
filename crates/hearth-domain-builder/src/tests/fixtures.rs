@@ -32,3 +32,13 @@ pub fn spec() -> render::parts::Spec {
 pub fn store_record() -> crate::store::vocabulary::StoreRecord {
     crate::store::vocabulary::StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: 1000 }
 }
+pub fn arrival_answer(builder: &mut crate::Builder, last: bool, answer: crate::store::vocabulary::Answer) {
+    builder.arrival = Some((
+        skein_lib::Token::new(2),
+        render::revision::Oid(bytes::copy_of(b"abc")),
+        3,
+        last,
+        hearth_lib::encode::Digest([1; 32]),
+    ));
+    builder.store_output.push(crate::store::vocabulary::Output::Answer(answer));
+}

@@ -469,3 +469,76 @@ pub fn only<T>(items: &[T]) -> &T {
     let [item] = items else { panic!("one item") };
     item
 }
+
+pub const ABC: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
+    0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde, 0x5d, 0xae, 0x22, 0x23, 0xb0, 0x03, 0x61,
+    0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00, 0x15, 0xad,
+]);
+pub fn cache_record(origin: builder::store::vocabulary::Origin) -> builder::store::vocabulary::CacheFile {
+    builder::store::vocabulary::CacheFile {
+        at: Wall::from_nanos(123),
+        origin,
+        sha256: ABC,
+        size: 3,
+        took: skein_lib::Duration::from_millis(3),
+    }
+}
+pub fn arriving() -> Layer {
+    let mut layer = Layer::new();
+    let mut first = blob(b"abc");
+    first.kind = render::vocabulary::As::Cached;
+    layer.read(Box::new([first.clone(), first]));
+    let mut held = Held::new(batch(b"abc"));
+    for _ in 0_u32..128 {
+        if let Some(event) = layer.told() {
+            let builder::vocabulary::Event::Arrived { last: false, .. } = event else { panic!("first arrival") };
+            return layer;
+        }
+        let Some(request) = layer.asked() else {
+            continue;
+        };
+        if let Asked::File(request) = request {
+            use io::file::{Event, Request};
+            let event = match request {
+                Request::Create { owner, .. } => Event::Opened { owner, file: CACHE_FILE, len: 0 },
+                Request::WriteAt { owner, .. } => Event::Written { owner },
+                Request::Sync { owner, .. } => Event::Synced { owner },
+                Request::Close { owner, .. } => Event::Closed { owner },
+                Request::Lock { .. }
+                | Request::MakeDirectory { .. }
+                | Request::OpenPrivate { .. }
+                | Request::CreateNoFollow { .. }
+                | Request::OpenRead { .. }
+                | Request::OpenReadNoFollow { .. }
+                | Request::OpenWrite { .. }
+                | Request::OpenWriteNoFollow { .. }
+                | Request::OpenDirectory { .. }
+                | Request::Load { .. }
+                | Request::Scan { .. }
+                | Request::Store { .. }
+                | Request::Stat { .. }
+                | Request::ReadAt { .. }
+                | Request::Cut { .. }
+                | Request::SyncDirectory { .. }
+                | Request::Rename { .. }
+                | Request::Remove { .. }
+                | Request::List { .. }
+                | Request::ListPage { .. } => panic!("only the temporary is written before arrival"),
+            };
+            layer.file_up(event);
+        } else {
+            layer.answer(request, &mut held, Exit::Code(0));
+        }
+    }
+    panic!("arrival reached");
+}
+#[must_use]
+pub fn cache_records() -> [builder::store::vocabulary::CacheFile; 4] {
+    use builder::store::vocabulary::Origin;
+    [
+        cache_record(Origin::Fetch { uri: bytes::copy_of(b"https://mirror/a") }),
+        cache_record(Origin::Index { resolution: ABC }),
+        cache_record(Origin::Blob { oid: bytes::copy_of(OID) }),
+        cache_record(Origin::Rendered { path: bytes::copy_of(b"tasks/core/tree/etc/motd.j2") }),
+    ]
+}

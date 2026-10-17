@@ -777,3 +777,5 @@ fn each_retained_hunk_line_translates_to_records_and_back() {
 }
 
 mod declarations;
+#[path = "translate_store.rs"]
+mod store_arrivals;

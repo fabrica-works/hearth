@@ -191,7 +191,9 @@ pub fn down(
     below: &mut Queue<Asked>,
 ) {
     match rq {
-        Request::Store(request) => protocol.store.down(request, &protocol.roots, &env.limits, below),
+        Request::Store(request) => {
+            protocol.store.down(request, &protocol.roots, &env.limits, read::current(&mut protocol.mode), below);
+        }
         Request::Unopened { to, why } => {
             assert_eq!(to.into_token(), Token::new(0), "initial call");
             protocol.startup = Some(
@@ -261,7 +263,7 @@ pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, above: &mut Queu
         Told::Io(event) => event,
         Told::File(event) => {
             if event.owner() == store::OWNER {
-                protocol.store.up(event, &env.limits, above, below);
+                protocol.store.up(event, &env.limits, &protocol.roots, read::current(&mut protocol.mode), above, below);
                 return;
             }
             let Some(Mode::Read(read)) = &mut protocol.mode else { unreachable!("cache read exists") };
@@ -540,6 +542,12 @@ fn finish(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Event>, 
         }
         Mode::Read(mut read) => {
             let request = read.request();
+            if !child.failed
+                && let Some(event) = read.take_terminal()
+            {
+                above.push(event);
+                return;
+            }
             let event = if child.failed || read.failed() { None } else { Some(read.take_answer()) };
             (request, event)
         }

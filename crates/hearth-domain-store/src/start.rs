@@ -41,7 +41,7 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Qu
             crate::scan::begin(store, env.limits, out);
             return;
         }
-        Event::Page { .. } => unreachable!("scan has not begun"),
+        Event::Arrived { .. } | Event::Page { .. } => unreachable!("scan has not begun"),
         Event::Failed => {
             let why = if store.phase == Phase::Locking { Why::Lock } else { Why::Record };
             store.timers.cancel(Timer::Retry);

@@ -1,7 +1,7 @@
 use super::fixtures::{self, CACHE_FILE as FILE, CACHE_OWNER as OWNER};
 use skein_io::{
     file::{Event, Request},
-    kernel::{Error, Fd},
+    kernel::Fd,
 };
 use skein_lib::bytes;
 #[test]
@@ -22,43 +22,15 @@ fn a_cached_blob_is_written_to_a_temporary_synced_then_renamed() {
     cache.up(Event::Synced { owner: OWNER });
     assert_eq!(cache.take_request(), Some(Request::Close { owner: OWNER, file: FILE }));
     cache.up(Event::Closed { owner: OWNER });
-    drop(cache.take_request());
-    cache.up(Event::Failed { owner: OWNER, error: Error::NotFound, committed: false, residue: None });
-    assert_eq!(
-        cache.take_request(),
-        Some(Request::Rename {
-            owner: OWNER,
-            from_root: Fd::new(4),
-            to_root: Fd::new(4),
-            from: name,
-            to: bytes::copy_of(b"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
-        })
-    );
-    cache.up(Event::Renamed { owner: OWNER });
-    assert_eq!(cache.take_request(), Some(Request::SyncDirectory { owner: OWNER, root: Fd::new(4) }));
-    cache.up(Event::Synced { owner: OWNER });
-    assert!(cache.done(), "cache publication is complete");
+    assert_eq!(cache.take_request(), None, "the store decides publication");
+    assert!(cache.done());
 }
 #[test]
 fn a_cache_file_already_present_keeps_it_and_removes_the_temporary() {
     let mut cache = fixtures::synced_cache();
-    assert_eq!(
-        cache.take_request(),
-        Some(Request::OpenRead {
-            owner: OWNER,
-            root: Fd::new(4),
-            name: bytes::copy_of(b"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
-        })
-    );
-    cache.up(Event::Opened { owner: OWNER, file: FILE, len: 3 });
-    assert_eq!(cache.take_request(), Some(Request::Close { owner: OWNER, file: FILE }));
-    cache.up(Event::Closed { owner: OWNER });
-    let Some(Request::Remove { root, directory, name, .. }) = cache.take_request() else { panic!("temporary removed") };
-    assert_eq!((root, directory, name.len()), (Fd::new(4), false, 68));
-    cache.up(Event::Removed { owner: OWNER });
-    assert!(cache.done(), "cache publication is complete");
+    assert_eq!(cache.take_request(), None, "the index decides presence without probing the cache");
+    assert!(cache.done());
 }
-
 #[test]
 fn a_failed_git_waits_for_the_inflight_cache_open_and_close() {
     let (mut layer, owner) = fixtures::opening_cache();

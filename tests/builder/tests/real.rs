@@ -69,7 +69,9 @@ fn static_files_enter_the_cache_by_sha256_and_no_temporary_stays() {
         names,
         [
             "775324fcea7f2cdcbf11df25550e362669caceb6e69c8370374d2d436bb63123",
-            "f487088ec8b18ff569dfede6f12e5fa91983f9f6dd2f3e0b6cee4349a231e745"
+            "775324fcea7f2cdcbf11df25550e362669caceb6e69c8370374d2d436bb63123.record",
+            "f487088ec8b18ff569dfede6f12e5fa91983f9f6dd2f3e0b6cee4349a231e745",
+            "f487088ec8b18ff569dfede6f12e5fa91983f9f6dd2f3e0b6cee4349a231e745.record"
         ]
     );
     for &(name, body) in CACHED {

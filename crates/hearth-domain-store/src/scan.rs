@@ -18,7 +18,7 @@ enum Pass {
 #[derive(Debug)]
 pub(super) struct Scan {
     pass: Pass,
-    index: index::Index,
+    pub(super) index: index::Index,
     entries: Box<[Entry]>,
     at: u32,
     last: bool,
@@ -81,7 +81,9 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
             finish(store, Answer::Unusable { step }, out);
             return;
         }
-        Event::Open | Event::Locked | Event::Busy | Event::Loaded { .. } => unreachable!("scan terminal"),
+        Event::Arrived { .. } | Event::Open | Event::Locked | Event::Busy | Event::Loaded { .. } => {
+            unreachable!("scan terminal")
+        }
     }
     if scan.pass == Pass::Settle {
         settle(store, out);
@@ -169,6 +171,7 @@ fn stop_full(store: &mut Store, limits: &Limits, out: &mut Queue<Output>) {
 fn finish(store: &mut Store, answer: Answer, out: &mut Queue<Output>) {
     store.phase = Phase::Ready;
     store.scan.entries = Box::new([]);
+    store.usable = answer == Answer::Ready;
     if answer != Answer::Ready {
         store.scan.index = index::Index::with_capacity(0);
     }

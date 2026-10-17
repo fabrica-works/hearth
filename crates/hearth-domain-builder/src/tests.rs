@@ -118,3 +118,37 @@ fn an_unopened_store_ends_the_call_before_render() {
         assert!(!builder.work_pending());
     }
 }
+
+#[test]
+fn a_refused_blob_fails_its_read_at_its_last_blob() {
+    use crate::{
+        render::vocabulary::{Event as RenderEvent, Outcome},
+        store::vocabulary as store,
+    };
+    let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+    builder.reply = Some(ReplyTo::new(Token::new(1)));
+    let mut out = Queue::with_capacity(1);
+    step(
+        &mut builder,
+        &fixtures::env(),
+        Event::Render(RenderEvent::Render {
+            repository: bytes::copy_of(b"/repo"),
+            revision: bytes::copy_of(b"HEAD"),
+            targets: Box::new([]),
+        }),
+        &mut out,
+    );
+    drop(out.pop());
+    builder.remaining = 2;
+    fixtures::arrival_answer(&mut builder, false, store::Answer::Refused { arrival: Token::new(10) });
+    crate::store_forward(&mut builder, &fixtures::env(), &mut out);
+    assert_eq!(out.pop(), None, "a refused read is drained before failing");
+    fixtures::arrival_answer(&mut builder, true, store::Answer::Cached { arrival: Token::new(10) });
+    crate::store_forward(&mut builder, &fixtures::env(), &mut out);
+    assert_eq!(out.pop(), None);
+    crate::resume(&mut builder, &fixtures::env(), &mut out);
+    assert_eq!(
+        out.pop(),
+        Some(Request::Reply { to: ReplyTo::new(Token::new(1)), outcome: Outcome::TryAgain, diff: None, left_out: 0 })
+    );
+}

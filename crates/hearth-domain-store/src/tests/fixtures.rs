@@ -68,3 +68,32 @@ pub fn scanning(limits: Limits) -> Harness {
     drop(store.page(&[], true));
     store
 }
+
+pub const ARRIVAL: skein_lib::Token = skein_lib::Token::new(1);
+pub const MOTD: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
+    0x77, 0x53, 0x24, 0xfc, 0xea, 0x7f, 0x2c, 0xdc, 0xbf, 0x11, 0xdf, 0x25, 0x55, 0x0e, 0x36, 0x26, 0x69, 0xca, 0xce,
+    0xb6, 0xe6, 0x9c, 0x83, 0x70, 0x37, 0x4d, 0x2d, 0x43, 0x6b, 0xb6, 0x31, 0x23,
+]);
+pub fn ready(limits: Limits, digests: &[hearth_lib::encode::Digest]) -> Harness {
+    let mut store = scanning(limits);
+    drop(store.page(&[], true));
+    drop(store.page(&[], true));
+    for digest in digests {
+        store.store.scan.index.insert(*digest, true).expect("fixture cache bound");
+    }
+    store
+}
+pub fn blob(arrival: skein_lib::Token, sha256: hearth_lib::encode::Digest) -> Event {
+    Event::Arrived {
+        arrival,
+        sha256,
+        size: 15,
+        origin: crate::vocabulary::Origin::Blob { oid: b"d23c59a84714a16a9597f6d92ce69390d6d13f9b".as_slice().into() },
+        took: skein_lib::Duration::from_millis(3),
+    }
+}
+pub fn full() -> Harness {
+    let mut store = ready(crate::limits::SHIPPED, &[]);
+    store.store.usable = false;
+    store
+}

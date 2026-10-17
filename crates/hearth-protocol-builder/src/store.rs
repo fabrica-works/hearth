@@ -20,15 +20,39 @@ pub(super) struct Store {
     directory: Directory,
     max: u32,
     closing: Option<Event>,
+    keeping: u8,
 }
 impl Store {
     pub fn new() -> Self {
-        Self { pending: None, cursor: None, directory: Directory::Top, max: 0, closing: None }
+        Self { pending: None, cursor: None, directory: Directory::Top, max: 0, closing: None, keeping: 0 }
     }
-    pub fn down(&mut self, request: Request, roots: &Roots, limits: &Limits, below: &mut Queue<Asked>) {
+    pub fn down(
+        &mut self,
+        request: Request,
+        roots: &Roots,
+        limits: &Limits,
+        read: Option<&mut crate::read::Read>,
+        below: &mut Queue<Asked>,
+    ) {
         assert!(self.pending.is_none(), "one store request");
         self.pending = Some(request.clone());
         below.push(Asked::File(match request {
+            Request::Keep { arrival: _, record } => {
+                self.keeping = 1;
+                file::Request::Rename {
+                    owner: OWNER,
+                    from_root: roots.cache.fd,
+                    to_root: roots.cache.fd,
+                    from: read.expect("arrival read").temporary(),
+                    to: names::removal(builder::store::vocabulary::Removal::File(record.sha256)),
+                }
+            }
+            Request::Discard { arrival: _ } => file::Request::Remove {
+                owner: OWNER,
+                root: roots.cache.fd,
+                name: read.expect("arrival read").temporary(),
+                directory: false,
+            },
             Request::List { directory, max } => {
                 self.directory = directory;
                 self.max = max;
@@ -77,9 +101,33 @@ impl Store {
         &mut self,
         event: file::Event,
         limits: &Limits,
+        roots: &Roots,
+        read: Option<&mut crate::read::Read>,
         above: &mut Queue<builder::vocabulary::Event>,
         below: &mut Queue<Asked>,
     ) {
+        if let Some(Request::Keep { record, .. }) = &self.pending {
+            let request = match (&event, self.keeping) {
+                (file::Event::Renamed { .. }, 1) => {
+                    Some(file::Request::SyncDirectory { owner: OWNER, root: roots.cache.fd })
+                }
+                (file::Event::Synced { .. }, 2) => Some(file::Request::Store {
+                    owner: OWNER,
+                    root: roots.cache.token,
+                    path: names::removal(builder::store::vocabulary::Removal::Record(record.sha256)),
+                    bytes: tree::cache_file::write(&translate::store::cache_file(record.clone()), &limits.tree)
+                        .expect("cache record within bound"),
+                    expected: file::Expect::Any,
+                    no_follow: true,
+                }),
+                _ => None,
+            };
+            if let Some(request) = request {
+                self.keeping = self.keeping.saturating_add(1);
+                below.push(Asked::File(request));
+                return;
+            }
+        }
         if let file::Event::Opened { file, .. } = event {
             self.cursor = Some(file);
             below.push(Asked::File(self.list()));
@@ -149,7 +197,14 @@ impl Store {
             | file::Event::Synced { .. }
             | file::Event::Renamed { .. } => unreachable!("store request terminal"),
         };
-        above.push(builder::vocabulary::Event::Store(event));
+        let event = builder::vocabulary::Event::Store(event);
+        if let Request::Keep { .. } | Request::Discard { .. } = pending {
+            if let Some(event) = read.expect("arrival read").settle(event) {
+                above.push(event);
+            }
+        } else {
+            above.push(event);
+        }
     }
 }
 pub(super) fn startup(why: Why) -> records::startup::Startup {

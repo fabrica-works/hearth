@@ -1,10 +1,22 @@
 //! The in-process client's call and replies (client/README.md, 3.1).
 use crate::{render, store};
 use alloc::boxed::Box;
-use skein_lib::ReplyTo;
+use skein_lib::{Duration, ReplyTo, Token};
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
-    Call { reply_to: ReplyTo, call: Call },
+    Arrived {
+        request: Token,
+        oid: render::revision::Oid,
+        size: u64,
+        last: bool,
+        arrival: Token,
+        sha256: render::vocabulary::Digest,
+        took: Duration,
+    },
+    Call {
+        reply_to: ReplyTo,
+        call: Call,
+    },
     Render(render::vocabulary::Event),
     Store(store::vocabulary::Event),
 }

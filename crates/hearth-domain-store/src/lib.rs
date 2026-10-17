@@ -2,6 +2,7 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+mod enter;
 mod index;
 pub mod limits;
 mod scan;
@@ -30,15 +31,28 @@ pub struct Store {
     uid: u32,
     timers: Deadlines<Timer>,
     scan: scan::Scan,
+    entering: Option<enter::Entering>,
+    usable: bool,
 }
 impl Store {
     #[must_use]
     pub fn new(limits: &Limits, uid: u32) -> Self {
-        Self { phase: Phase::Closed, uid, timers: Deadlines::with_capacity(1), scan: scan::Scan::new(limits) }
+        Self {
+            phase: Phase::Closed,
+            uid,
+            timers: Deadlines::with_capacity(1),
+            scan: scan::Scan::new(limits),
+            entering: None,
+            usable: false,
+        }
     }
 }
 pub fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Queue<Output>) {
-    if store.phase == Phase::Scanning {
+    if store.entering.is_some() {
+        enter::step(store, env, ev, out);
+    } else if let Event::Arrived { .. } = ev {
+        enter::step(store, env, ev, out);
+    } else if store.phase == Phase::Scanning {
         scan::step(store, env, ev, out);
     } else {
         start::step(store, env, ev, out);

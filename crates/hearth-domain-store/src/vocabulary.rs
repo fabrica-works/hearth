@@ -1,9 +1,10 @@
 //! Typed store requests and terminals (store.md, 6.6, 8.2).
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
-use skein_lib::Wall;
+use skein_lib::{Duration, Token, Wall};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    Arrived { arrival: Token, sha256: Digest, size: u64, origin: Origin, took: Duration },
     Open,
     Locked,
     Busy,
@@ -14,6 +15,8 @@ pub enum Event {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    Keep { arrival: Token, record: CacheFile },
+    Discard { arrival: Token },
     Lock,
     LoadRecord,
     WriteRecord { record: StoreRecord },
@@ -24,6 +27,8 @@ pub enum Request {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    Cached { arrival: Token },
+    Refused { arrival: Token },
     Ready,
     Full { limit: Limit, most: u32 },
     Unusable { step: Step },
@@ -65,6 +70,7 @@ pub enum Limit {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Step {
+    Keep,
     List,
     Remove,
 }
@@ -91,4 +97,21 @@ pub enum Removal {
 pub struct Stray {
     pub directory: Directory,
     pub name: Box<[u8]>,
+}
+
+/// A cache file's provenance and cost (store.md, 6.5).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct CacheFile {
+    pub at: Wall,
+    pub origin: Origin,
+    pub sha256: Digest,
+    pub size: u64,
+    pub took: Duration,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Origin {
+    Fetch { uri: Box<[u8]> },
+    Index { resolution: Digest },
+    Blob { oid: Box<[u8]> },
+    Rendered { path: Box<[u8]> },
 }
