@@ -2,7 +2,9 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod diff;
+pub mod face;
 pub mod objects;
+pub mod process;
 pub mod repository;
 #[cfg(test)]
 mod tests;
