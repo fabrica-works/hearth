@@ -43,7 +43,8 @@ the simulated world, the shipped `Client` and hosted fakes with their time;
   and the hosted fakes (27.2's `reach` is `&self`).
 - **Tools twice.** The protocol world spawns them with `Op::Spawn` and steps
   44.2's `Git` and 46.1's `Mmdebstrap`; the simulated world hosts them
-  (`HostedProgram`), wrapping the same pure `face::Run` and `print`, over the
+  (`HostedProgram`), wrapping the same pure faces (git's `face::{check, Run}`, mmdebstrap's
+  `face::{check, print}` over its `Simulate`), over the
   repositories and served mirror that `Shared` lends. The domain and protocol
   worlds play io with `Files`; the simulated one runs the real `FileIo`.
 - **Faults** are the seed's: a tool killed after n stdout bytes, a cache file
@@ -78,10 +79,14 @@ Needs: hearth 27; hearth 46.1; skein 03; skein 05.1 (`Ask::Lock`, `Error::Busy`)
 ~/src/rust/skein grep -n 'Lock { file:' origin/main -- crates/skein-sim` prints a line.
 Files: `testing/hearth-fake-machine/`: `Cargo.toml` (`skein-io`, `skein-sim`,
 `skein-world`), new `src/behind.rs`, `src/lib.rs`, derive lines in
-`src/{linux,hearth}.rs`, `src/linux/*.rs`, `src/hearth/{universe,mirror}.rs`
-(shared with 26, 27); tests new `src/tests/behind.rs`, `src/tests.rs`,
-`src/tests/fixtures.rs` (`behind()`: the builder logged in, `/srv/store` laid
-0700; `directory(behind, path) -> Handle`).
+`src/{linux,hearth}.rs`, `src/linux/*.rs` where a type lacks `Hash`,
+`src/hearth/{universe,mirror}.rs` (shared with 26, 27); tests new
+`src/tests/behind.rs`, `src/tests.rs`, `src/tests/fixtures.rs` (`behind()`: the
+builder logged in, `/srv/store` laid 0700 and the builder's, `.owner(BUILDER)`,
+`linux.rs:70`; `directory(behind, path) -> Handle`); shared (ruling 132): the
+root `Cargo.toml` (`skein-sim`, beside `skein-io` and `skein-world`) and
+`Cargo.lock` (skein repinned to `main`, at least 841f487: the pinned 78dd8fa
+has no `Machine::state_digest`, `StateDigests` or 03.4's `Digests::Traced`).
 Shape: the sketch. `answer` is `step` less the ticket, so a unit test needs
 no `Sim`. Seam handles are minted by `Behind`. `Open` is `Op::Open { at:
 At::Beneath(root), .. }`, `OpenHow` to `How` variant for variant; `Read`,
@@ -95,8 +100,9 @@ left. `Refusal` to `kernel::Error` is a total match: the same names, but
 `root` and `program` `At::Root`: missing or denied as refused, else
 `Program::Exit(127)` (3.5); hosted programs never reach the machine.
 `cut(Kill)` closes the handles it is given, so a lock goes; `PowerLoss`
-asserts "M2". `Hash` is derived on the parts and written by hand for the two
-machines: nodes, contents, handles, processes, pipes, rng, sizes, the served
+fails an `assert!` naming "M2" (the workspace denies `clippy::panic`). `Hash` is
+derived on the parts, `hearth::Machine` included, and written by hand only for
+a machine that holds the ledger: nodes, contents, handles, processes, pipes, rng, sizes, the served
 mirror, never the ledger the referee drains.
 Test shape: `src/tests/behind.rs`, each under 20 ms:
 `a_file_made_through_the_seam_reads_back_and_stats_as_laid`,
@@ -221,7 +227,7 @@ then mode 0644: render.md 7.2 "could not start"),
 #[test]
 fn a_diff_whose_git_fails_prints_the_change_bare_then_its_tool_error_and_exits_75() {
     for seed in 0..8 {
-        let scenario = Scenario { fault: Some(Fault::CacheFileGone { sha256: fixtures::MOTD_KIND_SHA256 }), ..fixtures::diff_motd(Form::Json) };
+        let scenario = Scenario { fault: Some(Fault::CacheFileGone { sha256: fixtures::MOTD_KIND_SHA256 }), ..fixtures::diff_motd(Form::JsonLines) };
         let run = protocol::run(&scenario, seed);
         let lines = fixtures::lines(&run.stdout);
         assert_eq!(lines.len(), 5, "version, two changes, the error, the outcome: seed {seed}");
@@ -303,12 +309,13 @@ Scope: testing.md, 8.4's Replay and Memory; the builder's `worst_case` summed
 (programming-model.md, 6.3); the sweeps.
 Needs: skein 03 (03.4: `Digests::Traced`, `Outcome::state_digests`); 28.4;
 hearth 39.1.
-Files (shared): `crates/hearth-domain-render/src/{lib,limits}.rs`,
+Files (shared): `crates/hearth-domain-render/src/{lib,limits,call}.rs`,
 `hearth-domain-store/src/lib.rs`, `hearth-domain-builder/src/lib.rs`,
 `hearth-protocol-builder/src/{lib,limits}.rs`, `hearth-service-builder/src/lib.rs`,
 `crates/hearth/src/lib.rs`; `tests/builder/`: `src/simulated.rs`, new
 `tests/{memory,fuzzy_simulation}.rs`, `tests/simulation.rs`.
-Shape: `Hash` derived on the domains' state (`Render` and its `Call`, `Store`,
+Shape: `Hash` derived on the domains' state (`Render`, `lib.rs:17`, and its
+`Call`, `call.rs:11`, whose `read` and `next` become `u32`; `Store`,
 the root) and the private types under them that lack it: no `usize` (explicit
 widths; log 7), no `Env` (log 8). `Service::domain()`; `Client`'s `state_digest`
 is `Some(state_digest(domain))`. `worst_case` at each layer, as the echo's
@@ -353,7 +360,8 @@ Removes: hearth 11's `Client::worst_case` of `u64::MAX`.
 
 ## Interface sketches
 
-The worlds are ordinary Rust; `behind` is held to the workspace lints.
+The worlds are ordinary Rust; `behind` is held to the workspace lints, and
+`Duration` is `core::time::Duration` (`std_instead_of_core`).
 
 ```rust
 // testing/hearth-fake-machine/src/behind.rs (28.1)

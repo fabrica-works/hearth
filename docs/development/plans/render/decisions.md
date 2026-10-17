@@ -570,6 +570,18 @@ None yet.
      7. `class()` is `Cause::class` (`crates/hearth-protocol-mmdebstrap/src/tail.rs:30`), not `Tail`'s; `Tail::lines` returns a `Queue`, which has no `PartialEq`, and `tail::failure` takes `Reader`s (`tail.rs:262`): `differ` compares the lines one by one, and applies 07.3's "the stderr one unless empty" to the two tails itself.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+132. **hearth 28's Shapes against main** (ready check of hearth-28.1).
+     hearth 28's ready check, against hearth 3cbd5d1 to 3b48d0e (46.1 landed at 266e6b1 meanwhile) and skein 841f487 (fmt and clippy clean with the corrections; default 516 passed, 1 skipped; fuzzy 13), corrects 28-builder-worlds.md:
+     1. 28.1 repins hearth's skein in `Cargo.lock` to `main`, at least 841f487: the pinned 78dd8fa has no `Machine::state_digest` or `StateDigests` (6141021) and no 03.4's `Digests::Traced` (841f487), which 28.5 needs. `Cargo.lock` joins 28.1's shared Files.
+     2. The root `Cargo.toml` gains `skein-sim` beside `skein-io` (`Cargo.toml:18`) and `skein-world` (`:33`), for `behind.rs`: it joins 28.1's shared Files.
+     3. `behind()` lays `/srv/store` 0700 and the builder's, `.owner(BUILDER)` (`testing/hearth-fake-machine/src/linux.rs:70`, `src/tests/fixtures.rs:3`): laid as root, the builder's opens fail with `Permission`.
+     4. 28.3's sketch takes `Form::JsonLines` (`crates/hearth-client-protocol-records/src/form.rs:12`); there is no `Form::Json`.
+     5. 28.5's Files gain `crates/hearth-domain-render/src/call.rs`: `Call` (`call.rs:11`) derives `Debug` alone, and its `read` and `next` (`call.rs:19-20`) are `usize`, which become `u32` under the Shape's "no `usize`"; `Render` (`lib.rs:17`) and `Call` derive `Hash`.
+     6. `PowerLoss` fails an `assert!` naming "M2": the workspace denies `clippy::panic` (`Cargo.toml:102`). `Hash` is derived on `hearth::Machine` too, written by hand only for a machine that holds the ledger; `src/linux/*.rs` names the files whose types lack `Hash`, not each one.
+     7. The worlds' `Duration` is `core::time::Duration` (`std_instead_of_core`, `Cargo.toml:118`).
+     8. The hosted fakes wrap git's `face::{check, Run}` and mmdebstrap's `face::{check, print}` over its `Simulate` (`testing/hearth-fake-mmdebstrap/src/face.rs:7, 45, 145`); mmdebstrap's face has no `Run`.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
