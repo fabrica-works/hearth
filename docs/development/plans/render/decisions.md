@@ -783,6 +783,55 @@ None yet.
 164. **hearth 24's Shapes against main, again** (re-check of hearth-24.1).
      The re-check of hearth 24 after hearth 17.2 landed (a read-only check of the files main moved since c8f830d, at hearth e116e1d, its diff again at 530525a; skein's pin 841f487; its report is this ruling) found eight places where 24-resolution.md does not match main; it now says each. (1) Records' `errors/repository.rs`: `Command` is at :23 and `Ended` at :30, their arms at :96 to :114 (text) and :123 to :139 (JSON). (2) domain-builder's `Event::Render` literal is `src/tests.rs:133`, and its `Spec` literal `src/tests/fixtures.rs:12` (`spec()`). (3) `tests/render/src/parent.rs`'s `Event` and `Answer` matches are at :53, :67, :87 and :95: each gains the variants its increment adds (24.1 `Find`, `Found`, `Absent`; 24.2 `Resolve` and its answers). (4) Further `Spec` literals gain `resolution: None` in 24.1: render `src/call/templates.rs` (`Answer::Spec(parts::Spec {`), protocol `src/tests/fixtures.rs:251` (`spec()`) and `src/tests/translate.rs:153`, `:177`; and protocol `src/tests/fixtures.rs:25`'s `Call::Render` gains `resolve: false` in 24.2. (5) `tests/render/src/declarations.rs:223`'s `Kind` match gains `| Kind::Resolution(_)` in 24.3 (as 21.1's gains `Kind::Reserved`, ruling 162). (6) 24.2 uses `TooLarge { limit: Closure }`, so `Limit::Closure` and its translation and reverse arms (protocol `src/tests/translate/errors.rs`, beside :55) land in 24.2, not 24.3, as do the reverse arms of `Command::Mmdebstrap` and `Ended::Timeout` (`src/tests/translate/repository.rs`, beside :38 and :48). (7) 24.1's `resolution … needed` line changes the text goldens: `THIN_TEXT` (`tests/builder/src/fixtures.rs:163`), `BROKEN_LAB_TEXT` (:439), `tests/builder/tests/real.rs:734`, and their users join 24.1's Files. (8) `Spec.resolution` stays boxed, but for size alone: unboxed, `Spec` is 336 bytes against 208, and clippy passed it, so ruling 160's "trips `large_enum_variant`" was wrong; the sketch's comment says so. Suites in the re-check's scratch tree, with stubs for the sketches' vocabulary and these literals, through heavy: check and clippy clean, nextest 1269 passed, fuzzy 20 passed. Not checked: the 24.1 reference test and the 24.2 live test (fixtures not stubbed), and files main moved after 530525a. Line numbers move as hearth 17 to 20 land: refresh any further copy of a corrected name or line, and list it in the commit body.
 
+165. **A container renders whatever else fails on its host** (design answer, hearth-21.1's ready check of 22:01).
+     The designer's answer, hearth 562994c ("Answer render's question of 22:01: a container on a failing host"), decides it; ruling 162's interim ends, and 21.4 may begin:
+
+     # Answer: hearth 21.4, whether a container renders when its host fails
+
+     Landed: hearth 562994c ("Answer render's question of 22:01: a container on
+     a failing host"), with `land --docs`: render.md 3.4, 7.1 and 7.2;
+     format.md 3.5 and 5.12; hearth/21-reserved.md (21.4) and
+     hearth/42-listing-members-rules.md (Choices).
+
+     ## Decision
+
+     The other reading. render.md 3.4 gains:
+
+     > **A container reads of its host its placement alone:** that `on` names
+     > a target of its environment that is not a container (format.md, 3.4).
+     > Its context holds nothing else of the host (format.md, 7.7), and its
+     > data part none of the host's policies (4.3). So what else fails on the
+     > host (a task that does not exist, `hearth` among them when
+     > `tasks/hearth/` is absent; a declaration or a file of its tasks; its
+     > settings, its guards, its entries) leaves its containers as they are,
+     > and they render. A host whose placement cannot be composed fails each
+     > container placed on it:
+     > - while a document the host composes is refused, by its decode, the
+     >   listing or a rule of composition (3.1, 7.2), the container is left
+     >   out under that error, which prints whatever targets are asked, once
+     >   and without a target (7.1);
+     > - a host whose documents are not refused but compose no placement
+     >   gives each container asked a `composition` error at its `on` (7.2),
+     >   beside the host's own when the host is asked too.
+
+     For hearth 21.4 (21-reserved.md, as landed): `Side::host_valid` keeps the
+     host's four documents alone (decoded, none marked `invalid`) and drops
+     `repository_valid`'s task and base halves and `files_valid`;
+     `validation::host_schema` goes, with its call at `call.rs:451`; `needed` is
+     the asked targets alone; `Host::Unplaced` is new (text `, a target with no
+     placement`, JSON `"unplaced"`). On `NO_HEARTH`, asked `chat-prod`: its
+     `target` line alone, no `tasks/` or `hosts/` line, exit 0; asked `rhi-prod`:
+     the line 21.4 had, exit 2. In the render world, `:150`'s test inverts to
+     `a_container_renders_whatever_else_fails_on_its_host`, and
+     `a_container_on_a_host_with_no_placement_errs_at_its_on` joins it. Size: at
+     most 260 lines (was 220). This replaces ruling 162's interim: 21.4 may begin.
+
+     What stays unchanged: `a_container_whose_host_failed_is_left_out_without_an_error`
+     (a refused host document); render.md 3.4's "a container whose placement
+     cannot be composed fails its host"; client/README.md 3.3's exit codes.
+
+     Nothing is deferred, so `later.md` gains no row.
+
 ## For the user
 
 The long-term choices the user may veto:
