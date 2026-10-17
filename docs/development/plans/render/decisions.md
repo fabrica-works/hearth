@@ -671,6 +671,9 @@ None yet.
      4. `Startup::Unopened` goes to standard error as the protocol's second output: `Service::adopt_error_pipe` and `adopt_error_file` beside `adopt_output_*` (service `lib.rs:72`, `:80`), `Client::open` taking `error: Fd`, which `main.rs:42` passes as `Fd::new(2)`, and protocol `client.rs:19`'s `output` gaining `error` beside it. 23.1's Files gain protocol `src/client.rs`, service `src/tests.rs` and the root's `src/main.rs`.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+142. **hearth 23.1's landing meets ruling 141** (process, hearth 23.1's block of 2026-10-17T18:51:12Z).
+     Ruling 141 is withdrawn, and no step repairs 23.1: hearth 23.1 landed as d25571e at 18:49:29Z, before it, and meets each of its four points another way. 1. `Files::files` is 8, the four roots and the operations (service `limits.rs:35`); 23.2 raises it to 32, as its Files said before ruling 141. 2. The roots stay adopted until the shell's `drain` closes them: the service's `is_empty` counts `open_files() == 4` (service `lib.rs:130`), so nothing closes them twice. 3. `Service::new` seeds the file layer (`lib.rs:64`). 4. The protocol prints the startup record (protocol `lib.rs:182`), and the shell writes it to standard error (`take_startup`, `crates/hearth/src/lib.rs:115-116`). 23-store.md is ruling 139's text again, with these four as 23.1's "As landed". 23.2 builds on d25571e as it stands.
+
 ## For the user
 
 The long-term choices the user may veto:
