@@ -25,6 +25,7 @@ pub struct Declaration {
     pub entries: Box<[crate::entries::Entries]>,
     pub types: Box<[crate::schema::Type]>,
     pub settings: Box<[crate::schema::Spec]>,
+    pub exports: Box<[crate::schema::Export]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Read {
@@ -67,7 +68,7 @@ enum Key {
     Scripts,
     Bless,
     Later,
-    Undecoded,
+    Exports,
     Map(crate::entries::Map),
 }
 const KEYS: &[(&[u8], Key)] = &[
@@ -78,7 +79,7 @@ const KEYS: &[(&[u8], Key)] = &[
     (b"bless", Key::Bless),
     (b"checks", Key::Later),
     (b"settings", Key::Settings),
-    (b"exports", Key::Undecoded),
+    (b"exports", Key::Exports),
     (b"packages", Key::Map(crate::entries::Map::Packages)),
     (b"preseeds", Key::Map(crate::entries::Map::Preseeds)),
     (b"initramfs", Key::Map(crate::entries::Map::Initramfs)),
@@ -107,7 +108,9 @@ pub fn declaration(value: Value, limits: &Limits) -> Result<Declaration, Error> 
         entries: Box::new([]),
         types: Box::new([]),
         settings: Box::new([]),
+        exports: Box::new([]),
     };
+    let mut types = List::with_capacity(limits.document.saturating_div(2).saturating_add(1));
     let mut maps = List::with_capacity(u32::try_from(entries.len()).expect("document bounded by u32"));
     for entry in entries {
         let mut key = None;
@@ -125,16 +128,18 @@ pub fn declaration(value: Value, limits: &Limits) -> Result<Declaration, Error> 
                 }
             }
             Key::Settings => {
-                let (types, settings) = crate::schema::settings(entry.value, limits)?;
-                declaration.types = types;
+                let (settings, _) = crate::schema::read(entry.value, limits, &mut types, false)?;
                 declaration.settings = settings;
+            }
+            Key::Exports => {
+                let (_, exports) = crate::schema::read(entry.value, limits, &mut types, true)?;
+                declaration.exports = exports;
             }
             Key::Reads => declaration.reads = reads(entry.value)?,
             Key::Requires => declaration.requires = guards(entry.value)?,
             Key::Scripts => declaration.scripts = scripts(entry.value)?,
             Key::Bless => declaration.bless = Some(bless(entry.value)?),
             Key::Later => return Err(fault(entry.at, Declared::Later)),
-            Key::Undecoded => return Err(fault(entry.at, Declared::Undecoded)),
             Key::Map(map) => {
                 let entries = crate::entries::read(map, entry.at, entry.value)?;
                 maps.push(entries).expect("one map per source entry");
@@ -142,6 +147,7 @@ pub fn declaration(value: Value, limits: &Limits) -> Result<Declaration, Error> 
         }
     }
     declaration.entries = maps.into_boxed();
+    declaration.types = types.into_boxed();
     Ok(declaration)
 }
 pub(crate) fn fault(at: Position, declared: Declared) -> Error {
@@ -270,4 +276,10 @@ fn bless(value: Value) -> Result<Bless, Error> {
 pub struct Number {
     pub at: Position,
     pub value: i64,
+}
+
+/// Peak heap for declaration decoding, including the JSON value still held.
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    crate::json::worst_case(limits)?.checked_add(crate::schema::worst_case(limits)?)
 }

@@ -1,0 +1,23 @@
+{
+  "doc": "A WireGuard network between the targets of an environment, through a hub.",
+  "settings": {
+    "address": { "type": "string", "doc": "This target's address on the network, such as 10.0.0.2." },
+    "hub": { "type": "bool", "default": false, "doc": "Whether this target relays for the others." },
+    "endpoint": { "type": "string", "optional": true, "doc": "The public address peers dial, for a hub." },
+    "port": { "type": "int", "min": 1, "max": 65535, "default": 51820, "doc": "The UDP port." },
+    "public_key": { "type": "string", "optional": true, "doc": "This target's public key, as its activator reported it." }
+  },
+  "reads": { "vpn": { "exports": true } },
+  "identity": {
+    "wireguard": {
+      "kind": "wireguard-key", "path": "/etc/wireguard/wg0.key",
+      "mode": "0640", "owner": "root", "group": "systemd-network"
+    }
+  },
+  "exports": {
+    "address": { "type": "string", "value": "{{ settings.address }}", "doc": "Its address on the network." },
+    "hub": { "type": "bool", "value": "{{ settings.hub }}", "doc": "Whether it relays." },
+    "endpoint": { "type": "string", "optional": true, "value": "{{ settings.endpoint }}", "doc": "Where to dial it." },
+    "public_key": { "type": "string", "optional": true, "value": "{{ settings.public_key }}", "doc": "Its public key." }
+  }
+}

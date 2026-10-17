@@ -268,3 +268,73 @@ fn the_513th_setting_is_refused_at_its_key() {
         Err(Error { at: at(16909, 1, 16910), fault: Fault::Declaration(Declared::Settings) })
     );
 }
+
+#[test]
+fn an_export_hands_up_its_type_and_value_text() {
+    let declared = declaration(br#"{"exports":{"x":{"type":"int","doc":"d","value":"{{ 1 }}","optional":true}},"settings":{"s":{"type":"bool","doc":"d"}}}"#).expect("export and setting");
+    let [export] = &*declared.exports else { panic!("one export") };
+    assert_eq!(
+        (&*export.name.text, export.name.at, export.at, export.ty, export.optional),
+        (b"x".as_slice(), at(12, 1, 13), at(16, 1, 17), 0, true)
+    );
+    assert_eq!((&*export.value.text, export.value.at), (b"{{ 1 }}".as_slice(), at(48, 1, 49)));
+    let [integer, boolean] = &*declared.types else { panic!("shared arena") };
+    assert_eq!((&integer.form, &boolean.form), (&Form::Int, &Form::Bool));
+    let [setting] = &*declared.settings else { panic!("one setting") };
+    assert_eq!(setting.ty, 1);
+}
+
+const AN_EXPORT_WHOSE_TYPE_HOLDS_SECRET_IS_REFUSED_AT_THAT_TYPE: &[(&[u8], crate::Position, Declared)] = &[
+    (br#"{"exports":{"x":{"type":"secret","doc":"d","value":"{{ 1 }}"}}}"#, at(24, 1, 25), Declared::Secret),
+    (br#"{"exports":{"x":{"type":{"list":"secret"},"doc":"d","value":"{{ 1 }}"}}}"#, at(32, 1, 33), Declared::Secret),
+    (br#"{"exports":{"x":{"type":{"map":{"object":{"s":{"type":"secret","doc":"d"}}}},"doc":"d","value":"{{ 1 }}"}}}"#, at(54, 1, 55), Declared::Secret),
+];
+#[test]
+fn an_export_whose_type_holds_secret_is_refused_at_that_type() {
+    for &(input, at, expected) in AN_EXPORT_WHOSE_TYPE_HOLDS_SECRET_IS_REFUSED_AT_THAT_TYPE {
+        assert_eq!(declaration(input), Err(Error { at, fault: Fault::Declaration(expected) }), "{input:?}");
+    }
+}
+
+const AN_EXPORT_WITHOUT_TYPE_DOC_OR_VALUE_IS_REFUSED_AT_ITS_BRACE: &[(&[u8], crate::Position, Declared)] = &[
+    (br#"{"exports":{"x":{"doc":"d","value":"{{ 1 }}"}}}"#, at(16, 1, 17), Declared::Missing { key: Required::Type }),
+    (br#"{"exports":{"x":{"type":"int","value":"{{ 1 }}"}}}"#, at(16, 1, 17), Declared::Missing { key: Required::Doc }),
+    (br#"{"exports":{"x":{"type":"int","doc":"d"}}}"#, at(16, 1, 17), Declared::Missing { key: Required::Value }),
+];
+#[test]
+fn an_export_without_type_doc_or_value_is_refused_at_its_brace() {
+    for &(input, at, expected) in AN_EXPORT_WITHOUT_TYPE_DOC_OR_VALUE_IS_REFUSED_AT_ITS_BRACE {
+        assert_eq!(declaration(input), Err(Error { at, fault: Fault::Declaration(expected) }), "{input:?}");
+    }
+}
+
+const AN_EXPORT_KEY_ONLY_A_SETTING_TAKES_IS_REFUSED_AT_IT: &[(&[u8], crate::Position, Declared)] = &[
+    (
+        br#"{"exports":{"x":{"type":"int","doc":"d","value":"{{ 1 }}","default":0}}}"#,
+        at(58, 1, 59),
+        Declared::Unknown { of: Object::Export },
+    ),
+    (
+        br#"{"exports":{"x":{"type":"int","doc":"d","value":"{{ 1 }}","min":0}}}"#,
+        at(58, 1, 59),
+        Declared::Unknown { of: Object::Export },
+    ),
+];
+#[test]
+fn an_export_key_only_a_setting_takes_is_refused_at_it() {
+    for &(input, at, expected) in AN_EXPORT_KEY_ONLY_A_SETTING_TAKES_IS_REFUSED_AT_IT {
+        assert_eq!(declaration(input), Err(Error { at, fault: Fault::Declaration(expected) }), "{input:?}");
+    }
+}
+
+const AN_EXPORT_NAME_OUT_OF_FORM_IS_REFUSED_AT_ITS_KEY: &[(&[u8], crate::Position, Declared)] = &[
+    (br#"{"exports":{"Port":{"type":"int","doc":"d","value":"{{ 1 }}"}}}"#, at(12, 1, 13), Declared::Name),
+    (br#"{"exports":{"a-b":{"type":"int","doc":"d","value":"{{ 1 }}"}}}"#, at(12, 1, 13), Declared::Name),
+    (br#"{"exports":{"1st":{"type":"int","doc":"d","value":"{{ 1 }}"}}}"#, at(12, 1, 13), Declared::Name),
+];
+#[test]
+fn an_export_name_out_of_form_is_refused_at_its_key() {
+    for &(input, at, expected) in AN_EXPORT_NAME_OUT_OF_FORM_IS_REFUSED_AT_ITS_KEY {
+        assert_eq!(declaration(input), Err(Error { at, fault: Fault::Declaration(expected) }), "{input:?}");
+    }
+}

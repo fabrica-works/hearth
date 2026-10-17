@@ -30,6 +30,8 @@ pub fn task(name: &str) -> Example {
     panic!("unknown task example: {name}");
 }
 const TASKS: &[Example] = &[
+    Example { name: "vpn", bytes: include_bytes!("../examples/tasks/vpn.json") },
+    Example { name: "backup-peer", bytes: include_bytes!("../examples/tasks/backup-peer.json") },
     Example { name: "boot", bytes: include_bytes!("../examples/tasks/boot.json") },
     Example { name: "hearth", bytes: include_bytes!("../examples/tasks/hearth.json") },
     Example { name: "users", bytes: include_bytes!("../examples/tasks/users.json") },

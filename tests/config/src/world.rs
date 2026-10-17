@@ -234,3 +234,9 @@ pub fn declare(
         Outcome::Failed(error) => Err(error),
     }
 }
+
+/// Limits that admit every declaration key while reaching the settings bound.
+#[must_use]
+pub fn declaring(rng: &mut Rng) -> Limits {
+    Limits { document: 8192, depth: 16, keys: 32, settings: u32::try_from(rng.between(1, 8)).expect("bounded") }
+}

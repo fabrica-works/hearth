@@ -25,7 +25,6 @@ pub enum Fault {
 pub enum Declared {
     Unknown { of: Object },
     Later,
-    Undecoded,
     Wrong { expected: Expected },
     Missing { key: Required },
     Name,
@@ -36,6 +35,7 @@ pub enum Declared {
     Above,
     Enum,
     Settings,
+    Secret,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Object {
@@ -47,6 +47,7 @@ pub enum Object {
     Entry(crate::entries::Map),
     Range,
     Spec,
+    Export,
     Type,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -66,6 +67,7 @@ pub enum Required {
     Message,
     Type,
     Doc,
+    Value,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Shape {

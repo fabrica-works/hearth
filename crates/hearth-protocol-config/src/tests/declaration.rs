@@ -153,14 +153,6 @@ fn a_script_order_outside_0_to_999_is_refused_at_its_value() {
     }
 }
 
-#[test]
-fn the_keys_decoded_later_are_refused_until_their_increment() {
-    assert_eq!(
-        declaration(br#"{"exports":5}"#),
-        Err(Error { at: at(1, 1, 2), fault: Fault::Declaration(Declared::Undecoded) })
-    );
-}
-
 const A_PLAIN_OBJECT_FIELD_ITS_OBJECT_LACKS_IS_REFUSED_AT_ITS_KEY: &[(&[u8], Position, Declared)] = &[
     (
         br#"{"reads":{"core":{"unknown":0}}}"#,

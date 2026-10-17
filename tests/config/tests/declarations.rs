@@ -169,3 +169,51 @@ fn every_schema_example_decodes_to_its_settings_cut_anywhere() {
         }
     }
 }
+
+const TASK_EXAMPLES: &[(&str, &[&[u8]])] = &[
+    ("reads", &[]),
+    ("scripts", &[]),
+    ("bless", &[]),
+    ("users-accounts", &[]),
+    ("ssh", &[]),
+    ("mail-accounts", &[]),
+    ("core-journal", &[]),
+    ("wifi", &[]),
+    ("mail-data", &[]),
+    ("firmware", &[]),
+    ("core-gettys", &[]),
+    ("mail-live", &[]),
+    ("stoa", &[]),
+    ("ripgrep", &[]),
+    ("dkim", &[]),
+    ("ssh-identity", &[]),
+    ("software", &[]),
+    ("boot", &[]),
+    ("hearth", &[]),
+    ("users", &[]),
+    ("locale", &[]),
+    ("vpn", &[b"address", b"endpoint", b"hub", b"public_key"]),
+    ("backup-peer", &[b"recipient"]),
+];
+#[test]
+fn every_task_example_decodes_as_a_declaration_cut_anywhere() {
+    for &(name, exports) in TASK_EXAMPLES {
+        for seed in 0..8 {
+            let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
+            let declared = world::declare(examples::task(name).bytes, &settings, seed).expect("format.md task example");
+            let actual: Vec<_> = declared.exports.iter().map(|export| &*export.name.text).collect();
+            assert_eq!(actual, exports, "{name}, seed {seed}");
+        }
+    }
+}
+#[test]
+fn generated_declarations_hand_up_each_string_where_it_was_written() {
+    for seed in 0..32 {
+        let mut rng = Rng::new(seed);
+        let limits = world::declaring(&mut rng);
+        let written = hearth_config_world::generate::declaration(&mut rng, &limits);
+        let declared =
+            world::declare(&written.bytes, &Settings::calm(&mut rng, limits), seed).expect("generated declaration");
+        assert_eq!(hearth_config_world::fixtures::declaration_texts(&declared), written.texts, "seed {seed}");
+    }
+}

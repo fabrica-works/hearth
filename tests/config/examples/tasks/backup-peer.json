@@ -1,0 +1,10 @@
+{
+  "doc": "Receives the environment's backups, encrypted to its own key.",
+  "settings": {
+    "recipient": { "type": "string", "optional": true, "doc": "This peer's age recipient, as its activator reported it." }
+  },
+  "identity": { "backup": { "kind": "backup-key" } },
+  "exports": {
+    "recipient": { "type": "string", "optional": true, "value": "{{ settings.recipient }}", "doc": "Where backups are encrypted to." }
+  }
+}

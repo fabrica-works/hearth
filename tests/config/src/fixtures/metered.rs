@@ -10,6 +10,13 @@ use skein_lib::{
 };
 
 pub fn metered(document: &[u8], limits: &Limits, bound: u64, what: &str) -> u64 {
+    measure(document, limits, bound, what, false)
+}
+
+pub fn metered_declaration(document: &[u8], limits: &Limits, bound: u64, what: &str) -> u64 {
+    measure(document, limits, bound, what, true)
+}
+fn measure(document: &[u8], limits: &Limits, bound: u64, what: &str, declare: bool) -> u64 {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
     let mut above = Queue::with_capacity(1);
     let mut below = Queue::with_capacity(1);
@@ -23,7 +30,16 @@ pub fn metered(document: &[u8], limits: &Limits, bound: u64, what: &str) -> u64 
     most = most.max(meter.check(meter.end(), bound, &what));
     for _ in 0..document.len() * 100 + 1000 {
         if let Some(event) = above.pop() {
-            drop(event);
+            match event {
+                json::Event::Decoded(value) if declare => {
+                    meter.start();
+                    let declared = hearth_protocol_config::declaration::declaration(value, limits)
+                        .expect("valid worst-case declaration");
+                    most = most.max(meter.check(meter.end(), bound, &what));
+                    drop(declared);
+                }
+                json::Event::Decoded(_) | json::Event::Failed(_) | json::Event::Closed => {}
+            }
             meter.start();
             json::down(&mut decoder, &env, Request::Close, &mut above, &mut below);
             let step = meter.end();

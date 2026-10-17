@@ -41,6 +41,15 @@ pub struct Spec {
     pub max: Option<Number>,
     pub max_length: Option<Number>,
 }
+/// An export's declared type and its expression text (format.md, 8.1).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Export {
+    pub name: Text,
+    pub at: Position,
+    pub ty: u32,
+    pub optional: bool,
+    pub value: Text,
+}
 #[derive(Debug)]
 struct Pending {
     spec: Spec,
@@ -48,6 +57,7 @@ struct Pending {
     min: Option<Position>,
     max: Option<Position>,
     length: Option<Position>,
+    value: Option<Box<Text>>,
 }
 #[derive(Debug)]
 enum Frame {
@@ -56,48 +66,57 @@ enum Frame {
     Type(Value),
 }
 
-type Schema = (Box<[Type]>, Box<[Spec]>);
-pub(crate) fn settings(value: Value, limits: &Limits) -> Result<Schema, Error> {
+type Decoded = (Box<[Spec]>, Box<[Export]>);
+pub(crate) fn read(value: Value, limits: &Limits, types: &mut List<Type>, exported: bool) -> Result<Decoded, Error> {
     let entries = object(value)?;
     let count = u32::try_from(entries.len()).expect("document bounded by u32");
     let mut stack = Stack::with_capacity(limits.depth);
     stack
-        .push(Frame::Fields {
-            entries: entries.into_iter(),
-            specs: List::with_capacity(count.min(limits.settings)),
-            owner: None,
-        })
+        .push(Frame::Fields { entries: entries.into_iter(), specs: List::with_capacity(count), owner: None })
         .expect("decoded object fits depth");
-    let mut types: List<Type> = List::with_capacity(limits.document.saturating_div(2).saturating_add(1));
+    let mut exports = List::with_capacity(if exported { count } else { 0 });
     for _ in 0..limits.document {
         let Some(frame) = stack.pop() else { unreachable!("root returns its specs") };
         match frame {
             Frame::Fields { mut entries, specs, owner } => {
                 if let Some(entry) = entries.next() {
-                    if owner.is_none() && specs.len() == limits.settings {
+                    if !exported && owner.is_none() && specs.len() == limits.settings {
                         return Err(fault(entry.at, Declared::Settings));
                     }
-                    let (pending, ty) = spec(entry, types.len())?;
+                    let (pending, ty) = spec(entry, types.len(), exported && owner.is_none())?;
                     stack.push(Frame::Fields { entries, specs, owner }).expect("decoded nesting fits stack");
                     stack.push(Frame::Finish(pending)).expect("spec occupies a JSON object level");
                     stack.push(Frame::Type(ty)).expect("type occupies a JSON value level");
                 } else if let Some(index) = owner {
                     types.get_mut(index).expect("object was placed first").form = Form::Object(specs.into_boxed());
                 } else {
-                    return Ok((types.into_boxed(), specs.into_boxed()));
+                    return Ok((specs.into_boxed(), exports.into_boxed()));
                 }
             }
             Frame::Finish(pending) => {
                 check(&pending, &types.get(pending.spec.ty).expect("type already read").form)?;
                 let Some(Frame::Fields { specs, .. }) = stack.top_mut() else { unreachable!("spec belongs to fields") };
-                specs.push(pending.spec).expect("one spec per field");
+                if let Some(value) = pending.value {
+                    let spec = pending.spec;
+                    exports
+                        .push(Export {
+                            name: spec.name,
+                            at: spec.at,
+                            ty: spec.ty,
+                            optional: spec.optional,
+                            value: *value,
+                        })
+                        .expect("one export per root field");
+                } else {
+                    specs.push(pending.spec).expect("one spec per field");
+                }
             }
-            Frame::Type(value) => read_type(value, &mut types, &mut stack)?,
+            Frame::Type(value) => read_type(value, types, &mut stack, exported)?,
         }
     }
     unreachable!("each walk step consumes fewer than one document byte")
 }
-fn spec(entry: Entry, ty: u32) -> Result<(Pending, Value), Error> {
+fn spec(entry: Entry, ty: u32, exported: bool) -> Result<(Pending, Value), Error> {
     if !names::identifier(&entry.key) {
         return Err(fault(entry.at, Declared::Name));
     }
@@ -117,6 +136,7 @@ fn spec(entry: Entry, ty: u32) -> Result<(Pending, Value), Error> {
         min: None,
         max: None,
         length: None,
+        value: None,
     };
     let mut value = None;
     let mut doc = false;
@@ -127,30 +147,34 @@ fn spec(entry: Entry, ty: u32) -> Result<(Pending, Value), Error> {
                 documentation(field.value)?;
                 doc = true;
             }
-            b"default" => pending.spec.default = Some(field.value),
+            b"default" if !exported => pending.spec.default = Some(field.value),
+            b"value" if exported => pending.value = Some(Box::new(text(field.value)?)),
             b"optional" => {
                 optional(field.value)?;
                 pending.spec.optional = true;
                 pending.optional = Some(field.at);
             }
-            b"min" => {
+            b"min" if !exported => {
                 pending.spec.min = Some(number(field.value)?);
                 pending.min = Some(field.at);
             }
-            b"max" => {
+            b"max" if !exported => {
                 pending.spec.max = Some(number(field.value)?);
                 pending.max = Some(field.at);
             }
-            b"max_length" => {
+            b"max_length" if !exported => {
                 pending.spec.max_length = Some(number(field.value)?);
                 pending.length = Some(field.at);
             }
-            _ => return Err(unknown(field.at, Object::Spec)),
+            _ => return Err(unknown(field.at, if exported { Object::Export } else { Object::Spec })),
         }
     }
     let value = value.ok_or(fault(at, Declared::Missing { key: Required::Type }))?;
     if !doc {
         return Err(fault(at, Declared::Missing { key: Required::Doc }));
+    }
+    if exported && pending.value.is_none() {
+        return Err(fault(at, Declared::Missing { key: Required::Value }));
     }
     Ok((pending, value))
 }
@@ -213,7 +237,7 @@ fn check(pending: &Pending, form: &Form) -> Result<(), Error> {
     }
     Ok(())
 }
-fn read_type(value: Value, types: &mut List<Type>, stack: &mut Stack<Frame>) -> Result<(), Error> {
+fn read_type(value: Value, types: &mut List<Type>, stack: &mut Stack<Frame>, exported: bool) -> Result<(), Error> {
     let at = value.at;
     let index = types.len();
     let next = index.checked_add(1).expect("document bounded by u32");
@@ -273,9 +297,25 @@ fn read_type(value: Value, types: &mut List<Type>, stack: &mut Stack<Frame>) -> 
         }
         Kind::Null | Kind::Bool(_) | Kind::Int(_) | Kind::List(_) => return Err(wrong(at, Expected::Type)),
     };
+    if exported && form == Form::Secret {
+        return Err(fault(at, Declared::Secret));
+    }
     types.push(Type { at, form }).expect("no more types than document values");
     if let Some(value) = child {
         stack.push(Frame::Type(value)).expect("child replaces its parent frame");
     }
     Ok(())
+}
+
+/// Additional peak heap while decoded values and all new schema lists coexist.
+pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
+    use core::mem::size_of;
+    let entries = u64::from(limits.document / 2).checked_add(1)?;
+    let largest = size_of::<Type>().max(size_of::<Spec>()).max(size_of::<Export>());
+    // Every source value funds at most one output slot. Export roots also
+    // reserve a spec list; boxing a list may temporarily hold both buffers.
+    let outputs = entries.checked_mul(u64::try_from(largest).ok()?)?.checked_mul(3)?;
+    let arena = List::<Type>::worst_case(limits.document.saturating_div(2).saturating_add(1))?;
+    let pending = u64::from(limits.depth).checked_mul(u64::try_from(size_of::<Text>()).ok()?)?;
+    outputs.checked_add(arena)?.checked_add(pending)?.checked_add(Stack::<Frame>::worst_case(limits.depth)?)
 }
