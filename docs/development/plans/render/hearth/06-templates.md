@@ -111,8 +111,9 @@ Scope: `template::compile` for text, `{{ e }}` and `{# … #}`; pass 1;
 found and refused as `UnknownStatement` until 06.2.
 Needs: hearth 37, the crate and its world.
 Files: new `src/{template, template/scan, instruction, utf8}.rs`;
-`src/{lib, limits, error}.rs`; `src/tests.rs`, `src/tests/fixtures.rs`,
-new `src/tests/templates.rs`. In `tests/template/`: new
+`src/{lib, limits, error}.rs`; `src/tests.rs` (`mod templates;`),
+`src/tests/fixtures.rs`, `src/tests/lookups.rs` (`ONE`, `:109`, becomes
+`Limits { nesting: 1, ..SHIPPED }`), new `src/tests/templates.rs`. In `tests/template/`: new
 `src/{generate, reference}/template.rs`; `src/{generate, reference,
 check, fixtures}.rs`; new `tests/{templates, fuzzy_templates}.rs`;
 `tests/fuzzy_expressions.rs` (`assert_fell`'s new form).
@@ -211,8 +212,8 @@ Needs: nothing beyond 06.1.
 Files: new `src/template/statement.rs` (the head and `Block`);
 `src/{template, template/scan, instruction, limits, error}.rs`;
 `src/expression.rs` (a `pub(crate)` entry that refuses a conditional at
-the outermost level, for the iterable); new
-`src/tests/statements.rs`; `src/tests/fixtures.rs`; the world's
+the outermost level, for the iterable); `src/tests.rs` (`mod
+statements;`), new `src/tests/statements.rs`; `src/tests/fixtures.rs`; the world's
 `src/{generate, reference}/template.rs`, `src/{check, fixtures}.rs`.
 Shape:
 - `Does::{Branch, Jump, Enter, Advance, Set}` and `Names`;
@@ -264,7 +265,7 @@ the `else`; `for … if` and `recursive`, 05's errors at the token; block
 `set` `{% set x %}`, `Expected(Assign)` at the tag's end; `{% set a, b = c
 %}`, `Expected(Assign)` at the `,`),
 `a_conditional_after_in_must_be_parenthesised` (`{% for x in a if c else b
-%}`, `Misplaced` at the `if`, 12; `{% for x in (a if c else b) %}` loops),
+%}`, `Misplaced` at the `if`, 14; `{% for x in (a if c else b) %}` loops),
 `a_root_of_the_context_is_refused_as_a_name_bound`,
 `a_close_no_open_block_takes_is_refused_at_its_word`,
 `a_block_open_at_the_end_is_refused_at_its_tag`,

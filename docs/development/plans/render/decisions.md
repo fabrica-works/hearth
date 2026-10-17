@@ -303,6 +303,15 @@ None yet.
 
      The coordinator adds `hearth-09.s1` and `skein-04.s1` to the ledger, each its session's, and removes a session's `target/` only after the session's final report and the end of its turn, until the run's end.
 
+112. **hearth 06's Shapes against main** (ready check of hearth-06.1).
+     hearth 06's Shapes against main (ready check of hearth-06.1), against hearth 0fa1b84 and skein b888da9: `hearth/06-templates.md` corrected.
+
+     1. 06.1's Files gain `src/tests/lookups.rs`: its `ONE` (`:109`, `Limits { expression: SHIPPED.expression, nesting: 1 }`) stops compiling once `Limits` has 06.1's `template`; it becomes `Limits { nesting: 1, ..SHIPPED }`. `src/tests.rs` gains `mod templates;`.
+     2. 06.2's Files gain `src/tests.rs` (`mod statements;`).
+     3. `a_conditional_after_in_must_be_parenthesised`: `Misplaced` at the `if` is at byte 14 of `{% for x in a if c else b %}`, not 12.
+
+     The check's runs: clippy over the workspace with the sketches on stubs, clean; the crate and its world 42 passed (4 sketch tests stubbed), fuzzy 1 of 1. A further `Limits` literal with named fields takes `..SHIPPED` the same way, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
