@@ -440,6 +440,6 @@ None.
 
 1. `git -C ~/src/rust/hearth log origin/main --grep='^Plan: render$' --format='%(trailers:key=Step,valueonly)' | sort -u | grep -c -x -E 'hearth-18\.[1-5]'` prints 5.
 2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run --workspace` and `heavy cargo nextest run --workspace --profile fuzzy` pass.
-3. `git -C ~/src/rust/hearth ls-tree -r --name-only origin/main crates | grep -c -x -E '.*/(kinds/(files|users|groups|presets|tmpfiles|scripts|data)|translate/parts/data)\.rs'` prints 8.
+3. `git -C ~/src/rust/hearth ls-tree -r --name-only origin/main crates | grep -c -x -E 'crates/hearth-domain-render/src/kinds/(files|users|groups|presets|tmpfiles|scripts|data)\.rs|crates/hearth-protocol-builder/src/translate/parts/data\.rs'` prints 8: the production modules alone, not render's `src/tests/kinds/data.rs` and `src/tests/fixtures/kinds/data.rs`.
 4. `git -C ~/src/rust/hearth grep -n -i -E 'minijinja|legacy|workaround' origin/main -- crates/hearth-domain-render/src/kinds crates/hearth-domain-render/src/parts` prints nothing.
 5. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|String::|[^:]: *String\b|-> *String\b|<String\b|&String\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).

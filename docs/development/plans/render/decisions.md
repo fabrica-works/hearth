@@ -923,6 +923,17 @@ None yet.
      - `git show origin/main:crates/hearth-domain-render/src/vocabulary.rs | sed -n 88,90p`: `Resolve {`, `request: Token,`, `key: Digest,`.
      - The sub-agent's suites passed at 1b95d31 with these corrections and 31.1's sketched: clippy `-D warnings`, fmt, nextest 1516, fuzzy 20, and conformance_render 2.
 
+173. **hearth 18's Done when 3 counts the production modules alone** (plan defect, hearth-18.5's block of 2026-10-17T23:29:05Z).
+     **hearth 18's Done when 3 counts the production modules alone** (plan defect, hearth-18.5's block of 2026-10-17T23:29:05Z).
+
+     Yes. Done when 3 meant the eight production modules of session 18: render's seven `src/kinds/{files, users, groups, presets, tmpfiles, scripts, data}.rs` and protocol's `src/translate/parts/data.rs`. Its unanchored `.*/` also matched render's two test modules `src/tests/kinds/data.rs` and `src/tests/fixtures/kinds/data.rs`, which the README's shared-fixture and file-size rules put there: on main it prints 10. The command now names its two roots:
+
+     `git -C ~/src/rust/hearth ls-tree -r --name-only origin/main crates | grep -c -x -E 'crates/hearth-domain-render/src/kinds/(files|users|groups|presets|tmpfiles|scripts|data)\.rs|crates/hearth-protocol-builder/src/translate/parts/data\.rs'` prints 8.
+
+     The two test modules stay where they are, under their names: no rename to fit a count.
+
+     What stays unchanged: Done when 1, 2, 4 and 5, which the report found passing, and the session's landed increments. The other closing counts of the plan that list files recursively, 19's Done when 3 and 21's, anchor at `/src/(parts|kinds|translate/parts)/` and `/src/reserved`, so a `src/tests/` module does not match them. A further closing count that a test module matches stops on a question, as this one did.
+
 ## For the user
 
 The long-term choices the user may veto:
