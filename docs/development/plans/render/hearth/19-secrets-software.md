@@ -37,8 +37,11 @@ change in `hearth diff` (19.5). Each proves on the real loop. M1 renders no
    `software` and `live` are their records with empty fields, and print
    their `part` line alone; THIN_TEXT gains the three lines (`secrets`
    `ac870b5c968e`, `software` `656d135b92c3`, `live` `6f1b7fda0c21`; with 19.5's
-   `seeds`, THIN's spec is `405bf3bde392`: findings/digests.md). JSON: the record under the part's
-   name (client/README.md 3.2).
+   `seeds`, THIN's spec is `405bf3bde392`: findings/digests.md; before 17's parts
+   and 19.5, README "A new part"). The empty records: `secrets` three empty maps
+   (`files`, `identity`, `passwords`); `software` `downloads` an empty map and
+   `scripts` an empty list; `live` the empty map of paths. JSON: the record under
+   the part's name (client/README.md 3.2).
 3. **One file a part** (10's Choices): render `parts/<name>.rs` holds `build`,
    `digest` (`H("part:<name>", the record)`), `change`; `kinds/` an entry's
    check; protocol `translate/parts/<name>.rs`; records `parts/<name>.rs`.
@@ -88,7 +91,8 @@ Files: render new `src/parts/secrets.rs`, `src/kinds/{secrets, identity}.rs`,
 `src/translate/{parts, errors}.rs`, `src/tests/translate.rs`; records new
 `src/parts/secrets.rs`, `src/{parts, records, errors}.rs`, `src/form/{text,
 json}.rs`, `src/tests/{fixtures, secrets}.rs`; `tests/builder/{src/fixtures.rs,
-tests/real.rs}`.
+tests/real.rs}` (the JSON record count, `real.rs:24`, one more a part); render
+`src/diff.rs`'s arms, at Choices 8's layers (README, "A new part").
 Shape: the sketches. A secret: key `Format::Secret` (2.4), `path` required
 (`Format::Path`), `mode` `Format::Mode` default `0600`, `owner` and `group`
 default `root`, unchecked here. A password: each user entry's `password`
@@ -265,7 +269,8 @@ fn a_secrets_owner_without_a_uid_is_an_ids_fault_at_the_owner() {
     let owned = [fixtures::owned(Owns::Secret, b"postfix", b"root", at(1, 71))];
     let faults = ids::check(&accounts, &owned).expect_err("postfix has no uid");
     let want = Kind::Ids(Ids { owner: Box::from(&b"postfix"[..]), of: Owns::Secret, why: Why::NoUid });
-    assert_eq!((&faults[0].kind, faults[0].at), (&want, at(1, 71)), "render.md, 3.3: a fixed id");
+    let place = faults[0].at.as_ref().expect("placed");
+    assert_eq!((&faults[0].kind, place.position), (&want, Some(at(1, 71))), "render.md, 3.3: a fixed id");
 }
 ```
 Then `an_undeclared_owner_is_no_user`, `a_package_user_with_both_ids_is_fixed`,
@@ -405,7 +410,7 @@ None.
 ## Done when
 
 1. `git -C ~/src/rust/hearth log origin/main --grep='^Plan: render$' --format='%(trailers:key=Step,valueonly)' | sort -u | grep -c -x -E 'hearth-19\.[1-5]'` prints 5.
-2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run -p hearth-domain-render -p hearth-protocol-builder -p hearth-client-protocol-records -p hearth-builder-world` passes.
+2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run --workspace` and `heavy cargo nextest run --workspace --profile fuzzy` pass.
 3. `git -C ~/src/rust/hearth ls-tree -r --name-only origin/main crates | grep -c -x -E '.*/src/(parts|kinds|translate/parts)/(secrets|identity|software|live)\.rs'` prints 13.
 4. `git -C ~/src/rust/hearth grep -l a_software_script_is_checked_not_digested origin/main -- crates/hearth-domain-render/src/tests` prints nothing.
 5. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|String::|[^:]: *String\b|-> *String\b|<String\b|&String\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).

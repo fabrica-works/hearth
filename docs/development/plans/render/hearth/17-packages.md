@@ -19,8 +19,8 @@ hearth 24's resolution key and the packages line; 17.3 reads `preseeds` and
   "Who adds what", 10.3); `11-thin-story.md` ("Where later sessions add");
   `25-diff.md` (25.1, sketches); `24-resolution.md` ("What hearth 24 needs of
   hearth 17"); `01-lib.md` (`Item`, `H`).
-- skein at `f981746`: `crates/skein-lib/src/map.rs` (`insert`:88, `get`:68,
-  `iter`:124), `list.rs` (`push`:55). `programming-model.md`: 3, 6.3, 8.
+- skein at `841f487`, hearth's pin: `crates/skein-lib/src/map.rs` (`insert`:90,
+  `get`:70, `iter`:126), `list.rs` (`push`:55). `programming-model.md`: 3, 6.3, 8.
 
 ## What the design asks
 
@@ -80,7 +80,8 @@ hearth 24's resolution key and the packages line; 17.3 reads `preseeds` and
   each spec prints a packages part, so `THIN_TEXT` and spec digests are
   re-pasted by the README's Rules (Edits outside Files), each named in the
   report
-  (`git grep -n -w -e THIN_TEXT -e d5942fa1a047 -e 9970fb4d8f97 -- tests crates`).
+  (`git grep -n -w -e THIN_TEXT -e d5942fa1a047 -e 9970fb4d8f97 -e e0d142ee5fb0 -- tests crates`;
+  README, "A new part").
 
 ## Rules that bind it
 
@@ -101,18 +102,31 @@ Files: render `src/{revision, compose, call, lib}.rs`, `src/evaluate/
 context.rs`, `src/tests/{compose, fixtures}.rs`, new `src/tests/debian.rs`;
 protocol `src/translate/documents.rs`, `src/tests/translate.rs`; `tests/render/
 {src/fixtures.rs, tests/debian.rs (new)}`; `tests/builder/{src/fixtures.rs,
-tests/real.rs}`; each fixture repository that renders
-(`git grep -n -F fleet.json -- tests crates`): `fleet.json` gains `fixtures::DEBIAN`, nothing
-else (past README's 20-line limit: a planner's ruling). `DEBIAN` is THIN's:
+tests/real.rs}`; render `src/call/{templates, guards}.rs` (the empty
+`debian` root at `templates.rs:61`, `guards.rs:24,45`: `call.rs` passes the
+target's root to both); the `Layer` literals that gain `debian`: render
+`src/tests/fixtures/discovery.rs` (seven), `src/tests/fixtures/schemas.rs:222`,
+protocol `src/tests/read.rs:60,145`, `src/tests/translate/composition.rs:38`;
+each fixture repository's `fleet.json` (builder world `src/fixtures.rs`: THIN
+:25, LAYERS :173, MOTD :230; `git grep -n -F '"fleet.json"' -- tests crates`
+for others) gains `DEBIAN`'s `debian` member beside what it holds (LAYERS
+keeps `"motd": {}`), nothing else (past README's 20-line limit: a planner's
+ruling). `DEBIAN` is THIN's:
 `{"debian": {"suite": "forky", "architecture": "amd64", "snapshot":
 {"archive": "20261001T030405Z"}, "pockets": {"updates": false, "security":
 false}}}`.
 Shape: the sketches. `compose::debian` walks 3.2's layers as `compose` does
 (one shared walk), `Merge::merge`ing each. Per target the call composes it,
 then `schema::debian(composed, base document)`; a `Fault` is an `Error` at
-`Documents::path` and its position; a fault gives no spec. The root is cloned
-into each task's `Roots::debian`.
-Test shape: unit, under 20 ms; new `fixtures::debian_layers([Option<&str>; 6])`:
+`Documents::path` and its position; a fault gives no spec. When a layer sets
+`debian`, `{"components": {"main": true}}` is merged first, beneath it, at
+`Layer::Defaults`, document 0 (`compose.rs:359`'s provenance), as
+`schema::debian`'s doc says (`schema/debian.rs:12`); when none does, `None`
+stays `Schema::Missing`. The translation follows `optional_layer`
+(protocol `translate/documents.rs:154`): `Option::map` is a disallowed method
+(`clippy.toml:106`). The root is cloned into each task's `Roots::debian`.
+Test shape: unit, under 20 ms; new `fixtures::debian_layers([Option<&str>; 6])`
+and `fixtures::suite(&Composed)` (the suite and the layer that set it):
 ```rust
 // crates/hearth-domain-render/src/tests/debian.rs
 #[test]
@@ -167,7 +181,8 @@ and `modules` stay empty until 17.3. Text (9.2's, the rest log 9's): `sources`
 suite, architecture, components, archive, then ` updates`, ` security <ts>` if
 on; `request` (absent when empty); `variant`; `microcode`; `apt` and
 `install_recommends <bool>`.
-Test shape: unit, under 20 ms; `fixtures::thin_packages()` is THIN's part:
+Test shape: unit, under 20 ms; `fixtures::thin_packages()` is THIN's part; new
+`fixtures::bytes(&[u8]) -> Item`, imported as `bytes`:
 ```rust
 // crates/hearth-domain-render/src/tests/packages.rs
 #[test]
@@ -402,7 +417,7 @@ None.
 ## Done when
 
 1. `git -C ~/src/rust/hearth log origin/main --grep='^Plan: render$' --format='%(trailers:key=Step,valueonly)' | sort -u | grep -c -x -E 'hearth-17\.[1-5]'` prints 5.
-2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run -p hearth-domain-render -p hearth-protocol-builder -p hearth-client-protocol-records -p hearth-render-world -p hearth-builder-world` passes.
+2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run --workspace` and `heavy cargo nextest run --workspace --profile fuzzy` pass.
 3. `git -C ~/src/rust/hearth ls-tree --name-only origin/main crates/hearth-domain-render/src/parts/ | grep -c -E '/(packages|boot)\.rs'` prints 2.
 4. `git -C ~/src/rust/hearth grep -c -E 'pub fn inputs\(|debian: _' origin/main -- crates/hearth-domain-render/src/parts/packages.rs crates/hearth-protocol-builder/src/translate/documents.rs` prints one `…packages.rs:1` line and no `documents.rs` line.
 5. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|String::|[^:]: *String\b|-> *String\b|<String\b|&String\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).

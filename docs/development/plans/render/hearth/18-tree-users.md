@@ -59,7 +59,10 @@ typed change (hearth 25.1's pattern), and proves itself through `hearth diff`.
    with no row is a field of the record, empty, and prints no row; the `data`
    part is in every spec, its `entries` empty without an entry. THIN's config
    part is then `369415fd653c` (32.1's `e2475ba7…` without the empty fields), its
-   data part `2d4765200bab`, its spec `af576004e1f8` (findings/digests.md).
+   data part `2d4765200bab`, its spec `af576004e1f8` (findings/digests.md, a
+   chain that has 17.2's packages and 17.4's boot parts: README, "A new part").
+   An empty field is an empty map (`groups`, `presets`, `tmpfiles`, `users`)
+   or list (`members`, `scripts`) in the record.
    JSON: a node or a variant is an object with its `kind`, as `file`.
 7. **Left to others:** hearth 19 reads `Accounts` (seeds, fixed ids) and
    `password`; `subordinate` waits for 22's `/etc/subuid`, data's `mode` and
@@ -102,7 +105,12 @@ Directory}`.
 Needs: hearth 16, hearth 25.1, hearth 42.1.
 Files: render new `src/kinds/files.rs`, `src/kinds.rs` (`mod` line),
 `src/{call, revision, vocabulary, errors}.rs`, `src/parts/config.rs`,
-`src/tests/fixtures.rs`, new `src/tests/kinds.rs`; protocol `src/read.rs`.
+`src/tests/fixtures.rs`, new `src/tests/kinds.rs`; protocol `src/read.rs`;
+the `Node` matches: render `src/call/templates.rs:143`, `src/tests/parts.rs:31`,
+`src/tests/diff.rs:76`; `tests/render/tests/thin.rs`'s
+`a_template_and_a_link_are_left_out_of_the_tree` (:215), which this
+increment's Removes ends: the link reaches the tree, and its request count
+(:238) is what the run then asks.
 Shape: the sketches. `As::Link` blobs are gathered whole (at most `Limit::
 Path`) and answered `Decoded::Link`. `files::plan` takes one source among
 `template`, `copy`, `link`, `directory` (`Schema::Source` at the second
@@ -409,7 +417,7 @@ None.
 ## Done when
 
 1. `git -C ~/src/rust/hearth log origin/main --grep='^Plan: render$' --format='%(trailers:key=Step,valueonly)' | sort -u | grep -c -x -E 'hearth-18\.[1-5]'` prints 5.
-2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run -p hearth-domain-render -p hearth-protocol-builder -p hearth-client-protocol-records -p hearth-builder-world` passes.
+2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run --workspace` and `heavy cargo nextest run --workspace --profile fuzzy` pass.
 3. `git -C ~/src/rust/hearth ls-tree -r --name-only origin/main crates | grep -c -x -E '.*/(kinds/(files|users|groups|presets|tmpfiles|scripts|data)|translate/parts/data)\.rs'` prints 8.
 4. `git -C ~/src/rust/hearth grep -n -i -E 'minijinja|legacy|workaround' origin/main -- crates/hearth-domain-render/src/kinds crates/hearth-domain-render/src/parts` prints nothing.
 5. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|String::|[^:]: *String\b|-> *String\b|<String\b|&String\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).

@@ -267,6 +267,36 @@ the closing repins (Repin). The increments of each session are in its file.
   These limits are guides: each landing's report lists its lines outside
   its Files (`git diff --numstat origin/main...HEAD -- <those paths>`),
   and a limit passed is a question before landing.
+- **A new part** (hearth 17 to 20; ruling 158):
+  - `parts::spec_digest` (render `src/parts.rs:26`) writes its map's keys
+    in byte order, `meta` among the parts (11's sketch; render.md 4.5),
+    whatever the order of `Spec.parts`: hearth-lib's encoder asserts it
+    (`encode.rs:116`, "a map's keys strictly increase"). The first
+    increment to add a part named after `meta` (`packages`, `secrets`,
+    `software`) or before `config` (`boot`) makes it so.
+  - A part digest the plan gives holds at once. A spec digest it gives
+    holds once each part of its chain in findings/digests.md has landed;
+    until then a test takes what `spec_digest` prints over the parts on
+    `main`, and the report names both values. THIN's digests are copied
+    in render `src/tests/parts.rs:39` (its config part),
+    `tests/render/tests/thin.rs:19` (its spec), and the builder world's
+    `THIN_TEXT` (`src/fixtures.rs:155`) and `BROKEN_LAB_TEXT` (`:431`),
+    which `tests/builder/tests/{real, store}.rs` and
+    `crates/hearth/tests/end_to_end.rs` read: each is re-pasted as the
+    rule above says.
+  - A new `PartRecord` variant gains its arms in render `src/diff.rs`
+    (`layer`:68, `config_part`:122) in the increment that adds it: the
+    layer its session gives (19's Choices 8), else `Layer::Other` with
+    `// transitional: <the increment that names src/diff.rs for it>`.
+    The tests that take a spec's only part find it by its variant:
+    render `src/tests/parts.rs:52`; records `src/tests/json.rs:45`,
+    `src/tests/text.rs:27,37`; protocol `src/tests/translate.rs:270`;
+    `tests/render/tests/thin.rs:224,249`, `tests/render/tests/compose.rs:45`.
+  - A new `Schema` or `Format` variant gains its arm in the matches over
+    them: `tests/render/src/schemas.rs:394,435`; protocol
+    `src/tests/translate/forms.rs`, `src/tests/translate/declarations.rs:80`,
+    `src/tests/fixtures.rs:479`; records `src/tests/fixtures.rs:177`,
+    `src/errors/schema.rs`.
 - **An increment past twice its Size** (rulings 113 and 130; it replaces,
   for this plan, code-organization.md 7's "Past that, it asks before
   landing" up to three times the Size): it lands at its count without

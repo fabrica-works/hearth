@@ -93,12 +93,23 @@ change in `hearth diff`. Each proves on the real loop.
 Scope: format.md 3.5, 7.7; render.md 3.4's second bullet.
 Needs: hearth 16, hearth 42.3.
 Files: render `src/{compose, call}.rs`, `src/evaluate/context.rs`,
-`src/tests/{compose, fixtures}.rs`; `tests/builder/` fixtures, `real.rs`.
-Shape: the sketches. `compose::containers` walks every discovered target
-whose placement 42.3's `compose::placement` composes, keeping those with `on` the
-host; `context::target` gains the map, each placement as `target.placement`
-(absent fields no key). A container whose placement is refused fails its
-host with that error (`target` the host).
+`src/tests/{compose, fixtures}.rs`; `tests/builder/` fixtures, `real.rs`;
+the users of `context::target` and `templates::Target::new`: render
+`src/call/{templates.rs:60, guards.rs:18}`, `src/call.rs:533`,
+`src/tests/evaluate.rs:138`, `src/tests/fixtures/templates.rs:58`.
+Shape: the sketches. `compose::containers` walks every discovered target of
+the host's environment whose placement 42.3's `compose::placement` composes,
+keeping those with `on` the host ("A host's containers are the targets of
+its environment placed on it", format.md 3.5); `context::target` gains the
+map, each placement as `target.placement` (absent fields no key). A target
+of the host's environment whose placement is refused, its `on` the host,
+fails the host with that error (`target` the host). A target of another
+environment is no container of the host and fails no host: its own 42.3
+error stands, so `real.rs`'s
+`a_container_on_another_environment_s_target_prints_its_error` (:419) keeps
+its lines. `Done::answer` (`call.rs:452`) is at 98 of clippy's 100 lines:
+the lookup goes inside the call to `compose::placed` (`compose.rs:641`), or
+into a function of its own.
 Test shape: render unit, each under 20 ms:
 `containers_are_the_targets_placed_on_a_host_in_name_order`,
 `a_target_placed_on_another_host_is_not_listed`,
@@ -120,7 +131,7 @@ likewise `on` `rhi-lab`; `tasks/inventory/task.json` `{}`,
 #[test]
 fn a_hosts_template_lists_the_containers_placed_on_it() {
     let repository = Repository::make("contained", &fixtures::thin_with(fixtures::CONTAINED));
-    let rendered = fixtures::render(&repository, &["chat-prod", "rhi-lab", "rhi-prod"], Form::Text);
+    let rendered = fixtures::render(&repository, &[b"chat-prod", b"rhi-lab", b"rhi-prod"], Form::Text);
     let expected = concat!(
         "  /etc/containers          file 0644 root:root 01ba4719c80b\n",
         "  /etc/containers          file 0644 root:root 9e40aaeae922\n",
@@ -149,7 +160,10 @@ errors, limits, lib}.rs`, `src/revision/declaration.rs`,
 `src/translate/{declarations, parts, errors}.rs`, `src/tests/translate.rs`;
 records new `src/parts/exports.rs`, `src/{parts, records, errors}.rs`,
 `src/form/{text, json}.rs`, `src/tests/{exports, errors, fixtures}.rs`;
-`tests/builder/` fixtures, `real.rs`.
+`tests/builder/` fixtures, `real.rs`; `tests/render/` (`hearth-render-world`);
+each `Declaration` literal, which gains `exports` as 16.1's gained
+`requires` (`git grep -n 'requires: ' -- crates tests`); render
+`src/diff.rs`'s arms (README, "A new part").
 Shape: the sketches. `translate::declarations::export` replaces 13's
 `exports: _`, compiling `value` with 36's `interpolation::compile`.
 `exports::check`, once a revision, in `schema::declarations`: a value that
@@ -351,13 +365,14 @@ Removes: nothing.
 
 ## Interface sketches
 
-render owns these; the records mirror them; types derive as 17's do.
+render owns these; the records mirror them; types derive as 17's do, but
+`Cache` derives `Debug` alone (skein's `Map` has no `Clone` or `PartialEq`).
 
 ```rust
 // crates/hearth-domain-render/src/compose.rs (20.1); evaluate/context.rs: `target` gains `containers`
 pub struct Container { pub name: Box<[u8]>, pub placement: parts::meta::Placement }
 /// `host`'s containers in name order; a container whose placement is refused fails the host with its error.
-pub fn containers(host: &Target, targets: &[Target], documents: &Documents) -> Result<Box<[Container]>, Error>;
+pub fn containers(host: &Target, targets: &[Target], documents: &Documents) -> Result<Box<[Container]>, Box<Error>>; // as `placed`, clippy's result_large_err
 #[must_use] pub fn target(meta: &Meta, containers: &[Container]) -> Value;
 // crates/hearth-domain-render/src/exports.rs (20.2; Cache, root 20.3); declaration.rs: `Export`
 pub struct Export { pub name: Text, pub at: Position, pub ty: u32, pub optional: bool, pub value: Interpolated }
@@ -409,7 +424,7 @@ None.
 ## Done when
 
 1. `git -C ~/src/rust/hearth log origin/main --grep='^Plan: render$' --format='%(trailers:key=Step,valueonly)' | sort -u | grep -c -x -E 'hearth-20\.[1-4]'` prints 4.
-2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run -p hearth-domain-render -p hearth-protocol-builder -p hearth-client-protocol-records -p hearth-render-world -p hearth-builder-world` passes.
+2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run --workspace` and `heavy cargo nextest run --workspace --profile fuzzy` pass.
 3. `git -C ~/src/rust/hearth ls-tree --name-only origin/main crates/hearth-domain-render/src/ crates/hearth-domain-render/src/parts/ | grep -c -x -E 'crates/hearth-domain-render/src/(parts/)?exports\.rs'` prints 2.
 4. `git -C ~/src/rust/hearth grep -n -E 'exports: _' origin/main -- crates/hearth-protocol-builder/src/translate/declarations.rs | wc -l` prints 0.
 5. `git -C ~/src/rust/hearth grep -n -E 'const DEPTH: u32 = 64;' origin/main -- crates/hearth-client-protocol-records/src/form/json.rs | wc -l` prints 1.
