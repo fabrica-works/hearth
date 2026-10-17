@@ -75,11 +75,21 @@ change line and hunks; a `same` target prints no line.
 Needs: hearth 10.3.
 Files: `src/lib.rs` (`mod diff`), `src/records.rs` (`Record::Change`,
 `Type::Change`, `Terminal`'s `diff`), new `src/diff.rs`,
-`src/parts/config.rs`, `src/form.rs`;
-`src/tests/{diff,fixtures}.rs`.
+`src/parts/config.rs`, `src/form.rs`, `src/form/{text,json}.rs`;
+`src/tests.rs` (`mod diff;`), `src/tests/{diff,fixtures}.rs`; the three
+`Terminal` literals, `src/tests/json.rs:35`, `src/tests/printer.rs:90`
+and `src/tests/text.rs:65`, which gain `diff: None`.
 Shape: the sketches. JSON: `{"record":"change","target":…,"kind":
 "changed","changed":{"parts":[…],"rebuild":{"kind":"from_config"}}}`;
-the tally's fields in the `outcome` line.
+the tally's fields in the `outcome` line, in client/README.md 3.2's
+order (`from`, `to`, `targets`, `changed`, `unchanged`; `left_out` last,
+40.2). Text, the plan's forms of render.md 6.1's names (6.3 shows two):
+`rebuild from packages`, `rebuild from packages, resolution needed`,
+`rebuild from software`, `rebuild from config`, `new slot only`,
+`nothing to build`; the tally `<c> of <t> targets change; <u> are
+unchanged.`, with `target` when `t` is 1, `changes` when `c` is 1, and
+`1 is unchanged`. Lints: pedantic's `match_same_arms` joins arms of one
+body with `|`; no `<[_]>::concat` or `join`, which make a `Vec`.
 Test shape: `fixtures::wg0_changed()`, 6.3's carbon-prod change, its
 hunk git's own (`--unified=3`) for a 13-line `wg0.netdev` whose line 12 is
 the endpoint: 6.3's example, `@@ -9,5 +9,5 @@ ListenPort=51820`, from
@@ -131,15 +141,22 @@ in a diff).
 Files: `src/lib.rs` (`mod errors`, `mod startup`), `src/records.rs`
 (`Record::Error`, `Record::Startup`, their `Type`s, `Terminal`'s
 `left_out`), new `src/errors.rs`, new
-`src/startup.rs`, `src/outcome.rs`, `src/form.rs`;
-`src/tests/{errors,outcome,fixtures}.rs`.
+`src/startup.rs`, `src/outcome.rs`, `src/form.rs`,
+`src/form/{text,json}.rs`; `src/tests.rs` (`mod errors;`),
+`src/tests/{errors,outcome,fixtures}.rs`; 40.1's three `Terminal`
+literals, which gain `left_out: 0`, and `src/tests/json.rs`'s
+`the_terminal_record_gives_its_outcome_by_name`, whose five rows end
+`,"left_out":0}`.
 Shape: the sketches. JSON: `{"record":"error","kind":"guard","guard":
 {"message":…,"name":"modules"},"class":"configuration","at":{"column":7,
 "line":22,"path":"tasks/boot/task.json"},"target":"carbon-lab",
 "task":"boot"}`. `startup`: text `hearth: unknown option: --bogus`, or
 `hearth: cannot open the store <path>: <error>`; JSON `{"record":
 "startup","kind":"usage","outcome":"usage","usage":{"misuse":"option",
-"word":"--bogus"}}`.
+"word":"--bogus"}}`. JSON's `outcome` line always carries `left_out`,
+last (render.md 7.3: "JSON's `outcome` record carries `left_out`"). In
+text the terminal record prints `<n> more errors` (`1 more error`) right
+after the last error, then, in a diff, the blank line and the tally.
 Test shape: `fixtures::modules_guard()`, 7.3's fourth line. Reference:
 
 ```rust
@@ -245,4 +262,4 @@ None.
 1. `git -C ~/src/rust/hearth log origin/main --grep='^Plan: render$' --format='%(trailers:key=Step,valueonly)' | sort -u | grep -c -x -E 'hearth-40\.[1-2]'` prints 2.
 2. In a worktree at `origin/main`, `heavy cargo nextest run -p
    hearth-client-protocol-records` passes, its `Summary` naming at least
-   44 tests.
+   43 tests.

@@ -261,6 +261,18 @@ None yet.
      the report's `Size:`, by that command. Every later increment counts its
      size with that command alone, written out as the document gives it.
 
+108. **hearth 40's Shapes against main** (ready check of hearth-40.1).
+     hearth 40's ready check, against hearth ff899e7 (hearth 10 landed) and skein 089ed83: `hearth/40-client-diff-errors.md` corrected against main's records crate and render.md 6.1, 6.3 and 7.3.
+
+     1. Files: main's form is split, `src/form.rs`, `src/form/json.rs`, `src/form/text.rs` (`git ls-tree origin/main crates/hearth-client-protocol-records`): both increments' Files gain `src/form/{text,json}.rs`. `src/tests.rs` reads `mod fixtures; mod json; mod outcome; mod printer; mod text;`: 40.1 adds `mod diff;`, 40.2 `mod errors;`.
+     2. `Terminal { outcome }` is built at `src/tests/json.rs:35`, `src/tests/printer.rs:90` and `src/tests/text.rs:65`, and nowhere else in hearth: 40.1 adds `diff: None` there, 40.2 `left_out: 0`.
+     3. `left_out` (render.md 7.3: "JSON's `outcome` record carries `left_out`"; client/README.md 3.2: "one `outcome` line, which carries `from`, `to`, the counts and `left_out`"): always in the `outcome` line, last; 40.2's Files gain the five rows of `the_terminal_record_gives_its_outcome_by_name`, each ending `,"left_out":0}`. In text, `<n> more errors` right after the last error, then a diff's blank line and tally.
+     4. The plan's text forms of render.md 6.1's rebuild names, 6.3 showing only `rebuild from config` and `nothing to build`: `rebuild from packages`, `rebuild from packages, resolution needed`, `rebuild from software`, `new slot only` (6.1: "a new slot of the same output"); the tally's singulars `target`, `changes`, `1 is unchanged`.
+     5. Lints the check met: pedantic's `match_same_arms`; `<[_]>::concat` and `join` make a `Vec`, a disallowed type in step crates (`clippy.toml`).
+     6. Done when 2: 20 tests on main (`git grep -c '#\[test\]'`: json 4, outcome 1, printer 6, text 9), and 12 + 11 named by 40.1 and 40.2: at least 43, not 44.
+
+     A further `Terminal` literal, or a further outcome-line literal, that a later landing meets is refreshed the same way, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
