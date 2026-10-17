@@ -69,8 +69,8 @@ files (32.1) and the binary (32.2).
 - **Transitional, each with its end** (development.md, 5.3): the cache
   file without its kind-5 record, the store's lock or `store.record`
   (hearth 23 and 33); `Client::worst_case`, none until hearth 28; `records::
-  Spec::parts` empty (32.1); the terminal record's `diff: None` and `left_out:
-  0`, which 11.3's translation writes (or the later of 11.3 and 40.1, 40.2
+  Spec::parts` empty (32.1), and its `resolution` `None` (24.1); the
+  terminal record's `diff: None` and `left_out: 0`, which 11.3's translation writes (or the later of 11.3 and 40.1, 40.2
   edits in), hearth 22 filling `left_out`.
 
 ## Rules that bind it
@@ -349,7 +349,7 @@ pub enum Answer { Spec(render::Spec) } // `Error` with hearth 12, `Change` with 
 pub struct Limits { pub render: render::Limits } // hearth-domain-builder's `src/lib.rs` (11.2); 23 adds the store's
 // crates/hearth-protocol-builder/src/lib.rs (11.2; the printer 11.3)
 pub enum Asked { Io(io::Request) }  pub enum Told { Io(io::Event) } // processes and streams (32.1: files)
-pub struct Limits { pub git: git::Limits, pub config: config::Limits, pub printer: records::Limits }
+pub struct Limits { pub git: git::limits::Limits, pub config: config::Limits, pub printer: records::limits::Limits } // neither crate re-exports `Limits`
 pub struct Protocol { /* private: one call's git child, blob, printer */ }
 impl Protocol {
     #[must_use] pub fn new(limits: &Limits, call: Call, form: Form, root: Fd) -> Protocol; // git spawned beneath `root`, `HOME=/dev/null`.
@@ -361,8 +361,8 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<buil
 // src/translate/*.rs: one function a type, both ways in src/tests/translate.rs
 #[must_use] pub fn entry(entry: listing::Entry) -> render::revision::Entry; // listing.rs (11.2)
 #[must_use] pub fn document(document: config::document::Document) -> render::revision::Document; // documents.rs (11.2)
-#[must_use] pub fn spec(spec: render::parts::Spec) -> records::Spec; // answers.rs (11.3)
-#[must_use] pub fn outcome(outcome: render::Outcome) -> records::Outcome; // answers.rs (11.3)
+#[must_use] pub fn spec(spec: render::parts::Spec) -> records::records::Spec; // answers.rs (11.3); `resolution: None` until hearth 24.1
+#[must_use] pub fn outcome(outcome: render::Outcome) -> records::outcome::Outcome; // answers.rs (11.3)
 // crates/hearth-service-builder/src/lib.rs (11.3)
 pub struct Configuration { pub limits: Limits }
 pub struct Limits { pub io: io::Limits, pub protocol: protocol::Limits, pub domain: builder::Limits, pub queue: u32 } // `files` with hearth 32.1

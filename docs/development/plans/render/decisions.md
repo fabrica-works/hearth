@@ -217,6 +217,15 @@ None yet.
      - `a_resolution_field_one_past_its_limit_is_unreadable` and its writing twin gain a row: a component of 257 bytes.
      09.1's Size stays 280: the check's layout of the sketches is within implementer.md's tolerance, twice the Size. The sketches compile under clippy as written; hearth's default and fuzzy suites passed at `b62b498` with them applied.
 
+104. **hearth 11's Shapes against main** (ready check of hearth-11.1).
+     hearth 11's ready check, against hearth 5ead93f and skein 089ed83: three sketch paths corrected in `hearth/11-thin-story.md`, no suite failed.
+
+     1. 11.2's `Limits` names `git::limits::Limits` and `records::limits::Limits`: neither `hearth-protocol-git` nor `hearth-client-protocol-records` re-exports `Limits` (`crates/hearth-protocol-git/src/limits.rs:3`, `crates/hearth-client-protocol-records/src/limits.rs:3`; their `lib.rs` declare `pub mod limits;` and no `pub use`).
+     2. 11.3's translations return `records::records::Spec` and `records::outcome::Outcome` (`records.rs:28`, `outcome.rs:3`), `records` the crate.
+     3. The records' `Spec` has `resolution: Option<Resolution>` since b62b498 (`records.rs:34`): 11.3's `translate::spec` writes `resolution: None` until hearth 24.1 fills it (`24-resolution.md:38`), which prints nothing, so 11's expected output is unchanged; the transitional list names it. A `Spec` literal without it fails with E0063.
+
+     The check compiled the corrected sketches; hearth-lib's suite passed, 23 of 23, the plan's digests among them. Any further copy of these paths in 11's text takes the same form, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
