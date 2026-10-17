@@ -3,7 +3,8 @@ use hearth_config_world::{
     world::{self, Outcome, Settings},
 };
 use hearth_protocol_config::{
-    Fault,
+    Fault, Position,
+    document::{self, Firmware, Runs},
     json::Waiting,
     limits::{Limits, SHIPPED},
 };
@@ -80,5 +81,45 @@ fn a_number_cut_before_its_delimiter_is_truncated_before_its_value_is_judged() {
                 fault: Fault::Json(skein_json::tokenizer::Error::Truncated)
             }))
         );
+    }
+}
+
+type Host = Option<(&'static [u8], Position)>;
+type Placed = (&'static str, Runs, Option<Firmware>, Option<&'static [u8]>, Host, Position);
+const PLACED: &[Placed] = &[
+    ("x1-prod", Runs::Metal, Some(Firmware::Efi), Some(b"7th-gen"), None, Position { offset: 17, line: 2, column: 16 }),
+    ("ion-prod", Runs::Vm, Some(Firmware::Bios), Some(b"ionos"), None, Position { offset: 15, line: 1, column: 16 }),
+    (
+        "chat-prod",
+        Runs::Container,
+        None,
+        None,
+        Some((b"rhi-prod", Position { offset: 44, line: 1, column: 45 })),
+        Position { offset: 15, line: 1, column: 16 },
+    ),
+];
+#[test]
+fn the_placed_examples_decode_to_their_placements_cut_anywhere() {
+    for expected in PLACED {
+        let example = examples::all().iter().find(|example| example.name == expected.0).expect("placed example");
+        for seed in 0..8 {
+            let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
+            let run = world::check(example.bytes, &settings, seed);
+            let placement =
+                document::document(run.value.expect("decoded")).expect("document").layer.placement.expect("placement");
+            assert_eq!(
+                (
+                    example.name,
+                    placement.kind,
+                    placement.firmware,
+                    placement.hardware.as_deref(),
+                    placement.on.as_ref().map(|on| (on.target.as_ref(), on.at)),
+                    placement.at
+                ),
+                *expected,
+                "{}, seed {seed}",
+                example.name
+            );
+        }
     }
 }

@@ -24,4 +24,19 @@ pub enum Shape {
     Name,
     Settings { task: Box<[u8]> },
     Reserved,
+    Placement,
+    Unknown { field: Box<[u8]> },
+    Wrong { field: Field },
+    Missing { field: Field },
+    Misplaced { field: Field },
+}
+
+/// Placement's M1 fields (format.md, 3.4).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Field {
+    Kind,
+    Firmware,
+    Hardware,
+    On,
+    Mutable,
 }

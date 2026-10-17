@@ -7,7 +7,7 @@ mod error;
 pub mod json;
 pub mod limits;
 pub mod names;
-pub use error::{Error, Fault, Shape};
+pub use error::{Error, Fault, Field, Shape};
 pub use skein_json::tokenizer::Position;
 #[cfg(test)]
 mod tests;
