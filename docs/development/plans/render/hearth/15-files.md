@@ -88,9 +88,12 @@ expression`), 06 (`template::compile`, `template::place`, `instruction::*`,
 `Name`, `Destination`), 36.2 (`ErrorKind::Interpolation`).
 Files: render `src/{vocabulary, revision, call, errors, limits}.rs`,
 `src/evaluate.rs`, new `src/evaluate/template.rs`, `src/tests/{revision,
-fixtures}.rs`; protocol `src/{lib, read}.rs`, `src/translate.rs`, new
+fixtures}.rs`; protocol `src/{lib, limits, read}.rs` (`limits.rs:4-12`:
+`Limits` gains `template`), `src/translate.rs`, new
 `src/translate/instructions.rs`, `src/translate/errors.rs`,
-`src/tests/{read, translate, fixtures}.rs`; records `src/errors.rs`,
+`src/tests/{read, translate, fixtures}.rs`, `src/tests/translate/errors.rs`
+(`decode_back` `:5`, `decode_limit_back` `:50`: `Syntax`'s and
+`Limit::Template`'s reverse arms); records `src/errors.rs`,
 `src/form/{text, json}.rs`, `src/tests/errors.rs`; `tests/render/src/parent.rs`
 (answers a template through 06's compiler); `tests/builder/{src/fixtures.rs,
 tests/real.rs}`. Shape: the sketches' types, translations.
@@ -101,17 +104,27 @@ tests/real.rs}`. Shape: the sketches' types, translations.
   as a link is `Repository::Link`, and a name `.j2` alone `Repository::Name`
   (42.1's), neither asked. `Decoded::Template` is dropped until 15.2;
   `Refused` becomes 12.2's error with the template's path and `task`.
+  `call.rs:388`'s `contains` asks one blob for paths of one content: a
+  template's `Decoded` is kept by oid (15.2 evaluates it so), and a
+  `Refused` one makes an error at each path that holds it, each with its
+  `task`, so that every task's targets fail.
 - **protocol:** the blob gathered into a `Writer` (11.2);
   `template::compile(&bytes, &limits.template)`: `Ok` is `Decoded::Template(
   translate::instructions::template(t))`; `Err(e)` is `Refused { at:
   template::place(&bytes, e.at), fault: Decode::Syntax(translate::errors::
-  syntax(e.kind)), also: None }`.
+  syntax(e.kind)), also: None }`, `place`'s `(u32, u32)` (06's
+  `template.rs:82`) made a `Position { line, column }`. `syntax` translates
+  `Arity`'s filter with the landed `translate::operations::filter`
+  (`operations.rs:58`), not a copy.
 - **records:** a message an arm: `a tag with no end`, `not
   UTF-8`, `a carriage return`, `an unknown statement`, `a close with no open
   block`, `a block left open`, `a root of the context bound`, `an unknown
   filter`, `"join" takes 1 argument, given 2`; JSON `"decode":{"kind":
   "syntax","fault":"unclosed"}`, `Arity`'s filter by its 7.5 name; the other
   ten kinds print their name in words (`too deep`, `an unknown test`).
+  The JSON arm names all 19 kinds, no `_`. Code here takes `skein_lib::List`
+  and `match`, never `map`, `collect`, `into_vec` or `and_then`
+  (`clippy.toml:104-123`).
 Test shape: protocol unit, through 11.2's `fixtures::Layer`, under 20 ms:
 `a_templates_blob_reaches_render_compiled_with_its_lines`,
 `a_template_that_does_not_compile_is_refused_at_its_line_and_column`;
@@ -141,8 +154,11 @@ in `config`'s tree; render.md 7.2's `evaluation`.
 Needs: nothing beyond 15.1, and hearth 13.4 (`Checked`).
 Files: render new `src/evaluate/frame.rs`,
 `src/evaluate/{template, context, value, lookup, operators, filter, walk}.rs`,
-`src/{call, parts, errors, limits}.rs`, `src/parts/config.rs`, new
-`src/tests/templates.rs`, `src/tests/{fixtures, parts}.rs`; protocol
+`src/{call, parts, errors, limits}.rs`, `src/parts/config.rs`,
+`src/evaluate.rs` (`:278`) and `src/evaluate/escape.rs` (`:65`), which
+match `Operand` and `View` and gain `Loop`'s arms as the files above do,
+new `src/tests/templates.rs`, `src/tests/{fixtures, parts}.rs`;
+`tests/render/src/expressions.rs` (`:329`); protocol
 `src/translate/errors.rs`, `src/tests/translate.rs`; records `src/errors.rs`,
 `src/form/{text, json}.rs`, `src/tests/errors.rs`; `tests/render/{src/
 fixtures.rs, tests/thin.rs}`; `tests/builder/{src/fixtures.rs, tests/real.rs}`.
@@ -242,7 +258,9 @@ the next runs, written by store.md 6.8; with 33.1, entered through the store.
 Needs: nothing beyond 15.2.
 Files: render `src/{vocabulary, call, lib}.rs`, `src/tests/templates.rs`;
 protocol `src/{lib, cache}.rs`, `src/tests/cache.rs`; `tests/render/src/
-parent.rs`; `tests/builder/tests/real.rs`.
+parent.rs`; `tests/builder/tests/real.rs`. Protocol `lib.rs:209` asserts
+`mode.is_none() && child.is_none()` before each render request: `Keep`
+meets it, and 15.3's commit body says how it passes.
 **Whichever of 15.3 and 33.1 lands second** also changes: root
 `crates/hearth-domain-builder/src/{lib, vocabulary}.rs` (`Event::Produced`),
 `src/tests.rs`; protocol `src/{cache, store}.rs`, `src/tests/store.rs`;
@@ -369,8 +387,9 @@ pub enum Expected { Operand, Operator, Name, CloseParen, CloseBracket, In, Else,
 pub enum Kind { /* … */ Evaluation(Evaluation) }  // 13.4's
 pub enum Decode { /* … */ Syntax(Syntax) }        // 15.1; `Limit` gains `Template`
 pub enum Evaluation { Unknown, NoKey, NoIndex, Undefined, Type, Overflow, Empty, Path, Output, Limit } // mirrors render's `FaultKind`
-// `Syntax`, `Expected` mirror render's, but `Arity { filter: Box<[u8]>, given: u32 }`: the filter's 7.5 name.
-// protocol translate/instructions.rs (15.1); reverses in src/tests/translate.rs
+// `Syntax`, `Expected` mirror render's, but `Arity { filter: Box<[u8]>, expected: u32, given: u32 }`: the filter's
+// 7.5 name, and its arity from render's `Filter::arity` (`evaluate/filter.rs:30`), so `"replace" takes 2 arguments`.
+// protocol translate/instructions.rs (15.1); reverses in src/tests/translate.rs, errors' in src/tests/translate/errors.rs
 #[must_use] pub fn template(template: template::instruction::Template) -> render::evaluate::template::Template;
 #[must_use] pub fn instruction(instruction: template::instruction::Instruction) -> render::evaluate::template::Instruction;
 #[must_use] pub fn does(does: template::instruction::Does) -> render::evaluate::template::Does;
@@ -378,7 +397,7 @@ pub enum Evaluation { Unknown, NoKey, NoIndex, Undefined, Type, Overflow, Empty,
 // protocol translate/errors.rs: 12's `error` gains its arms, and
 #[must_use] pub fn syntax(kind: template::error::ErrorKind) -> render::errors::Syntax;   // 15.1
 #[must_use] pub fn evaluation(kind: render::evaluate::FaultKind) -> records::Evaluation; // 13.4's
-// protocol lib.rs: 11.2's `Limits` gains `template: template::limits::Limits` (15.1).
+// protocol limits.rs: 11.2's `Limits` gains `template: template::limits::Limits` (15.1).
 // root vocabulary.rs: by whichever of 15.3 and 33.1 lands second; `Cached` becomes `Kept`, `Refused` `Failed`
 pub enum Event { /* … */
     Produced { request: Token, path: Box<[u8]>, arrival: Token, sha256: Digest, size: u64, took: Duration } }
