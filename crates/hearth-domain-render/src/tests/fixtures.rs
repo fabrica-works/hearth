@@ -238,6 +238,7 @@ pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
     call.documents.set(
         &base,
         Document {
+            members: None,
             at,
             layer: Layer {
                 placement: Some(crate::revision::Placement {
@@ -255,6 +256,7 @@ pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
     call.documents.set(
         &host,
         Document {
+            members: None,
             at,
             layer: Layer {
                 placement: Some(crate::revision::Placement {
@@ -686,7 +688,11 @@ pub fn template_call(path: &[u8], mode: crate::revision::Mode, size: u64, limits
     let at = composition::at(1, 1);
     call.documents.set(
         &crate::revision::Oid(bytes::copy_of(b"host")),
-        crate::revision::Document { at, layer: crate::revision::Layer { tasks: Box::new([]), placement: None } },
+        crate::revision::Document {
+            at,
+            members: None,
+            layer: crate::revision::Layer { tasks: Box::new([]), placement: None },
+        },
     );
     call.targets = Box::new([target]);
     call.commit = Some(crate::revision::Oid(bytes::copy_of(b"commit")));
@@ -767,3 +773,6 @@ pub fn failed_diff(bound: u32, count: u32) -> Box<[crate::vocabulary::Answer]> {
     }
     finish_render(&mut crate::Render { call: Some(call) }, &env, &mut out)
 }
+
+mod discovery;
+pub use discovery::{member_documents, member_layers, members, with_document};

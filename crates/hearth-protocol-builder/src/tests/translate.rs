@@ -100,6 +100,7 @@ fn a_document_without_placement_keeps_its_position_and_absence() {
     assert_eq!(
         documents::document(input),
         target::Document {
+            members: None,
             at: target::Position { line: 2, column: 4 },
             layer: target::Layer { placement: None, tasks: Box::new([]) }
         },
@@ -779,6 +780,7 @@ fn each_retained_hunk_line_translates_to_records_and_back() {
     }
 }
 
+mod composition;
 mod declarations;
 mod repository;
 #[path = "translate_store.rs"]

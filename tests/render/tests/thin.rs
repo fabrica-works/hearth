@@ -147,10 +147,22 @@ fn a_document_above_its_limit_fails_only_its_targets_before_reading() {
 
 #[test]
 fn targets_above_the_configured_limit_fail_before_reading() {
+    use hearth_domain_render::errors::{Decode, Error, Kind, Limit, Place};
     let run = parent::run_with(&fixtures::two_targets(), &[], 0, limits::Limits { targets: 1, ..limits::SHIPPED });
-    assert_eq!(run.answers, []);
+    assert_eq!(
+        run.answers,
+        [Answer::Error(Error {
+            side: None,
+            kind: Kind::Decode(Decode::TooLarge { limit: Limit::Targets, max: 1 }),
+            class: hearth_domain_render::vocabulary::Class::Configuration,
+            at: Some(Place { path: Box::from(b"hosts/x1/x1-prod.json".as_slice()), position: None }),
+            also: None,
+            target: None,
+            task: None,
+        })]
+    );
     assert_eq!(run.outcome, Outcome::Failed);
-    assert_eq!(run.requests.len(), 1);
+    assert_eq!(run.requests.len(), 2);
 }
 
 #[test]

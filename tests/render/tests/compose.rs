@@ -77,3 +77,45 @@ fn documents_past_the_revision_s_budget_fail_the_call() {
         assert_eq!(run.requests.len(), 1, "budget checked before reading, seed {seed}");
     }
 }
+
+#[test]
+fn targets_are_discovered_from_every_base_s_members() {
+    let mut repository = fixtures::cluster();
+    repository.entries.push(fixtures::entry(b"hosts/stoa/stoa-prod.json", b'4'));
+    repository.entries.push(fixtures::entry(b"hosts/stoa/stoa.json", b'5'));
+    repository.documents.push((fixtures::oid(b'4'), fixtures::document(Some(fixtures::placement()))));
+    repository.documents.push((fixtures::oid(b'5'), fixtures::members(&[(b"a", false), (b"b", false)])));
+    for seed in 0..8 {
+        let run = parent::run(&repository, &[], seed);
+        let names: Vec<_> = run
+            .answers
+            .iter()
+            .map(|answer| {
+                let Answer::Spec(spec) = answer else { panic!("spec") };
+                spec.meta.target.as_ref()
+            })
+            .collect();
+        assert_eq!(names, [b"stoa-a-prod".as_slice(), b"stoa-b-prod", b"x1-1-prod", b"x1-2-prod"], "seed {seed}");
+    }
+}
+#[test]
+fn the_target_past_the_limit_errs_and_fails_the_call() {
+    use hearth_domain_render::errors::{Decode, Kind, Limit};
+    let mut repository = fixtures::cluster();
+    fixtures::set_document(&mut repository, b'2', fixtures::members(&[(b"1", false), (b"2", false), (b"3", false)]));
+    let run = parent::run_with(&repository, &[], 0, limits::Limits { targets: 2, ..limits::SHIPPED });
+    let Answer::Error(error) = only(&run.answers) else { panic!("limit error") };
+    assert_eq!(error.kind, Kind::Decode(Decode::TooLarge { limit: Limit::Targets, max: 2 }));
+    assert_eq!(run.outcome, Outcome::Failed);
+}
+#[test]
+fn a_named_target_a_refused_base_hides_is_no_usage() {
+    use hearth_domain_render::{errors::Decode, revision::Position, vocabulary::Decoded};
+    let mut repository = fixtures::cluster();
+    fixtures::set_document(
+        &mut repository,
+        b'2',
+        Decoded::Refused { at: Position { line: 1, column: 2 }, fault: Decode::Unexpected, also: None },
+    );
+    assert_eq!(parent::run(&repository, &[b"x1-1-prod"], 0).outcome, Outcome::Failed);
+}

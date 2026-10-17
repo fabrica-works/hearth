@@ -97,3 +97,99 @@ fn a_merge_at_the_shipped_depth_fits_its_stack() {
     }
     assert_eq!(value.kind, Composite::Int(42));
 }
+
+#[test]
+fn a_base_with_members_makes_one_target_per_member() {
+    use super::fixtures;
+    let documents = fixtures::member_documents(Some(fixtures::members(&[(b"2", false), (b"1", false)])), None);
+    let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+    let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
+    assert_eq!(discovered.names.as_ref(), &[Box::from(b"stoa-1-lab".as_slice()), Box::from(b"stoa-2-lab".as_slice())]);
+}
+#[test]
+fn a_base_env_adds_removes_and_changes_members() {
+    use super::fixtures;
+    let documents = fixtures::member_documents(
+        Some(fixtures::members(&[(b"1", false), (b"2", false), (b"3", true)])),
+        Some(fixtures::members(&[(b"1", false), (b"2", true), (b"4", false)])),
+    );
+    let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+    let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
+    assert_eq!(discovered.names.as_ref(), &[Box::from(b"stoa-1-lab".as_slice()), Box::from(b"stoa-4-lab".as_slice())]);
+}
+const MEMBER_LAYERS: &[([Option<i64>; 5], Composite)] = &[
+    ([Some(1), None, None, None, None], Composite::Int(1)),
+    ([Some(1), Some(2), None, None, None], Composite::Int(2)),
+    ([Some(1), Some(2), Some(3), None, None], Composite::Int(3)),
+    ([Some(1), Some(2), Some(3), Some(4), None], Composite::Int(4)),
+    ([Some(1), Some(2), Some(3), Some(4), Some(5)], Composite::Int(5)),
+];
+#[test]
+fn a_member_s_layers_follow_its_base_s_and_base_env_s() {
+    use super::fixtures;
+    for (row, (values, expected)) in MEMBER_LAYERS.iter().enumerate() {
+        let documents = fixtures::member_layers(*values);
+        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+        let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
+        let settings =
+            crate::compose::compose(only(&discovered.targets), &documents, &mut Merge::new(&limits::SHIPPED));
+        let Composite::Map(pairs) = &only(&settings.tasks).settings.kind else { panic!("task settings") };
+        assert_eq!(&only(pairs).value.kind, expected, "row {row}: member layer order");
+    }
+}
+const LONG_MEMBERS: &[&[u8]] = &[
+    b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+];
+#[test]
+fn a_target_name_past_63_bytes_is_refused() {
+    use super::fixtures;
+    for (row, &name) in LONG_MEMBERS.iter().enumerate() {
+        let input = (name, false);
+        let documents = fixtures::member_documents(Some(fixtures::members(core::slice::from_ref(&input))), None);
+        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+        let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("bounded count");
+        assert_eq!(discovered.targets.as_ref(), [], "row {row}");
+        assert_eq!(
+            only(&errors.finish().0).kind,
+            crate::errors::Kind::Composition(crate::errors::Composition::Long),
+            "row {row}"
+        );
+    }
+}
+#[test]
+fn two_targets_of_one_name_fail_both_with_one_error() {
+    use super::fixtures;
+    use crate::{
+        errors::{Class, Composition, Error, Kind, Place},
+        revision::{Document, Layer, Position},
+    };
+    use skein_lib::bytes::copy_of;
+    let input = (b"1".as_slice(), false);
+    let documents = fixtures::member_documents(Some(fixtures::members(core::slice::from_ref(&input))), None);
+    let documents = fixtures::with_document(
+        &documents,
+        b"hosts/stoa-1/stoa-1-lab.json",
+        Document { at: at(1, 1), members: None, layer: Layer { placement: None, tasks: Box::new([]) } },
+    );
+    let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+    assert_eq!(
+        crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("bounded count").targets.as_ref(),
+        []
+    );
+    assert_eq!(
+        errors.finish().0.as_ref(),
+        &[Error {
+            side: None,
+            kind: Kind::Composition(Composition::Duplicate),
+            class: Class::Configuration,
+            at: Some(Place { path: copy_of(b"hosts/stoa-1/stoa-1-lab.json"), position: None }),
+            also: Some(Place {
+                path: copy_of(b"hosts/stoa/stoa.json"),
+                position: Some(Position { line: 1, column: 12 })
+            }),
+            target: Some(copy_of(b"stoa-1-lab")),
+            task: None,
+        }]
+    );
+}

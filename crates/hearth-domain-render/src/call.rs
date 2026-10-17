@@ -80,44 +80,65 @@ impl Side {
         if self.errors.outcome() != Outcome::Done {
             self.outcome = self.outcome.worst(Outcome::Failed);
         }
-        let targets = match compose::targets(entries) {
-            Ok(targets) => targets,
+        self.entries = entries.into();
+        self.documents = Documents::new(entries);
+        self.read_documents(limits, out);
+    }
+    fn discover(&mut self, limits: Limits) {
+        let discovery = match compose::targets(&self.documents, &limits, &mut self.errors) {
+            Ok(discovery) => discovery,
             Err(compose::TooMany) => {
                 self.fail(Outcome::Failed);
                 return;
             }
         };
-        if targets.len() > usize::try_from(limits.targets).expect("u32 fits usize") {
-            self.fail(Outcome::Failed);
-            return;
-        }
         let mut selected = List::with_capacity(limits.targets);
-        for target in &targets {
+        for target in &discovery.targets {
             if self.names.is_empty() || self.names.contains(&target.name) {
                 selected.push(target.clone()).expect("target limit checked");
             }
         }
         for name in &self.names {
             let mut known = false;
-            for target in &targets {
-                if target.name == *name {
+            for target in &discovery.names {
+                if *target == *name {
                     known = true;
                 }
             }
-            if !known && !self.diff {
+            if !known && !self.diff && !self.hosts_refused() {
                 self.outcome = self.outcome.worst(Outcome::Usage);
             }
         }
         self.targets = selected.into_boxed();
         self.made = Map::with_capacity(limits.targets);
-        for target in &self.targets {
+        for name in &discovery.names {
+            if !self.names.is_empty() && !self.names.contains(name) {
+                continue;
+            }
             self.made
-                .insert(target.name.clone(), crate::diff::Made::Failed(crate::vocabulary::Class::Configuration))
+                .insert(name.clone(), crate::diff::Made::Failed(crate::vocabulary::Class::Configuration))
                 .expect("target capacity");
         }
-        self.entries = entries.into();
-        self.documents = Documents::new(entries);
-        self.read_documents(limits, out);
+    }
+    fn prepare(&mut self, limits: Limits, out: &mut Queue<Output>) -> bool {
+        if !self.files {
+            self.discover(limits);
+        }
+        self.files(limits, out)
+    }
+    fn hosts_refused(&self) -> bool {
+        for (entry, invalid) in self.entries.iter().zip(&self.invalid) {
+            if *invalid && revision::base(&entry.path).is_some() {
+                return true;
+            }
+            if let revision::Class::Host { .. } = revision::class(&entry.path)
+                && let Some(index) = self.documents.find(&entry.path)
+                && self.documents.get(index).is_none()
+            {
+                return true;
+            }
+        }
+        false
     }
     fn read_documents(&mut self, limits: Limits, out: &mut Queue<Output>) {
         let mut blobs = List::with_capacity(u32::try_from(self.entries.len()).expect("listing capacity"));
@@ -458,18 +479,13 @@ impl Side {
     pub fn answer(&mut self) -> Answer {
         for target in self.targets.get(self.next..).expect("answer cursor within targets") {
             self.next = self.next.saturating_add(1);
-            let mut placement = None;
             let mut valid = self.repository_valid(target);
             for index in [target.fleet, target.base_document, Some(target.environment_document), Some(target.base_env)]
                 .into_iter()
                 .flatten()
             {
                 match self.documents.get(index) {
-                    Some(document) => {
-                        if let Some(p) = &document.layer.placement {
-                            placement = Some(p.clone());
-                        }
-                    }
+                    Some(_) => {}
                     None => {
                         valid = false;
                     }
@@ -478,7 +494,7 @@ impl Side {
             if !valid {
                 continue;
             }
-            let Some(p) = placement else {
+            let Some(p) = compose::placement(target, &self.documents) else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
@@ -489,7 +505,7 @@ impl Side {
             let meta = meta::Meta {
                 target: target.name.clone(),
                 base: target.base.clone(),
-                member: None,
+                member: target.member.clone(),
                 environment: target.environment.clone(),
                 placement: meta::Placement { kind: p.kind, firmware: p.firmware, hardware: p.hardware, on },
             };
@@ -605,7 +621,7 @@ impl Call {
         self.side.ready = true;
     }
     pub fn resume(&mut self, limits: Limits, out: &mut Queue<Output>) -> bool {
-        if self.side.files(limits, out) {
+        if self.side.prepare(limits, out) {
             return false;
         }
         let Some(diff) = &mut self.diff else {

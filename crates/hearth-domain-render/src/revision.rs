@@ -153,6 +153,18 @@ fn identifier(name: &[u8]) -> bool {
 pub struct Document {
     pub at: Position,
     pub layer: Layer,
+    pub members: Option<Members>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Members {
+    pub at: Position,
+    pub each: Box<[Member]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Member {
+    pub name: Box<[u8]>,
+    pub at: Position,
+    pub layer: Option<Layer>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Layer {

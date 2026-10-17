@@ -71,6 +71,7 @@ pub fn error(error: target::Error) -> records::errors::Error {
         target::Kind::Decode(fault) => records::errors::Kind::Decode(decode(fault)),
         target::Kind::Repository(why) => records::errors::Kind::Repository(repository(why)),
         target::Kind::Tool(value) => records::errors::Kind::Tool(tool(value)),
+        target::Kind::Composition(value) => records::errors::Kind::Composition(composition(value)),
     };
     let class = match class {
         render::vocabulary::Class::Configuration => records::errors::Class::Configuration,
@@ -140,6 +141,7 @@ pub fn limit(limit: target::Limit) -> records::errors::Limit {
         target::Limit::Decoded => records::errors::Limit::Decoded,
         target::Limit::Static => records::errors::Limit::Static,
         target::Limit::Tasks => records::errors::Limit::Tasks,
+        target::Limit::Targets => records::errors::Limit::Targets,
         target::Limit::Paths => records::errors::Limit::Paths,
         target::Limit::Path => records::errors::Limit::Path,
         target::Limit::Entries => records::errors::Limit::Entries,
@@ -534,4 +536,12 @@ fn filter_name(value: render::evaluate::Filter) -> &'static [u8] {
 
 fn optional_side(side: Option<render::diff::Side>) -> Option<records::diff::Side> {
     Some(super::changes::side(side?))
+}
+
+#[must_use]
+pub fn composition(why: target::Composition) -> records::errors::Composition {
+    match why {
+        target::Composition::Duplicate => records::errors::Composition::Duplicate,
+        target::Composition::Long => records::errors::Composition::Long,
+    }
 }

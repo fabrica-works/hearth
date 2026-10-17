@@ -1,7 +1,6 @@
 //! Target discovery and whole-placement replacement (format.md, 3.1, 3.4).
 use crate::{
     limits::Limits,
-    limits::SHIPPED,
     revision::{self, Class, Entry},
     revision::{Documents, Kind, Position, Value},
 };
@@ -20,78 +19,144 @@ pub struct Target {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct TooMany;
-pub fn targets(entries: &[Entry]) -> Result<Box<[Target]>, TooMany> {
-    let documents = Documents::new(entries);
-    let capacity = u32::try_from(entries.len()).expect("listing's configured capacity");
-    let mut environments = Map::with_capacity(capacity);
-    for entry in entries {
-        if documents.find(&entry.path).is_none() {
+#[derive(Debug)]
+struct Maker {
+    target: Target,
+    at: crate::errors::Place,
+}
+type Makers = Map<(Box<[u8]>, Box<[u8]>, u32, u32), Maker>;
+#[derive(Debug)]
+pub struct Discovery {
+    pub targets: Box<[Target]>,
+    pub names: Box<[Box<[u8]>]>,
+}
+pub fn targets(
+    documents: &Documents,
+    limits: &Limits,
+    errors: &mut crate::errors::Collector,
+) -> Result<Discovery, TooMany> {
+    let mut discovered = Makers::with_capacity(limits.targets);
+    for (index, entry) in documents.entries().iter().enumerate() {
+        let Class::Host { base, name } = revision::class(&entry.path) else { continue };
+        if name == base {
             continue;
         }
-        match revision::class(&entry.path) {
-            Class::Environment { env } => {
-                environments.insert(bytes::copy_of(env), entry).expect("listing capacity");
+        let Some(suffix) = name.strip_prefix(base) else { continue };
+        let Some(env) = suffix.strip_prefix(b"-") else { continue };
+        let mut environment = None;
+        for (index, entry) in documents.entries().iter().enumerate() {
+            if revision::class(&entry.path) == (Class::Environment { env }) {
+                environment = Some(u32::try_from(index).expect("bounded listing"));
             }
-            Class::Fleet
-            | Class::Host { .. }
-            | Class::Declaration { .. }
-            | Class::Tree { .. }
-            | Class::Template { .. }
-            | Class::Script { .. }
-            | Class::Readme { .. }
-            | Class::Refused { .. }
-            | Class::Other => {}
         }
-    }
-    let mut discovered = Map::with_capacity(SHIPPED.targets);
-    for entry in entries {
-        if documents.find(&entry.path).is_none() {
+        let Some(environment_document) = environment else { continue };
+        let target = Target {
+            name: bytes::copy_of(name),
+            base: bytes::copy_of(base),
+            environment: bytes::copy_of(env),
+            member: None,
+            fleet: documents.find(b"fleet.json"),
+            base_document: base_document(documents, base),
+            environment_document,
+            base_env: u32::try_from(index).expect("bounded listing"),
+        };
+        let base_members = members(documents, target.base_document);
+        let env_members = members(documents, Some(target.base_env));
+        if base_members.is_none() && env_members.is_none() {
+            admit(&mut discovered, target, crate::errors::Place { path: entry.path.clone(), position: None }, errors)?;
             continue;
         }
-        match revision::class(&entry.path) {
-            Class::Host { base, name } => {
-                if name == base {
+        for (document, each) in [(target.base_document, base_members), (Some(target.base_env), env_members)] {
+            let Some(each) = each else { continue };
+            for member in &each.each {
+                if document == target.base_document && member_in(env_members, &member.name).is_some() {
                     continue;
                 }
-                let Some(suffix) = name.strip_prefix(base) else {
+                if member.layer.is_none() {
                     continue;
-                };
-                let Some(env) = suffix.strip_prefix(b"-") else {
-                    continue;
-                };
-                let Some(environment) = environments.get(env) else {
-                    continue;
-                };
-                let target = Target {
-                    name: bytes::copy_of(name),
-                    base: bytes::copy_of(base),
-                    environment: bytes::copy_of(env),
-                    member: None,
-                    fleet: documents.find(b"fleet.json"),
-                    base_document: base_document(&documents, base),
-                    environment_document: documents.find(&environment.path).expect("environment listed"),
-                    base_env: documents.find(&entry.path).expect("host listed"),
-                };
-                if discovered.insert(target.name.clone(), target).is_err() {
-                    return Err(TooMany);
                 }
+                let mut made = target.clone();
+                made.member = Some(member.name.clone());
+                made.name = target_name(base, &member.name, env);
+                let at = crate::errors::Place {
+                    path: bytes::copy_of(documents.path(document.expect("member document"))),
+                    position: Some(member.at),
+                };
+                admit(&mut discovered, made, at, errors)?;
             }
-            Class::Fleet
-            | Class::Environment { .. }
-            | Class::Declaration { .. }
-            | Class::Tree { .. }
-            | Class::Template { .. }
-            | Class::Script { .. }
-            | Class::Readme { .. }
-            | Class::Refused { .. }
-            | Class::Other => {}
         }
     }
-    let mut targets = List::with_capacity(discovered.len());
-    for (_, target) in &discovered {
-        targets.push(target.clone()).expect("discovered count");
+    let mut targets: List<Target> = List::with_capacity(discovered.len());
+    let mut names = List::with_capacity(discovered.len());
+    let mut previous: Option<&Maker> = None;
+    for (_, maker) in &discovered {
+        if let Some(first) = previous
+            && first.target.name == maker.target.name
+        {
+            if let Some(target) = targets.as_slice().last()
+                && target.name == maker.target.name
+            {
+                targets.truncate(targets.len().saturating_sub(1));
+                let mut error = composition(&first.target, first.at.clone(), crate::errors::Composition::Duplicate);
+                error.also = Some(maker.at.clone());
+                errors.push(error);
+            }
+        } else {
+            names.push(maker.target.name.clone()).expect("target limit");
+            if maker.target.name.len() <= 63 {
+                targets.push(maker.target.clone()).expect("target limit");
+            }
+        }
+        previous = Some(maker);
     }
-    Ok(targets.into_boxed())
+    Ok(Discovery { targets: targets.into_boxed(), names: names.into_boxed() })
+}
+fn admit(
+    makers: &mut Makers,
+    target: Target,
+    at: crate::errors::Place,
+    errors: &mut crate::errors::Collector,
+) -> Result<(), TooMany> {
+    if target.name.len() > 63 {
+        errors.push(composition(&target, at.clone(), crate::errors::Composition::Long));
+    }
+    let position = at.position.unwrap_or(Position { line: 0, column: 0 });
+    let key = (target.name.clone(), at.path.clone(), position.line, position.column);
+    let max = makers.capacity();
+    if makers.insert(key, Maker { target, at: at.clone() }).is_err() {
+        errors.push(crate::errors::refused(
+            &at.path,
+            at.position,
+            crate::errors::Decode::TooLarge { limit: crate::errors::Limit::Targets, max: u64::from(max) },
+            None,
+        ));
+        return Err(TooMany);
+    }
+    Ok(())
+}
+fn composition(target: &Target, at: crate::errors::Place, why: crate::errors::Composition) -> crate::errors::Error {
+    crate::errors::Error {
+        side: None,
+        kind: crate::errors::Kind::Composition(why),
+        class: crate::vocabulary::Class::Configuration,
+        at: Some(at),
+        also: None,
+        target: Some(target.name.clone()),
+        task: None,
+    }
+}
+fn members(documents: &Documents, document: Option<u32>) -> Option<&revision::Members> {
+    documents.get(document?)?.members.as_ref()
+}
+fn member_in<'a>(members: Option<&'a revision::Members>, name: &[u8]) -> Option<&'a revision::Member> {
+    let mut found = None;
+    for member in &members?.each {
+        if member.name.as_ref() == name {
+            found = Some(member);
+            break;
+        }
+    }
+    found
 }
 fn base_document(documents: &Documents, base: &[u8]) -> Option<u32> {
     for (index, entry) in documents.entries().iter().enumerate() {
@@ -287,27 +352,18 @@ pub struct Present {
 pub fn compose(target: &Target, documents: &Documents, merge: &mut Merge) -> Settings {
     let mut presence = None;
     let mut settings = None;
-    for (index, layer) in [
-        (target.fleet, Layer::Fleet),
-        (target.base_document, Layer::Base),
-        (Some(target.environment_document), Layer::Environment),
-        (Some(target.base_env), Layer::BaseEnv),
-    ] {
-        if let Some(index) = index
-            && let Some(document) = documents.get(index)
-        {
-            let mut pairs = List::with_capacity(u32::try_from(document.layer.tasks.len()).expect("bounded tasks"));
-            for task in &document.layer.tasks {
-                pairs
-                    .push(revision::Pair { key: task.name.clone(), at: task.at, value: task.value.clone() })
-                    .expect("task count");
-            }
-            let patch = Value { at: document.at, kind: Kind::Map(pairs.into_boxed()) };
-            if layer == Layer::Base || layer == Layer::BaseEnv {
-                presence = merge.merge(presence, &patch, layer, index);
-            }
-            settings = merge.merge(settings, &patch, layer, index);
+    for (index, source, layer) in layers(target, documents).into_iter().flatten() {
+        let mut pairs = List::with_capacity(u32::try_from(source.tasks.len()).expect("bounded tasks"));
+        for task in &source.tasks {
+            pairs
+                .push(revision::Pair { key: task.name.clone(), at: task.at, value: task.value.clone() })
+                .expect("task count");
         }
+        let patch = Value { at: documents.get(index).expect("layer document").at, kind: Kind::Map(pairs.into_boxed()) };
+        if [Layer::Base, Layer::Member, Layer::BaseEnv, Layer::BaseEnvMember].contains(&layer) {
+            presence = merge.merge(presence, &patch, layer, index);
+        }
+        settings = merge.merge(settings, &patch, layer, index);
     }
     let origin = Provenance { layer: Layer::Base, document: 0, at: Position { line: 1, column: 1 } };
     let (_, present) = map_target(presence, origin);
@@ -439,4 +495,52 @@ fn listing_refusal(entry: &Entry, class: &Class<'_>, entries: &[Entry]) -> Optio
         why = Some(Repository::Link);
     }
     why
+}
+
+fn target_name(base: &[u8], member: &[u8], env: &[u8]) -> Box<[u8]> {
+    let mut name =
+        skein_lib::Writer::new(base.len().saturating_add(member.len()).saturating_add(env.len()).saturating_add(2));
+    for part in [base, b"-", member, b"-", env] {
+        name.put(part).expect("name capacity");
+    }
+    name.finish()
+}
+fn layer<'a>(
+    documents: &'a Documents,
+    index: Option<u32>,
+    member: Option<&[u8]>,
+    kind: Layer,
+) -> Option<(u32, &'a revision::Layer, Layer)> {
+    let index = index?;
+    let document = documents.get(index)?;
+    if (kind == Layer::Member || kind == Layer::BaseEnvMember) && member.is_none() {
+        return None;
+    }
+    let layer = match member {
+        Some(name) => member_in(document.members.as_ref(), name)?.layer.as_ref()?,
+        None => &document.layer,
+    };
+    Some((index, layer, kind))
+}
+fn layers<'a>(target: &Target, documents: &'a Documents) -> [Option<(u32, &'a revision::Layer, Layer)>; 6] {
+    [
+        layer(documents, target.fleet, None, Layer::Fleet),
+        layer(documents, target.base_document, None, Layer::Base),
+        layer(documents, target.base_document, target.member.as_deref(), Layer::Member),
+        layer(documents, Some(target.environment_document), None, Layer::Environment),
+        layer(documents, Some(target.base_env), None, Layer::BaseEnv),
+        layer(documents, Some(target.base_env), target.member.as_deref(), Layer::BaseEnvMember),
+    ]
+}
+#[must_use]
+pub fn placement(target: &Target, documents: &Documents) -> Option<revision::Placement> {
+    let mut placement = None;
+    for (_, source, kind) in layers(target, documents).into_iter().flatten() {
+        if kind != Layer::Member
+            && let Some(value) = &source.placement
+        {
+            placement = Some(value.clone());
+        }
+    }
+    placement
 }

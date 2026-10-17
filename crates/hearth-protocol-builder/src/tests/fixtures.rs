@@ -731,3 +731,25 @@ pub fn decode_error() -> render::errors::Error {
         task: Some(bytes::copy_of(b"motd")),
     }
 }
+
+pub fn member_document() -> crate::config::document::Document {
+    use crate::config::{
+        Position,
+        document::{Document, Layer, Member, Members},
+    };
+    Document {
+        at: Position { offset: 0, line: 1, column: 1 },
+        layer: Layer { tasks: Box::new([]), debian: None, placement: None },
+        members: Some(Members {
+            at: Position { offset: 11, line: 1, column: 12 },
+            each: Box::new([
+                Member {
+                    name: bytes::copy_of(b"1"),
+                    at: Position { offset: 12, line: 1, column: 13 },
+                    layer: Some(Layer { tasks: Box::new([]), debian: None, placement: None }),
+                },
+                Member { name: bytes::copy_of(b"2"), at: Position { offset: 19, line: 1, column: 20 }, layer: None },
+            ]),
+        }),
+    }
+}

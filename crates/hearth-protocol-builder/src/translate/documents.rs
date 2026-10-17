@@ -10,16 +10,25 @@ pub fn position(at: config::Position) -> target::Position {
 }
 #[must_use]
 pub fn document(document: source::Document) -> target::Document {
-    let source::Document { at, layer, members: _ } = document;
+    let source::Document { at, layer, members } = document;
+    target::Document { at: position(at), layer: self::layer(layer), members: self::members(members) }
+}
+fn members(members: Option<source::Members>) -> Option<target::Members> {
+    let source::Members { at, each } = members?;
+    let mut translated = skein_lib::List::with_capacity(u32::try_from(each.len()).expect("bounded members"));
+    for source::Member { name, at, layer } in each {
+        let layer = optional_layer(layer);
+        translated.push(target::Member { name, at: position(at), layer }).expect("member count");
+    }
+    Some(target::Members { at: position(at), each: translated.into_boxed() })
+}
+fn layer(layer: source::Layer) -> target::Layer {
     let source::Layer { tasks, debian: _, placement } = layer;
     let mut translated = skein_lib::List::with_capacity(u32::try_from(tasks.len()).expect("bounded tasks"));
     for source::Task { name, at, value } in tasks {
         translated.push(target::Task { name, at: position(at), value: self::value(value) }).expect("task capacity");
     }
-    target::Document {
-        at: position(at),
-        layer: target::Layer { placement: optional_placement(placement), tasks: translated.into_boxed() },
-    }
+    target::Layer { placement: optional_placement(placement), tasks: translated.into_boxed() }
 }
 #[must_use]
 pub fn placement_to_render(placement: source::Placement) -> target::Placement {
@@ -140,4 +149,8 @@ enum Frame {
 }
 fn take(value: &mut config::json::Value) -> config::json::Value {
     core::mem::replace(value, config::json::Value { at: value.at, kind: config::json::Kind::Null })
+}
+
+fn optional_layer(layer: Option<source::Layer>) -> Option<target::Layer> {
+    Some(self::layer(layer?))
 }

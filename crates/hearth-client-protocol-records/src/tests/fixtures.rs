@@ -275,3 +275,15 @@ pub fn meta_changes() -> [crate::diff::MetaChange; 2] {
         },
     ]
 }
+
+pub fn composition_error(why: crate::errors::Composition) -> crate::errors::Error {
+    crate::errors::Error {
+        side: None,
+        kind: crate::errors::Kind::Composition(why),
+        class: crate::errors::Class::Configuration,
+        at: None,
+        also: None,
+        target: Some(copy_of(b"stoa-1-lab")),
+        task: None,
+    }
+}

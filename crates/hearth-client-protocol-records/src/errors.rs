@@ -21,6 +21,7 @@ pub enum Kind {
     Decode(Decode),
     Repository(Repository),
     Tool(Tool),
+    Composition(Composition),
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Guard {
@@ -66,6 +67,7 @@ impl Error {
             Kind::Schema(schema) => schema.text(lines),
             Kind::Repository(why) => why.text(lines),
             Kind::Tool(tool) => tool.text(lines),
+            Kind::Composition(why) => why.text(lines, self.target.as_deref()),
             Kind::Guard(guard) => {
                 lines.put(b"requires ");
                 lines.put(&guard.name);
@@ -106,6 +108,11 @@ impl Error {
                 field(json, b"kind", b"repository");
                 json.key(b"repository");
                 why.json(json);
+            }
+            Kind::Composition(why) => {
+                field(json, b"kind", b"composition");
+                json.key(b"composition");
+                json.string(why.name());
             }
             Kind::Tool(tool) => {
                 field(json, b"kind", b"tool");
@@ -225,6 +232,7 @@ pub enum Limit {
     Path,
     Paths,
     Tasks,
+    Targets,
 }
 
 impl Decode {
@@ -289,6 +297,7 @@ impl Decode {
                     Limit::Path => b"a path past ",
                     Limit::Paths => b"listing paths past ",
                     Limit::Tasks => b"tasks past ",
+                    Limit::Targets => b"targets past ",
                 });
                 lines.decimal(*max);
                 lines.put(b" bytes");
@@ -378,6 +387,7 @@ impl Decode {
                         Limit::Path => b"path",
                         Limit::Paths => b"paths",
                         Limit::Tasks => b"tasks",
+                        Limit::Targets => b"targets",
                     },
                 );
                 json.key(b"max");
@@ -774,3 +784,5 @@ fn json_names(json: &mut Encoder, names: &[Box<[u8]>]) {
     }
     json.array_end();
 }
+mod composition;
+pub use composition::Composition;

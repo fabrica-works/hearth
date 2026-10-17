@@ -24,6 +24,7 @@ pub enum Kind {
     Decode(Decode),
     Repository(Repository),
     Tool(Tool),
+    Composition(Composition),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -78,6 +79,7 @@ pub enum Limit {
     Path,
     Paths,
     Tasks,
+    Targets,
 }
 
 pub(crate) fn refused(path: &[u8], position: Option<Position>, fault: Decode, also: Option<Position>) -> Error {
@@ -379,3 +381,9 @@ pub enum Step {
 
 pub mod syntax;
 pub use syntax::Syntax;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Composition {
+    Duplicate,
+    Long,
+}

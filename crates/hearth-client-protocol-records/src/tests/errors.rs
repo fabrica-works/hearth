@@ -477,3 +477,30 @@ fn a_diff_error_leads_its_line_with_the_revision_side() {
         assert_eq!(print(&Record::Error(error)).as_deref(), Ok(expected.as_bytes()), "row {row}: error prefix");
     }
 }
+
+const COMPOSITION_LINES: &[(crate::errors::Composition, &[u8], &[u8])] = &[
+    (crate::errors::Composition::Duplicate, b"stoa-1-lab: two targets are named stoa-1-lab\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":\"duplicate\",\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
+    (crate::errors::Composition::Long, b"stoa-1-lab: a target name past 63 bytes\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":\"long\",\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
+];
+#[test]
+fn each_composition_error_prints_its_text() {
+    for (row, &(why, text, _)) in COMPOSITION_LINES.iter().enumerate() {
+        assert_eq!(print(&Record::Error(fixtures::composition_error(why))).as_deref(), Ok(text), "row {row}");
+    }
+}
+#[test]
+fn each_composition_error_prints_its_json_fields() {
+    for (row, &(why, _, json)) in COMPOSITION_LINES.iter().enumerate() {
+        assert_eq!(
+            form::print(
+                Form::JsonLines,
+                &Record::Error(fixtures::composition_error(why)),
+                Some(Type::Error),
+                &limits::SHIPPED
+            )
+            .as_deref(),
+            Ok(json),
+            "row {row}"
+        );
+    }
+}

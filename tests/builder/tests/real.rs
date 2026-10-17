@@ -380,3 +380,19 @@ fn the_diffs_errors_follow_its_changes_and_precede_the_outcome() {
     );
     assert_eq!(lines.filter(|line| line.starts_with("{\"record\":\"change\"")).count(), 4);
 }
+#[test]
+
+fn a_cluster_s_members_render_as_targets_with_their_own_layers() {
+    let repository = Repository::make("cluster", &fixtures::cluster());
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["target ", "placement "]),
+        concat!(
+            "target       stoa-1-lab   base stoa   member 1   environment lab\n",
+            "placement    vm efi incus\n",
+            "target       stoa-2-lab   base stoa   member 2   environment lab\n",
+            "placement    vm bios pool\n",
+        )
+    );
+    assert_eq!(rendered.exit, Exit::Code(0));
+}

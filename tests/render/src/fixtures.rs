@@ -17,7 +17,11 @@ pub fn oid(byte: u8) -> Oid {
 }
 #[must_use]
 pub fn document(placement: Option<Placement>) -> Decoded {
-    Decoded::Document(Document { at: Position { line: 1, column: 1 }, layer: Layer { placement, tasks: Box::new([]) } })
+    Decoded::Document(Document {
+        members: None,
+        at: Position { line: 1, column: 1 },
+        layer: Layer { placement, tasks: Box::new([]) },
+    })
 }
 #[must_use]
 pub fn placement() -> Placement {
@@ -110,6 +114,7 @@ pub fn with_task() -> Repository {
     let mut repository = x1_prod();
     repository.documents.iter_mut().find(|(id, _)| *id == oid(b'2')).expect("base document").1 =
         Decoded::Document(Document {
+            members: None,
             at: Position { line: 1, column: 1 },
             layer: Layer {
                 placement: None,
@@ -156,6 +161,7 @@ pub fn set_document(repository: &mut Repository, byte: u8, document: Decoded) {
 pub fn tasks(names: &[(&[u8], bool)], placement: Option<Placement>) -> Decoded {
     use hearth_domain_render::revision::{Kind, Task, Value};
     Decoded::Document(Document {
+        members: None,
         at: Position { line: 1, column: 1 },
         layer: Layer {
             placement,
@@ -241,5 +247,29 @@ pub fn broken_envs(count: u32) -> Repository {
             },
         ));
     }
+    repository
+}
+
+#[must_use]
+pub fn members(names: &[(&[u8], bool)]) -> Decoded {
+    use hearth_domain_render::revision::{Member, Members};
+    let Decoded::Document(mut document) = document(None) else { unreachable!("fixture document") };
+    document.members = Some(Members {
+        at: Position { line: 1, column: 2 },
+        each: names
+            .iter()
+            .map(|(name, removed)| Member {
+                name: Box::from(*name),
+                at: Position { line: 1, column: 12 },
+                layer: if *removed { None } else { Some(Layer { placement: None, tasks: Box::new([]) }) },
+            })
+            .collect(),
+    });
+    Decoded::Document(document)
+}
+#[must_use]
+pub fn cluster() -> Repository {
+    let mut repository = x1_prod();
+    set_document(&mut repository, b'2', members(&[(b"1", false), (b"2", false)]));
     repository
 }

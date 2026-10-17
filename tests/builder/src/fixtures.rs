@@ -605,3 +605,27 @@ pub fn notice_limits() -> hearth::Limits {
 
 pub const BROKEN_TEMPLATE: File =
     File { path: "tasks/motd/tree/etc/issue.j2", body: b"Host:\n{{ target.name\n", mode: 0o644 };
+
+pub const CLUSTER: &[File] = &[
+    File {
+        path: "envs/lab.json",
+        body: br#"{"placement":{"kind":"vm","firmware":"efi","hardware":"incus"}}"#,
+        mode: 0o644,
+    },
+    File { path: "hosts/stoa/stoa.json", body: br#"{"motd":{},"members":{"1":{},"2":{},"3":{}}}"#, mode: 0o644 },
+    File {
+        path: "hosts/stoa/stoa-lab.json",
+        body: br#"{"members":{"2":{"placement":{"kind":"vm","firmware":"bios","hardware":"pool"}},"3":null}}"#,
+        mode: 0o644,
+    },
+];
+#[must_use]
+pub fn cluster() -> Vec<File> {
+    let mut files = CLUSTER.to_vec();
+    for file in THIN {
+        if file.path.starts_with("tasks/") {
+            files.push(*file);
+        }
+    }
+    files
+}
