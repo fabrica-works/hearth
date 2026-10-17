@@ -13,7 +13,8 @@ hearth's format.md, 7.4, 7.6, 6.2 and 2.3; render.md, 2.3, 8.3, 9.4, 9.5;
 testing.md, 2.1, 2.4, 2.9. This plan's `hearth/05-expressions.md`, whole,
 whose names and sketches this file takes as written; decisions.md, 9 and
 10; `findings/skein-testing.md`, 2, 3 and 7. skein's
-`crates/skein-lib/src/{stack, list}.rs` (`push`:55, `get_mut`:72). The model
+`crates/skein-lib/src/{stack, list}.rs` (`Stack::push`:48 and `List::push`:55,
+each `Result<(), T>`; `List::get_mut`:72). The model
 for the world is skein's JSON world, as 05's. Read skein's
 programming-model.md, 3, 6.3, 7, 8 and 10, and testing-strategy.md, 2.1,
 2.4, 3 and 8, by number only.
@@ -64,11 +65,14 @@ Needs: hearth 05 (05.2).
 Files: `src/expression.rs`, `src/expression/{pending, lexer}.rs`,
 `src/expression/chain.rs` (new), `src/operation.rs` (`Missing`, a field of
 `Name`, `Key` and `Item`), `src/error.rs`; `src/tests/operators.rs`
-(new). The fixtures' `name` and `key`, and a new `item`, take
-`Missing::Error`, which is all `literals.rs` and `lookups.rs` see of it
-(`lookups.rs` writes `item` for `Op::Item`: README, Edits outside Files).
-The world's
-`src/{generate, reference, fixtures}.rs`.
+(new); `src/tests/fixtures.rs`, whose `name` (:12-13, the only one on
+main) and new `key` and `item` take `Missing::Error`, which is all
+`literals.rs` and `lookups.rs` see of it: `lookups.rs`'s `Op::Key` and
+`Op::Item` literals (:13, 15, 17, 27, 30, 142, 156) call `key` and `item`
+(README, Edits outside Files). The world's
+`src/{generate, reference, fixtures, check}.rs` (`check::invariants`
+matches on every `Op`, :9-10, and an operator moves the depth: a binary
+one pops two and pushes one).
 Shape:
 - **Levels,** 7.4's, from the loosest: conditional (37.2), `or`, `and`,
   `not`, test, comparison, `~`, `+ -`, filter, lookup (render.md 9.5). `or`, `and`,
@@ -146,8 +150,13 @@ Shape: the layout that hearth 14 evaluates:
 `Pending::{And { jump }, Or { jump }, If { start, mid, at }, Else { jump,
 start }}`; each jump is patched when its entry is reduced, `over =
 out.len() - jump - 1`. `If` and `Else` count one level each (render.md 2.3).
-`Expected::Else` at the end of `a if c`. At `if`, the depth `values`
-tracks falls back to its value before a.
+`Expected::Else` at the end of `a if c`. `If.start` is where a's
+operations begin: the start of the operand a stands in, the expression's,
+a group's or `Else`'s `start`, or the current element's, which
+`Pending::List` and `Pending::Arguments` gain as a mark set at each `,`
+(in `[p, x if c else y]`, a is `x`: `[p, c, if, x, else]`, never `[c, if,
+p, x, else]`). At `if`, the depth `values` tracks falls back to its value
+at that mark.
 Test shape: in `src/tests/jumps.rs`, each under 20 ms:
 `and_keeps_a_false_left_operand_and_skips_the_right`,
 `or_keeps_a_true_left_operand_and_skips_the_right`,
@@ -170,18 +179,22 @@ Removes: nothing.
 Scope: `limits::worst_case(Decoder::Expression, &Limits)`
 (programming-model.md, 6.3), a `Decoder` first as hearth 02's
 (code-organization.md, 2), hearth 36.3 adding its variants; the capacities
-`compile` allocates by; the world at the shipped limits.
+`compile` allocates by, which 05.2 set (`out` at the text's length,
+`pending` at `min(nesting, length)`, `expression.rs:33-34`): 37.3 counts
+them; the world at the shipped limits.
 Needs: nothing beyond 37.2. `skein-heap` is in skein at hearth's pin.
 Files: `src/{limits, expression}.rs`. In the world: `src/fixtures.rs`,
 whose `at_the_limits()` gives a 4,096-byte list, 64 levels of each
 bracket, of `not` and of `else`, the longest string and chain, and each of
 these one past; `tests/memory.rs` (new); `tests/expressions.rs`;
 `tests/fuzzy_expressions.rs`; `Cargo.toml` (`skein-heap` as a
-dev-dependency). Shared: root `Cargo.toml` (`skein-heap` by URL),
-`Cargo.lock`.
+dev-dependency). Shared: `Cargo.lock` (`skein-heap` is in the root's
+`[workspace.dependencies]` already, `Cargo.toml:19`).
 Shape: the worst case counts the output at one operation per byte, the
-pending stack at its capacity, the chain's list, the bytes of names and
-strings (at most the text's length), and the expression returned.
+pending stack at its capacity, the chain's list, the lexer's copy of the
+text (`copy_of(text)` in `compile`), the bytes of names and strings (at
+most the text's length), the buffer of the string being read (the text's
+length, `lexer.rs:98`), and the expression returned.
 Test shape: `compiling_at_the_limits_holds_no_more_than_the_worst_case`,
 in a binary of its own (findings 2), under 1 s (the Bound below);
 `texts_at_the_limits_compile_as_the_reference_does` in
@@ -231,16 +244,19 @@ pub enum Decoder {
 
 The rotation at `else`, in `src/expression/jumps.rs` (37.2), once
 everything above `If { start, mid }` is reduced. `out[start..mid]` is a,
-`out[mid..]` is c, and c runs first:
+`out[mid..]` is c, and c runs first; `push(out, ..)` stands for the
+parser's `emit` (`expression.rs:54`, `fn emit(&mut self, at: u32, op: Op,
+pops: u32)`, no `Result`), which keeps `depth` and `values`:
 ```rust
 let a = mid.checked_sub(start).expect("a's start is not past its end");
 let over = a.checked_add(1).expect("a and the jump fit a u32");
-push(out, if_at, Op::JumpIfFalse { over })?;               // [a][c][J]
+push(out, if_at, Op::JumpIfFalse { over });                // [a][c][J]
 rotate_left(out, start, a)?;                                // [c][J][a]: three reversals, swapping
                                                             // by List::get_mut and mem::replace
 let jump = out.len();
-push(out, else_at, Op::Jump { over: 0 })?;                 // patched when b is reduced
-pending.push(Pending::Else { jump, start: out.len() })?;   // b, or a conditional to its right
+push(out, else_at, Op::Jump { over: 0 });                  // patched when b is reduced
+pending.push(Pending::Else { jump, start: out.len() })     // b, or a conditional to its right
+    .expect("the room of the If entry just popped");
 ```
 
 

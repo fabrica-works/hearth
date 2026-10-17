@@ -236,6 +236,17 @@ None yet.
 
      The check compiled 38.1's sketches against the landed crate under clippy once 1 was made; the workspace's suites passed but for the sketched test on a placeholder fixture (65 of 66), fuzzy 2 of 2. A further file a change reaches (the world's `src/fixtures.rs` for `tests/memory.rs`, say) joins the increment's Files, and the commit body lists it.
 
+106. **hearth 37's Shapes against main** (ready check of hearth-37.1).
+     hearth 37's ready check, against hearth de43be3 (05.1 and 05.2 landed) and skein 089ed83: `hearth/37-expression-operators.md` corrected.
+
+     1. 37.1's Files: `src/tests/fixtures.rs` holds only `name` (:12-13); it gains `key` and `item`, each taking `Missing::Error`, and `lookups.rs`'s `Op::Key` and `Op::Item` literals (:13, 15, 17, 27, 30, 142, 156) call them (README, Edits outside Files: the users of a type the Shape changes).
+     2. 37.1's world Files gain `src/check.rs`: `invariants` matches on every `Op` (:9-10), and an operator moves the depth (a binary one pops two and pushes one), more than README's five-line arm.
+     3. 37.2's `If.start` is where a's operations begin: the start of the operand a stands in (the expression's, a group's, `Else`'s `start`), or the current element's, which `Pending::List` and `Pending::Arguments` gain as a mark set at each `,`. The list's `start` moved earlier elements: `[p, x if c else y]` compiled to `[c, if, p, x, else]`, not `[p, c, if, x, else]`. `values` falls back to the depth at that mark.
+     4. 37.2's rotation sketch: `Stack::push` returns `Result<(), Pending>` (skein `stack.rs:48`) and `Error` has no `From<Pending>` (E0277): `pending.push(Pending::Else {..})` takes `.expect("the room of the If entry just popped")`; `push(out, ..)` stands for the parser's `emit` (`expression.rs:54`, no `Result`), which keeps `depth` and `values`.
+     5. 37.3's worst case also counts the lexer's copy of the text (`copy_of(text)` in `compile`) and the buffer of the string being read (`lexer.rs:98`, the text's length): the longest string held 12,286 bytes at the peak, three times the text. The capacities `compile` allocates by are 05.2's (`expression.rs:33-34`): 37.3 counts them. `skein-heap` is in the root's `[workspace.dependencies]` already (`Cargo.toml:19`): only the world's `Cargo.toml` and `Cargo.lock` change.
+
+     The check's suites at de43be3: clippy clean on the sketches, the workspace's 112 tests and fuzzy's 3 passed, the memory sketch held 12,286 and 8,224 of 266,240, the rotation's two tests passed once 3 was made. A further copy of these names takes the same correction, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
