@@ -526,3 +526,15 @@ fn rendered_cache_files_leave_no_temporary() {
         Vec::<String>::new()
     );
 }
+
+#[test]
+fn a_target_past_its_rendered_bytes_prints_a_limit_error() {
+    let repository = Repository::make("template-target-limit", &fixtures::thin_with(fixtures::TEMPLATED));
+    let rendered = fixtures::render_with(&repository, &fixtures::target_output_limit());
+    assert_eq!(rendered.stdout, b"tasks/motd/tree/etc/issue.j2:1:39: x1-prod: motd: a limit exceeded\n");
+}
+#[test]
+fn a_target_past_its_rendered_bytes_fails_the_call() {
+    let repository = Repository::make("template-target-limit-exit", &fixtures::thin_with(fixtures::TEMPLATED));
+    assert_eq!(fixtures::render_with(&repository, &fixtures::target_output_limit()).exit, Exit::Code(2));
+}

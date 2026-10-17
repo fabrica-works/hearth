@@ -5,3 +5,5 @@ pub mod expressions;
 pub mod reference;
 
 pub mod schemas;
+
+pub mod templates;

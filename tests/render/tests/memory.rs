@@ -25,3 +25,22 @@ fn evaluating_at_the_limits_holds_no_more_than_the_worst_case() {
         meter.check(step, bound, &what);
     }
 }
+
+#[test]
+fn running_templates_at_the_limits_holds_no_more_than_the_worst_case() {
+    let bound = evaluate::template::worst_case(&limits::SHIPPED).expect("the shipped run has a worst case");
+    let roots = fixtures::wide_roots();
+    for (template, what) in fixtures::templates_at_the_limits() {
+        let meter = Meter::new();
+        meter.start();
+        let rendered = evaluate::template::run(
+            &template,
+            &roots.context(),
+            &limits::SHIPPED,
+            u64::from(limits::SHIPPED.rendered_file),
+        );
+        drop(rendered);
+        let step = meter.end();
+        meter.check(step, bound, &what);
+    }
+}

@@ -24,6 +24,7 @@ pub(crate) struct Target {
     meta_digest: Digest,
     tasks: Box<[schema::Checked]>,
     task: usize,
+    rendered: u64,
     entry: usize,
     roots: Option<Roots>,
     tree: Map<Box<[u8]>, TreeEntry>,
@@ -42,6 +43,7 @@ impl Target {
             meta_digest,
             tasks: checked.tasks,
             task: 0,
+            rendered: 0,
             entry: 0,
             roots: None,
             tree,
@@ -73,9 +75,13 @@ impl Target {
                     template,
                     &self.roots.as_ref().expect("task roots").context(),
                     &side.limits,
-                    u64::from(side.limits.rendered_file),
+                    side.limits.rendered_target.saturating_sub(self.rendered),
                 ) {
                     Ok(bytes) => {
+                        self.rendered = self
+                            .rendered
+                            .checked_add(u64::try_from(bytes.len()).expect("file bound"))
+                            .expect("target bound");
                         let digest = Digest(skein_lib::sha256::digest(&bytes));
                         side.sizes
                             .insert(digest, u64::try_from(bytes.len()).expect("file bound"))

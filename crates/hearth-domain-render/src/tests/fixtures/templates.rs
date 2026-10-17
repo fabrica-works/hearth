@@ -77,3 +77,16 @@ pub fn keeping_templates() -> (crate::Render, skein_lib::Env<Limits>, skein_lib:
         skein_lib::Queue::with_capacity(1),
     )
 }
+
+pub const TEMPLATE_TARGET_LIMIT: u64 = 3;
+
+pub fn target_limited_answers() -> Box<[crate::vocabulary::Answer]> {
+    use crate::vocabulary::{Event, Output, Request};
+    let (mut render, mut env, mut out) = keeping_templates();
+    env.limits.rendered_target = TEMPLATE_TARGET_LIMIT;
+    render.call.as_mut().expect("call").side.limits = env.limits;
+    crate::resume(&mut render, &env, &mut out);
+    let Some(Output::Request(Request::Keep { request, sha256, .. })) = out.pop() else { panic!("first keep") };
+    crate::step(&mut render, &env, Event::Kept { request, sha256 }, &mut out);
+    super::finish_render(&mut render, &env, &mut out)
+}

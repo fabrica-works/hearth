@@ -388,3 +388,36 @@ fn a_failed_keep_leaves_its_target_out_and_the_call_try_again() {
         &[Answer::Rendered { outcome: crate::vocabulary::Outcome::TryAgain, diff: None, left_out: 0 }]
     );
 }
+
+#[test]
+fn a_targets_rendered_bytes_past_the_limit_fail_its_template() {
+    let answers = fixtures::target_limited_answers();
+    let [crate::vocabulary::Answer::Error(error), crate::vocabulary::Answer::Rendered { .. }] = answers.as_ref() else {
+        panic!("fault then outcome")
+    };
+    assert_eq!(error.kind, crate::errors::Kind::Evaluation(FaultKind::Limit));
+    assert_eq!(
+        error.at,
+        Some(crate::errors::Place {
+            path: b"tasks/motd/tree/etc/motd.j2".as_slice().into(),
+            position: Some(crate::revision::Position { line: 1, column: 1 })
+        })
+    );
+}
+#[test]
+fn a_target_past_its_rendered_bytes_is_left_out_and_fails_the_call() {
+    let answers = fixtures::target_limited_answers();
+    let [crate::vocabulary::Answer::Error(_), outcome] = answers.as_ref() else { panic!("no target spec") };
+    assert_eq!(
+        *outcome,
+        crate::vocabulary::Answer::Rendered { outcome: crate::vocabulary::Outcome::Failed, diff: None, left_out: 0 }
+    );
+}
+const OVERFLOWING_RUN_LIMITS: &[Limits] =
+    &[Limits { made: u64::MAX, ..SHIPPED }, Limits { statements: u32::MAX, ..SHIPPED }];
+#[test]
+fn a_run_whose_worst_case_cannot_fit_returns_none() {
+    for (row, limits) in OVERFLOWING_RUN_LIMITS.iter().enumerate() {
+        assert_eq!(crate::evaluate::template::worst_case(limits), None, "row {row}");
+    }
+}

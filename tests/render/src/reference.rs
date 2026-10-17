@@ -19,13 +19,13 @@ impl Made {
 /// Returns the first fault specified by format.md, 7.4 to 7.7.
 pub fn evaluate(tree: &Tree, roots: &Roots, limits: &Limits) -> Result<Option<Plain>, &'static str> {
     let mut left = limits.made;
-    run(tree, roots, limits, &mut left).map(|v| v.value)
+    expression(tree, roots, limits, &mut left).map(|v| v.value)
 }
 fn charge(left: &mut u64, n: u64) -> Result<(), &'static str> {
     *left = left.checked_sub(n).ok_or("limit")?;
     Ok(())
 }
-fn run(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Made, &'static str> {
+fn expression(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Made, &'static str> {
     run_lookup(tree, roots, limits, left, Missing::Error)
 }
 fn marked(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Made, &'static str> {
@@ -57,7 +57,7 @@ fn run_lookup(
         Tree::Key(v, k, _) => key(run_lookup(v, roots, limits, left, missing)?.value, k, missing)?,
         Tree::Item(v, i, _) => {
             let container = run_lookup(v, roots, limits, left, missing)?;
-            let index = run(i, roots, limits, left)?.value;
+            let index = expression(i, roots, limits, left)?.value;
             match (container.value, index) {
                 (None, _) => absent(missing, "undefined")?,
                 (Some(_), None) => return Err("undefined"),
@@ -78,7 +78,7 @@ fn run_lookup(
         Tree::List(items) => {
             let mut made = vec![];
             for item in items {
-                made.push(run(item, roots, limits, left)?);
+                made.push(expression(item, roots, limits, left)?);
             }
             charge(left, u64::try_from(items.len()).expect("small") * 32)?;
             let values = made.iter().map(|v| v.value.clone()).collect::<Option<Box<[_]>>>().ok_or("undefined")?;
@@ -89,40 +89,42 @@ fn run_lookup(
             return Ok(Made { value: Some(Value::List(values)), depth, items: Some(made) });
         }
         Tree::Defined(v, negated) => Some(Value::Bool(marked(v, roots, limits, left)?.value.is_some() != *negated)),
-        Tree::Not(v) => Some(Value::Bool(!truthy(run(v, roots, limits, left)?.value.as_ref()))),
+        Tree::Not(v) => Some(Value::Bool(!truthy(expression(v, roots, limits, left)?.value.as_ref()))),
         Tree::And(a, b) => {
-            let a = run(a, roots, limits, left)?;
-            return if truthy(a.value.as_ref()) { run(b, roots, limits, left) } else { Ok(a) };
+            let a = expression(a, roots, limits, left)?;
+            return if truthy(a.value.as_ref()) { expression(b, roots, limits, left) } else { Ok(a) };
         }
         Tree::Or(a, b) => {
-            let a = run(a, roots, limits, left)?;
-            return if truthy(a.value.as_ref()) { Ok(a) } else { run(b, roots, limits, left) };
+            let a = expression(a, roots, limits, left)?;
+            return if truthy(a.value.as_ref()) { Ok(a) } else { expression(b, roots, limits, left) };
         }
         Tree::Conditional { condition, yes, no } => {
-            let condition = run(condition, roots, limits, left)?;
-            let result = run(if truthy(condition.value.as_ref()) { yes } else { no }, roots, limits, left)?;
+            let condition = expression(condition, roots, limits, left)?;
+            let result = expression(if truthy(condition.value.as_ref()) { yes } else { no }, roots, limits, left)?;
             if result.value.is_none() {
                 return Err("undefined");
             }
             return Ok(result);
         }
         Tree::Binary(a, op, b) => {
-            let a = run(a, roots, limits, left)?;
-            let b = run(b, roots, limits, left)?;
+            let a = expression(a, roots, limits, left)?;
+            let b = expression(b, roots, limits, left)?;
             Some(binary(a.value.ok_or("undefined")?, *op, b.value.ok_or("undefined")?, left)?)
         }
         Tree::Filter(input, filter, arguments) => {
             let input = if *filter == Filter::Default {
                 marked(input, roots, limits, left)?
             } else {
-                run(input, roots, limits, left)?
+                expression(input, roots, limits, left)?
             };
-            let arguments =
-                arguments.iter().map(|argument| run(argument, roots, limits, left)).collect::<Result<Vec<_>, _>>()?;
+            let arguments = arguments
+                .iter()
+                .map(|argument| expression(argument, roots, limits, left))
+                .collect::<Result<Vec<_>, _>>()?;
             return filtered(input, *filter, arguments, limits, left);
         }
         Tree::Output(v) => {
-            let value = run(v, roots, limits, left)?.value.ok_or("undefined")?;
+            let value = expression(v, roots, limits, left)?.value.ok_or("undefined")?;
             Some(Value::String(match value {
                 Value::Bool(v) => v.to_string().into_bytes().into_boxed_slice(),
                 Value::Int(v) => v.to_string().into_bytes().into_boxed_slice(),
@@ -549,3 +551,6 @@ fn path(value: &Value, filter: Filter) -> Result<Vec<u8>, &'static str> {
         | Filter::ShellQuote => unreachable!("text filter"),
     })
 }
+
+mod templates;
+pub use templates::run;

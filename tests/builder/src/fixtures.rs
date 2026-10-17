@@ -681,3 +681,12 @@ pub const RENDERED_FILES: &[(&str, &[u8])] = &[
     ("21c50adeb849aa6df1c779b5464f84f614f2b3775ef6d2ffb2ad0f0a1d650011", b"x1-prod\n"),
     ("e75f92b4b8419984111db313564627b1ee90ecb312dbffd66a1a42f64e6e2334", b"x1 runs on metal.\n1: one\n2: two\n"),
 ];
+
+#[must_use]
+pub fn target_output_limit() -> hearth::Limits {
+    let mut limits = hearth::limits();
+    limits.domain.render.rendered_target = TARGET_OUTPUT_LIMIT;
+    limits
+}
+
+pub const TARGET_OUTPUT_LIMIT: u64 = 8;
