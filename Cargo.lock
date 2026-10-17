@@ -23,6 +23,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-domain-render"
+version = "0.0.0"
+dependencies = [
+ "hearth-lib",
+ "skein-lib",
+]
+
+[[package]]
 name = "hearth-git-world"
 version = "0.0.0"
 dependencies = [
@@ -76,6 +84,16 @@ version = "0.0.0"
 dependencies = [
  "hearth-lib",
  "skein-lib",
+]
+
+[[package]]
+name = "hearth-render-world"
+version = "0.0.0"
+dependencies = [
+ "hearth-domain-render",
+ "hearth-lib",
+ "skein-lib",
+ "skein-world",
 ]
 
 [[package]]
