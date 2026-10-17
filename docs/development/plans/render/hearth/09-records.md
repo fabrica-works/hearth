@@ -54,9 +54,10 @@ number only.
   then architecture, none repeated; the request a set; each `source` a
   line's index. Whatever this crate writes reads back.
 - **`made.costs` is `{ fetched, took }`,** bytes and ns (render.md, 5.5: "each
-  run's duration and bytes"). **Kind 4's bounds 6.1 leaves:** a line's `uri`
-  4,096 ("a path"); `suite`, `components` 256 ("a name"). **An index is
-  `list [ path, size, sha256 ]`,** as store.md 6.4, not render.md 5.4's map.
+  run's duration and bytes"). **Kind 4's bounds, as 6.1's table gives
+  them:** a line's `uri` 4,096; its `suite` and each of its `components`
+  256. **An index is `list [ path, size, sha256 ]`,** as store.md 6.4 and
+  render.md 5.4 give it.
   **The InRelease's entry in `indices` is `[ "InRelease", its size, its
   SHA-256 ]`,** its path relative to the suite's directory; hearth 31 writes
   it, the decoder takes any bytes. **A blob's `oid` is git's hex text,** as
@@ -88,7 +89,7 @@ plan's. 09.1 owns the frame and kinds 1, 4 and 5 at version 1.
 Needs: hearth 01.1's value model (`hearth_lib::encode::{Item, Digest,
 Encoder}`).
 Files: the root `Cargo.toml` and `Cargo.lock` (shared: README, "Shared
-files"): `members` gains the crate, `[workspace.dependencies]` gains
+files"): `members` is `crates/*` already (decisions.md, 16); `[workspace.dependencies]` gains
 `hearth-lib = { path = "crates/hearth-lib" }` unless landed; new `crates/hearth-protocol-tree/Cargo.toml` (hearth-lib's, plus
 `hearth-lib.workspace = true`), `src/{lib.rs, limits.rs, frame.rs,
 decode.rs, tests.rs}` and `src/tests/{fixtures.rs, frame.rs}`. No users at
@@ -253,7 +254,7 @@ repeated); `a_package_whose_source_names_no_line_is_unreadable`;
 `a_resolution_field_one_past_its_limit_is_unreadable` (6.1's and the plan's
 limits, a row each, on `resolution_items`: 9 lines, 17 indices, an index's
 path, a filename and a `uri` of 4,097 bytes, a package's name, version and
-architecture and a `suite` of 257; each `Limit` naming its field) and
+architecture, a `suite` and a component of 257; each `Limit` naming its field) and
 `writing_a_resolution_field_one_past_its_limit_is_refused` (the same rows on
 `a_resolution(2)`: `Refused::Limit`); `a_request_that_is_not_a_set_is_unreadable`;
 `an_input_of_another_kind_than_its_own_is_unreadable` (a uint `variant`);

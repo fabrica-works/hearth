@@ -209,6 +209,14 @@ None yet.
      `size_of::<tokenizer::Tokenizer>()`, in skein or at a downstream repin,
      to what the code computes, and list it in the commit body.
 
+103. **hearth 09's Shapes against main** (ready check of hearth-09.1).
+     hearth 09's session file against hearth `29891d8`, `b62b498` and skein `089ed83` (its ready check): four text corrections in `hearth/09-records.md`, none in code.
+     - 09.1's Files: `members` is `crates/*` already (`Cargo.toml:5`, `members = ["crates/*", "tests/*"]`; decisions.md, 16), so it gains nothing; `[workspace.dependencies]` still gains `hearth-lib` unless landed.
+     - Kind 4's bounds are 6.1's table's (`store.md`, 6.1: "a URI, a path or a filename of 4,096 bytes; a suite, a component, a name, a version or an architecture of 256"), not bounds "6.1 leaves".
+     - An index is `list [ path, size, sha256 ]` as store.md 6.4 and render.md 5.4 both give it (`render.md`, 5.4: "its indices in the cache, each [ path, size, sha256 ]"), not "render.md 5.4's map".
+     - `a_resolution_field_one_past_its_limit_is_unreadable` and its writing twin gain a row: a component of 257 bytes.
+     09.1's Size stays 280: the check's layout of the sketches is within implementer.md's tolerance, twice the Size. The sketches compile under clippy as written; hearth's default and fuzzy suites passed at `b62b498` with them applied.
+
 ## For the user
 
 The long-term choices the user may veto:
