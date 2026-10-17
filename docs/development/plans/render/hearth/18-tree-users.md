@@ -274,7 +274,11 @@ declared scripts exist, script files declared); `Config::{presets, tmpfiles,
 scripts}`.
 Needs: hearth 16, hearth 25.1, hearth 42.1.
 Files: render new `src/kinds/{presets, tmpfiles, scripts}.rs`, `src/kinds.rs`,
-`src/parts/config.rs`, `src/{call, revision, errors}.rs`, `src/tests/kinds.rs`.
+`src/parts/config.rs`, `src/{call, revision, errors}.rs`, `src/tests/kinds.rs`;
+render `src/revision/declaration.rs` (`Declaration` gains `scripts`) and each
+`Declaration` literal, which gains it as 16.1's gained `requires` (`git grep
+-n 'requires: ' -- crates tests`); protocol `src/translate/declarations.rs`
+(its `scripts: _`, `:16`, translates them) and `src/tests/translate/declarations.rs`.
 Shape: `action` is `enable` or `disable`; `type` one of 14 letters (`Schema::
 Enum`) and required (`MissingField`); `mode` `Format::Mode`; the rest as
 written. `scripts`: each declared name must exist as `NAME` or `NAME.j2`

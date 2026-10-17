@@ -401,8 +401,8 @@ pub struct Exports { pub tasks: Box<[Exported]> }
 #[must_use] pub fn digest(exports: &Exports) -> Digest; // H("part:exports", the record)
 /// The part: the empty map when no present task exports.
 #[must_use] pub fn build(exported: Box<[Exported]>) -> Exports;
-pub struct Change { pub entries: Box<[EntryChange]> } // by (task, name)
-pub struct EntryChange { pub task: Box<[u8]>, pub name: Box<[u8]>, pub before: Option<Value>, pub after: Option<Value> }
+pub struct Change { pub entries: Box<[ExportChange]> } // by (task, name)
+pub struct ExportChange { pub task: Box<[u8]>, pub name: Box<[u8]>, pub before: Option<Value>, pub after: Option<Value> }
 #[must_use] pub fn change(before: Option<&Exports>, after: Option<&Exports>) -> Change;
 // errors.rs (20.2, 20.3): `Schema` gains `Export { fault: ExportFault }`, `Kind` gains `Exported`,
 // limits.rs `Limits` gains `exported: u64`, `SHIPPED` 67_108_864 (no `Limit` variant: 13.4's `Evaluation(Limit)`)
@@ -418,7 +418,7 @@ pub struct Exports { pub tasks: Box<[TaskExports]> }
 pub struct TaskExports { pub task: Box<[u8]>, pub values: Box<[Named]> }
 pub struct Named { pub name: Box<[u8]>, pub value: Value }
 pub enum Value { Bool(bool), Int(i64), String(Box<[u8]>), List(Box<[Value]>), Map(Box<[(Box<[u8]>, Value)]>) }
-// src/diff.rs (20.4): `PartChange::Exports(ExportsChange { entries })`, entries as render's `EntryChange`
+// src/diff.rs (20.4): `PartChange::Exports(ExportsChange { entries })`, entries as render's `ExportChange` (records' `EntryChange`, `diff.rs:75`, is the tree's)
 ```
 
 ## Questions to raise when reached

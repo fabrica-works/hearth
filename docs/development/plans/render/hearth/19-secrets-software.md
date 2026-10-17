@@ -266,7 +266,7 @@ Test shape: unit, `src/tests/ids.rs`, under 20 ms. Reference:
 #[test]
 fn a_secrets_owner_without_a_uid_is_an_ids_fault_at_the_owner() {
     let accounts = fixtures::accounts(&[fixtures::sysusers(b"postfix", None)], &[]);
-    let owned = [fixtures::owned(Owns::Secret, b"postfix", b"root", at(1, 71))];
+    let owned = [fixtures::owned_by(Owns::Secret, b"postfix", b"root", at(1, 71))];
     let faults = ids::check(&accounts, &owned).expect_err("postfix has no uid");
     let want = Kind::Ids(Ids { owner: Box::from(&b"postfix"[..]), of: Owns::Secret, why: Why::NoUid });
     let place = faults[0].at.as_ref().expect("placed");
