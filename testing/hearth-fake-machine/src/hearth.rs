@@ -16,6 +16,7 @@ pub struct Machine {
 #[repr(u8)]
 pub enum Tool {
     Git,
+    Mmdebstrap,
 }
 impl Machine {
     #[must_use]
