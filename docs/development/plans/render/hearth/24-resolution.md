@@ -12,8 +12,8 @@ closure (store.md 6.4) and keeps the indices (6.8). The gate runs no mmdebstrap
   `decisions.md` 11, 14, 19; `findings/skein-io.md` 2 to 4
 - Drafts: 07 whole; 38.1; 08 (`Pin`, `Mirror`, `Proxy`); 41.1; 09.3; 10.3; 11; 12
   (`errors`) and 42.1 (`Failure`, `Tool`); 17; 33 ("What hearth 24 calls"); 45.2
-- skein: `skein-lib/src/intake.rs:130` (`Intake::meet`),
-  `skein-lib/src/stream.rs:21` (`Read::Scan`),
+- skein, at hearth's pin 841f487: `crates/skein-lib/src/intake.rs:132`
+  (`Intake::meet`), `crates/skein-lib/src/stream.rs:34` (`Read::Scan`),
   `04-store-io.md`; `programming-model.md` 2, 4.5, 5.2, 6.3, 9
 
 ## What the design asks
@@ -61,8 +61,8 @@ closure (store.md 6.4) and keeps the indices (6.8). The gate runs no mmdebstrap
 ## Rules that bind it
 - **Meeting point** (README): each increment proves on the real loop or, for
   what runs mmdebstrap, live; a variant added to a vocabulary crossing the
-  protocol layer extends `translate/` and its reverse in
-  `src/tests/translate.rs`.
+  protocol layer extends `translate/` and its reverse in a module under
+  `src/tests/translate/` (`errors.rs`, `repository.rs`, or a new one).
 - **No expected value computed by the code under test:** literals, by hand
   (`python3 -I`, once), from `sha256sum`, or from what hearth 41 recorded.
 - **Shared files** (README): root `Cargo.toml`, `Cargo.lock`, and the files
@@ -76,12 +76,22 @@ Needs: hearth 08 (`testing/repos/test/`, pin), hearth 17.2 (`inputs`), hearth 33
 (`Load`; hearth 23's `fixtures::lay`).
 Files: render new `src/keys.rs`, `src/{lib, vocabulary, call, parts,
 limits}.rs`, `src/tests/{fixtures, keys}.rs` (new `keys.rs`); root `src/{lib,
-vocabulary}.rs`, new `src/resolution.rs`, `src/tests.rs`; store `src/{lib,
-vocabulary, resolutions, scan}.rs`, `src/tests/{fixtures, scan}.rs`, new
-`src/tests/find.rs`; protocol `src/store.rs`, `src/translate/{store,
-answers}.rs`, `src/tests/{store, translate}.rs`; `tests/builder/{Cargo.toml
-(dev: hearth-test-mirror), src/fixtures.rs}`, new
-`tests/builder/tests/resolution.rs`.
+vocabulary}.rs`, new `src/resolution.rs`, `src/tests.rs`,
+`src/tests/fixtures.rs` (its `Spec` literal, :18, gains `resolution: None`);
+store `src/{lib, vocabulary, resolutions, scan}.rs`, `src/{start, enter}.rs`
+(their `Event` matches, :51 and :56, gain `Find`), `src/tests/{fixtures,
+scan}.rs`, new `src/tests/find.rs`; protocol `src/store.rs`, `src/lib.rs` (the
+`Request` match at :267 gains `Find`), `src/translate/{store, answers}.rs`,
+`src/tests/store.rs`, a module under `src/tests/translate/`; `tests/render/src/parent.rs`
+(its matches at :55, :70 and :91 gain `Find`, `Found` and `Absent`);
+`tests/builder/{Cargo.toml (dev: hearth-test-mirror), src/fixtures.rs}`, new
+`tests/builder/tests/resolution.rs`. `tests/builder/src/fixtures.rs` gains
+`Laid::Resolution(..)` (23-store.md named it; hearth 23 landed `Laid` with
+`File` and `Record` alone, :441), `test_min_recorded()`, `TEST_MIN_KEY`,
+`TEST_MIN_KEYS_LINE`, and `TEST_REPOSITORY: &[File]`, `testing/repos/test`'s
+eight files by `include_bytes!`, for `Repository::make` (:45, which takes
+`&[File]`). Any further exhaustive match the compiler names joins the
+increment: list it in the commit body.
 Shape: the sketches. After the last target, `Find` per distinct key, one at a
 time: targets in name order, each key at the first target that holds it;
 `Failed { Store }` → `Needed`, `TryAgain` (exit 75, a declined `Find` too);
@@ -113,13 +123,13 @@ each, on `fixtures::test_min_recorded()` (a closure of `apt` alone, digest
 ```rust
 #[test]
 fn a_recorded_resolution_prints_known_and_the_layer_keys() {
-    let r = Repository::make("known", &fixtures::repos("test"));
+    let r = Repository::make("known", fixtures::TEST_REPOSITORY);
     fixtures::lay(&r.scratch().join("store"), &[Laid::Resolution(fixtures::test_min_recorded())]);
     let out = fixtures::render(&r, &["test-min"], Form::Text);
-    let lines = fixtures::lines(&out.stdout, &["packages ", "keys "]);
-    let known = ["resolution ", &fixtures::TEST_MIN_KEY[..12], " known"].concat();
-    assert!(lines[0].ends_with(&known), "9.2: {}", lines[0]);
-    assert_eq!((lines[1], out.exit), (fixtures::TEST_MIN_KEYS_LINE, Exit::Code(0)), "4.5");
+    let printed = fixtures::lines_starting(&out.stdout, &["packages ", "keys "]);
+    let known = ["resolution ", &fixtures::TEST_MIN_KEY[..12], " known\n", fixtures::TEST_MIN_KEYS_LINE, "\n"].concat();
+    assert!(printed.ends_with(&known), "9.2, 4.5: {printed}");
+    assert_eq!(out.exit, Exit::Code(0));
 }
 ```
 Then `an_unrecorded_resolution_prints_needed_and_no_keys_line` (exit 0 too),
@@ -154,7 +164,15 @@ Files: render `src/{vocabulary, call, errors, limits, lib}.rs`, new
 `src/{lib, limits}.rs` (`fire`, `next_deadline`; `proxy`);
 `crates/hearth/src/{lib, argv, tests}.rs`, `crates/hearth/tests/end_to_end.rs`;
 `tests/builder/{Cargo.toml, src/fixtures.rs}`, new
-`tests/builder/tests/conformance_render.rs`.
+`tests/builder/tests/conformance_render.rs`; the `resolve: false` the `Call`
+and `Event::Render` literals gain: domain-builder `src/tests.rs:137`,
+`src/tests/fixtures.rs:9`, service-builder `src/tests/fixtures.rs:9`,
+`tests/render/src/parent.rs:36`; mmdebstrap `src/limits.rs` (`Limits` derives
+`Hash`, as the protocol's `Limits` that holds it does); `Cargo.lock`. Records:
+`Command::Mmdebstrap` and `Ended::Timeout` go in `src/errors/repository.rs`
+(`Command` :21, `Ended` :28, their arms :72 to :133), in place of
+`src/form/{text, json}.rs`, which hold no error kind. Reverse tests: protocol
+`src/tests/translate/{errors, repository}.rs`.
 Shape: the sketches. With `--resolve`, render sets `deadline = now +
 Limits::resolve` and resolves each absent key (targets in name order, each key
 at its first holder), one at a time, a failure not stopping the rest, each holder given the error (render.md 5.7);
@@ -224,7 +242,7 @@ laid record, no network: `known`, exit 0). Real loop:
 ```rust
 #[test]
 fn an_unreachable_mirror_fails_the_resolution_as_mmdebstraps_and_exits_75() {
-    let r = Repository::make("unreachable", &fixtures::repos("test"));
+    let r = Repository::make("unreachable", fixtures::TEST_REPOSITORY);
     let out = fixtures::resolve(&r, &["test-min"], Form::Text, &fixtures::dead_proxy());
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains("test-min: mmdebstrap exited ") && text.contains(" needed\n"), "7.2: {text}");
@@ -248,8 +266,10 @@ Needs: hearth 38.1 (`packages`, `lists`); nothing else beyond 24.2.
 Files: render `src/{resolution, keys, errors, vocabulary}.rs`,
 `src/tests/{fixtures, resolution, keys}.rs`; protocol `src/{resolve, lib}.rs`,
 new `src/indices.rs`, `src/translate/{resolution, errors}.rs`,
-`src/tests/translate.rs`, new `src/tests/indices.rs`; records `src/errors.rs`,
-`src/form/{text, json}.rs`, `src/tests/errors.rs`;
+`src/tests/translate/errors.rs` (`Limit::Closure`, beside :55 and :241), new
+`src/tests/indices.rs`; records `src/errors.rs` and a new
+`src/errors/resolution.rs` beside `errors/repository.rs` (`Kind::Resolution`),
+`src/tests/errors.rs`;
 `tests/builder/{src/fixtures.rs, tests/conformance_render.rs}`.
 Shape: the sketches. Lists: `OpenDirectory` of the scratch's
 `root/var/lib/apt/lists`, `ListPage`, `lists::listed` per name against
@@ -305,9 +325,9 @@ Removes: 24.2's "a run that succeeds reads no index".
 these added.
 ```rust
 // crates/hearth-domain-render/src/keys.rs (24.1; closure 24.3): resolution(&Inputs) -> Digest, closure(&[Package]) -> Digest
-// (render.md 4.5), layers(&Digest × 4) -> Keys, part(&Spec, &[u8]) -> Digest; `Limits` gains `closure: u32` (8,192), `resolve: Duration` (600 s)
+// (render.md 4.5), layers(&Digest × 4) -> Keys, part(&Spec, &[u8]) -> Digest; `Limits` gains `closure: u32` (8,192), `resolve: skein_lib::Duration` (600 s; clippy.toml:74 disallows `core::time::Duration`)
 pub struct Keys { pub packages: Digest, pub software: Digest, pub config: Digest }
-pub enum Resolution { Needed { key: Digest }, Known { key: Digest, keys: Keys } } // `Spec.resolution: Option`
+pub enum Resolution { Needed { key: Digest }, Known { key: Digest, keys: Keys } } // `Spec.resolution: Option<Box<Resolution>>`: unboxed, `Answer::Spec` grows to 336 bytes and `Output` (vocabulary.rs:39) trips `large_enum_variant`
 // crates/hearth-domain-render/src/vocabulary.rs; `Event::Render` gains `resolve: bool` (24.2)
 pub enum Event {
     Found { request: Token, digest: Digest },                 // Find: the closure's digest (31.1 widens it to `resolution: resolution::Record`)
@@ -327,7 +347,7 @@ pub struct Line { pub uri: B, pub suite: B, pub components: Box<[B]>, pub indice
 pub struct Index { pub path: B, pub size: u64, pub sha256: Digest }
 pub struct Package { pub name: B, pub architecture: B, pub version: B, pub source: u32, pub filename: B, pub size: u64, pub sha256: Digest }
 pub struct Tools { pub apt: B, pub mmdebstrap: B }
-pub struct Costs { pub fetched: u64, pub took: Duration }
+pub struct Costs { pub fetched: u64, pub took: skein_lib::Duration }
 // `Closure`, at most `Limits::closure` triples by name then architecture: new(&Limits), inst(Inst) (TooMany), stanza(line, Stanza)
 // (Disagree), close(self, names: &[B]) -> Result<Box<[Package]>, errors::Resolution> (Unmatched, Missing)
 // crates/hearth-domain-render/src/errors.rs: hearth 12's and 42.1's, these added
@@ -343,8 +363,8 @@ pub enum Command { Mmdebstrap }
 pub enum Ended { Timeout }
 pub enum Cause { Fetch, Resolve, Space, Absent { uri: B, suite: B }, Unknown(B), Unsatisfiable(Option<B>), Other } // 07's `tail::Cause`; `Absent` gains its line
 pub enum Limit { Closure } // hearth 31 adds `Record`
-// vocabulary.rs's `Failure` (hearth 42.1's) gains mmdebstrap's run and `Store` (declined or refused):
-pub enum Failure { Run { tool: Tool, cause: Option<Cause> }, Store }
+// vocabulary.rs's `Failure` (hearth 42.1's, :84) keeps `Tool(Tool)`, `TooLarge` and `Store` (declined or refused), and gains mmdebstrap's run:
+pub enum Failure { Run { tool: Tool, cause: Option<Cause> } }
 ```
 ```rust
 // crates/hearth-domain-store/src/vocabulary.rs: hearth 23's and 33's, these added (Find 24.1; hearth 31 adds Record, Room)
