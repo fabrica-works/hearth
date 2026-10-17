@@ -84,10 +84,20 @@ mirror of their own.
 - **The fetch, `testing/mirror/fetch`:** POSIX sh with `curl`, `sqv` against
   `/usr/share/keyrings/debian-archive-keyring.pgp` (x1 has `sqv`, not
   `gpgv`), `xz` and `sha256sum`; it refuses to start naming a missing one.
-  `--pin` asks for `…/archive/debian/<now, from date -u>/dists/<suite>/InRelease`
-  and takes the canonical timestamp from the URL it is redirected to
-  (format.md, 5.3: snapshot.debian.org "redirects any other to the nearest
-  earlier one").
+  `--pin` takes the canonical timestamp first (testing.md, 6.2: "the
+  canonical one snapshot.debian.org gives for the time the pin is made";
+  format.md, 5.3: "Timestamps should be the snapshot's own, since
+  snapshot.debian.org redirects any other to the nearest earlier one"),
+  from one of two listings (ruling 110): the URL that
+  `…/archive/debian/<now>/dists/<suite>/` is redirected to, `<now>` from
+  `date -u +%Y%m%dT%H%M%SZ`; or, when that URL names no timestamp other
+  than `<now>`, the greatest timestamp at or before `<now>` in the month's
+  index, `…/archive/debian/?year=<YYYY>&month=<M>` (the month's number,
+  no leading zero). A file's URL names none: snapshot.debian.org
+  redirects it to `/file/<sha1>/<name>` (build.md, 5.1: "apt follows
+  its redirects to content-addressed `/file/<sha1>/` URLs"). Then `InRelease` from
+  `…/archive/debian/<that timestamp>/dists/<suite>/InRelease`, as without
+  `--pin` from the pin's `archive`.
 - **The test repositories' layout** (code-organization.md, 3: hearth
   08's): `testing/repos/<repository>/` holds one repository's files at one
   revision, format.md 2.1's layout and nothing else; a later revision is
@@ -99,9 +109,10 @@ mirror of their own.
 ## Rules that bind it
 
 - **Live services** (README): "snapshot.debian.org alone, by hearth 08.2's
-  fetch script ... Budget: one run of the script, two files (about 10 MB);
-  a run that fails may be repeated twice, after a change aimed at the cause
-  its output names; a fourth run is a question." A run under `unshare
+  fetch script ... Budget: one run of the script, two files (about 10 MB),
+  and with `--pin` one or two listings for its timestamp, each under 1 MB
+  (ruling 110); a run that fails may be repeated twice, after a change aimed
+  at the cause its output names; a fourth run is a question." A run under `unshare
   --map-root-user --net` reaches nothing and is not one of them. Each commit
   whose work ran the script carries `Fetch-Runs: <n>` and `Fetch-Bytes:
   <n>` trailers.
@@ -184,8 +195,10 @@ the crate).
 Shape:
 - The script, `set -eu`: tools checked; the cache (Choices); without
   `--pin`, `<cache>/<digest>/` present prints `present: <dir>` and exits 0.
-  Else into `<cache>/.fetch-<pid>/`: `InRelease` (with `--pin` from
-  `<now>`, through its redirect); `sqv --cleartext --output=`; from the
+  Else into `<cache>/.fetch-<pid>/`: with `--pin`, the canonical timestamp
+  (Choices: a timestamp `[0-9]{8}T[0-9]{6}Z` at or before `<now>`, else it
+  fails naming each listing's URL); `InRelease` at that timestamp, or the
+  pin's `archive` without `--pin`; `sqv --cleartext --output=`; from the
   signed text, the `SHA256` entries of `main/binary-<arch>/Packages.xz` and
   `…/Packages`; `Packages.xz` by its plain path, checked by size and SHA-256;
   `xz -dc` into `checked/`, checked against `…/Packages`'s entry; the
@@ -194,7 +207,8 @@ Shape:
   and `digest`. Each curl: `--fail --location --max-redirs 2 --write-out
   '%{url_effective} %{size_download}\n'`; it prints each line, then the
   total bytes and the directory. Components loop over the pin's. Each
-  curl also takes `--connect-timeout 20 --max-time 120`.
+  curl also takes `--connect-timeout 20 --max-time 120`; a listing's also
+  `--max-filesize 1048576`.
 - The repository: `fleet.json` `{"debian": {"suite": "forky", "architecture":
   "amd64", "snapshot": {"archive": "<the pin's>"}, "pockets": {"updates":
   false, "security": false}}}`; each environment `{"placement": {"kind":
@@ -223,14 +237,17 @@ fn the_test_repository_names_the_pin_s_snapshot_timestamp() {
     assert!(fleet.contains(&archive), "debian.snapshot.archive is the pin's {}", pin.archive);
 }
 ```
-Proof: live: `testing/mirror/fetch --pin` once, on the run's machine: it
-prints `…/<archive>/dists/forky/InRelease` (about 150 KB) and
-`…/main/binary-amd64/Packages.xz` (about 10 MB), their total and the
-directory; then `unshare --map-root-user --net testing/mirror/fetch` once
+Proof: live: `testing/mirror/fetch --pin` once, on the run's machine,
+the third run of the budget and its last (ruling 110): it prints the
+listing's URL that names `<archive>` (or the month's index), the
+`InRelease` (about 150 KB) and `Packages.xz` (about 10 MB) URLs that
+snapshot.debian.org serves them at, their total and the directory; then `unshare --map-root-user --net testing/mirror/fetch` once
 prints `present: <that directory>` and exits 0, with no network to reach;
 then `heavy cargo nextest run -p hearth-test-mirror` passes. Bound: 5 min;
-one run reaching snapshot.debian.org, two files. The commit's trailers give
-the runs and the bytes the script printed.
+one run reaching snapshot.debian.org, two files and at most two listings.
+The commit's trailers give the runs and the bytes the script printed, the
+two failed runs counted: `Fetch-Runs: 3`, and `Fetch-Bytes:`
+301546 plus the third run's total.
 Don't: fetch beyond the two files; a `.gitignore` or any fetched file in
 the repository; a run beyond the budget; the hearth task's packages or
 download in the test repository (testing.md 6.2).

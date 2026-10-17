@@ -284,6 +284,16 @@ None yet.
 
      The re-check's runs: the crate and world 28 of 28 with the corrected sketch on a stub, fuzzy 1 of 1, clippy clean after 2. A further sketch call that queues a demand drains it the same way.
 
+110. **hearth 08.2's canonical timestamp from a listing** (plan defect, hearth 08's block of 2026-10-17T16:28:56Z).
+     Ruling 110, plan defect: 08's Choices took the canonical timestamp from the URL that a file's request is redirected to, and snapshot.debian.org redirects a file to `/file/<sha1>/<name>`, which names none (build.md, 5.1: "apt follows its redirects to content-addressed `/file/<sha1>/` URLs"). What counts is the design's: "the canonical one snapshot.debian.org gives for the time the pin is made" (testing.md, 6.2), "the snapshot's own, since snapshot.debian.org redirects any other to the nearest earlier one" (format.md, 5.3). Where the script reads it is the plan's:
+
+     1. `--pin` takes the timestamp first, from one of two listings: the URL that `…/archive/debian/<now>/dists/<suite>/` (a directory) is redirected to, `<now>` from `date -u +%Y%m%dT%H%M%SZ`; or, when that URL names no timestamp other than `<now>`, the greatest timestamp at or before `<now>` in the month's index, `…/archive/debian/?year=<YYYY>&month=<M>` (the month's number, no leading zero). It must match `[0-9]{8}T[0-9]{6}Z` and be at or before `<now>`; else the script fails, printing each listing's URL. Each listing's curl adds `--max-filesize 1048576` to the Shape's flags.
+     2. Then `InRelease` from `…/archive/debian/<that timestamp>/dists/<suite>/InRelease`, the path the script takes without `--pin` from the pin's `archive`; the rest of 08.2's Shape is unchanged.
+     3. The budget (README.md, Live services) gains, with `--pin`, one or two listings, each under 1 MB. The next run is the third, the budget's last; a run that fails after it is a question (blocked.md), with its output's lines.
+     4. 08.2's commit carries `Fetch-Runs: 3` and `Fetch-Bytes:` 301546 plus the third run's total.
+
+     Unchanged: the two files, the cache's layout, the pin's form, 08.2's tests, and the `unshare --net` check, which is no run.
+
 ## For the user
 
 The long-term choices the user may veto:

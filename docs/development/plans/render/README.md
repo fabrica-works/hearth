@@ -383,7 +383,8 @@ first. skein's browser suite runs only inside skein's gate.
   index for `main/binary-amd64`, whole, as the archive serves it
   (`Packages.xz`, about 10 MB at x1's 2026-09-28 lists; a test that needs
   its stanzas decompresses it with `/usr/bin/xz`, no crate). **Budget:** one run of the script,
-  two files (about 10 MB); a run that fails may be repeated twice, after
+  two files (about 10 MB), and with `--pin` one or two listings for its
+  timestamp, each under 1 MB (ruling 110); a run that fails may be repeated twice, after
   a change aimed at the cause its output names; a fourth run is a
   question. Its runs and bytes are in hearth 08.2's report, and each commit
   whose work ran the script carries `Fetch-Runs: <n>` and `Fetch-Bytes:
