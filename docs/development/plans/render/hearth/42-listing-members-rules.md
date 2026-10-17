@@ -52,8 +52,8 @@ and Rules bind here as there.
   "targets in a revision" before it. A container whose host failed is
   left out with no error of its own: it depends on the host's documents.
 - **Later sessions:** 20 gives `target.containers`; 21 the `hearth` task;
-  24 mmdebstrap's `Command` and `Ended::Timeout`; 45.1 git's diff
-  `Command`.
+  24 mmdebstrap's `Command` and `Ended::Timeout`; 45.1 a failed diff's
+  error per target (42.1 adds git's diff `Command`).
 
 ## Rules that bind it
 
@@ -79,11 +79,17 @@ Scope: render.md 3.1's refusals under the four roots (format.md 2.1;
 submodule (2.2), 2.3's `tasks`; 7.2's `tool` for git with its standard
 error's tail (8.2, 2.4); the listing's limits as `decode`.
 Needs: nothing beyond hearth 12.
-Files: render `src/{revision, compose, call, errors, vocabulary}.rs`,
-`src/tests/{revision, errors}.rs`; `hearth-protocol-git` `src/{limits,
+Files: render `src/{lib, revision, compose, call, errors, limits,
+vocabulary}.rs` (`lib.rs:74`'s `Failed`; `limits.rs`: `tasks: 1_024`
+beside `targets`), `src/tests/{revision, errors, diff}.rs`
+(`diff.rs:201`'s `Failed` names `Failure::Tool` with `Command::Diff`);
+`hearth-protocol-git` `src/{limits,
 lib, tests}.rs` (`mod tail;`), new `src/tail.rs`, new `src/tests/tail.rs`; protocol `src/{git,
-read}.rs`, `src/translate/{errors, listing}.rs`, `src/tests/{git,
-translate}.rs`; records `src/errors.rs`, `src/form/{text, json}.rs`,
+lib, read}.rs` (`lib.rs:464` and `:549`: the hunk call's failure),
+`src/translate/{errors, listing}.rs`, `src/tests/{git,
+translate}.rs`, `src/tests/translate/errors.rs` (`decode_limit_back`
+`:50`, `DECODE_LIMITS` `:230`: a row for each new `Limit`, in the
+README's round-trip form, ruling 144); records `src/errors.rs`, `src/form/{text, json}.rs`,
 `src/tests/errors.rs`; `tests/render/tests/{errors, thin}.rs`;
 `tests/git/{src/fixtures.rs, src/world.rs, tests/memory.rs}` (a `Tail` case:
 `world.rs:238` and `:266` match `Decoder` whole, and a `Tail` driver feeds it,
@@ -93,8 +99,15 @@ translate}.rs`; records `src/errors.rs`, `src/form/{text, json}.rs`,
 Shape: the sketches. `revision::class` gains `Template`, `Script`,
 `Readme` (accepted for hearth 15 and 18) and `Refused`, and drops `Copy`
 (`revision.rs:25`: `Refused` holds a box), so `src/tests/revision.rs:17`
-iterates `PATHS` by reference; each match on it in `call.rs` and `compose.rs`
-names the four, with no wildcard. An environment
+iterates `PATHS` by reference; each of its seven matches
+(`revision.rs:152`'s `Documents::new`, `call.rs:206` and `:289`,
+`compose.rs:28`, `:37` and `:80`, `errors.rs:72`'s `refused`) names the
+four, with no wildcard. `Command` gains `Diff` here, not in 45.1: the
+hunk call's run spawns through `git.rs:28` too (builder `lib.rs:180`,
+`:390`), so its failure (`lib.rs:464`'s `hunks::Event::Failed`, `:549`'s
+fallback) is a `Tool` as the others' are, with its `ended` and its tail
+(records: `git diff exited 1`, JSON `"command":"diff"`); 45.1 keeps the
+target's error for a failed `Hunks`, with its `side`. An environment
 not listed and a task directory without `task.json` are found by
 `compose::targets`' pass over the listing, as are two sources of one
 destination in a task (`tree/etc/foo` and `tree/etc/foo.j2`,
@@ -187,7 +200,7 @@ Files: render `src/{revision, compose, call, errors}.rs`,
 `src/parts/meta.rs`, `src/tests/{compose, errors, fixtures}.rs` (each
 `Document` literal takes `members: None`: `fixtures.rs:240`, `:257`); protocol
 `src/translate/{documents, errors}.rs`, `src/tests/{translate, read}.rs`
-(`read.rs:57`, `:129`); records
+(`read.rs:57`, `:133`; `translate.rs:95`, `:102`); records
 `src/errors.rs`, `src/form/{text, json}.rs`, `src/tests/errors.rs`;
 `tests/render/{src/fixtures.rs, tests/compose.rs}`;
 `tests/builder/{src/fixtures.rs, tests/real.rs}`.
@@ -292,9 +305,12 @@ hosts/chat/chat-prod.json:1:43: chat-prod: placement's on names rhi-lab, a targe
 Don't: check a container's M5 parameters; give a host its containers
 (hearth 20); check settings against schemas (hearth 13).
 Size: at most 160 lines.
-Removes: hearth 11's silent failure of a target with no placement; the
-silent ignoring of `placement` in `fleet.json`, a base or its member
-(hearth 12.1, 12.2, 42.1 and 42.2).
+Removes: hearth 11's silent failure of a target with no placement;
+hearth 11's composing of `placement` from `fleet.json` and a base
+(`call.rs:329`'s loop takes the last of the fleet's, the base's, the
+environment's and the base-env's), which 42.3 refuses, keeping the last
+of the environment's, the base-env's and its member's; the silent
+ignoring of a base's member's `placement` (42.2).
 
 ## Interface sketches
 
@@ -323,8 +339,8 @@ pub enum Failure { Tool(Tool), TooLarge { limit: Limit, max: u64 } }
 pub enum Repository { Stray, Environment { env: Box<[u8]> }, Name, Declaration, Static, Destination, Submodule, Link }
 /// Which run, how it ended, its standard error's last lines.
 pub struct Tool { pub command: Command, pub ended: Ended, pub tail: Box<[Box<[u8]>]> }
-/// hearth 24 adds mmdebstrap's, hearth 45.1 git's diff.
-pub enum Command { RevParse, LsTree, CatFile }
+/// hearth 24 adds mmdebstrap's.
+pub enum Command { RevParse, LsTree, CatFile, Diff }
 /// hearth 24 adds `Timeout`.
 pub enum Ended { Start, Exit(u8), Signal(u32), Output, Missing { oid: Oid }, Stream }
 /// 42.2: Duplicate, Long; 42.3: the rest.
@@ -338,7 +354,7 @@ pub enum Host { Unknown, Elsewhere { environment: Box<[u8]> }, Container }
 pub struct Tail { /* the lines kept, the line in hand */ }
 impl Tail { #[must_use] pub fn new(limits: &Limits) -> Tail; pub fn admit(&mut self, bytes: &[u8]); #[must_use] pub fn lines(&self) -> Box<[Box<[u8]>]>; }
 
-// crates/hearth-protocol-builder/src/translate/errors.rs (hearth 12's; 42.1 on); reverses in src/tests/translate.rs
+// crates/hearth-protocol-builder/src/translate/errors.rs (hearth 12's; 42.1 on); reverses in src/tests/translate/errors.rs
 // `error` gains an arm per variant above; `translate::listing` gains the listing's `TooMany`, `PathTooLong`, `PathsTooLarge`.
 
 // crates/hearth-client-protocol-records/src/errors.rs (40.2's; 12.2)

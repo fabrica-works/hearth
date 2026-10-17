@@ -701,6 +701,9 @@ None yet.
      Done when 4 prints 0 at ca17d04 (ca17d04 named each field of `translate/documents.rs`'s two frames): no change.
      A further line number these corrections move takes the new value, and the commit body lists it.
 
+147. **hearth 42's Shapes against main** (re-check of hearth-42.1).
+     hearth 42's re-check against hearth 3fd9fab (check/recheck-42.md), after ruling 143: its four corrections hold, and 42-listing-members-rules.md now says five more. 42.1: `Class`'s seven matches (`revision.rs:152`, `call.rs:206` and `:289`, `compose.rs:28`, `:37` and `:80`, `errors.rs:72`), not two files'; `Event::Failed`'s other builders (render `lib.rs:74`, `tests/diff.rs:201`, builder `lib.rs:549`) in its Files; `Limits.tasks` (1,024, beside `targets`) for `TooLarge { Tasks }`; the new `Limit` rows in builder `src/tests/translate/errors.rs` (`:50`, `:230`), in the README's round-trip form (ruling 144). `Command::Diff` moves from 45.1 to 42.1: the hunk call spawns through `git.rs:28` like the others, so 42.1 gives its failure (`lib.rs:464`, `:549`) its `Tool`, `ended` and tail; 45.1 keeps a failed diff's error per target. 42.2: `read.rs:133` (was `:129`), and `tests/translate.rs:95`, `:102` take `members: None` too. 42.3's Removes: hearth 11 composes `placement` from `fleet.json` and a base (`call.rs:329`), which 42.3 refuses; it does not ignore it. Refresh any further copy of a moved line, and list it in the commit body.
+
 ## For the user
 
 The long-term choices the user may veto:

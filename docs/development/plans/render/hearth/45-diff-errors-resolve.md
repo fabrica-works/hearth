@@ -89,7 +89,8 @@ records' `Error` gain `side: Option<Side>`, `None` in a render, omitted in
 JSON then; text leads 7.3's line with `from: ` or `to: `), after
 the last change; errors equal in every other key sort `from` before `to`. A
 failed `Hunks` leaves its file bare and adds the target's `tool` error: git.rs
-gives 25.2's `Failed` its `Tool` (`Command::Diff`, the exit, the tail).
+gives 25.2's `Failed` its `Tool` (`Command::Diff`, the exit, the tail:
+hearth 42.1's).
 `argv`: `diff`, two revisions checked by `invocation::revision` before
 the loop (64), `--target` repeated, `--repo`, `--store`, `--json` as
 `render` takes them; anything else (`--running`: M3) a usage line.
@@ -205,7 +206,7 @@ pub enum PartChange { Meta(MetaChange), Config(ConfigChange) }    // Meta: 45.1
 pub struct MetaChange { pub base: Option<Pair<Box<[u8]>>>, pub member: Option<Pair<Option<Box<[u8]>>>>, pub environment: Option<Pair<Box<[u8]>>>, pub placement: Option<Pair<Placement>> }
 pub struct Pair<T> { pub before: T, pub after: T }
 // src/errors.rs (hearth 40.2's; 45.1): `Error` gains `pub side: Option<Side>`, as hearth 12's error does
-// render's errors.rs and records' (45.1): `Command` gains `Diff` (45.1 adds it, as hearth 42.1's notes say)
+// render's errors.rs and records' (45.1): `Command`'s `Diff` is hearth 42.1's (ruling 147)
 ```
 
 ## Questions to raise when reached
