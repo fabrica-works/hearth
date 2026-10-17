@@ -2,7 +2,7 @@
 use crate::{records::parts::config as target, render::parts::config as source};
 #[must_use]
 pub fn config(config: source::Config) -> target::Config {
-    let source::Config { tree, groups, users, members } = config;
+    let source::Config { tree, groups, users, members, presets, tmpfiles, scripts } = config;
     let mut translated = skein_lib::List::with_capacity(u32::try_from(tree.len()).expect("bounded tree"));
     for source::TreeEntry { path, node } in tree {
         let node = match node {
@@ -28,6 +28,9 @@ pub fn config(config: source::Config) -> target::Config {
     }
     target::Config {
         tree: translated.into_boxed(),
+        presets: directives::presets(presets),
+        tmpfiles: directives::tmpfiles(tmpfiles),
+        scripts: directives::scripts(scripts),
         groups: translated_groups.into_boxed(),
         users: translated_users.into_boxed(),
         members: translated_members.into_boxed(),
@@ -54,3 +57,6 @@ pub fn user(kind: source::UserKind) -> target::UserKind {
 pub fn member(source::Member { user, group }: source::Member) -> target::Member {
     target::Member { user, group }
 }
+
+mod directives;
+pub use directives::{action, line, scripts};

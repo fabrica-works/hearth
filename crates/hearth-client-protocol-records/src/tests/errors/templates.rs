@@ -1,6 +1,11 @@
 use crate::{errors::Repository, form::Form, tests::fixtures};
 const TEMPLATES: &[(Repository, &str, &str)] = &[
     (
+        Repository::NoScript,
+        "no script at this path\n",
+        "{\"record\":\"error\",\"kind\":\"repository\",\"repository\":\"no_script\",\"class\":\"configuration\"}\n",
+    ),
+    (
         Repository::NoTemplate,
         "no template at this path\n",
         "{\"record\":\"error\",\"kind\":\"repository\",\"repository\":\"no_template\",\"class\":\"configuration\"}\n",

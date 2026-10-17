@@ -20,3 +20,7 @@ pub mod preseeds;
 
 pub mod groups;
 pub mod users;
+
+pub mod presets;
+pub mod scripts;
+pub mod tmpfiles;

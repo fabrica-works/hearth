@@ -5,6 +5,9 @@ pub fn config() -> crate::parts::config::Config {
         revision::Mode,
     };
     Config {
+        presets: Box::new([]),
+        tmpfiles: Box::new([]),
+        scripts: Box::new([]),
         groups: Box::new([]),
         users: Box::new([]),
         members: Box::new([]),

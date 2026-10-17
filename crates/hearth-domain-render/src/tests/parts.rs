@@ -36,7 +36,7 @@ fn an_executable_blob_is_0755_and_any_other_file_0644() {
 fn the_config_digest_is_h_of_part_config_over_its_tree() {
     assert_eq!(
         crate::parts::config::digest(&fixtures::config()),
-        fixtures::digest("7365350846669fd36d65fa1268c9bbd06ece7f40479415d42dfc740db0deca70"),
+        fixtures::digest("369415fd653cb11934a29e440c06fcd2c270c6bcb60f2301ddfbdd0c7d37168a"),
         "store.md 3.1's tree encoding"
     );
 }

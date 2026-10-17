@@ -324,6 +324,9 @@ pub fn config_change() -> render::diff::Change {
         target: bytes::copy_of(b"x1-prod"),
         change: diff::TargetChange::Changed {
             parts: Box::new([diff::PartChange::Config(config::Change {
+                presets: Box::new([]),
+                tmpfiles: Box::new([]),
+                scripts: None,
                 groups: Box::new([]),
                 users: Box::new([]),
                 members: Box::new([]),
@@ -787,3 +790,5 @@ pub use accounts::*;
 
 mod indices;
 pub use indices::*;
+mod directives;
+pub use directives::*;

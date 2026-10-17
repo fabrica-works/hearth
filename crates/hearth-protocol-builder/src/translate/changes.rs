@@ -61,13 +61,16 @@ pub fn part_change(part: source::PartChange) -> target::PartChange {
             environment: optional_name_pair(meta.environment),
             placement: optional_placement_pair(meta.placement),
         }),
-        source::PartChange::Config(config::Change { tree, groups, users, members }) => {
+        source::PartChange::Config(config::Change { tree, groups, users, members, presets, tmpfiles, scripts }) => {
             let mut translated = List::with_capacity(u32::try_from(tree.len()).expect("bounded tree"));
             for entry in tree {
                 translated.push(entry_change(entry)).expect("tree capacity");
             }
             target::PartChange::Config(target::ConfigChange {
                 tree: translated.into_boxed(),
+                presets: directives_changes::presets(presets),
+                tmpfiles: directives_changes::tmpfiles(tmpfiles),
+                scripts: directives_changes::scripts(scripts),
                 groups: account_changes::groups(groups),
                 users: account_changes::users(users),
                 members: account_changes::members(members),
@@ -221,3 +224,5 @@ mod account_changes {
         translated.into_boxed()
     }
 }
+
+mod directives_changes;

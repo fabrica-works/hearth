@@ -124,6 +124,7 @@ impl Side {
             for (index, entry) in self.entries.iter().enumerate() {
                 let (name, path) = match revision::class(&entry.path) {
                     revision::Class::Tree { task, path } | revision::Class::Template { task, path } => (task, path),
+                    revision::Class::Script { task, name } if name != b"software.sh" => (task, name),
                     revision::Class::Fleet
                     | revision::Class::Environment { .. }
                     | revision::Class::Host { .. }
@@ -218,4 +219,42 @@ pub(super) fn fault_capacity(expansion: &Expansion, listed: usize) -> u32 {
         }
     }
     capacity
+}
+
+pub(super) fn read_kind<'a>(
+    entry: &'a revision::Entry,
+    limits: &crate::limits::Limits,
+) -> Option<(&'a [u8], crate::vocabulary::As, u32)> {
+    use crate::vocabulary::As;
+    match revision::class(&entry.path) {
+        revision::Class::Tree { task, path } if entry.mode == Mode::Link && !path.ends_with(b".j2") => {
+            Some((task, As::Link, 4095))
+        }
+        revision::Class::Tree { task, path }
+            if !path.ends_with(b".j2") && entry.mode != Mode::Link && entry.mode != Mode::Submodule =>
+        {
+            Some((task, As::Cached, limits.static_file))
+        }
+        revision::Class::Tree { task, path }
+            if path.ends_with(b".j2")
+                && entry.mode != Mode::Link
+                && entry.mode != Mode::Submodule
+                && path != b".j2"
+                && !path.ends_with(b"/.j2") =>
+        {
+            Some((task, As::Template, limits.template))
+        }
+        revision::Class::Template { task, .. } => Some((task, As::Template, limits.template)),
+        revision::Class::Script { task, name } if name.ends_with(b".j2") => Some((task, As::Template, limits.template)),
+        revision::Class::Script { task, name: b"customize.sh" } => Some((task, As::Cached, limits.static_file)),
+        revision::Class::Declaration { .. }
+        | revision::Class::Fleet
+        | revision::Class::Environment { .. }
+        | revision::Class::Host { .. }
+        | revision::Class::Tree { .. }
+        | revision::Class::Script { .. }
+        | revision::Class::Readme { .. }
+        | revision::Class::Refused { .. }
+        | revision::Class::Other => None,
+    }
 }

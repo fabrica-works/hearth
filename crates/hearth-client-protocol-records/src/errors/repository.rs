@@ -4,6 +4,7 @@ use super::{Box, Encoder, Lines, field};
 pub enum Repository {
     NoTree,
     NoTemplate,
+    NoScript,
     Unused,
     LinkTarget,
     Stray,
@@ -43,6 +44,7 @@ pub enum Ended {
 impl Repository {
     pub(super) fn text(&self, lines: &mut Lines) {
         match self {
+            Self::NoScript => lines.put(b"no script at this path"),
             Self::NoTemplate => lines.put(b"no template at this path"),
             Self::Unused => lines.put(b"a template no entry names"),
             Self::NoTree => lines.put(b"no tree entry at this path"),
@@ -69,6 +71,7 @@ impl Repository {
                 field(json, b"env", env);
                 json.object_end();
             }
+            Self::NoScript => json.string(b"no_script"),
             Self::NoTemplate => json.string(b"no_template"),
             Self::Unused => json.string(b"unused"),
             Self::NoTree => json.string(b"no_tree"),

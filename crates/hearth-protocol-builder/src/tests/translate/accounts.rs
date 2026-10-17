@@ -1,7 +1,7 @@
 use super::config::{group_back, member_back, user_back};
 use crate::{records::diff as target, render::parts::config as source};
 pub(super) fn change_back(
-    target::ConfigChange { tree, groups, users, members }: target::ConfigChange,
+    target::ConfigChange { tree, groups, users, members, presets, tmpfiles, scripts }: target::ConfigChange,
 ) -> source::Change {
     let mut entries = skein_lib::List::with_capacity(u32::try_from(tree.len()).expect("tree count"));
     for entry in tree {
@@ -45,6 +45,9 @@ pub(super) fn change_back(
             .expect("member count");
     }
     source::Change {
+        presets: super::directives::preset_changes_back(presets),
+        tmpfiles: super::directives::line_changes_back(tmpfiles),
+        scripts: super::directives::script_change_back(scripts),
         tree: entries.into_boxed(),
         groups: changed_groups.into_boxed(),
         users: changed_users.into_boxed(),

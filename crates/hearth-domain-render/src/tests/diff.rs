@@ -100,6 +100,9 @@ fn changed_parts_are_compared_by_digest_and_rebuild_from_config() {
         TargetChange::Changed {
             rebuild: Rebuild::FromConfig,
             parts: Box::new([diff::PartChange::Config(config::Change {
+                presets: Box::new([]),
+                tmpfiles: Box::new([]),
+                scripts: None,
                 groups: Box::new([]),
                 users: Box::new([]),
                 members: Box::new([]),

@@ -86,7 +86,15 @@ pub(crate) fn rows(accounts: &users::Accounts, tree: Box<[super::TreeEntry]>) ->
     for (member, ()) in &members {
         member_rows.push(member.clone()).expect("member count");
     }
-    Config { tree, groups: group_rows.into_boxed(), users: user_rows.into_boxed(), members: member_rows.into_boxed() }
+    Config {
+        tree,
+        groups: group_rows.into_boxed(),
+        users: user_rows.into_boxed(),
+        members: member_rows.into_boxed(),
+        presets: Box::new([]),
+        tmpfiles: Box::new([]),
+        scripts: Box::new([]),
+    }
 }
 pub(super) fn encode(config: &Config, record: &mut hearth_lib::encode::Encoder) {
     record.key(b"groups");

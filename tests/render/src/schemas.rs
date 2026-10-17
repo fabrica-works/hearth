@@ -32,6 +32,7 @@ pub fn declaration(rng: &mut Rng, shape: Shape) -> Declaration {
         types: types.into_boxed_slice(),
         settings: Box::new([spec]),
         requires: Box::new([]),
+        scripts: Box::new([]),
         exports: Box::new([]),
         entries: Box::new([]),
         reads: Box::new([]),

@@ -18,6 +18,9 @@ pub(super) fn config_back(config: records::parts::config::Config) -> render::par
         members.push(member_back(member)).expect("member count");
     }
     render::parts::config::Config {
+        presets: super::directives::presets_back(config.presets),
+        tmpfiles: super::directives::tmpfiles_back(config.tmpfiles),
+        scripts: super::directives::scripts_back(config.scripts),
         groups: groups.into_boxed(),
         users: users.into_boxed(),
         members: members.into_boxed(),

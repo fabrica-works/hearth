@@ -284,6 +284,9 @@ pub mod composition {
 pub fn diff_trees() -> (crate::parts::config::Config, crate::parts::config::Config) {
     use crate::parts::config::{self, Config};
     let before = Config {
+        presets: Box::new([]),
+        tmpfiles: Box::new([]),
+        scripts: Box::new([]),
         groups: Box::new([]),
         users: Box::new([]),
         members: Box::new([]),
@@ -293,6 +296,9 @@ pub fn diff_trees() -> (crate::parts::config::Config, crate::parts::config::Conf
         ]),
     };
     let after = Config {
+        presets: Box::new([]),
+        tmpfiles: Box::new([]),
+        scripts: Box::new([]),
         groups: Box::new([]),
         users: Box::new([]),
         members: Box::new([]),
@@ -314,6 +320,9 @@ pub fn changed_specs() -> (crate::parts::Spec, crate::parts::Spec) {
         &[Part {
             digest: Digest([1; 32]),
             record: PartRecord::Config(Config {
+                presets: Box::new([]),
+                tmpfiles: Box::new([]),
+                scripts: Box::new([]),
                 groups: Box::new([]),
                 users: Box::new([]),
                 members: Box::new([]),
@@ -326,6 +335,9 @@ pub fn changed_specs() -> (crate::parts::Spec, crate::parts::Spec) {
         &[Part {
             digest: Digest([2; 32]),
             record: PartRecord::Config(Config {
+                presets: Box::new([]),
+                tmpfiles: Box::new([]),
+                scripts: Box::new([]),
                 groups: Box::new([]),
                 users: Box::new([]),
                 members: Box::new([]),
@@ -468,6 +480,9 @@ pub fn hunk_call() -> (crate::Render, skein_lib::Env<limits::Limits>, skein_lib:
             &[Part {
                 digest,
                 record: PartRecord::Config(Config {
+                    presets: Box::new([]),
+                    tmpfiles: Box::new([]),
+                    scripts: Box::new([]),
                     groups: Box::new([]),
                     users: Box::new([]),
                     members: Box::new([]),
@@ -566,6 +581,7 @@ pub fn declaration(
         settings: settings.into(),
         reads: reads.into(),
         requires: Box::new([]),
+        scripts: Box::new([]),
         exports: Box::new([]),
         entries: Box::new([]),
     }
@@ -682,6 +698,11 @@ pub fn template_call(path: &[u8], mode: crate::revision::Mode, size: u64, limits
         })
         .expect("fourth entry");
     call.entries = entries.into_boxed();
+    let mut invalid = skein_lib::List::with_capacity(u32::try_from(call.entries.len()).expect("fixture count"));
+    for _ in &call.entries {
+        invalid.push(false).expect("fixture count");
+    }
+    call.invalid = invalid.into_boxed();
     let mut out = skein_lib::Queue::with_capacity(1);
     call.files(limits, &mut out);
     call
@@ -766,3 +787,6 @@ pub use resolution::*;
 mod config;
 pub mod export_readers;
 pub use config::*;
+
+mod scripts;
+pub use scripts::*;

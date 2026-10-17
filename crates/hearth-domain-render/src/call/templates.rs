@@ -17,7 +17,7 @@ use hearth_lib::encode::Digest;
 use skein_lib::{List, Map, Queue, Token};
 pub(crate) struct Prepared {
     pub accounts: crate::kinds::users::Accounts,
-    pub plans: Box<[Plan]>,
+    pub installation: super::scripts::Installation,
     pub expansion: crate::entries::Expansion,
     pub secrets: parts::secrets::Secrets,
     pub packages: parts::packages::Packages,
@@ -48,7 +48,12 @@ pub(crate) struct Target {
     accounts: crate::kinds::users::Accounts,
     plans: Box<[Plan]>,
     outcome: Outcome,
-    keeping: Option<TreeEntry>,
+    keeping: Option<Keeping>,
+    presets: Box<[parts::config::Preset]>,
+    tmpfiles: Box<[parts::config::Tmpfile]>,
+    scripts: Box<[crate::kinds::scripts::Source]>,
+    script_rows: Map<(u16, Box<[u8]>), parts::config::Script>,
+    script_done: bool,
     request: Option<Request>,
 }
 impl Target {
@@ -61,7 +66,10 @@ impl Target {
         prepared: Prepared,
         capacity: u32,
     ) -> Self {
-        let Prepared { accounts, plans, expansion, secrets, packages, live, boot, exports, export_roots } = prepared;
+        let Prepared { accounts, installation, expansion, secrets, packages, live, boot, exports, export_roots } =
+            prepared;
+        let super::scripts::Installation { plans, presets, tmpfiles, scripts } = installation;
+        let script_rows = Map::with_capacity(u32::try_from(scripts.len()).expect("task bound"));
         let mut tree = Map::with_capacity(capacity);
         for plan in &plans {
             for install in &plan.installs {
@@ -112,6 +120,11 @@ impl Target {
             plans,
             outcome: Outcome::Done,
             keeping: None,
+            presets,
+            tmpfiles,
+            scripts,
+            script_rows,
+            script_done: false,
             request: None,
         }
     }
@@ -131,73 +144,46 @@ impl Target {
                     exports: crate::exports::of(&self.export_roots, &task.name).clone(),
                 });
             }
-            let plan = self.plans.get(self.task).expect("task plan");
-            for install in plan.installs.get(self.entry..).expect("plan cursor") {
+            let task_name = task.name.clone();
+            let count = self.plans.get(self.task).expect("task plan").installs.len();
+            for index in self.entry..count {
+                let install =
+                    self.plans.get(self.task).expect("task plan").installs.get(index).expect("plan cursor").clone();
                 self.entry = self.entry.saturating_add(1);
                 let (path, via, mode) = match &install.make {
                     Make::Rendered { template, via, mode } => (template, via, *mode),
                     Make::Copied { source, mode } => {
                         self.tree
-                            .insert(install.path.clone(), copied(side, install, source, *mode))
+                            .insert(install.path.clone(), copied(side, &install, source, *mode))
                             .expect("plan capacity");
                         continue;
                     }
                     Make::Static { .. } | Make::Link { .. } | Make::Directory { .. } => continue,
                 };
-                let oid = side.listed_entry(path).expect("planned template listed").oid.clone();
-                let Some(template) = side.templates.get(&oid) else { continue };
-                let context = self.roots.as_ref().expect("task roots").context();
-                let element =
-                    element(&self.expansion, &side.documents, &task.name, via.as_ref(), &context, &side.limits);
-                match template::run(
-                    template,
-                    &context,
-                    element,
-                    &side.limits,
-                    side.limits.rendered_target.saturating_sub(self.rendered),
-                ) {
-                    Ok(bytes) => {
-                        self.rendered = self
-                            .rendered
-                            .checked_add(u64::try_from(bytes.len()).expect("file bound"))
-                            .expect("target bound");
-                        let digest = Digest(skein_lib::sha256::digest(&bytes));
-                        side.sizes
-                            .insert(digest, u64::try_from(bytes.len()).expect("file bound"))
-                            .expect("listing capacity");
-                        let file = TreeEntry {
-                            path: install.path.clone(),
-                            node: parts::config::Node::File {
-                                content_digest: digest,
-                                mode,
-                                owner: install.owner.clone(),
-                                group: install.group.clone(),
-                            },
-                        };
-                        self.keeping = Some(file);
-                        self.request =
-                            Some(Request::Keep { request: Token::new(4), path: path.clone(), sha256: digest, bytes });
-                        side.ready = false;
-                    }
-                    Err(fault) => {
-                        self.outcome = self.outcome.worst(Outcome::Failed);
-                        side.errors.push(Error {
-                            side: None,
-                            kind: Kind::Evaluation(fault.kind),
-                            class: Class::Configuration,
-                            at: Some(Place {
-                                path: path.clone(),
-                                position: Some(template::place(&template.lines, fault.at)),
-                            }),
-                            also: None,
-                            target: Some(self.meta.target.clone()),
-                            task: Some(task.name.clone()),
-                        });
-                    }
+                if let Some((digest, bytes)) = self.render(side, path, &task_name, via.as_ref()) {
+                    self.keeping = Some(Keeping::File(TreeEntry {
+                        path: install.path.clone(),
+                        node: parts::config::Node::File {
+                            content_digest: digest,
+                            mode,
+                            owner: install.owner.clone(),
+                            group: install.group.clone(),
+                        },
+                    }));
+                    self.request =
+                        Some(Request::Keep { request: Token::new(4), path: path.clone(), sha256: digest, bytes });
+                    side.ready = false;
                 }
                 return true;
             }
+            if !self.script_done {
+                self.script_done = true;
+                if self.script(side, &task_name) {
+                    return true;
+                }
+            }
             self.task = self.task.saturating_add(1);
+            self.script_done = false;
             self.entry = 0;
             self.roots = None;
         }
@@ -214,7 +200,16 @@ impl Side {
         debian: Value,
         prepared: Prepared,
     ) {
-        let capacity = self.plan_capacity(&prepared.plans);
+        let capacity = self.plan_capacity(&prepared.installation.plans);
+        let mut sizes = Map::with_capacity(
+            self.sizes
+                .capacity()
+                .saturating_add(u32::try_from(prepared.installation.scripts.len()).expect("task bound")),
+        );
+        for (digest, size) in &self.sizes {
+            sizes.insert(*digest, *size).expect("size bound");
+        }
+        self.sizes = sizes;
         self.rendering = Some(Target::new(meta, containers, meta_digest, checked, debian, prepared, capacity));
     }
 
@@ -234,11 +229,21 @@ impl Side {
     }
     pub(crate) fn kept(&mut self, digest: Option<Digest>) {
         let target = self.rendering.as_mut().expect("rendered target");
-        let file = target.keeping.take().expect("one rendered file waiting");
+        let keeping = target.keeping.take().expect("one rendered file waiting");
         if let Some(digest) = digest {
-            let parts::config::Node::File { content_digest, .. } = &file.node else { unreachable!("rendered file") };
-            assert_eq!(digest, *content_digest, "kept rendered digest");
-            target.tree.insert(file.path.clone(), file).expect("listing capacity");
+            match keeping {
+                Keeping::File(file) => {
+                    let parts::config::Node::File { content_digest, .. } = &file.node else {
+                        unreachable!("rendered file")
+                    };
+                    assert_eq!(digest, *content_digest, "kept rendered digest");
+                    target.tree.insert(file.path.clone(), file).expect("listing capacity");
+                }
+                Keeping::Script(script) => {
+                    assert_eq!(digest, script.content_digest, "kept rendered digest");
+                    target.script_rows.insert((script.order, script.task.clone()), script).expect("task bound");
+                }
+            }
         } else {
             target.outcome = target.outcome.worst(Outcome::TryAgain);
             self.outcome = self.outcome.worst(Outcome::TryAgain);
@@ -279,7 +284,14 @@ impl Side {
         for (_, file) in &target.tree {
             files.push(file.clone()).expect("tree count");
         }
-        let config = parts::config::account_rows(&target.accounts, files.into_boxed());
+        let mut config = parts::config::account_rows(&target.accounts, files.into_boxed());
+        config.presets = target.presets;
+        config.tmpfiles = target.tmpfiles;
+        let mut scripts = List::with_capacity(target.script_rows.len());
+        for (_, row) in &target.script_rows {
+            scripts.push(row.clone()).expect("task bound");
+        }
+        config.scripts = scripts.into_boxed();
         let parts = Box::new([
             parts::Part { digest: parts::boot::digest(&target.boot), record: parts::PartRecord::Boot(target.boot) },
             parts::Part {
@@ -362,3 +374,10 @@ fn copied(side: &Side, install: &crate::kinds::files::Install, source: &[u8], mo
         },
     }
 }
+
+#[derive(Debug)]
+enum Keeping {
+    File(TreeEntry),
+    Script(parts::config::Script),
+}
+mod scripts;

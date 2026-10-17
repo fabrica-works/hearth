@@ -179,6 +179,9 @@ fn a_config_part_translates_to_the_records_and_back() {
     let source = render::parts::Part {
         digest: hearth_lib::encode::Digest([7; 32]),
         record: render::parts::PartRecord::Config(render::parts::config::Config {
+            presets: Box::new([]),
+            tmpfiles: Box::new([]),
+            scripts: Box::new([]),
             groups: Box::new([]),
             users: Box::new([]),
             members: Box::new([]),
@@ -195,6 +198,9 @@ fn a_config_part_translates_to_the_records_and_back() {
     assert_eq!(
         config::config_back(config),
         render::parts::config::Config {
+            presets: Box::new([]),
+            tmpfiles: Box::new([]),
+            scripts: Box::new([]),
             groups: Box::new([]),
             users: Box::new([]),
             members: Box::new([]),
@@ -435,6 +441,9 @@ fn a_changed_config_entry_translates_its_sizes_and_hunks() {
         change_back(translated.change),
         diff::TargetChange::Changed {
             parts: Box::new([diff::PartChange::Config(render::parts::config::Change {
+                presets: Box::new([]),
+                tmpfiles: Box::new([]),
+                scripts: None,
                 groups: Box::new([]),
                 users: Box::new([]),
                 members: Box::new([]),
@@ -757,3 +766,5 @@ mod accounts;
 mod export_changes;
 
 mod resolve;
+
+mod directives;

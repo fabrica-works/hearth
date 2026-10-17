@@ -6,6 +6,7 @@ pub(crate) mod guards;
 mod packages;
 mod references;
 mod resolution;
+pub(crate) mod scripts;
 mod secrets;
 pub(crate) mod templates;
 mod validation;
@@ -14,7 +15,7 @@ use crate::{
     errors::{self, Decode, Limit},
     limits::Limits,
     parts::{self, meta},
-    revision::{self, Budget, Documents, Entry, Mode, Oid},
+    revision::{self, Budget, Documents, Entry, Oid},
     vocabulary::{Answer, As, Blob, Decoded, Outcome, Output, Request},
 };
 use alloc::boxed::Box;
@@ -245,14 +246,13 @@ impl Side {
                     self.refused.insert(oid.clone(), ()).expect("listing capacity");
                     for entry in &self.entries {
                         let asked = match revision::class(&entry.path) {
-                            revision::Class::Tree { task, .. } | revision::Class::Template { task, .. } => {
-                                self.needs(task)
-                            }
+                            revision::Class::Tree { task, .. }
+                            | revision::Class::Template { task, .. }
+                            | revision::Class::Script { task, .. } => self.needs(task),
                             revision::Class::Fleet
                             | revision::Class::Environment { .. }
                             | revision::Class::Host { .. }
                             | revision::Class::Declaration { .. }
-                            | revision::Class::Script { .. }
                             | revision::Class::Readme { .. }
                             | revision::Class::Refused { .. }
                             | revision::Class::Other => false,
@@ -316,35 +316,7 @@ impl Side {
         let mut blobs = List::with_capacity(capacity);
         let mut paths = List::with_capacity(capacity);
         for entry in &self.entries {
-            let kind = match revision::class(&entry.path) {
-                revision::Class::Tree { task, path } if entry.mode == Mode::Link && !path.ends_with(b".j2") => {
-                    Some((task, As::Link, 4095))
-                }
-                revision::Class::Tree { task, path }
-                    if !path.ends_with(b".j2") && entry.mode != Mode::Link && entry.mode != Mode::Submodule =>
-                {
-                    Some((task, As::Cached, limits.static_file))
-                }
-                revision::Class::Tree { task, path }
-                    if path.ends_with(b".j2")
-                        && entry.mode != Mode::Link
-                        && entry.mode != Mode::Submodule
-                        && path != b".j2"
-                        && !path.ends_with(b"/.j2") =>
-                {
-                    Some((task, As::Template, limits.template))
-                }
-                revision::Class::Template { task, .. } => Some((task, As::Template, limits.template)),
-                revision::Class::Declaration { .. }
-                | revision::Class::Fleet
-                | revision::Class::Environment { .. }
-                | revision::Class::Host { .. }
-                | revision::Class::Tree { .. }
-                | revision::Class::Script { .. }
-                | revision::Class::Readme { .. }
-                | revision::Class::Refused { .. }
-                | revision::Class::Other => None,
-            };
+            let kind = files::read_kind(entry, &limits);
             if let Some((task, kind, max)) = kind
                 && self.needs(task)
             {
@@ -512,13 +484,7 @@ impl Side {
             else {
                 continue;
             };
-            let mut faults = List::with_capacity(files::fault_capacity(&expansion, self.entries.len()));
-            let plans = self.plans(&meta, &checked, &expansion, &mut faults);
-            self.errors.extend(faults.into_boxed());
-            let Some(plans) = plans else {
-                self.outcome = self.outcome.worst(Outcome::Failed);
-                continue;
-            };
+            let Some(installation) = self.installation(&meta, &checked, &expansion) else { continue };
             self.prepare_rendering(
                 meta,
                 containers,
@@ -527,7 +493,7 @@ impl Side {
                 debian,
                 templates::Prepared {
                     accounts,
-                    plans,
+                    installation,
                     expansion,
                     secrets,
                     packages,

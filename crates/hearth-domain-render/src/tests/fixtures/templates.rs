@@ -103,7 +103,12 @@ pub fn template_prepared(
     crate::call::templates::Prepared {
         accounts: crate::kinds::users::Accounts { users: Box::new([]), groups: Box::new([]) },
         boot: super::built_boot(&[]),
-        plans,
+        installation: crate::call::scripts::Installation {
+            plans,
+            presets: Box::new([]),
+            tmpfiles: Box::new([]),
+            scripts: Box::new([]),
+        },
         expansion,
         secrets: crate::parts::secrets::Secrets {
             files: Box::new([]),

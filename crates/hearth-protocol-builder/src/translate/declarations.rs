@@ -7,17 +7,8 @@ pub fn declaration(
     declaration: config::declaration::Declaration,
     limits: &Limits,
 ) -> Result<target::Declaration, Refusal> {
-    let config::declaration::Declaration {
-        at,
-        types,
-        settings,
-        reads,
-        requires,
-        scripts: _,
-        exports,
-        bless: _,
-        entries,
-    } = declaration;
+    let config::declaration::Declaration { at, types, settings, reads, requires, scripts, exports, bless: _, entries } =
+        declaration;
     let mut translated = List::with_capacity(u32::try_from(types.len()).expect("bounded types"));
     for config::schema::Type { at, form: written } in types {
         translated.push(target::Type { at: position(at), form: form(written, limits) }).expect("type count");
@@ -46,6 +37,7 @@ pub fn declaration(
         settings: specs(settings, limits),
         reads: translated_reads.into_boxed(),
         requires: guards.into_boxed(),
+        scripts: self::scripts(scripts),
         exports: published.into_boxed(),
         entries: maps.into_boxed(),
     })
@@ -296,4 +288,16 @@ pub fn export(
 ) -> Result<target::Export, Refusal> {
     let config::schema::Export { name, at, ty, optional, value } = written;
     Ok(target::Export { name: text(name), at: position(at), ty, optional, value: interpolated(value, limits)? })
+}
+
+fn scripts(scripts: Box<[config::declaration::Script]>) -> Box<[target::Script]> {
+    let mut translated = List::with_capacity(u32::try_from(scripts.len()).expect("declaration bound"));
+    for config::declaration::Script { fragment, at, order } in scripts {
+        let fragment = match fragment {
+            config::declaration::Fragment::Customize => target::Fragment::Customize,
+            config::declaration::Fragment::Software => target::Fragment::Software,
+        };
+        translated.push(target::Script { fragment, at: position(at), order }).expect("declaration bound");
+    }
+    translated.into_boxed()
 }

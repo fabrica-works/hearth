@@ -7,6 +7,9 @@ use hearth_lib::{
 };
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Config {
+    pub presets: Box<[Preset]>,
+    pub tmpfiles: Box<[Tmpfile]>,
+    pub scripts: Box<[Script]>,
     pub groups: Box<[Group]>,
     pub users: Box<[User]>,
     pub members: Box<[Member]>,
@@ -42,8 +45,9 @@ pub fn digest(config: &Config) -> Digest {
     hash.finish()
 }
 pub fn encode(config: &Config, record: &mut Encoder) {
-    record.map(4);
+    record.map(7);
     accounts::encode(config, record);
+    directives::encode(config, record);
     record.key(b"tree");
     record.map(u64::try_from(config.tree.len()).expect("bounded tree"));
     for entry in &config.tree {
@@ -99,6 +103,9 @@ fn absolute(path: &[u8]) -> Box<[u8]> {
 /// Paths changed in byte order (render.md, 6.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Change {
+    pub presets: Box<[PresetKeyed]>,
+    pub tmpfiles: Box<[LineKeyed]>,
+    pub scripts: Option<ScriptsChange>,
     pub groups: Box<[GroupKeyed]>,
     pub users: Box<[UserKeyed]>,
     pub members: Box<[MemberChange]>,
@@ -112,6 +119,9 @@ pub enum EntryChange {
 }
 #[must_use]
 pub fn change(before: Option<&Config>, after: Option<&Config>) -> Change {
+    let presets = directives_changes::presets(before, after);
+    let tmpfiles = directives_changes::tmpfiles(before, after);
+    let scripts = directives_changes::scripts(before, after);
     let groups = changes::groups(before, after);
     let users = changes::users(before, after);
     let members = changes::members(before, after);
@@ -152,7 +162,7 @@ pub fn change(before: Option<&Config>, after: Option<&Config>) -> Change {
         };
         tree.push(change).expect("tree capacity");
     }
-    Change { tree: tree.into_boxed(), groups, users, members }
+    Change { tree: tree.into_boxed(), groups, users, members, presets, tmpfiles, scripts }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -218,3 +228,27 @@ pub enum MemberChange {
 }
 
 mod changes;
+
+mod directives;
+pub use directives::{Action, Line, LineKind, Preset, Script, Tmpfile};
+pub(crate) use directives::{Lists as Directives, build as directives};
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum PresetKeyed {
+    Added { key: Box<[u8]>, value: Action },
+    Removed { key: Box<[u8]>, value: Action },
+    Changed { key: Box<[u8]>, before: Action, after: Action },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum LineKeyed {
+    Added { key: Box<[u8]>, value: Line },
+    Removed { key: Box<[u8]>, value: Line },
+    Changed { key: Box<[u8]>, before: Line, after: Line },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ScriptsChange {
+    pub before: Box<[Script]>,
+    pub after: Box<[Script]>,
+}
+
+mod directives_changes;

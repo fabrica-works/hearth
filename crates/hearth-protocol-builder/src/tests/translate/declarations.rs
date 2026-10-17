@@ -262,3 +262,30 @@ fn reference_root_back(root: crate::records::errors::Root) -> render::errors::Ro
         crate::records::errors::Root::Exports => render::errors::Root::Exports,
     }
 }
+
+#[test]
+fn script_order_defaults_to_500() {
+    let declaration = fixtures::read_declaration(br#"{"scripts":{"customize.sh":{}}}"#);
+    assert_eq!(fixtures::only(&declaration.scripts).order, fixtures::DEFAULT_SCRIPT_ORDER);
+}
+
+#[test]
+fn declared_scripts_keep_their_fragments_positions_and_orders() {
+    let declaration =
+        fixtures::read_declaration(br#"{"scripts":{"customize.sh":{"order":300},"software.sh":{"order":200}}}"#);
+    assert_eq!(
+        declaration.scripts.as_ref(),
+        [
+            target::Script {
+                fragment: target::Fragment::Customize,
+                at: render::revision::Position { line: 1, column: 13 },
+                order: 300
+            },
+            target::Script {
+                fragment: target::Fragment::Software,
+                at: render::revision::Position { line: 1, column: 42 },
+                order: 200
+            },
+        ]
+    );
+}

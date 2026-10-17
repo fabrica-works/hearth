@@ -83,6 +83,9 @@ pub struct PlacementPair {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ConfigChange {
+    pub presets: Box<[PresetKeyed]>,
+    pub tmpfiles: Box<[LineKeyed]>,
+    pub scripts: Option<ScriptsChange>,
     pub groups: Box<[GroupKeyed]>,
     pub users: Box<[UserKeyed]>,
     pub members: Box<[MemberChange]>,
@@ -257,6 +260,7 @@ impl Rebuild {
 impl ConfigChange {
     fn text(&self, lines: &mut Lines) {
         self.accounts_text(lines);
+        self.directives_text(lines);
         let mut column = 52;
         for entry in &*self.tree {
             column = column.max(entry.path().len().saturating_add(15));
@@ -310,6 +314,7 @@ impl ConfigChange {
         json.object_start();
         field(json, b"kind", b"config");
         self.accounts_json(json);
+        self.directives_json(json);
         json.key(b"tree");
         json.array_start();
         for entry in &*self.tree {
@@ -621,3 +626,25 @@ mod accounts {
         }
     }
 }
+
+use crate::parts::config::{Action, Line, Script};
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum PresetKeyed {
+    Added { key: Box<[u8]>, value: Action },
+    Removed { key: Box<[u8]>, value: Action },
+    Changed { key: Box<[u8]>, before: Action, after: Action },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum LineKeyed {
+    Added { key: Box<[u8]>, value: Line },
+    Removed { key: Box<[u8]>, value: Line },
+    Changed { key: Box<[u8]>, before: Line, after: Line },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ScriptsChange {
+    pub before: Box<[Script]>,
+    pub after: Box<[Script]>,
+}
+
+mod directives;

@@ -35,6 +35,9 @@ pub fn x1_prod() -> Box<Spec> {
         parts: Box::new([Part {
             digest: digest([0xe7, 0xc2, 0xa0, 0xd9, 0x5b, 0x13]),
             record: PartRecord::Config(Config {
+                presets: Box::new([]),
+                tmpfiles: Box::new([]),
+                scripts: Box::new([]),
                 groups: Box::new([]),
                 users: Box::new([]),
                 members: Box::new([]),
@@ -92,6 +95,9 @@ pub fn wg0_changed() -> crate::diff::Change {
         change: TargetChange::Changed {
             rebuild: Rebuild::FromConfig,
             parts: Box::new([PartChange::Config(ConfigChange {
+                presets: Box::new([]),
+                tmpfiles: Box::new([]),
+                scripts: None,
                 groups: Box::new([]),
                 users: Box::new([]),
                 members: Box::new([]),
@@ -433,3 +439,6 @@ pub use accounts::*;
 
 mod diff;
 pub use diff::*;
+
+mod directives;
+pub use directives::*;

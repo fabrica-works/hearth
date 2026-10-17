@@ -12,12 +12,13 @@ impl Side {
         for index in 0..self.entries.len() {
             let entry = self.entries.get(index).expect("listing cursor");
             let (task, path) = match revision::class(&entry.path) {
-                revision::Class::Tree { task, path } | revision::Class::Template { task, path } => (task, path),
+                revision::Class::Tree { task, path }
+                | revision::Class::Template { task, path }
+                | revision::Class::Script { task, name: path } => (task, path),
                 revision::Class::Fleet
                 | revision::Class::Environment { .. }
                 | revision::Class::Host { .. }
                 | revision::Class::Declaration { .. }
-                | revision::Class::Script { .. }
                 | revision::Class::Readme { .. }
                 | revision::Class::Refused { .. }
                 | revision::Class::Other => continue,

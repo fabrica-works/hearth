@@ -4,6 +4,9 @@ use alloc::boxed::Box;
 pub fn account_configs() -> [Config; 2] {
     [
         Config {
+            presets: Box::new([]),
+            tmpfiles: Box::new([]),
+            scripts: Box::new([]),
             groups: Box::new([
                 Group { name: b"ops".as_slice().into(), kind: GroupKind::Sysusers { gid: Some(1500) } },
                 Group { name: b"mail".as_slice().into(), kind: GroupKind::Package },
@@ -16,6 +19,9 @@ pub fn account_configs() -> [Config; 2] {
             tree: Box::new([]),
         },
         Config {
+            presets: Box::new([]),
+            tmpfiles: Box::new([]),
+            scripts: Box::new([]),
             groups: Box::new([Group { name: b"ci".as_slice().into(), kind: GroupKind::Sysusers { gid: None } }]),
             users: Box::new([]),
             members: Box::new([]),
@@ -39,6 +45,9 @@ fn member() -> Member {
 pub fn account_changes() -> [Change; 2] {
     [
         Change {
+            presets: Box::new([]),
+            tmpfiles: Box::new([]),
+            scripts: None,
             tree: Box::new([]),
             groups: Box::new([
                 GroupKeyed::Added { key: b"ops".as_slice().into(), value: GroupKind::Sysusers { gid: None } },
@@ -56,6 +65,14 @@ pub fn account_changes() -> [Change; 2] {
             ]),
             members: Box::new([MemberChange::Added(member()), MemberChange::Removed(member())]),
         },
-        Change { tree: Box::new([]), groups: Box::new([]), users: Box::new([]), members: Box::new([]) },
+        Change {
+            presets: Box::new([]),
+            tmpfiles: Box::new([]),
+            scripts: None,
+            tree: Box::new([]),
+            groups: Box::new([]),
+            users: Box::new([]),
+            members: Box::new([]),
+        },
     ]
 }

@@ -9,6 +9,9 @@ pub fn accounts_spec() -> Record {
     spec.parts = Box::new([Part {
         digest: [0; 32],
         record: PartRecord::Config(Config {
+            presets: Box::new([]),
+            tmpfiles: Box::new([]),
+            scripts: Box::new([]),
             tree: Box::new([]),
             groups: Box::new([
                 Group { name: b"mail".as_slice().into(), kind: GroupKind::Package },
@@ -30,6 +33,9 @@ pub fn accounts_change() -> Record {
         change: TargetChange::Changed {
             rebuild: Rebuild::FromConfig,
             parts: Box::new([PartChange::Config(ConfigChange {
+                presets: Box::new([]),
+                tmpfiles: Box::new([]),
+                scripts: None,
                 tree: Box::new([]),
                 groups: Box::new([GroupKeyed::Removed { key: b"ops".as_slice().into(), value: ops() }]),
                 users: Box::new([UserKeyed::Changed {

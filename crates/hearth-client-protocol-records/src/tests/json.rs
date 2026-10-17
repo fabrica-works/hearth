@@ -15,7 +15,7 @@ fn json_lines_start_with_the_version_and_give_digests_whole() {
         "\n",
         r#"{"record":"part","target":"x1-prod","name":"meta","digest":"c4d3a0b1e2f50000000000000000000000000000000000000000000000000000","meta":{"base":"x1","environment":"prod","placement":{"firmware":"efi","hardware":"7th-gen","kind":"metal"},"target":"x1-prod"}}"#,
         "\n",
-        r#"{"record":"part","target":"x1-prod","name":"config","digest":"e7c2a0d95b130000000000000000000000000000000000000000000000000000","config":{"groups":{},"members":[],"tree":{"/etc/hostname":{"content_digest":"3f1c2ab07e440000000000000000000000000000000000000000000000000000","group":"root","kind":"file","mode":"0644","owner":"root"}},"users":{}}}"#,
+        r#"{"record":"part","target":"x1-prod","name":"config","digest":"e7c2a0d95b130000000000000000000000000000000000000000000000000000","config":{"groups":{},"members":[],"presets":{},"scripts":[],"tmpfiles":{},"tree":{"/etc/hostname":{"content_digest":"3f1c2ab07e440000000000000000000000000000000000000000000000000000","group":"root","kind":"file","mode":"0644","owner":"root"}},"users":{}}}"#,
         "\n",
     );
     assert_eq!(printed.as_deref(), Ok(expected.as_bytes()), "client/README.md, 3.2: version first, digests whole");
@@ -62,7 +62,7 @@ fn json_gives_the_resolution_and_its_keys_whole() {
         "\n",
         r#"{"record":"part","target":"x1-prod","name":"meta","digest":"c4d3a0b1e2f50000000000000000000000000000000000000000000000000000","meta":{"base":"x1","environment":"prod","placement":{"firmware":"efi","hardware":"7th-gen","kind":"metal"},"target":"x1-prod"}}"#,
         "\n",
-        r#"{"record":"part","target":"x1-prod","name":"config","digest":"e7c2a0d95b130000000000000000000000000000000000000000000000000000","config":{"groups":{},"members":[],"tree":{"/etc/hostname":{"content_digest":"3f1c2ab07e440000000000000000000000000000000000000000000000000000","group":"root","kind":"file","mode":"0644","owner":"root"}},"users":{}}}"#,
+        r#"{"record":"part","target":"x1-prod","name":"config","digest":"e7c2a0d95b130000000000000000000000000000000000000000000000000000","config":{"groups":{},"members":[],"presets":{},"scripts":[],"tmpfiles":{},"tree":{"/etc/hostname":{"content_digest":"3f1c2ab07e440000000000000000000000000000000000000000000000000000","group":"root","kind":"file","mode":"0644","owner":"root"}},"users":{}}}"#,
         "\n",
     );
     assert_eq!(&*printed, expected.as_bytes(), "resolution key, state and layer keys whole");

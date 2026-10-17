@@ -351,6 +351,7 @@ pub enum TypeName {
 pub enum Repository {
     NoTree,
     NoTemplate,
+    NoScript,
     Unused,
     LinkTarget,
     Stray,

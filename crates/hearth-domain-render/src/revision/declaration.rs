@@ -37,8 +37,29 @@ pub struct Declaration {
     pub settings: Box<[Spec]>,
     pub reads: Box<[Read]>,
     pub requires: Box<[Guard]>,
+    pub scripts: Box<[Script]>,
     pub exports: Box<[Export]>,
     pub entries: Box<[Entries]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Script {
+    pub fragment: Fragment,
+    pub at: Position,
+    pub order: u16,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Fragment {
+    Customize,
+    Software,
+}
+impl Fragment {
+    #[must_use]
+    pub const fn name(self) -> &'static [u8] {
+        match self {
+            Self::Customize => b"customize.sh",
+            Self::Software => b"software.sh",
+        }
+    }
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Read {
