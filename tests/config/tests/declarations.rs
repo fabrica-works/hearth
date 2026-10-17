@@ -149,3 +149,23 @@ fn the_m5_and_m6_examples_are_refused_at_their_keys() {
         }
     }
 }
+
+const SCHEMAS: &[(&str, &[&[u8]], usize)] = &[
+    ("boot", &[b"kernel", b"modules", b"params"], 8),
+    ("hearth", &[b"alarms", b"backups", b"snapshots"], 14),
+    ("locale", &[b"locale", b"timezone"], 4),
+    ("users", &[b"accounts"], 7),
+];
+#[test]
+fn every_schema_example_decodes_to_its_settings_cut_anywhere() {
+    for &(name, names, types) in SCHEMAS {
+        for seed in 0..8 {
+            let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
+            let declaration =
+                world::declare(examples::task(name).bytes, &settings, seed).expect("format.md schema example");
+            let actual: Vec<_> = declaration.settings.iter().map(|spec| &*spec.name.text).collect();
+            assert_eq!(actual, names, "{name}, seed {seed}");
+            assert_eq!(declaration.types.len(), types, "{name}, seed {seed}");
+        }
+    }
+}

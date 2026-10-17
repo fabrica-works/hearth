@@ -153,15 +153,12 @@ fn a_script_order_outside_0_to_999_is_refused_at_its_value() {
     }
 }
 
-const THE_KEYS_DECODED_LATER_ARE_REFUSED_UNTIL_THEIR_INCREMENT: &[(&[u8], Position, Declared)] = &[
-    (br#"{"settings":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"exports":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-];
 #[test]
 fn the_keys_decoded_later_are_refused_until_their_increment() {
-    for &(input, at, expected) in THE_KEYS_DECODED_LATER_ARE_REFUSED_UNTIL_THEIR_INCREMENT {
-        assert_eq!(declaration(input), Err(Error { at, fault: Fault::Declaration(expected) }), "{input:?}");
-    }
+    assert_eq!(
+        declaration(br#"{"exports":5}"#),
+        Err(Error { at: at(1, 1, 2), fault: Fault::Declaration(Declared::Undecoded) })
+    );
 }
 
 const A_PLAIN_OBJECT_FIELD_ITS_OBJECT_LACKS_IS_REFUSED_AT_ITS_KEY: &[(&[u8], Position, Declared)] = &[

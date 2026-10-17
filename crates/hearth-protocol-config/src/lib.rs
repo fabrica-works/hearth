@@ -9,6 +9,7 @@ mod error;
 pub mod json;
 pub mod limits;
 pub mod names;
+pub mod schema;
 pub use error::{Declared, Error, Expected, Fault, Field, Object, Required, Shape};
 pub use skein_json::tokenizer::Position;
 #[cfg(test)]

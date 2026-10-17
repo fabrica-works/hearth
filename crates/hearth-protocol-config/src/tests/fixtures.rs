@@ -116,3 +116,32 @@ pub const fn at(offset: u32, line: u32, column: u32) -> crate::Position {
 pub fn text(at: crate::Position, input: &[u8]) -> crate::declaration::Text {
     crate::declaration::Text { at, text: bytes::copy_of(input) }
 }
+
+pub fn settings(count: u32) -> Box<[u8]> {
+    let mut input = skein_lib::List::with_capacity(60_000);
+    for byte in b"{\"settings\":{" {
+        input.push(*byte).expect("room");
+    }
+    for n in 0..count {
+        if n > 0 {
+            input.push(b',').expect("room");
+        }
+        for byte in b"\"s" {
+            input.push(*byte).expect("room");
+        }
+        let decimal = skein_lib::Decimal::of(u64::from(n));
+        for _ in decimal.as_bytes().len()..3 {
+            input.push(b'0').expect("room");
+        }
+        for byte in decimal.as_bytes() {
+            input.push(*byte).expect("room");
+        }
+        for byte in b"\":{\"type\":\"bool\",\"doc\":\"d\"}" {
+            input.push(*byte).expect("room");
+        }
+    }
+    for byte in b"}}" {
+        input.push(*byte).expect("room");
+    }
+    input.into_boxed()
+}

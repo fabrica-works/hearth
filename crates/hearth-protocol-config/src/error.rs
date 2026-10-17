@@ -31,6 +31,11 @@ pub enum Declared {
     Name,
     Doc,
     Order,
+    Optional,
+    Bound,
+    Above,
+    Enum,
+    Settings,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Object {
@@ -41,6 +46,8 @@ pub enum Object {
     Bless,
     Entry(crate::entries::Map),
     Range,
+    Spec,
+    Type,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Expected {
@@ -50,11 +57,15 @@ pub enum Expected {
     Bool,
     Int,
     Field(crate::entries::Takes),
+    True,
+    Type,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Required {
     If,
     Message,
+    Type,
+    Doc,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Shape {

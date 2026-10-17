@@ -1,0 +1,21 @@
+{
+  "doc": "People's accounts: their ids, shells, groups and password hashes.",
+  "settings": {
+    "accounts": {
+      "type": { "map": { "object": {
+        "uid": { "type": "int", "min": 1000, "max": 59999, "doc": "The account's id." },
+        "shell": { "type": "path", "default": "/bin/bash", "doc": "The login shell." },
+        "groups": { "type": { "list": "string" }, "default": [], "doc": "Supplementary groups, such as sudo." },
+        "password": { "type": "secret", "optional": true, "doc": "The secret holding the password's hash." }
+      } } },
+      "default": {},
+      "doc": "Accounts, by user name."
+    }
+  },
+  "data": {
+    "home-{{ key }}": {
+      "for_each": "settings.accounts",
+      "path": "/home/{{ key }}", "mode": "0700", "owner": "{{ key }}", "group": "{{ key }}"
+    }
+  }
+}

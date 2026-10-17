@@ -24,7 +24,7 @@ fn every_example_decodes_as_the_reference_reads_it_cut_anywhere() {
 fn generated_documents_decode_as_the_reference_reads_them() {
     for seed in 0..64 {
         let mut rng = Rng::new(seed);
-        let limits = Limits { document: 4096, depth: 16, keys: 32 };
+        let limits = Limits { document: 4096, depth: 16, keys: 32, settings: 16 };
         let document = generate::document(&mut rng, &limits);
         let settings = Settings::calm(&mut rng, limits);
         assert_eq!(world::check(&document, &settings, seed).outcome, Some(Outcome::Decoded));

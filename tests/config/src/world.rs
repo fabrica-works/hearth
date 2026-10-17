@@ -60,9 +60,10 @@ pub fn limits(rng: &mut Rng) -> Limits {
             document: u32::try_from(rng.below(200)).expect("draw fits u32"),
             depth: u32::try_from(rng.below(5)).expect("draw fits u32"),
             keys: u32::try_from(rng.below(5)).expect("draw fits u32"),
+            settings: u32::try_from(rng.below(5)).expect("draw fits u32"),
         }
     } else {
-        Limits { document: 4096, depth: 16, keys: 32 }
+        Limits { document: 4096, depth: 16, keys: 32, settings: 16 }
     }
 }
 #[derive(Clone, PartialEq, Eq, Debug)]

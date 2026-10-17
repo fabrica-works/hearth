@@ -1,0 +1,36 @@
+{
+  "doc": "The kernel, its initramfs and its command line.",
+  "settings": {
+    "kernel": { "type": "string", "default": "linux-image-amd64", "doc": "The kernel package." },
+    "params": {
+      "type": { "map": { "object": {
+        "param": { "type": "string", "doc": "One parameter, as the kernel reads it." },
+        "order": { "type": "int", "min": 0, "max": 999, "default": 500, "doc": "Its place on the line." }
+      } } },
+      "default": {}, "doc": "Command-line parameters, by name."
+    },
+    "modules": {
+      "type": { "map": { "list": "string" } },
+      "default": {
+        "7th-gen": ["btrfs", "nvme"],
+        "ionos": ["btrfs", "virtio_blk", "virtio", "virtio_pci", "virtio_rng", "scsi_mod", "vmw_pvscsi"],
+        "serverhino": ["btrfs", "scsi_mod", "sd_mod", "virtio_scsi", "virtio_pci", "virtio_mmio"],
+        "vultr": ["btrfs", "virtio_blk", "virtio_pci"]
+      },
+      "doc": "Initramfs modules, by hardware profile."
+    }
+  },
+  "requires": {
+    "kernel": { "if": "target.placement.kind != 'container'", "message": "a container has no kernel: its host runs it" },
+    "modules": { "if": "target.placement.kind == 'container' or target.placement.hardware in settings.modules", "message": "no initramfs modules for this hardware" }
+  },
+  "packages": {
+    "{{ settings.kernel }}": {},
+    "tiny-initramfs": {},
+    "efibootmgr": { "if": "target.placement.firmware == 'efi'" }
+  },
+  "initramfs": { "{{ value }}": { "for_each": "settings.modules[target.placement.hardware]" } },
+  "cmdline": {
+    "{{ key }}": { "for_each": "settings.params", "param": "{{ value.param }}", "order": "{{ value.order }}" }
+  }
+}

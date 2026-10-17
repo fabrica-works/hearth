@@ -23,6 +23,8 @@ pub struct Declaration {
     pub scripts: Box<[Script]>,
     pub bless: Option<Bless>,
     pub entries: Box<[crate::entries::Entries]>,
+    pub types: Box<[crate::schema::Type]>,
+    pub settings: Box<[crate::schema::Spec]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Read {
@@ -59,6 +61,7 @@ pub struct Bless {
 #[derive(Clone, Copy)]
 enum Key {
     Doc,
+    Settings,
     Reads,
     Requires,
     Scripts,
@@ -74,7 +77,7 @@ const KEYS: &[(&[u8], Key)] = &[
     (b"scripts", Key::Scripts),
     (b"bless", Key::Bless),
     (b"checks", Key::Later),
-    (b"settings", Key::Undecoded),
+    (b"settings", Key::Settings),
     (b"exports", Key::Undecoded),
     (b"packages", Key::Map(crate::entries::Map::Packages)),
     (b"preseeds", Key::Map(crate::entries::Map::Preseeds)),
@@ -91,7 +94,7 @@ const KEYS: &[(&[u8], Key)] = &[
     (b"software", Key::Map(crate::entries::Map::Software)),
     (b"live", Key::Map(crate::entries::Map::Live)),
 ];
-pub fn declaration(value: Value, _limits: &Limits) -> Result<Declaration, Error> {
+pub fn declaration(value: Value, limits: &Limits) -> Result<Declaration, Error> {
     let Kind::Map(entries) = value.kind else {
         return Err(Error { at: value.at, fault: Fault::NotObject });
     };
@@ -102,6 +105,8 @@ pub fn declaration(value: Value, _limits: &Limits) -> Result<Declaration, Error>
         scripts: Box::new([]),
         bless: None,
         entries: Box::new([]),
+        types: Box::new([]),
+        settings: Box::new([]),
     };
     let mut maps = List::with_capacity(u32::try_from(entries.len()).expect("document bounded by u32"));
     for entry in entries {
@@ -118,6 +123,11 @@ pub fn declaration(value: Value, _limits: &Limits) -> Result<Declaration, Error>
                 if doc.text.contains(&b'\n') {
                     return Err(fault(doc.at, Declared::Doc));
                 }
+            }
+            Key::Settings => {
+                let (types, settings) = crate::schema::settings(entry.value, limits)?;
+                declaration.types = types;
+                declaration.settings = settings;
             }
             Key::Reads => declaration.reads = reads(entry.value)?,
             Key::Requires => declaration.requires = guards(entry.value)?,

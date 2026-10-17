@@ -1,0 +1,20 @@
+{
+  "doc": "The timezone and the locale, answered to debconf before packages are configured.",
+  "settings": {
+    "timezone": {
+      "type": { "object": {
+        "area": { "type": "string", "doc": "tzdata's area, such as Europe." },
+        "zone": { "type": "string", "doc": "The zone in the area, such as Lisbon." }
+      } },
+      "doc": "The system's timezone."
+    },
+    "locale": { "type": "string", "default": "C.UTF-8", "doc": "The default locale, generated and set." }
+  },
+  "packages": { "locales": {}, "tzdata": {} },
+  "preseeds": {
+    "tzdata/Areas": { "type": "select", "value": "{{ settings.timezone.area }}" },
+    "tzdata/Zones/{{ settings.timezone.area }}": { "type": "select", "value": "{{ settings.timezone.zone }}" },
+    "locales/default_environment_locale": { "type": "select", "value": "{{ settings.locale }}" },
+    "locales/locales_to_be_generated": { "type": "multiselect", "value": "{{ settings.locale }} UTF-8" }
+  }
+}
