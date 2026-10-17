@@ -273,7 +273,11 @@ the closing repins (Repin). The increments of each session are in its file.
   asking when each counted file is in its Files, each file is at most 800
   lines, and each test its Test shape names is there. A new child module
   that takes code out of a file in its Files, so that file stays at most
-  800 lines, counts as in its Files (ruling 154). Its report's
+  800 lines, counts as in its Files (ruling 154). The count is the sum of
+  the added lines that `git diff --numstat origin/main...HEAD -- crates
+  ':!crates/*/src/tests/*' ':!crates/*/src/tests.rs'` prints: a line
+  moved into a child module counts once, in the child, and its removal
+  from the parent counts nothing (ruling 156). Its report's
   `Size:` gives the count by file and names this rule. Past three times
   its Size, or with a counted file outside its Files, it still stops on a
   question before landing, with the count by file.
