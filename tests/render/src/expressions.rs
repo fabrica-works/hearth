@@ -1,7 +1,8 @@
 //! Generated trees and contexts, independent of the postfix evaluator's implementation.
 use hearth_domain_render::{
     evaluate::{
-        self, Binding, Bindings, Budget, Context, Entry, Evaluator, Expression, Missing, Op, Operand, Operation, Value,
+        self, Binding, Bindings, Budget, Context, Entry, Evaluator, Expression, Filter, Missing, Op, Operand,
+        Operation, Value,
     },
     limits::Limits,
 };
@@ -13,21 +14,26 @@ pub struct Shape {
 }
 pub const SMALL: Shape = Shape { depth: 3, width: 3 };
 pub const WIDE: Shape = Shape { depth: 6, width: 6 };
-pub const KINDS: &[&str] = &["unknown", "key", "index", "undefined", "type", "limit", "overflow", "output"];
+pub const KINDS: &[&str] =
+    &["unknown", "key", "index", "undefined", "type", "limit", "overflow", "output", "empty", "path"];
 #[derive(Clone, Debug)]
 pub struct Roots {
-    pub values: [Value; 5],
+    pub target: Value,
+    pub debian: Value,
+    pub settings: Value,
+    pub tasks: Value,
+    pub exports: Value,
     pub bindings: Vec<(&'static [u8], Value)>,
 }
 impl Roots {
     #[must_use]
     pub const fn context(&self) -> Context<'_> {
         Context {
-            target: &self.values[0],
-            debian: &self.values[1],
-            settings: &self.values[2],
-            tasks: &self.values[3],
-            exports: &self.values[4],
+            target: &self.target,
+            debian: &self.debian,
+            settings: &self.settings,
+            tasks: &self.tasks,
+            exports: &self.exports,
         }
     }
 }
@@ -41,6 +47,7 @@ pub enum Tree {
     Item(Box<Tree>, Box<Tree>, Missing),
     List(Vec<Tree>),
     Defined(Box<Tree>, bool),
+    Filter(Box<Tree>, Filter, Vec<Tree>),
     Not(Box<Tree>),
     Binary(Box<Tree>, Binary, Box<Tree>),
     And(Box<Tree>, Box<Tree>),
@@ -96,7 +103,7 @@ impl Binary {
 pub type Plain = Value;
 #[must_use]
 pub fn roots(rng: &mut Rng) -> Roots {
-    let values = core::array::from_fn(|_| {
+    fn root(rng: &mut Rng) -> Value {
         Value::Map(
             [b"a".as_slice(), b"b", b"c"]
                 .into_iter()
@@ -106,13 +113,13 @@ pub fn roots(rng: &mut Rng) -> Roots {
                 })
                 .collect(),
         )
-    });
+    }
     let bindings = if rng.chance(500) {
         vec![(b"key".as_slice(), Value::Int(2)), (b"value".as_slice(), context_value(rng, 3))]
     } else {
         vec![]
     };
-    Roots { values, bindings }
+    Roots { target: root(rng), debian: root(rng), settings: root(rng), tasks: root(rng), exports: root(rng), bindings }
 }
 fn context_value(rng: &mut Rng, depth: u32) -> Value {
     if depth == 0 {
@@ -144,7 +151,7 @@ fn grow(rng: &mut Rng, roots: &Roots, shape: Shape) -> Tree {
         return leaf(rng);
     }
     let sub = Shape { depth: shape.depth - 1, ..shape };
-    match rng.below(16) {
+    match rng.below(18) {
         0 => leaf(rng),
         1 => {
             if roots.bindings.is_empty() {
@@ -188,7 +195,8 @@ fn grow(rng: &mut Rng, roots: &Roots, shape: Shape) -> Tree {
             no: Box::new(grow(rng, roots, sub)),
         },
         14 => Tree::Binary(Box::new(Tree::Int(i64::MAX)), Binary::Add, Box::new(Tree::Int(1))),
-        _ => Tree::Binary(Box::new(Tree::String(b"x".to_vec())), Binary::Concat, Box::new(Tree::Int(-12))),
+        15 => Tree::Binary(Box::new(Tree::String(b"x".to_vec())), Binary::Concat, Box::new(Tree::Int(-12))),
+        _ => filtered(rng, roots, sub),
     }
 }
 fn leaf(rng: &mut Rng) -> Tree {
@@ -226,6 +234,13 @@ pub fn flatten(tree: &Tree, out: &mut Vec<Operation>) {
         Tree::Defined(v, negated) => {
             flatten(v, out);
             if *negated { Op::NotDefined } else { Op::Defined }
+        }
+        Tree::Filter(input, filter, arguments) => {
+            flatten(input, out);
+            for argument in arguments {
+                flatten(argument, out);
+            }
+            Op::Filter(*filter)
         }
         Tree::Not(v) => {
             flatten(v, out);
@@ -321,4 +336,49 @@ fn owned(operand: Operand<'_>) -> Option<Plain> {
             Value::List(items.into_iter().map(|v| owned(v).expect("defined list")).collect())
         }
     })
+}
+
+pub const FILTERS: &[Filter] = &[
+    Filter::Default,
+    Filter::Join,
+    Filter::Split,
+    Filter::First,
+    Filter::Last,
+    Filter::Length,
+    Filter::Replace,
+    Filter::Items,
+    Filter::Keys,
+    Filter::Values,
+    Filter::Sort,
+    Filter::Tojson,
+    Filter::ShellQuote,
+    Filter::SystemdEscape,
+    Filter::SystemdEscapePath,
+    Filter::Basename,
+    Filter::Dirname,
+];
+fn filtered(rng: &mut Rng, roots: &Roots, shape: Shape) -> Tree {
+    let filter = FILTERS[usize::try_from(rng.below(17)).expect("small")];
+    let text = || Tree::String(b"a:b::a".to_vec());
+    let (input, arguments) = match filter {
+        Filter::Default => (Tree::Key(Box::new(Tree::Name(b"settings")), b"a", Missing::Undefined), vec![Tree::Int(9)]),
+        Filter::Join => (Tree::List(vec![text(), Tree::Int(-12)]), vec![Tree::String(b",".to_vec())]),
+        Filter::Split => (text(), vec![Tree::String(if rng.chance(200) { vec![] } else { b":".to_vec() })]),
+        Filter::Replace => (text(), vec![Tree::String(if rng.chance(200) { vec![] } else { b"a".to_vec() }), text()]),
+        Filter::First | Filter::Last => {
+            (Tree::List(if rng.chance(200) { vec![] } else { vec![text(), Tree::Int(2)] }), vec![])
+        }
+        Filter::Items | Filter::Keys | Filter::Values => (Tree::Name(b"settings"), vec![]),
+        Filter::Sort => (
+            Tree::List(vec![Tree::String(b"b".to_vec()), Tree::String(b"a".to_vec()), Tree::String(b"b".to_vec())]),
+            vec![],
+        ),
+        Filter::SystemdEscapePath | Filter::Basename | Filter::Dirname => {
+            (Tree::String(if rng.chance(200) { b"/a/../b".to_vec() } else { b"/a/b".to_vec() }), vec![])
+        }
+        Filter::Length | Filter::ShellQuote | Filter::SystemdEscape => (text(), vec![]),
+        Filter::Tojson => (grow(rng, roots, shape), vec![]),
+    };
+    let input = if rng.chance(200) { grow(rng, roots, shape) } else { input };
+    Tree::Filter(Box::new(input), filter, arguments)
 }

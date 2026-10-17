@@ -39,7 +39,7 @@ pub(super) fn view<'v>(operand: &'v Operand<'v>) -> View<'v> {
         Operand::List { items, depth: _ } => View::List(Items::Operands(items)),
     }
 }
-fn context(value: &Value) -> View<'_> {
+pub(super) fn context(value: &Value) -> View<'_> {
     match value {
         Value::Bool(v) => View::Bool(*v),
         Value::Int(v) => View::Int(*v),

@@ -1,5 +1,8 @@
 //! A bounded postfix value stack (render.md, 8.3; format.md, 7.4 to 7.7).
 pub mod context;
+mod escape;
+pub mod filter;
+pub use filter::Filter;
 mod lookup;
 mod operators;
 mod walk;
@@ -177,6 +180,7 @@ impl<'c> Evaluator<'c> {
             | Op::Key { .. }
             | Op::Item { .. }
             | Op::List { .. }
+            | Op::Filter(_)
             | Op::Defined
             | Op::NotDefined
             | Op::Not
@@ -240,6 +244,7 @@ impl<'c> Evaluator<'c> {
                 lookup::item(self.pop(), index, *missing)?
             }
             Op::List { length } => self.list(*length, budget)?,
+            Op::Filter(filter) => self.filter(*filter, budget)?,
             Op::Not => Operand::Bool(!truthy(&self.pop())),
             Op::Equal
             | Op::NotEqual

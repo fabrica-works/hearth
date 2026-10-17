@@ -1,7 +1,7 @@
 //! Recursive reference from format.md, 7.4 to 7.7; no use of evaluator operations.
 use super::expressions::{Binary, Plain, Roots, Tree};
 use hearth_domain_render::{
-    evaluate::{Missing, Value},
+    evaluate::{Filter, Missing, Value},
     limits::Limits,
 };
 #[derive(Clone, Debug)]
@@ -34,11 +34,11 @@ fn run(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Ma
         Tree::Int(v) => Some(Value::Int(*v)),
         Tree::Bool(v) => Some(Value::Bool(*v)),
         Tree::Name(n) => Some(match *n {
-            b"target" => roots.values[0].clone(),
-            b"debian" => roots.values[1].clone(),
-            b"settings" => roots.values[2].clone(),
-            b"tasks" => roots.values[3].clone(),
-            b"exports" => roots.values[4].clone(),
+            b"target" => roots.target.clone(),
+            b"debian" => roots.debian.clone(),
+            b"settings" => roots.settings.clone(),
+            b"tasks" => roots.tasks.clone(),
+            b"exports" => roots.exports.clone(),
             _ => roots.bindings.iter().rev().find(|(key, _)| key == n).ok_or("unknown")?.1.clone(),
         }),
         Tree::Key(v, k, missing) => key(run(v, roots, limits, left)?.value, k, *missing)?,
@@ -97,6 +97,12 @@ fn run(tree: &Tree, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Ma
             let a = run(a, roots, limits, left)?;
             let b = run(b, roots, limits, left)?;
             Some(binary(a.value.ok_or("undefined")?, *op, b.value.ok_or("undefined")?, left)?)
+        }
+        Tree::Filter(input, filter, arguments) => {
+            let input = run(input, roots, limits, left)?;
+            let arguments =
+                arguments.iter().map(|argument| run(argument, roots, limits, left)).collect::<Result<Vec<_>, _>>()?;
+            return filtered(input, *filter, arguments, limits, left);
         }
         Tree::Output(v) => {
             let value = run(v, roots, limits, left)?.value.ok_or("undefined")?;
@@ -216,4 +222,313 @@ fn absent(missing: Missing, kind: &'static str) -> Result<Option<Value>, &'stati
         Missing::Error => Err(kind),
         Missing::Undefined => Ok(None),
     }
+}
+fn filtered(
+    input: Made,
+    filter: Filter,
+    arguments: Vec<Made>,
+    limits: &Limits,
+    left: &mut u64,
+) -> Result<Made, &'static str> {
+    let mut arguments = arguments.into_iter();
+    let first = arguments.next();
+    let second = arguments.next();
+    if matches!(filter, Filter::Default) && input.value.is_none() {
+        return Ok(first.expect("one argument"));
+    }
+    let value = input.value.as_ref().ok_or("undefined")?;
+    let first = first.map(|value| value.value.ok_or("undefined")).transpose()?;
+    let second = second.map(|value| value.value.ok_or("undefined")).transpose()?;
+    let mut list = None;
+    let mut bytes = None;
+    match filter {
+        Filter::Default => return Ok(input),
+        Filter::First | Filter::Last => {
+            let Value::List(values) = value else {
+                return Err("type");
+            };
+            let index = if matches!(filter, Filter::First) { 0 } else { values.len().saturating_sub(1) };
+            let value = values.get(index).ok_or("empty")?;
+            return Ok(match input.items {
+                Some(items) => items[index].clone(),
+                None => Made::plain(Some(value.clone())),
+            });
+        }
+        Filter::Length => {
+            let length = match value {
+                Value::String(text) => text.iter().filter(|byte| **byte & 0xc0 != 0x80).count(),
+                Value::List(items) => items.len(),
+                Value::Map(entries) => entries.iter().filter(|entry| entry.value.is_some()).count(),
+                Value::Bool(_) | Value::Int(_) => return Err("type"),
+            };
+            return Ok(Made::plain(Some(Value::Int(i64::try_from(length).expect("small")))));
+        }
+        Filter::Join => bytes = Some(join(value, first.expect("one argument"))?),
+        Filter::Split => list = Some((split(value, first.expect("one argument"), left)?, 1)),
+        Filter::Replace => bytes = Some(replace(value, first.expect("two arguments"), second.expect("two arguments"))?),
+        Filter::Items | Filter::Keys | Filter::Values => list = Some(entries(value, filter, left)?),
+        Filter::Sort => {
+            let Value::List(values) = value else {
+                return Err("type");
+            };
+            charge(left, u64::try_from(values.len()).expect("small") * 32)?;
+            let strings = values.iter().all(|value| matches!(value, Value::String(_)));
+            let integers = values.iter().all(|value| matches!(value, Value::Int(_)));
+            if !strings && !integers {
+                return Err("type");
+            }
+            let mut values = values.to_vec();
+            values.sort_by(|a, b| match (a, b) {
+                (Value::String(a), Value::String(b)) => a.cmp(b),
+                (Value::Int(a), Value::Int(b)) => a.cmp(b),
+                _ => unreachable!("homogeneous"),
+            });
+            list = Some((values.into_iter().map(|value| Made::plain(Some(value))).collect(), 1));
+        }
+        Filter::Tojson => bytes = Some(json(value)),
+        Filter::ShellQuote => {
+            let input = text(value.clone())?;
+            let mut output = vec![b'\''];
+            for byte in input {
+                if byte == b'\'' {
+                    output.extend_from_slice(b"'\\''");
+                } else {
+                    output.push(byte);
+                }
+            }
+            output.push(b'\'');
+            bytes = Some(output);
+        }
+        Filter::SystemdEscape | Filter::SystemdEscapePath | Filter::Basename | Filter::Dirname => {
+            bytes = Some(path(value, filter)?);
+        }
+    }
+    if let Some(bytes) = bytes {
+        charge(left, u64::try_from(bytes.len()).expect("small"))?;
+        return Ok(string(bytes));
+    }
+    let (items, depth) = list.expect("list filter");
+    charge(left, u64::try_from(items.len()).expect("small") * 32)?;
+    if depth > limits.nesting {
+        return Err("limit");
+    }
+    Ok(Made {
+        value: Some(Value::List(items.iter().map(|item| item.value.clone().expect("defined")).collect())),
+        depth,
+        items: Some(items),
+    })
+}
+fn json(value: &Value) -> Vec<u8> {
+    match value {
+        Value::Bool(value) => value.to_string().into_bytes(),
+        Value::Int(value) => value.to_string().into_bytes(),
+        Value::String(text) => {
+            let mut result = vec![b'"'];
+            for byte in text {
+                match byte {
+                    b'"' => result.extend_from_slice(b"\\\""),
+                    b'\\' => result.extend_from_slice(b"\\\\"),
+                    8 => result.extend_from_slice(b"\\b"),
+                    12 => result.extend_from_slice(b"\\f"),
+                    b'\n' => result.extend_from_slice(b"\\n"),
+                    b'\r' => result.extend_from_slice(b"\\r"),
+                    b'\t' => result.extend_from_slice(b"\\t"),
+                    0..=31 => result.extend(format!("\\u00{byte:02x}").bytes()),
+                    _ => result.push(*byte),
+                }
+            }
+            result.push(b'"');
+            result
+        }
+        Value::List(items) => {
+            let mut result = vec![b'['];
+            result.extend(items.iter().map(json).collect::<Vec<_>>().join(&b","[..]));
+            result.push(b']');
+            result
+        }
+        Value::Map(entries) => {
+            let mut result = vec![b'{'];
+            let mut fields = vec![];
+            for entry in entries {
+                if let Some(value) = &entry.value {
+                    let mut field = json(&Value::String(entry.key.clone()));
+                    field.push(b':');
+                    field.extend(json(value));
+                    fields.push(field);
+                }
+            }
+            result.extend(fields.join(&b","[..]));
+            result.push(b'}');
+            result
+        }
+    }
+}
+
+fn string(text: Vec<u8>) -> Made {
+    Made::plain(Some(Value::String(text.into_boxed_slice())))
+}
+fn text(value: Value) -> Result<Vec<u8>, &'static str> {
+    match value {
+        Value::String(text) => Ok(text.into_vec()),
+        Value::Bool(_) | Value::Int(_) | Value::List(_) | Value::Map(_) => Err("type"),
+    }
+}
+
+fn join(value: &Value, separator: Value) -> Result<Vec<u8>, &'static str> {
+    let Value::List(values) = value else {
+        return Err("type");
+    };
+    let separator = text(separator)?;
+    let values = values
+        .iter()
+        .map(|value| match value {
+            Value::String(text) => Ok(text.to_vec()),
+            Value::Int(value) => Ok(value.to_string().into_bytes()),
+            Value::Bool(_) | Value::List(_) | Value::Map(_) => Err("type"),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(values.join(separator.as_slice()))
+}
+
+fn split(value: &Value, separator: Value, left: &mut u64) -> Result<Vec<Made>, &'static str> {
+    let input = text(value.clone())?;
+    let separator = text(separator)?;
+    if separator.is_empty() {
+        return Err("empty");
+    }
+    let mut pieces = vec![];
+    let mut from = 0;
+    while let Some(index) = input[from..].windows(separator.len()).position(|part| part == separator) {
+        pieces.push(string(input[from..from + index].to_vec()));
+        from += index + separator.len();
+    }
+    pieces.push(string(input[from..].to_vec()));
+    charge(
+        left,
+        pieces
+            .iter()
+            .map(|piece| match piece.value.as_ref().expect("defined") {
+                Value::String(text) => u64::try_from(text.len()).expect("small"),
+                Value::Bool(_) | Value::Int(_) | Value::List(_) | Value::Map(_) => unreachable!("string"),
+            })
+            .sum(),
+    )?;
+    Ok(pieces)
+}
+
+fn replace(value: &Value, pattern: Value, replacement: Value) -> Result<Vec<u8>, &'static str> {
+    let input = text(value.clone())?;
+    let pattern = text(pattern)?;
+    let replacement = text(replacement)?;
+    if pattern.is_empty() {
+        return Err("empty");
+    }
+    let mut output = vec![];
+    let mut from = 0;
+    while let Some(index) = input[from..].windows(pattern.len()).position(|part| part == pattern) {
+        output.extend_from_slice(&input[from..from + index]);
+        output.extend_from_slice(&replacement);
+        from += index + pattern.len();
+    }
+    output.extend_from_slice(&input[from..]);
+    Ok(output)
+}
+
+fn entries(value: &Value, filter: Filter, left: &mut u64) -> Result<(Vec<Made>, u32), &'static str> {
+    let Value::Map(entries) = value else {
+        return Err("type");
+    };
+    let mut items = vec![];
+    for entry in entries {
+        let Some(value) = &entry.value else {
+            continue;
+        };
+        if !matches!(filter, Filter::Values) {
+            charge(left, u64::try_from(entry.key.len()).expect("small"))?;
+        }
+        items.push(match filter {
+            Filter::Keys => string(entry.key.to_vec()),
+            Filter::Values => Made::plain(Some(value.clone())),
+            Filter::Items => {
+                charge(left, 64)?;
+                let pair = vec![string(entry.key.to_vec()), Made::plain(Some(value.clone()))];
+                Made {
+                    value: Some(Value::List(pair.iter().map(|value| value.value.clone().expect("defined")).collect())),
+                    depth: 1,
+                    items: Some(pair),
+                }
+            }
+            Filter::Default
+            | Filter::Join
+            | Filter::Split
+            | Filter::First
+            | Filter::Last
+            | Filter::Length
+            | Filter::Replace
+            | Filter::Sort
+            | Filter::Tojson
+            | Filter::ShellQuote
+            | Filter::SystemdEscape
+            | Filter::SystemdEscapePath
+            | Filter::Basename
+            | Filter::Dirname => unreachable!("map filter"),
+        });
+    }
+    let depth = if matches!(filter, Filter::Items) && !items.is_empty() { 2 } else { 1 };
+    Ok((items, depth))
+}
+
+fn path(value: &Value, filter: Filter) -> Result<Vec<u8>, &'static str> {
+    let mut input = text(value.clone())?;
+    if !matches!(filter, Filter::SystemdEscape) {
+        let absolute = input.first() == Some(&b'/');
+        let segments = if absolute { &input[1..] } else { &input[..] };
+        if input != b"/"
+            && (input.is_empty()
+                || segments.split(|byte| *byte == b'/').any(|part| part.is_empty() || part == b"." || part == b".."))
+        {
+            return Err("path");
+        }
+        if matches!(filter, Filter::SystemdEscapePath) && !absolute {
+            return Err("path");
+        }
+    }
+    Ok(match filter {
+        Filter::Basename if input != b"/" => input.rsplit(|byte| *byte == b'/').next().expect("one segment").to_vec(),
+        Filter::Dirname if input != b"/" => match input.iter().rposition(|byte| *byte == b'/') {
+            Some(0) => b"/".to_vec(),
+            Some(index) => input[..index].to_vec(),
+            None => b".".to_vec(),
+        },
+        Filter::Basename | Filter::Dirname => input,
+        Filter::SystemdEscape | Filter::SystemdEscapePath => {
+            if matches!(filter, Filter::SystemdEscapePath) && input != b"/" {
+                input.remove(0);
+            }
+            let mut output = vec![];
+            for (index, byte) in input.into_iter().enumerate() {
+                if byte == b'/' {
+                    output.push(b'-');
+                } else if byte.is_ascii_alphanumeric() || b":_".contains(&byte) || (byte == b'.' && index != 0) {
+                    output.push(byte);
+                } else {
+                    output.extend(format!("\\x{byte:02x}").bytes());
+                }
+            }
+            output
+        }
+        Filter::Default
+        | Filter::Join
+        | Filter::Split
+        | Filter::First
+        | Filter::Last
+        | Filter::Length
+        | Filter::Replace
+        | Filter::Items
+        | Filter::Keys
+        | Filter::Values
+        | Filter::Sort
+        | Filter::Tojson
+        | Filter::ShellQuote => unreachable!("text filter"),
+    })
 }

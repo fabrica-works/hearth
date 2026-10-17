@@ -100,6 +100,7 @@ pub(super) fn binary<'c>(
         | Op::Key { .. }
         | Op::Item { .. }
         | Op::List { .. }
+        | Op::Filter(_)
         | Op::Defined
         | Op::NotDefined
         | Op::Not

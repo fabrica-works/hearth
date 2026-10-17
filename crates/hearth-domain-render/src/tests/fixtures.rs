@@ -421,3 +421,25 @@ pub fn error_call(limits: &limits::Limits) -> crate::call::Side {
     call.listed(*limits, Oid(bytes::copy_of(b"commit")), &entries, &mut out);
     call
 }
+
+pub fn filter(input: Value, filter: evaluate::Filter, arguments: &[Value]) -> Result<Option<Value>, Fault> {
+    let mut roots = Roots::x1_prod();
+    roots.target = input;
+    let mut arguments = arguments.iter();
+    if let Some(value) = arguments.next() {
+        roots.debian = value.clone();
+    }
+    if let Some(value) = arguments.next() {
+        roots.settings = value.clone();
+    }
+    let mut operations = skein_lib::List::with_capacity(4);
+    operations.push(name(0, b"target", Missing::Error)).expect("room");
+    if filter.arity() != 0 {
+        operations.push(name(1, b"debian", Missing::Error)).expect("room");
+    }
+    if filter.arity() == 2 {
+        operations.push(name(2, b"settings", Missing::Error)).expect("room");
+    }
+    operations.push(op(3, Op::Filter(filter))).expect("room");
+    evaluate(&roots, operations.as_slice())
+}

@@ -1,4 +1,5 @@
 //! Postfix expressions (render.md, 8.3), mirrored from the template machine.
+use super::Filter;
 use alloc::boxed::Box;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Expression {
@@ -19,6 +20,7 @@ pub enum Op {
     Key { name: Box<[u8]>, missing: Missing },
     Item { missing: Missing },
     List { length: u32 },
+    Filter(Filter),
     Defined,
     NotDefined,
     Not,

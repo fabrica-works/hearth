@@ -11,3 +11,4 @@ mod compose;
 mod diff;
 
 mod errors;
+mod filters;
