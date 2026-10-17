@@ -24,6 +24,7 @@ pub(crate) struct Prepared {
     pub expansion: crate::entries::Expansion,
     pub secrets: parts::secrets::Secrets,
     pub packages: parts::packages::Packages,
+    pub live: parts::live::Live,
 }
 #[derive(Debug)]
 pub(crate) struct Target {
@@ -35,6 +36,7 @@ pub(crate) struct Target {
     pub(crate) expansion: crate::entries::Expansion,
     secrets: parts::secrets::Secrets,
     packages: parts::packages::Packages,
+    live: parts::live::Live,
     task: usize,
     rendered: u64,
     entry: usize,
@@ -55,7 +57,7 @@ impl Target {
         prepared: Prepared,
         capacity: u32,
     ) -> Self {
-        let Prepared { plans, expansion, secrets, packages } = prepared;
+        let Prepared { plans, expansion, secrets, packages, live } = prepared;
         let mut tree = Map::with_capacity(capacity);
         for plan in &plans {
             for install in &plan.installs {
@@ -93,6 +95,7 @@ impl Target {
             expansion,
             secrets,
             packages,
+            live,
             task: 0,
             rendered: 0,
             entry: 0,
@@ -270,6 +273,7 @@ impl Side {
                 digest: parts::secrets::digest(&target.secrets),
                 record: parts::PartRecord::Secrets(target.secrets),
             },
+            parts::Part { digest: parts::live::digest(&target.live), record: parts::PartRecord::Live(target.live) },
         ]);
         drop(target.expansion);
         Some(Answer::Spec(parts::Spec {

@@ -70,6 +70,7 @@ pub const fn layer(part: &PartRecord) -> Layer {
         PartRecord::Config(_) => Layer::Config,
         PartRecord::Secrets(_) => Layer::Slot,
         PartRecord::Packages(_) => Layer::Packages,
+        PartRecord::Live(_) => Layer::Other,
     }
 }
 #[must_use]
@@ -126,7 +127,7 @@ fn config_part(spec: &Spec) -> Option<(&Digest, &config::Config)> {
     for part in &spec.parts {
         match &part.record {
             PartRecord::Config(config) => found = Some((&part.digest, config)),
-            PartRecord::Secrets(_) | PartRecord::Packages(_) => {} // transitional: hearth 19.5, 17.5
+            PartRecord::Secrets(_) | PartRecord::Live(_) | PartRecord::Packages(_) => {} // transitional: hearth 19.5, 17.5
         }
     }
     found

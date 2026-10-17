@@ -21,7 +21,7 @@ fn json_lines_give_the_version_first_and_the_outcome_last() {
         Some("{\"record\":\"outcome\",\"outcome\":\"done\",\"left_out\":0}"),
         "terminal last"
     );
-    assert_eq!(lines.len(), 7, "version, spec, packages, config, secrets, meta and outcome");
+    assert_eq!(lines.len(), 8, "version, spec, packages, config, secrets, live, meta and outcome");
 }
 #[test]
 fn an_unknown_target_exits_64_after_the_listing() {
@@ -769,6 +769,20 @@ fn preseeds_and_modules_reach_the_packages_part() {
             "  initramfs  btrfs nvme\n",
             "  microcode  generic\n",
             "  apt        install_recommends false\n"
+        )
+    );
+}
+
+#[test]
+fn hearth_render_lists_each_path_with_its_consumers() {
+    let repository = Repository::make("live", &fixtures::thin_with(&[fixtures::LIVE]));
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["  path "]),
+        concat!(
+            "  path       /etc/mailname motd postfix.service reload\n",
+            "  path       /etc/postfix/ motd postfix.service reload\n",
+            "  path       /opt/ripgrep/ motd - none\n"
         )
     );
 }

@@ -593,6 +593,7 @@ pub fn config_part(parts: &[hearth_domain_render::parts::Part]) -> &hearth_domai
         .find_map(|part| match &part.record {
             hearth_domain_render::parts::PartRecord::Config(config) => Some(config),
             hearth_domain_render::parts::PartRecord::Secrets(_)
+            | hearth_domain_render::parts::PartRecord::Live(_)
             | hearth_domain_render::parts::PartRecord::Packages(_) => None,
         })
         .expect("config part")

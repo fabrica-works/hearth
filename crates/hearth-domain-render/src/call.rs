@@ -501,7 +501,7 @@ impl Side {
             let Some(packages) = packages::build(&debian, &p, &expansion, set.as_ref(), &meta, &mut self.errors) else {
                 continue;
             };
-            let Some(secrets) = secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome) else {
+            let Some((secrets, live)) = secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome) else {
                 continue;
             };
             let mut faults = List::with_capacity(files::fault_capacity(&expansion, self.entries.len()));
@@ -520,7 +520,7 @@ impl Side {
                 meta_digest,
                 checked,
                 debian,
-                templates::Prepared { plans, expansion, secrets, packages },
+                templates::Prepared { plans, expansion, secrets, packages, live },
                 capacity,
             ));
             return self.template();

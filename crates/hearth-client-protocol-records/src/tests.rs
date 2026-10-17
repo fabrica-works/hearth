@@ -8,6 +8,7 @@ mod text;
 
 mod progress;
 
+mod live;
 mod secrets;
 
 mod packages;

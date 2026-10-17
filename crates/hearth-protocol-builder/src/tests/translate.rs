@@ -139,6 +139,7 @@ fn spec_back(spec: records::records::Spec) -> Option<render::parts::Spec> {
             }
             records::records::PartRecord::Secrets(value) => render::parts::PartRecord::Secrets(secrets::back(value)),
             records::records::PartRecord::Packages(value) => packages::part_back(value),
+            records::records::PartRecord::Live(value) => render::parts::PartRecord::Live(live::back(value)),
         };
         translated.push(render::parts::Part { digest: hearth_lib::encode::Digest(digest), record }).expect("part room");
     }
@@ -171,30 +172,12 @@ fn spec_back(spec: records::records::Spec) -> Option<render::parts::Spec> {
 }
 #[test]
 fn a_spec_translates_to_the_records_and_back() {
-    let spec = spec_back(answers::spec(super::fixtures::spec()));
-    assert_eq!(
-        spec,
-        Some(render::parts::Spec {
-            meta: render::parts::meta::Meta {
-                target: skein_lib::bytes::copy_of(b"x1-prod"),
-                base: skein_lib::bytes::copy_of(b"x1"),
-                member: None,
-                environment: skein_lib::bytes::copy_of(b"prod"),
-                placement: render::parts::meta::Placement {
-                    kind: target::Runs::Metal,
-                    firmware: Some(target::Firmware::Efi),
-                    hardware: Some(skein_lib::bytes::copy_of(b"7th-gen")),
-                    on: None
-                }
-            },
-            meta_digest: hearth_lib::encode::Digest([1; 32]),
-            commit: target::Oid(skein_lib::bytes::copy_of(b"0123456789abcdef0123456789abcdef01234567")),
-            digest: hearth_lib::encode::Digest([2; 32]),
-            parts: Box::new([])
-        }),
-        "a complete client spec translates back"
-    );
+    for (row, input) in super::fixtures::live_specs().into_iter().enumerate() {
+        let back = spec_back(answers::spec(input.clone())).expect("spec");
+        assert_eq!(back, input, "row {row}: spec");
+    }
 }
+
 const CLIENT_KINDS: &[(target::Runs, client_meta::PlacementKind)] = &[
     (target::Runs::Metal, client_meta::PlacementKind::Metal),
     (target::Runs::Vm, client_meta::PlacementKind::Vm),
@@ -793,6 +776,7 @@ mod debian;
 mod fields;
 
 mod config;
+mod live;
 mod secrets;
 
 mod files;

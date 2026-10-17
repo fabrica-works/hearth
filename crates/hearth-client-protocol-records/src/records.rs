@@ -61,6 +61,7 @@ pub enum PartRecord {
     Config(Config),
     Secrets(crate::parts::secrets::Secrets),
     Packages(crate::parts::packages::Packages),
+    Live(crate::parts::live::Live),
 }
 impl PartRecord {
     pub(crate) fn name(&self) -> &'static [u8] {
@@ -68,6 +69,7 @@ impl PartRecord {
             Self::Config(_) => b"config",
             Self::Secrets(_) => b"secrets",
             Self::Packages(_) => b"packages",
+            Self::Live(_) => b"live",
         }
     }
     pub(crate) fn json(&self, json: &mut skein_json::writer::Encoder) {
@@ -75,6 +77,7 @@ impl PartRecord {
             Self::Config(config) => config.json(json),
             Self::Secrets(secrets) => secrets.json(json),
             Self::Packages(packages) => packages.json(json),
+            Self::Live(live) => live.json(json),
         }
     }
     pub(crate) fn text(&self, lines: &mut Lines) {
@@ -82,6 +85,7 @@ impl PartRecord {
             Self::Config(config) => config.text(lines),
             Self::Secrets(secrets) => secrets.text(lines),
             Self::Packages(packages) => packages.text(lines),
+            Self::Live(live) => live.text(lines),
         }
     }
 }

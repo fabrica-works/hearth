@@ -638,6 +638,7 @@ pub enum Schema {
     Unread { task: Box<[u8]>, setting: Box<[u8]>, declared: Box<[Box<[u8]>]> },
     Wrong { expected: TypeName },
     Enum { value: Box<[u8]>, listed: Box<[Box<[u8]>]> },
+    Beneath { allowed: Box<[Box<[u8]>]> },
     Below { min: i64 },
     Above { max: i64 },
     Length { max_length: i64 },

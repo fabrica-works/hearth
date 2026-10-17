@@ -24,6 +24,7 @@ mod references;
 
 mod debian;
 
+mod live;
 mod packages;
 mod secrets;
 

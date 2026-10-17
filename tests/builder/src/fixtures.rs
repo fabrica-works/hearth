@@ -160,7 +160,7 @@ fn run(repository: &Repository, call: Call, form: Form, store: Option<&Path>) ->
     run_holding(repository, call, form, store, &hearth::limits(), Release::After(skein_lib::Duration::ZERO)).rendered
 }
 
-pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         9f5ddc2ca0e8\npackages     part de38a7ed6276\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\n";
+pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         a458c0851287\npackages     part de38a7ed6276\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\n";
 
 mod binary;
 pub use binary::{Ended, binary};
@@ -437,7 +437,7 @@ pub fn broken_task() -> Vec<File> {
     files
 }
 pub const BROKEN_LAB_TEXT: &str = concat!(
-    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         9f5ddc2ca0e8\npackages     part de38a7ed6276\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\n",
+    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         a458c0851287\npackages     part de38a7ed6276\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\n",
     "\nenvs/lab.json:1:14: duplicate key \"motd\" (envs/lab.json:1:2)\n"
 );
 pub const D1: hearth::service::domain::render::vocabulary::Digest =
@@ -749,6 +749,8 @@ pub const REFUSED_DEBIAN: File =
     File { path: "hosts/x1/x1.json", body: br#"{"motd":{},"debian":{"components":{"main":false}}}"#, mode: 0o644 };
 
 /// Secrets, identity and a password travel through the real declaration decoder.
+pub const LIVE: File = File { path: "tasks/motd/task.json", body: br#"{"live":{"postfix":{"unit":"postfix.service","action":"reload","paths":["/etc/postfix/","/etc/mailname"]},"ripgrep":{"action":"none","paths":["/opt/ripgrep/"]}}}"#, mode: 0o644 };
+
 pub const SECRETS: File = File { path: "tasks/motd/task.json", body: br#"{"secrets": {"mail/dkim/example.org.key": {"path": "/etc/dkimkeys/example.org.key", "mode": "0640", "group": "opendkim"}, "mail/tls/mx1.key": {"path": "/etc/ssl/private/mx1.key"}}, "identity": {"ssh-ed25519": {"kind": "ssh-host-key", "algorithm": "ed25519", "path": "/etc/ssh/ssh_host_ed25519_key", "public_path": "/etc/ssh/ssh_host_ed25519_key.pub"}}, "users": {"free": {"uid": 1000, "password": "users/free.passwd"}}}"#, mode: 0o644 };
 pub const SECRET_NO_PATH: File =
     File { path: "tasks/motd/task.json", body: br#"{"secrets": {"mail/tls/mx1.key": {}}}"#, mode: 0o644 };

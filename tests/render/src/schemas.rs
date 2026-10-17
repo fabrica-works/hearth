@@ -402,6 +402,7 @@ pub const fn kind(schema: &Schema) -> &'static str {
         Schema::Main => "main",
         Schema::Security => "security",
         Schema::Source { .. } => "source",
+        Schema::Beneath { .. } => "beneath",
     }
 }
 

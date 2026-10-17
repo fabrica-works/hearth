@@ -4,7 +4,7 @@ use skein_lib::bytes;
 pub const MIN_UID: i64 = 1000;
 pub const MAX_UID: i64 = 59999;
 #[must_use]
-pub fn schema_faults() -> [render::errors::Schema; 21] {
+pub fn schema_faults() -> [render::errors::Schema; 22] {
     use render::errors::Schema;
     [
         Schema::Undeclared { setting: bytes::copy_of(b"greting"), declared: Box::new([bytes::copy_of(b"greeting")]) },
@@ -23,6 +23,7 @@ pub fn schema_faults() -> [render::errors::Schema; 21] {
         Schema::Target { name: bytes::copy_of(b"x9-prod"), environment: bytes::copy_of(b"prod") },
         Schema::File { path: bytes::copy_of(b"lab-ca/lab.crt") },
         Schema::Large { path: bytes::copy_of(b"lab-ca/big.crt"), max: 67_108_864 },
+        Schema::Beneath { allowed: Box::new([bytes::copy_of(b"/etc"), bytes::copy_of(b"/opt")]) },
         Schema::Main,
         Schema::Security,
         Schema::Unlisted {

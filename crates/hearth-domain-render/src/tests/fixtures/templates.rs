@@ -68,6 +68,7 @@ pub fn keeping_templates() -> (crate::Render, skein_lib::Env<Limits>, skein_lib:
         },
         super::Roots::x1_prod().debian,
         crate::call::templates::Prepared {
+            live: crate::parts::live::Live { paths: Box::new([]) },
             plans: super::kinds::template_plans(&side.entries),
             packages: super::thin_packages(),
             expansion: crate::entries::Expansion { tasks: Box::new([]) },

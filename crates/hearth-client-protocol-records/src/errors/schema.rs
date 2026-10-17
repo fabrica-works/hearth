@@ -60,6 +60,10 @@ impl Schema {
             }
             Self::Large { path, max } => large_text(lines, path, *max),
             Self::Component { package, component } => component_text(lines, package, component),
+            Self::Beneath { allowed } => {
+                lines.put(b"path must be beneath ");
+                names(lines, allowed);
+            }
             Self::Main => lines.put(b"debian.components must keep main on"),
             Self::Security => lines.put(b"debian.snapshot.security is required with its pocket"),
 
@@ -142,11 +146,11 @@ impl Schema {
                 field(json, b"kind", b"file");
                 field(json, b"path", path);
             }
-            Self::Large { path, max } => {
-                field(json, b"kind", b"large");
-                json.key(b"max");
-                json.unsigned(*max);
-                field(json, b"path", path);
+            Self::Large { path, max } => large_json(json, path, *max),
+            Self::Beneath { allowed } => {
+                json.key(b"allowed");
+                json_names(json, allowed);
+                field(json, b"kind", b"beneath");
             }
             Self::Component { package, component } => component_json(json, package, component),
             Self::Main => field(json, b"kind", b"main"),
@@ -309,4 +313,10 @@ fn component_json(json: &mut Encoder, package: &[u8], component: &[u8]) {
     field(json, b"component", component);
     field(json, b"kind", b"component");
     field(json, b"package", package);
+}
+fn large_json(json: &mut Encoder, path: &[u8], max: u64) {
+    field(json, b"kind", b"large");
+    json.key(b"max");
+    json.unsigned(max);
+    field(json, b"path", path);
 }
