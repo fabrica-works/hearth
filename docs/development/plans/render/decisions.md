@@ -638,6 +638,21 @@ None yet.
      8. `Option::map` is a disallowed method (`clippy.toml:106`), and a hand-written `match` that rewraps `Some` trips `manual_map`: a helper that uses `?` passes.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+139. **hearth 23's Shapes against main** (ready check of hearth-23.1).
+     hearth 23's ready check, against hearth 992ff01 (d0df92f touched none of its crates) and skein 841f487 (fmt and clippy clean with the corrections; default 603 of 604, the one failure the plan's real-loop test, which needs 23.2 and 32.1; fuzzy 13 of 13), corrects 23-store.md, its names grepped again at hearth 3ba7416:
+     1. skein's `FileIo::adopt_root` is `file_layer.rs:363`, and `effective_user` is `ring.rs:1678`.
+     2. `frame::largest` takes `(Kind, &Limits)` and gives a `u64` (hearth-protocol-tree `frame.rs:113`): the record's `Load` and `Files::whole` take `frame::largest(Kind::Store, &limits.tree)` and `frame::largest(Kind::Resolution, &limits.tree)`, narrowed by `u32::try_from`.
+     3. 23.1's Files gain the root's `src/tests/fixtures.rs` (`:4`'s `LIMITS` takes `store`; `a_render_call_reaches_render`, `tests.rs:11`, sees the store's `Open` first), the service's `src/tests/fixtures.rs` (`:7`'s `Configuration` takes `uid`, `:8`'s `Roots` takes `resolutions` and `staging`), and `skein-lib` in `tests/builder/Cargo.toml`, for `Duration`, `Time`, `Wall` and `Queue`.
+     4. The store's types are named by their module: `store::vocabulary::{Event, Request, StoreRecord, Why}`.
+     5. `worst_case`'s doc names `Map::worst_case` and names of 255 bytes; there is no `Set`.
+     6. The service's `Files` is in `src/limits.rs` (`:14`), as 32.1 put it; `Configuration` and `Roots` stay in `src/lib.rs` (`:21`, `:25`).
+     7. The store's `MAX_OUT` is 1, as the root's (`hearth-domain-builder/src/lib.rs:10`): one store request is in flight, and each answer comes alone on a terminal, in each transition 23's Shapes give.
+     8. An unopened store is said at startup. render.md 7.2's `store` row: "A store that cannot be opened, or is another uid's or another range's (store.md, 6.6), is no error of the answer: nothing renders, and the client says so at startup (client/README.md, 3.2)"; client/README.md: "What keeps the client from answering at all (an unknown option, a repository or a store it cannot open) goes to standard error alone: `hearth: <message>`, or with `--json` one `startup` record after the version line, naming its outcome, `usage` or `try_again`, with 3.3's code." On `Unopened { why }` the root emits its new `Request::Unopened { to: ReplyTo, why }` in place of `Reply { TryAgain }`; the protocol layer writes records' `Startup::Unopened { what: Opened::Store, path: None, error }` (`startup.rs:11`; hearth 33.3 gives the path) to standard error, and the call ends with 75. `error` is `lock failed`, `store.record failed`, or `store.record is uid <recorded>'s, not uid <builder>'s`. The root's test checks each `Why`, and a new protocol test, `an_unopened_store_writes_its_startup_record`, the three texts as literals.
+     9. The opening paragraph quotes hearth 11's transitional entry as written: "the store's lock or `store.record`".
+     10. A new unit test, `a_readable_record_of_layout_2_is_written_again_as_layout_1`, covers 6.1 and 6.8's "written again" for a readable record of another `layout`.
+     11. The reference test's `let limits` line is wrapped at 120 columns, as rustfmt does.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
