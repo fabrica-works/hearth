@@ -310,7 +310,17 @@ the closing repins (Repin). The increments of each session are in its file.
   from the parent counts nothing (ruling 156). Its report's
   `Size:` gives the count by file and names this rule. Past three times
   its Size, or with a counted file outside its Files, it still stops on a
-  question before landing, with the count by file.
+  question before landing, with the count by file, except (ruling 168,
+  after rulings 136, 150 and 161, each a block where the plan's Size or
+  Files missed what the work needed): up to four times its Size, it lands
+  at its count when each file is at most 800 lines, each test its Test shape
+  names is there, and each counted file outside its Files is the
+  protocol's translation (`hearth-protocol-builder` `src/translate.rs`,
+  `src/translate/**`) or the records' mirror
+  (`hearth-client-protocol-records` `src/{diff, errors}.rs`,
+  `src/{parts, errors}/**`) of a variant, part or kind it adds (the
+  meeting point, above), or a module under a file its Files name. Its
+  commit body then names each such file, with its count, and this rule.
 - **A Proof's "Bound: N s"** is an aim for the test's time as nextest
   prints it, building aside; a bound missed is noted in the report, and
   the landing stands.

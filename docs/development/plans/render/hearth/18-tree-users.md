@@ -223,7 +223,13 @@ example; render.md 4.2's `groups`, `users`, `members`; `Accounts`.
 Needs: hearth 16, hearth 25.1, hearth 42.1.
 Files: render new `src/kinds/{users, groups}.rs`, `src/kinds.rs`,
 `src/parts/config.rs`, `src/{call, errors}.rs`, `src/tests/{kinds,
-fixtures}.rs`.
+fixtures}.rs`; and, as the work needed them (ruling 168): render new
+`src/parts/config/{accounts, changes}.rs`, `src/call/{secrets,
+templates}.rs`; records `src/diff.rs`, `src/parts/config.rs`, new
+`src/parts/config/accounts.rs`; protocol `src/translate/changes.rs`,
+`src/translate/parts/config.rs`; `tests/builder/src/fixtures.rs`, new
+`src/fixtures/accounts.rs`; `tests/builder/tests/real.rs`, new
+`real/{accounts, diff}.rs` (`diff.rs` the eight `hearth diff` tests moved).
 Shape: the sketches. `from` is `sysusers` (default) or `package` (`Schema::
 Enum`); a package account takes `uid`, `gid` alone (`UndeclaredField`). A
 sysusers user: `group` its own name, `gecos` empty, `home` `/`, `shell`
@@ -265,7 +271,7 @@ Proof: process, `hearth_diff_names_each_account_group_and_member_moved`, bound
 ```
 Don't: write sysusers lines or `/etc/subuid` (22, build); read `password`;
 check fixed ids (19) or two users of one id (22).
-Size: at most 300 lines.
+Size: at most 300 lines; it lands at 979 (ruling 168).
 Removes: nothing.
 
 ### 18.4 Presets, tmpfiles and `customize.sh`

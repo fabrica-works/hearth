@@ -846,6 +846,18 @@ None yet.
 
      What stays unchanged: Choices' nine failure rows and their classes; `each_cause_takes_its_kind_and_class`'s nine rows; 24.3's `Closure`, indices and live test; 31.1's `Record` and `Known`. Nothing is deferred, so `later.md` gains no row. Any further exhaustive match over `Kind` that the compiler names joins 24.2: list it in the commit body.
 
+168. **hearth 18.3 lands at its count; the Size rule up to four times** (plan defect, hearth-18.3's block of 2026-10-17T22:34:05Z).
+     **hearth 18.3 lands at its count, and the README's Size rule lets such a count land up to four times the Size** (plan defect, hearth-18.3's block of 2026-10-17T22:34:05Z).
+
+     Yes: hearth-18.3 lands as prepared (ef98c3a), at 979 production additions against its Size of 300 (README, Rules: "Past three times its Size, or with a counted file outside its Files, it still stops on a question before landing"). The plan's Files missed what the work needed, not the increment its scope: the README's meeting point says "Each increment that adds a variant to a vocabulary that crosses the protocol layer extends `hearth-protocol-builder`'s translation in the same increment", and 18.3's Proof is a `hearth diff` test, which prints through the records' diff; 18.3's Files named neither. Every test its Test shape and Proof name is there, and no counted file passes 770 lines once rebased (render `call.rs`).
+
+     1. 18.3's Files gain the counted files they missed: render new `src/parts/config/{accounts, changes}.rs`, `src/call/{secrets, templates}.rs`; records `src/diff.rs`, `src/parts/config.rs`, new `src/parts/config/accounts.rs`; protocol `src/translate/changes.rs`, `src/translate/parts/config.rs`; and the test files `tests/builder/src/fixtures.rs`, new `tests/builder/src/fixtures/accounts.rs`, `tests/builder/tests/real.rs`, new `tests/builder/tests/real/{accounts, diff}.rs`.
+     2. **`tests/builder/tests/real.rs` stays at most 800 lines.** It is 799 on main (a34c716), and 18.3's `#[path = "real/accounts.rs"] mod accounts;` takes it to 802: 18.3 is the first increment that needs a new `#[path]` module, so it first moves the eight `hearth diff` tests (main's lines 103 to 199, `hearth_diff_names_each_changed_target_and_its_rebuild` to `json_lines_give_each_targets_change_then_the_tally_in_the_outcome`) to a new `real/diff.rs`, `#[path = "real/diff.rs"] mod diff;` beside the others, as a move only: each test's name and body kept, the module's `use` lines what the moved tests read (as `real/package_changes.rs` has them). This is the steer of 22:35:44Z, point 2.
+     3. 18.3's commit body gives the count by file (`logs/hearth-18/18.3-size.txt`, counted again after the rebase) and names ruling 168. Nothing is trimmed to fit: comments and formatting stay as prepared.
+     4. **The same block a fourth time becomes the README's rule** (after rulings 136, 150 and 161): up to four times its Size, an increment lands at its count when each file is at most 800 lines, each test its Test shape names is there, and each counted file outside its Files is the protocol's translation (`hearth-protocol-builder` `src/translate.rs`, `src/translate/**`) or the records' mirror (`hearth-client-protocol-records` `src/{diff, errors}.rs`, `src/{parts, errors}/**`) of a variant, part or kind it adds, or a module under a file its Files name; its commit body then names each such file, with its count, and the rule. Past four times its Size, or with any other counted file outside its Files, it still stops on a question.
+
+     A further counted file outside the Files takes a line in the commit body, with its count.
+
 ## For the user
 
 The long-term choices the user may veto:
