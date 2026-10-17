@@ -13,6 +13,9 @@ hearth-domain-render.workspace = true
 hearth-lib.workspace = true
 skein-world.workspace = true
 
+[dev-dependencies]
+skein-heap.workspace = true
+
 [lints.rust]
 unsafe_code = "forbid"
 elided_lifetimes_in_paths = "deny"

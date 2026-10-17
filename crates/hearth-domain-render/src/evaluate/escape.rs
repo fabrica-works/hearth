@@ -37,7 +37,7 @@ fn quoted(text: &[u8], writer: &mut Option<&mut Writer>, length: &mut usize) -> 
     put(writer, length, b"\"")
 }
 #[derive(Debug)]
-enum Frame<'v> {
+pub(super) enum Frame<'v> {
     List { items: Items<'v>, next: usize },
     Map { entries: Iter<'v, Entry>, first: bool },
 }

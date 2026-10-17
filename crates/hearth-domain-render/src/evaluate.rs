@@ -14,6 +14,22 @@ pub use context::{Binding, Bindings, Context};
 pub use operation::{Expression, Missing, Op, Operation};
 use skein_lib::{List, Stack, bytes};
 pub use value::{Entry, Operand, Value};
+/// The most heap an evaluator, its temporary storage and a spent budget hold.
+/// Returns `None` when the bound does not fit a `u64`.
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    let depth = limits.depth.saturating_add(limits.nesting);
+    // Walks and binding copies run one at a time, above the persistent stacks.
+    let scratch = Stack::<walk::Frame<'_>>::worst_case(depth)?
+        .max(Stack::<escape::Frame<'_>>::worst_case(depth)?)
+        .max(Stack::<(core::slice::Iter<'_, Operand<'_>>, List<Operand<'_>>, u32)>::worst_case(limits.nesting)?);
+    Stack::<Operand<'_>>::worst_case(limits.expression)?
+        .checked_add(Stack::<(usize, u32)>::worst_case(limits.nesting)?)?
+        .checked_add(scratch)?
+        // List construction can hold the reverse stack and its output together;
+        // shrinking a List can likewise retain its old allocation briefly.
+        .checked_add(limits.made.checked_mul(2)?)
+}
 #[derive(Debug)]
 pub struct Evaluator<'c> {
     values: Stack<Operand<'c>>,

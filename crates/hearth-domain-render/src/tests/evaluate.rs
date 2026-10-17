@@ -212,3 +212,8 @@ fn a_later_element_fault_precedes_an_undefined_list_element() {
     ];
     assert_eq!(fixtures::evaluate(&Roots::x1_prod(), &operations), Err(Fault { at: 24, kind: FaultKind::NoKey }));
 }
+
+#[test]
+fn an_operand_costs_no_more_than_an_elements_charge() {
+    assert!(u64::try_from(size_of::<crate::evaluate::Operand<'_>>()).expect("size fits") <= crate::evaluate::ELEMENT);
+}

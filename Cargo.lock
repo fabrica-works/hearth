@@ -276,6 +276,7 @@ dependencies = [
  "hearth-lib",
  "hearth-protocol-builder",
  "hearth-protocol-template",
+ "skein-heap",
  "skein-lib",
  "skein-world",
 ]

@@ -165,3 +165,53 @@ pub fn tasks(names: &[(&[u8], bool)], placement: Option<Placement>) -> Decoded {
         },
     })
 }
+
+use crate::expressions::Roots;
+use hearth_domain_render::evaluate::{Entry as ValueEntry, Expression, Value};
+
+// Head, repeated opening, count, middle, repeated closing, tail, description.
+const EVALUATION_TEXTS: &[(&str, &str, usize, &str, &str, &str, &str)] = &[
+    ("[0", ",0", 2046, "", "", "] ", "4096-byte list"),
+    ("", "[", 64, "0", "]", "", "64 nested lists"),
+    ("settings.text", " ~ settings.text", 16, "", "", "", "concatenation past made"),
+    ("settings.text | replace('a', 'aaaaaaaaaaaaaaaaa')", "", 0, "", "", "", "replacement past made"),
+    ("settings.large | tojson", "", 0, "", "", "", "tojson of 4096 values"),
+    ("settings.large | sort", "", 0, "", "", "", "sort of 4096 values"),
+    ("settings.text | split('aaa')", "", 0, "", "", "", "split of a MiB string"),
+];
+#[must_use]
+pub fn at_the_limits() -> Vec<(Expression, &'static str)> {
+    EVALUATION_TEXTS
+        .iter()
+        .map(|&(head, open, count, middle, close, tail, what)| {
+            let text = [head, &open.repeat(count), middle, &close.repeat(count), tail].concat();
+            let expression = hearth_protocol_template::expression::compile(
+                text.as_bytes(),
+                &hearth_protocol_template::limits::SHIPPED,
+            )
+            .expect("shipped-limit expression compiles");
+            (hearth_protocol_builder::translate::operations::expression(expression), what)
+        })
+        .collect()
+}
+#[must_use]
+pub fn wide_roots() -> Roots {
+    let empty = || Value::Map(Box::new([]));
+    Roots {
+        target: empty(),
+        debian: empty(),
+        tasks: empty(),
+        exports: empty(),
+        bindings: Vec::new(),
+        settings: Value::Map(Box::new([
+            ValueEntry {
+                key: Box::from(b"large".as_slice()),
+                value: Some(Value::List((0..4096).rev().map(Value::Int).collect())),
+            },
+            ValueEntry {
+                key: Box::from(b"text".as_slice()),
+                value: Some(Value::String(vec![b'a'; 1_048_576].into_boxed_slice())),
+            },
+        ])),
+    }
+}

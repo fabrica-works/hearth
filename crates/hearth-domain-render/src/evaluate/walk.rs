@@ -49,7 +49,7 @@ pub(super) fn context(value: &Value) -> View<'_> {
     }
 }
 #[derive(Debug)]
-enum Frame<'v> {
+pub(super) enum Frame<'v> {
     List { left: Items<'v>, right: Items<'v>, next: usize },
     Map { left: core::slice::Iter<'v, Entry>, right: core::slice::Iter<'v, Entry> },
 }
