@@ -398,6 +398,15 @@ None yet.
 
      The check's runs, with 34.2's types and stubs applied and a stub `conformance_git`: `scripts/check.sh` passed (fmt, clippy, default 221, fuzzy 4); `--profile conformance` 1 of 1. The nextest edit and `conformance_git` land together, as the plan says. A further limits literal or exhaustive match the new fields and variants reach takes them the same way, and the commit body lists it.
 
+120. **hearth 44's Shapes against main** (ready check of hearth-44.1).
+     hearth 44's ready check, against hearth b961a12 and skein 2112fce (fmt, clippy, nextest 226 and fuzzy 4 pass), corrects 44-fake-git.md:
+     - render.md 2.2 is pinned at `31bed37`, not `175e92f`;
+     - `function`'s 80-byte cut also drops a UTF-8 sequence it split (git 2.47.3);
+     - a missing side exits 1 as git's answer when it cannot read a file (render.md 2.2), not as a tool error;
+     - of the five cases that decode to no answer, four are 02.1's `succeeded` and `diff-missing-side` is 34.2's `Malformed`, exit 1;
+     - `hearth_git_world::expect` gains the ten case names in `CASE_NAMES` as well as `Expected::Failed`.
+     44.2's `step` ends a child by a pending TERM (`Exit::Signal(15)`) or a broken stdout (`Exit::Signal(13)`), as testing.md 3.5 lets a process end by a signal; 26.2's `Op::Exit` took only a code, so it becomes `Exit { exit: Exit }` (26-fake-git.md), and session 26 is steered to it.
+
 ## For the user
 
 The long-term choices the user may veto:

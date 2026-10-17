@@ -9,7 +9,7 @@ git scenario runs on the fake too, compared with real git.
 ## Read first
 
 - hearth's testing.md: 3.1, 3.11, 4.1, 4.2, 4.4, 4.5, 5.1 to 5.3, 5.5;
-  render.md, 2.2 at `175e92f`; decisions.md, 13, 16, 17;
+  render.md, 2.2 at `31bed37`; decisions.md, 13, 16, 17;
   code-organization.md, 1 and 3; later.md's rows for the fake.
 - `findings/skein-testing.md`, 4, 5, Gaps; `findings/skein-io.md`, 2, 3, 5.
 - `hearth/26-fake-git.md`'s sketch (`linux`, `hearth`); hearth 34's
@@ -108,7 +108,8 @@ changes at most 6 unchanged lines apart sharing one (git 2.53: lines 2
 and 9 of 20 share, 2 and 10 do not); an empty `Span` starts at the line
 before; `function` is the last line of `before` above the hunk's first
 printed line (its first context line) that starts with a letter, `_` or
-`$`, cut to 80 bytes, trailing whitespace dropped.
+`$`, cut to 80 bytes, trailing whitespace dropped, then a UTF-8
+sequence the cut split dropped whole (git 2.47.3).
 Test shape: `src/tests/fixtures.rs` (new: `hearth()`, `hearth
 <hearth@example.org> 1700000000 +0000`; `hello()`, `a.txt` "hello\n";
 `mixed()`, `a.txt` "hello\n", `a/b` "x", `empty` "", `link` to `a.txt`,
@@ -181,7 +182,7 @@ printed:
   when 1; lines after ` `, `-`, `+`; `\ No newline at end of file\n`
   after a line without one; exit 1. Paths as given, a leading `/`
   dropped (`./cache/<hex>` prints `a/./cache/<hex>`, as 2.53.0).
-  Missing: `error: Could not access '<path>'\n`, 1 (render.md 2.2: an exit past 1 is a tool error);
+  Missing: `error: Could not access '<path>'\n`, 1, git's answer when it cannot read a file (render.md 2.2);
   unreadable: `error: open("<path>"): Permission denied\nfatal: cannot
   hash <path>\n`, 128.
 - A git-dir the child cannot open, or `Repositories` lacks: `fatal: not
@@ -271,8 +272,9 @@ and a side of mode 0o000 (`diff-unreadable-side`: `error: open(…)`,
 each line 44.2 prints has a recorded run (4.1). Five of them,
 `rev-parse-no-repository`, `ls-tree-absent-commit`, `diff-equal`,
 `diff-missing-side` and `diff-unreadable-side`, decode to no answer
-(02.1's `succeeded`): `hearth_git_world::expect`
-gains `Expected::Failed`, a line `failed exit <n>` | `failed signal <n>`
+(02.1's `succeeded` for four, 34.2's `Malformed` for
+`diff-missing-side`, exit 1): `hearth_git_world::expect` gains the ten
+case names in `CASE_NAMES` and `Expected::Failed`, a line `failed exit <n>` | `failed signal <n>`
 | `failed <error>` (the machine's, by name: `malformed` for the missing
 side), which `world::replay` answers, so each recording keeps its
 `expect`. The ten are recorded once, with `HEARTH_RECORD=1 heavy cargo nextest run -p hearth-conformance-world --profile conformance -E 'test(=each_git_case_prints_on_the_fake_what_real_git_prints)'`.

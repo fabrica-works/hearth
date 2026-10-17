@@ -141,7 +141,9 @@ its own group, and keeps `args` and `env` exactly
 `BrokenPipe` once no reader holds it; `Take` is `Empty` while a writer
 holds it, `Ended` once none does and it is drained. `Kill` ends the
 child, or its group, at once (`Exit::Signal(9)`); `Terminate` stays
-`pending` for its program. An exit closes the process's handles; `Wait`
+`pending` for its program, which ends by `Op::Exit` with a code or a
+signal (`Exit::Signal(15)` on TERM, `Exit::Signal(13)` on a broken
+stdout; testing.md, 3.5). An exit closes the process's handles; `Wait`
 answers `Exited` once. A child whose program no tool claims exits 127
 before `Spawned` returns. `counts(pid)`, read at settle (3.1): the bytes
 its `Read`s and `Write`s moved, the files whose counter it moved, the
@@ -225,7 +227,7 @@ use alloc::boxed::Box;
     Take { pipe: Handle, most: u32 },                                            // Took, Empty or Ended
     Signal { child: Pid, signal: Signal, to: Target },                           // Done: io's Request::Signal
     Wait { child: Pid },                                                         // Running, or Exited once
-    Exit { code: u8 },                                                           // Done: the caller ends
+    Exit { exit: Exit },                                                         // Done: the caller ends, by a code or a signal
 }
 /// What a call answers; `Spawned` gives the parent's ends in the request's order.
 #[derive(PartialEq, Eq, Debug)] pub enum Reply {
