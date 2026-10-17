@@ -168,6 +168,7 @@ render.md. Open questions are in section 13.
 | base, environment, member | `[a-z0-9]`, then `[a-z0-9-]`, not ending in `-` | no dot |
 | target | made from them (3.1), at most 63 bytes | no dot; never `hearth` |
 | task, setting, object field, export | `[a-z]`, then `[a-z0-9_]` | identifiers in expressions |
+| guard (5.9) | `[a-z]`, then `[a-z0-9_]` | printed in its error, never in an expression |
 | data | `[a-z]`, then `[a-z0-9-]`, at most 32 bytes | names a directory in its class (5.7); no dot |
 | secret | segments of `[a-z0-9._-]` joined by `/`, at most 255 bytes | no `.` or `..` segment |
 | key of a map setting | any string of 1 to 255 bytes | |
@@ -182,6 +183,11 @@ render.md. Open questions are in section 13.
   share the top level.
 - **Tasks and settings are identifiers,** so `tasks.core.domain` and
   `settings.public_key` parse; a hyphen would read as a minus.
+- **A guard's name has their form,** though no expression reads it: a
+  false guard prints it in its error, `boot: requires modules: no
+  initramfs modules for this hardware` (render.md, 7.3), and a key of any
+  bytes, a `: ` or a line feed in it, would break that line. A name out
+  of form is a decode error at its key.
 
 ## 3. Targets
 
@@ -1119,9 +1125,10 @@ nothing.
 
 ### 5.9 Requires
 
-- **`requires`** is a map of guards, each with `if` and `message`. Render
-  evaluates them after validation and before any entry; a false guard is
-  an error carrying its message and its line in `task.json`.
+- **`requires`** is a map of guards, each named as 2.4 says and with `if`
+  and `message`. Render evaluates them after validation and before any
+  entry; a false guard is an error carrying its message and its line in
+  `task.json`.
 - Most of os's guards are types now (`"type": {"enum": [...]}`).
   `requires` is for what spans settings or reads placement: the boot
   task refuses a container, and its module table must hold the target's

@@ -39,7 +39,10 @@ route a task's `task.json` through the thin story's protocol layer.
   with "`if`: an expression" and "`for_each`: an expression giving a map or
   a list"; "A field of another type ... may be written as one `{{ expr }}`".
   Each map's fields: 5.3 to 5.7, 5.14, 9.1, 9.3, 10.1.
-- **Guards** (5.9): "a map of guards, each with `if` and `message`".
+- **Guards** (5.9): "a map of guards, each named as 2.4 says and with
+  `if` and `message`"; 2.4: "guard (5.9) | `[a-z]`, then `[a-z0-9_]`",
+  and "A name out of form is a decode error at its key": `Name` at the
+  key, as a read's task.
   **Reads** (6.4): `settings`, `exports: true`, `optional`. **Scripts**
   (5.8): `customize.sh`, `software.sh`, `order`, "an integer from 0 to 999,
   default 500" (4.3). **Bless** (5.13): `ignore_failed`.
@@ -127,8 +130,9 @@ Error>`: the root a `Kind::Map` (else 03's `Fault::NotObject` at it); a
 keys; each string becomes a `Text` at its opening quote (render.md 7.1). `doc`: a
 string with no line feed (`Doc`; one line, unbounded), dropped. `reads`: task names
 (`names::identifier`) to objects of `settings` (a list of identifiers),
-`exports` and `optional` (booleans). `requires`: guards, each an object of
-`if` and `message`, strings, both required. `scripts`: `customize.sh` and
+`exports` and `optional` (booleans). `requires`: guards, each named by an
+identifier (`names::identifier`, else `Name` at its key, before its value)
+and an object of `if` and `message`, strings, both required. `scripts`: `customize.sh` and
 `software.sh` only, each an object of an optional `order`, an integer from
 0 to 999, 500 when absent (format.md, 4.3; else `Order` at the value).
 `bless`: an object of `ignore_failed`, a list of strings. `checks`:
@@ -155,6 +159,8 @@ Then `an_empty_object_is_a_task_that_declares_nothing`,
 `a_key_the_declaration_lacks_is_refused_at_the_key` (`pakages`,
 `setting`), `checks_are_refused_at_their_key_until_m5`,
 `a_guard_without_if_or_message_is_refused_at_its_brace`,
+`a_guard_named_out_of_form_is_refused_at_its_key` (`Kernel`, `no-kernel`,
+`""`),
 `a_read_s_task_or_setting_out_of_form_is_refused_at_it` (`Core`, `a-b`),
 `a_script_5_8_does_not_name_is_refused_at_its_key` (`build.sh`),
 `a_script_without_order_is_at_4_3s_default_500`,
@@ -310,7 +316,7 @@ pub struct Declaration {
 }
 /// A read (6.4): the task, at its key; its `{`; its settings; whether it reads the task's exports; whether the task may be absent.
 pub struct Read { pub task: Text, pub at: Position, pub settings: Box<[Text]>, pub exports: bool, pub optional: bool }
-/// A guard (5.9): its name, at its key; its `{`; `if`, an expression; its message, as written.
+/// A guard (5.9): its name, an identifier (2.4), at its key; its `{`; `if`, an expression; its message, as written.
 pub struct Guard { pub name: Text, pub at: Position, pub when: Text, pub message: Text }
 /// A fragment (5.8), at its key, and its order: 0 to 999, 500 when absent (4.3).
 pub struct Script { pub fragment: Fragment, pub at: Position, pub order: u16 }
