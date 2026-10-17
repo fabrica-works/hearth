@@ -4,7 +4,7 @@ use super::{
     value::{Entry, Operand, Value},
 };
 use crate::{
-    parts::meta::Meta,
+    parts::meta::{Meta, Placement},
     revision::{Firmware, Runs},
 };
 use skein_lib::{List, bytes};
@@ -60,9 +60,9 @@ fn string(value: &[u8]) -> Value {
     Value::String(bytes::copy_of(value))
 }
 #[must_use]
-pub fn target(meta: &Meta) -> Value {
+fn placement(value: &Placement) -> Value {
     let mut placement = List::with_capacity(4);
-    if let Some(firmware) = meta.placement.firmware {
+    if let Some(firmware) = value.firmware {
         placement
             .push(entry(
                 b"firmware",
@@ -73,21 +73,29 @@ pub fn target(meta: &Meta) -> Value {
             ))
             .expect("four fields");
     }
-    if let Some(hardware) = &meta.placement.hardware {
+    if let Some(hardware) = &value.hardware {
         placement.push(entry(b"hardware", Some(string(hardware)))).expect("four fields");
     }
     placement
         .push(entry(
             b"kind",
-            Some(string(match meta.placement.kind {
+            Some(string(match value.kind {
                 Runs::Metal => b"metal",
                 Runs::Vm => b"vm",
                 Runs::Container => b"container",
             })),
         ))
         .expect("four fields");
-    if let Some(on) = &meta.placement.on {
+    if let Some(on) = &value.on {
         placement.push(entry(b"on", Some(string(on)))).expect("four fields");
+    }
+    Value::Map(placement.into_boxed())
+}
+#[must_use]
+pub fn target(meta: &Meta, containers: &[crate::compose::Container]) -> Value {
+    let mut entries = List::with_capacity(u32::try_from(containers.len()).expect("target count"));
+    for container in containers {
+        entries.push(entry(&container.name, Some(placement(&container.placement)))).expect("target count");
     }
     let mut member = None;
     if let Some(v) = &meta.member {
@@ -95,11 +103,11 @@ pub fn target(meta: &Meta) -> Value {
     }
     Value::Map(Box::new([
         entry(b"base", Some(string(&meta.base))),
-        entry(b"containers", Some(Value::Map(Box::new([])))),
+        entry(b"containers", Some(Value::Map(entries.into_boxed()))),
         entry(b"environment", Some(string(&meta.environment))),
         entry(b"member", member),
         entry(b"name", Some(string(&meta.target))),
-        entry(b"placement", Some(Value::Map(placement.into_boxed()))),
+        entry(b"placement", Some(placement(&meta.placement))),
     ]))
 }
 use alloc::boxed::Box;

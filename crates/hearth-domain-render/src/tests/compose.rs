@@ -375,3 +375,65 @@ fn a_task_named_that_does_not_exist_is_refused_at_its_key() {
         assert_eq!(only(&errors).task.as_deref(), Some(b"missing".as_slice()), "row {row}");
     }
 }
+
+use super::fixtures::containers;
+#[test]
+fn containers_are_the_targets_placed_on_a_host_in_name_order() {
+    let mut fleet = containers::fleet();
+    fleet.targets.reverse();
+    let containers = containers::on(&fleet, b"rhi-prod").expect("valid containers");
+    assert_eq!(containers::names(&containers).as_ref(), containers::RHI_PROD_CONTAINERS);
+}
+#[test]
+fn a_target_placed_on_another_host_is_not_listed() {
+    let containers = containers::on(&containers::fleet(), b"rhi-lab").expect("valid containers");
+    assert_eq!(containers::names(&containers).as_ref(), [b"mail-lab".as_slice()]);
+}
+#[test]
+fn a_target_nothing_is_placed_on_has_an_empty_containers_map() {
+    assert_eq!(containers::root(&containers::fleet(), b"empty-prod"), crate::evaluate::Value::Map(Box::new([])));
+}
+#[test]
+fn a_containers_placement_map_leaves_absent_fields_out() {
+    assert_eq!(
+        containers::root(&containers::fleet(), b"rhi-lab"),
+        crate::evaluate::Value::Map(Box::new([crate::evaluate::Entry {
+            key: Box::from(b"mail-lab".as_slice()),
+            value: Some(crate::evaluate::Value::Map(Box::new([
+                crate::evaluate::Entry {
+                    key: Box::from(b"kind".as_slice()),
+                    value: Some(crate::evaluate::Value::String(Box::from(b"container".as_slice())))
+                },
+                crate::evaluate::Entry {
+                    key: Box::from(b"on".as_slice()),
+                    value: Some(crate::evaluate::Value::String(Box::from(b"rhi-lab".as_slice())))
+                },
+            ]))),
+        }]))
+    );
+}
+#[test]
+fn a_base_envs_placement_replaces_the_environments_for_containers() {
+    let fleet = containers::fleet();
+    let documents = super::fixtures::with_document(
+        &fleet.documents,
+        b"envs/prod.json",
+        containers::document(Some(containers::placement(Some(b"empty-prod")))),
+    );
+    let fleet = containers::discovered(documents);
+    let containers = containers::on(&fleet, b"rhi-prod").expect("valid containers");
+    assert_eq!(containers::names(&containers).as_ref(), containers::RHI_PROD_CONTAINERS);
+}
+#[test]
+fn a_container_with_a_refused_placement_fails_its_host() {
+    let fleet = containers::discovered(super::fixtures::container_documents(b"vm-lab"));
+    let error = containers::on(&fleet, b"stoa-lab").expect_err("a container cannot host chat");
+    assert_eq!(
+        error.kind,
+        crate::errors::Kind::Composition(crate::errors::Composition::On {
+            on: Box::from(b"stoa-lab".as_slice()),
+            host: crate::errors::Host::Container
+        })
+    );
+    assert_eq!(error.target.as_deref(), Some(b"stoa-lab".as_slice()));
+}

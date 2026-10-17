@@ -57,6 +57,7 @@ pub fn keeping_templates() -> (crate::Render, skein_lib::Env<Limits>, skein_lib:
     );
     side.rendering = Some(crate::call::templates::Target::new(
         super::meta(),
+        Box::new([]),
         super::digest("0101010101010101010101010101010101010101010101010101010101010101"),
         crate::schema::Validated {
             tasks: Box::new([crate::schema::Checked {

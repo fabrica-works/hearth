@@ -8,14 +8,15 @@ use crate::{
     vocabulary::Class,
 };
 use alloc::boxed::Box;
-pub(crate) fn check(
+pub(crate) fn contained(
     documents: &crate::revision::Documents,
     errors: &mut crate::errors::Collector,
     limits: &crate::limits::Limits,
     meta: &Meta,
     checked: &Validated,
+    containers: &[crate::compose::Container],
 ) -> bool {
-    let target = context::target(meta);
+    let target = context::target(meta, containers);
     let empty = Value::Map(Box::new([]));
     let mut valid = true;
     for task in &checked.tasks {
@@ -62,4 +63,15 @@ pub(crate) fn check(
         }
     }
     valid
+}
+
+#[cfg(test)]
+pub(crate) fn check(
+    documents: &crate::revision::Documents,
+    errors: &mut crate::errors::Collector,
+    limits: &crate::limits::Limits,
+    meta: &Meta,
+    checked: &Validated,
+) -> bool {
+    contained(documents, errors, limits, meta, checked, &[])
 }

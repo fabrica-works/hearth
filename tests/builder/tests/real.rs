@@ -645,3 +645,21 @@ fn a_typo_in_an_untaken_branch_exits_with_configuration_failure() {
     let repository = Repository::make("typo-branch-exit", &fixtures::thin_with(fixtures::TYPO_BRANCH));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }
+
+#[test]
+fn a_hosts_template_lists_the_containers_placed_on_it() {
+    let rendered = fixtures::contained();
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["  /etc/containers"]),
+        concat!(
+            "  /etc/containers          file 0644 root:root 01ba4719c80b\n",
+            "  /etc/containers          file 0644 root:root 9e40aaeae922\n",
+            "  /etc/containers          file 0644 root:root 755c9769e418\n",
+        ),
+        "format.md, 3.5: chat none, lab mail, prod chat and mail"
+    );
+}
+#[test]
+fn a_hosts_containers_leave_the_render_successful() {
+    assert_eq!(fixtures::contained().exit, Exit::Code(0));
+}

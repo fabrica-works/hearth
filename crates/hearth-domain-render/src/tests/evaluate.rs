@@ -135,7 +135,7 @@ fn looking_into_undefined_outside_a_chain_fails() {
 #[test]
 fn target_holds_metas_names_an_undefined_member_and_no_containers() {
     assert_eq!(
-        crate::evaluate::context::target(&fixtures::meta()),
+        crate::evaluate::context::target(&fixtures::meta(), &[]),
         Value::Map(Box::new([
             crate::evaluate::Entry { key: bytes::copy_of(b"base"), value: Some(Value::String(bytes::copy_of(b"x1"))) },
             crate::evaluate::Entry { key: bytes::copy_of(b"containers"), value: Some(Value::Map(Box::new([]))) },

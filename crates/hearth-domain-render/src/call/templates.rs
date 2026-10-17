@@ -21,6 +21,7 @@ use skein_lib::{List, Map, Queue, Token};
 #[derive(Debug)]
 pub(crate) struct Target {
     meta: Meta,
+    containers: Box<[crate::compose::Container]>,
     meta_digest: Digest,
     tasks: Box<[schema::Checked]>,
     task: usize,
@@ -33,13 +34,21 @@ pub(crate) struct Target {
     request: Option<Request>,
 }
 impl Target {
-    pub fn new(meta: Meta, meta_digest: Digest, checked: schema::Validated, config: Config, capacity: u32) -> Self {
+    pub fn new(
+        meta: Meta,
+        containers: Box<[crate::compose::Container]>,
+        meta_digest: Digest,
+        checked: schema::Validated,
+        config: Config,
+        capacity: u32,
+    ) -> Self {
         let mut tree = Map::with_capacity(capacity);
         for file in config.tree {
             tree.insert(file.path.clone(), file).expect("tree count");
         }
         Self {
             meta,
+            containers,
             meta_digest,
             tasks: checked.tasks,
             task: 0,
@@ -57,7 +66,7 @@ impl Target {
             let Some(task) = self.tasks.get_mut(self.task) else { return false };
             if self.roots.is_none() {
                 self.roots = Some(Roots {
-                    target: context::target(&self.meta),
+                    target: context::target(&self.meta, &self.containers),
                     debian: Value::Map(Box::new([])),
                     settings: core::mem::replace(&mut task.settings, Value::Map(Box::new([]))),
                     tasks: core::mem::replace(&mut task.tasks, Value::Map(Box::new([]))),

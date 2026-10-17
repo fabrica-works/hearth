@@ -451,6 +451,14 @@ impl Side {
         }
         Some(parts::config::Config { tree: files.into_boxed() })
     }
+    fn placement(
+        &self,
+        target: &Target,
+    ) -> Result<(revision::Placement, Box<[compose::Container]>), Box<errors::Error>> {
+        let placement = compose::placed(target, &self.documents, &self.targets)?;
+        let containers = compose::containers(target, &self.targets, &self.documents)?;
+        Ok((placement, containers))
+    }
     pub fn answer(&mut self) -> Option<Answer> {
         if self.rendering.is_some() {
             return self.template();
@@ -463,7 +471,7 @@ impl Side {
             if !self.dependencies_valid(target, self.next.saturating_sub(1)) {
                 continue;
             }
-            let p = match compose::placed(target, &self.documents, &self.targets) {
+            let (p, containers) = match self.placement(target) {
                 Ok(placement) => placement,
                 Err(error) => {
                     self.errors.push(*error);
@@ -489,17 +497,7 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             }
-            let on = match p.on {
-                Some(on) => Some(on.target),
-                None => None,
-            };
-            let meta = meta::Meta {
-                target: target.name.clone(),
-                base: target.base.clone(),
-                member: target.member.clone(),
-                environment: target.environment.clone(),
-                placement: meta::Placement { kind: p.kind, firmware: p.firmware, hardware: p.hardware, on },
-            };
+            let meta = compose::metadata(target, p);
             let meta_digest = meta::digest(&meta);
             let settings = self.settings.get(self.next.saturating_sub(1)).expect("target settings");
             let names = validation::targets(&self.targets, &target.environment);
@@ -523,7 +521,7 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
-            if !guards::check(&self.documents, &mut self.errors, &self.limits, &meta, &checked) {
+            if !guards::contained(&self.documents, &mut self.errors, &self.limits, &meta, &checked, &containers) {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             }
@@ -534,6 +532,7 @@ impl Side {
             };
             self.rendering = Some(templates::Target::new(
                 meta,
+                containers,
                 meta_digest,
                 checked,
                 config,

@@ -17,6 +17,12 @@ pub struct Target {
     pub environment_document: u32,
     pub base_env: u32,
 }
+/// A target placed on a host of the same environment (format.md, 3.5).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Container {
+    pub name: Box<[u8]>,
+    pub placement: crate::parts::meta::Placement,
+}
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct TooMany;
 #[derive(Debug)]
@@ -706,5 +712,61 @@ fn error(
         also: None,
         target,
         task,
+    }
+}
+
+/// The host's containers, in target name order (format.md, 3.5).
+pub fn containers(
+    host: &Target,
+    targets: &[Target],
+    documents: &Documents,
+) -> Result<Box<[Container]>, Box<crate::errors::Error>> {
+    let mut containers = Map::with_capacity(u32::try_from(targets.len()).expect("target count"));
+    for target in targets {
+        if target.environment != host.environment {
+            continue;
+        }
+        let Some(placement) = placement(target, documents) else { continue };
+        let Some(on) = &placement.on else { continue };
+        if on.target != host.name {
+            continue;
+        }
+        let placement = match placed(target, documents, targets) {
+            Ok(placement) => placement,
+            Err(mut error) => {
+                error.target = Some(host.name.clone());
+                return Err(error);
+            }
+        };
+        containers
+            .insert(
+                target.name.clone(),
+                Container { name: target.name.clone(), placement: metadata(target, placement).placement },
+            )
+            .expect("target count");
+    }
+    let mut ordered = List::with_capacity(containers.len());
+    for (_, container) in &containers {
+        ordered.push(container.clone()).expect("target count");
+    }
+    Ok(ordered.into_boxed())
+}
+
+pub(crate) fn metadata(target: &Target, placement: revision::Placement) -> crate::parts::meta::Meta {
+    let on = match placement.on {
+        Some(on) => Some(on.target),
+        None => None,
+    };
+    crate::parts::meta::Meta {
+        target: target.name.clone(),
+        base: target.base.clone(),
+        member: target.member.clone(),
+        environment: target.environment.clone(),
+        placement: crate::parts::meta::Placement {
+            kind: placement.kind,
+            firmware: placement.firmware,
+            hardware: placement.hardware,
+            on,
+        },
     }
 }

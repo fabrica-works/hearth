@@ -707,3 +707,23 @@ pub const TYPO_BRANCH: &[File] = &[
  File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"greeting\": {\"type\": \"string\", \"default\": \"hello\", \"doc\": \"The greeting.\"}}}" },
  File { path: "tasks/motd/tree/etc/issue.j2", mode: 0o644, body: b"{% if false %}{{ settings.greting }}{% endif %}\n" },
 ];
+
+pub const CONTAINED: &[File] = &[
+    File { path: "envs/prod.json", body: b"{}", mode: 0o644 },
+    File { path: "envs/lab.json", body: b"{}", mode: 0o644 },
+    File { path: "hosts/rhi/rhi.json", body: br#"{"inventory":{}}"#, mode: 0o644 },
+    File { path: "hosts/rhi/rhi-prod.json", body: br#"{"placement":{"kind":"vm","firmware":"bios","hardware":"serverhino"}}"#, mode: 0o644 },
+    File { path: "hosts/rhi/rhi-lab.json", body: br#"{"placement":{"kind":"vm","firmware":"efi","hardware":"incus"}}"#, mode: 0o644 },
+    File { path: "hosts/chat/chat.json", body: br#"{"inventory":{}}"#, mode: 0o644 },
+    File { path: "hosts/chat/chat-prod.json", body: br#"{"placement":{"kind":"container","on":"rhi-prod"}}"#, mode: 0o644 },
+    File { path: "hosts/mail/mail-prod.json", body: br#"{"placement":{"kind":"container","on":"rhi-prod"}}"#, mode: 0o644 },
+    File { path: "hosts/mail/mail-lab.json", body: br#"{"placement":{"kind":"container","on":"rhi-lab"}}"#, mode: 0o644 },
+    File { path: "tasks/inventory/task.json", body: b"{}", mode: 0o644 },
+    File { path: "tasks/inventory/tree/etc/containers.j2", body: b"{% for name, placement in target.containers | items %}{{ name }}={{ placement.kind }}@{{ placement.on }};{% endfor +%}\n", mode: 0o644 },
+];
+
+#[must_use]
+pub fn contained() -> Rendered {
+    let repository = Repository::make("contained", &thin_with(CONTAINED));
+    render(&repository, &[b"chat-prod", b"rhi-lab", b"rhi-prod"], Form::Text)
+}
