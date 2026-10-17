@@ -47,7 +47,8 @@ impl Side {
         }
         let mut faults: List<Error> = List::with_capacity(capacity);
         let plans = self.plans(meta, checked, expansion, &mut faults);
-        let mut sources = List::with_capacity(u32::try_from(checked.tasks.len()).expect("task bound"));
+        let mut sources =
+            List::with_capacity(u32::try_from(checked.tasks.len()).expect("task bound").saturating_mul(2));
         for task in &checked.tasks {
             let (_, Some(declaration)) = self.documents.declaration(&task.name)? else { return None };
             for source in scripts::plan(&task.name, declaration, &self.entries, &mut faults) {

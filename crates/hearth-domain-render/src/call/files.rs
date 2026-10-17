@@ -124,12 +124,11 @@ impl Side {
             for (index, entry) in self.entries.iter().enumerate() {
                 let (name, path) = match revision::class(&entry.path) {
                     revision::Class::Tree { task, path } | revision::Class::Template { task, path } => (task, path),
-                    revision::Class::Script { task, name } if name != b"software.sh" => (task, name),
+                    revision::Class::Script { task, name } => (task, name),
                     revision::Class::Fleet
                     | revision::Class::Environment { .. }
                     | revision::Class::Host { .. }
                     | revision::Class::Declaration { .. }
-                    | revision::Class::Script { .. }
                     | revision::Class::Readme { .. }
                     | revision::Class::Refused { .. }
                     | revision::Class::Other => continue,
@@ -246,7 +245,9 @@ pub(super) fn read_kind<'a>(
         }
         revision::Class::Template { task, .. } => Some((task, As::Template, limits.template)),
         revision::Class::Script { task, name } if name.ends_with(b".j2") => Some((task, As::Template, limits.template)),
-        revision::Class::Script { task, name: b"customize.sh" } => Some((task, As::Cached, limits.static_file)),
+        revision::Class::Script { task, name: b"customize.sh" | b"software.sh" } => {
+            Some((task, As::Cached, limits.static_file))
+        }
         revision::Class::Declaration { .. }
         | revision::Class::Fleet
         | revision::Class::Environment { .. }

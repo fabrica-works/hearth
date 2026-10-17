@@ -479,7 +479,7 @@ impl Side {
             else {
                 continue;
             };
-            let Some((secrets, live, accounts)) =
+            let Some((secrets, live, software, accounts)) =
                 secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome)
             else {
                 continue;
@@ -508,6 +508,7 @@ impl Side {
                     installation,
                     expansion,
                     secrets,
+                    software,
                     packages,
                     live,
                     boot,

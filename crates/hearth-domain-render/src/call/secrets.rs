@@ -6,7 +6,7 @@ pub(crate) fn build(
     meta: &meta::Meta,
     errors: &mut errors::Collector,
     outcome: &mut Outcome,
-) -> Option<(parts::secrets::Secrets, parts::live::Live, crate::kinds::users::Accounts)> {
+) -> Option<(parts::secrets::Secrets, parts::live::Live, parts::software::Software, crate::kinds::users::Accounts)> {
     match built(expansion) {
         Ok(parts) => Some(parts),
         Err(faults) => {
@@ -21,6 +21,14 @@ pub(crate) fn build(
 }
 fn built(
     expansion: &Expansion,
-) -> Result<(parts::secrets::Secrets, parts::live::Live, crate::kinds::users::Accounts), Box<[errors::Error]>> {
-    Ok((parts::secrets::build(expansion)?, parts::live::build(expansion)?, parts::config::accounts(expansion)?))
+) -> Result<
+    (parts::secrets::Secrets, parts::live::Live, parts::software::Software, crate::kinds::users::Accounts),
+    Box<[errors::Error]>,
+> {
+    Ok((
+        parts::secrets::build(expansion)?,
+        parts::live::build(expansion)?,
+        parts::software::build(expansion, Box::new([]))?,
+        parts::config::accounts(expansion)?,
+    ))
 }

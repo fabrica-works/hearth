@@ -24,7 +24,7 @@ fn json_lines_give_the_version_first_and_the_outcome_last() {
     assert_eq!(
         lines.len(),
         fixtures::THIN_RECORDS,
-        "version, spec, boot, packages, config, secrets, live, exports, meta and outcome"
+        "version, spec, boot, packages, software, config, data, secrets, live, exports, meta and outcome"
     );
 }
 #[test]
@@ -713,3 +713,6 @@ mod diff;
 mod data;
 #[path = "real/scripts.rs"]
 mod scripts;
+
+#[path = "real/software.rs"]
+mod software;

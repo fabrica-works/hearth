@@ -598,6 +598,7 @@ pub fn config_part(parts: &[hearth_domain_render::parts::Part]) -> &hearth_domai
             hearth_domain_render::parts::PartRecord::Config(config) => Some(config),
             hearth_domain_render::parts::PartRecord::Data(_)
             | hearth_domain_render::parts::PartRecord::Secrets(_)
+            | hearth_domain_render::parts::PartRecord::Software(_)
             | hearth_domain_render::parts::PartRecord::Live(_)
             | hearth_domain_render::parts::PartRecord::Packages(_)
             | hearth_domain_render::parts::PartRecord::Boot(_)

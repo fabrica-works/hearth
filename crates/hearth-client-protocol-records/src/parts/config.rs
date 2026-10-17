@@ -125,7 +125,7 @@ impl Node {
     }
 }
 
-fn octal(mode: u16) -> [u8; 4] {
+pub(crate) fn octal(mode: u16) -> [u8; 4] {
     let mut digits = [b'0'; 4];
     for (digit, shift) in digits.iter_mut().zip([9_u32, 6, 3, 0]) {
         *digit = b'0'.saturating_add(u8::try_from((mode >> shift) & 7).expect("octal digit"));
@@ -137,4 +137,5 @@ mod accounts;
 pub use accounts::{Group, GroupKind, Member, User, UserKind};
 
 mod directives;
+pub(crate) use directives::scripts_json;
 pub use directives::{Action, Line, LineKind, Preset, Script, Tmpfile};

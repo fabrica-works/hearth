@@ -448,7 +448,8 @@ fn valid_form(format: hearth_domain_render::errors::Format, value: &[u8]) -> boo
         | Format::Debian
         | Format::Preseed
         | Format::Module
-        | Format::Param => {
+        | Format::Param
+        | Format::Sha256 => {
             unreachable!("only generated forms")
         }
     }

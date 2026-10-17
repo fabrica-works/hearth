@@ -10,6 +10,7 @@ pub fn check(format: Format, value: &[u8]) -> bool {
     match format {
         Format::Preseed | Format::Module | Format::Param => unreachable!("declaration forms checked by kinds"),
         Format::DataName => return crate::kinds::data::name(value),
+        Format::Sha256 if value.len() != 64 => return false,
         Format::Link => return crate::kinds::files::link(value),
         Format::Path => {
             return value == b"/"
@@ -25,10 +26,11 @@ pub fn check(format: Format, value: &[u8]) -> bool {
         Format::Mode if !(3..=4).contains(&value.len()) => return false,
         Format::Timestamp if value.len() != 16 => return false,
         Format::Debian if !(2..=256).contains(&value.len()) => return false,
-        Format::Secret | Format::Mode | Format::Timestamp | Format::Debian => {}
+        Format::Sha256 | Format::Secret | Format::Mode | Format::Timestamp | Format::Debian => {}
     }
     for (index, byte) in value.iter().enumerate() {
         let valid = match format {
+            Format::Sha256 => byte.is_ascii_digit() || (b'a'..=b'f').contains(byte),
             Format::Secret => byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._-/".contains(byte),
             Format::Mode => (b'0'..=b'7').contains(byte),
             Format::Timestamp => {

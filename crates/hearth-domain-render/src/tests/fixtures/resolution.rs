@@ -58,6 +58,7 @@ fn packages_side(variant: crate::parts::packages::Variant) -> crate::call::Side 
         spec.parts = Box::new([
             crate::parts::Part { digest: KEY_A, record: crate::parts::PartRecord::Packages(packages) },
             crate::parts::Part { digest: KEY_A, record: crate::parts::PartRecord::Config(super::config()) },
+            super::empty_software_part(),
         ]);
         made.insert(name.clone(), crate::diff::Made::Spec(Box::new(spec))).expect("fixture targets");
     }

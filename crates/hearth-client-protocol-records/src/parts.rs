@@ -7,3 +7,4 @@ pub mod live;
 pub mod meta;
 pub mod packages;
 pub mod secrets;
+pub mod software;

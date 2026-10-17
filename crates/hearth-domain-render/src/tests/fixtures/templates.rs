@@ -111,6 +111,11 @@ pub fn template_prepared(
             scripts: Box::new([]),
         },
         expansion,
+        software: crate::parts::software::Software {
+            downloads: Box::new([]),
+            scripts: Box::new([]),
+            fetch: Box::new([]),
+        },
         secrets: crate::parts::secrets::Secrets {
             files: Box::new([]),
             passwords: Box::new([]),

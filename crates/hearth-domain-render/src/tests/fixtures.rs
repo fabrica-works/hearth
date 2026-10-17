@@ -788,5 +788,7 @@ mod config;
 pub mod export_readers;
 pub use config::*;
 
+mod software;
+pub use software::*;
 mod scripts;
 pub use scripts::*;

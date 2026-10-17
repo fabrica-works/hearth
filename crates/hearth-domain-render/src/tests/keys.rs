@@ -26,7 +26,7 @@ fn the_layer_keys_chain_packages_software_and_config() {
 #[test]
 fn an_empty_output_part_enters_as_its_record_with_empty_fields() {
     assert_eq!(
-        keys::part(&fixtures::spec(b"x1-prod", &[]), b"software"),
+        keys::part(&fixtures::empty_software_spec(), b"software"),
         fixtures::digest("656d135b92c33782dc40e4dc874400fa4d4b666e9e466b3644075a81279f74a6")
     );
 }

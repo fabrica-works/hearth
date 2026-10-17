@@ -382,6 +382,7 @@ pub fn config_mut(spec: &mut Spec) -> &mut Config {
             PartRecord::Config(config) => return config,
             PartRecord::Data(_)
             | PartRecord::Secrets(_)
+            | PartRecord::Software(_)
             | PartRecord::Live(_)
             | PartRecord::Packages(_)
             | PartRecord::Boot(_)
@@ -391,6 +392,8 @@ pub fn config_mut(spec: &mut Spec) -> &mut Config {
     panic!("config part")
 }
 
+mod software;
+pub use software::software_spec;
 mod live;
 pub use live::*;
 mod secrets;

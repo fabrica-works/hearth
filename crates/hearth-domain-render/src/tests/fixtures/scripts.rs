@@ -29,13 +29,18 @@ pub fn script_plan(
     let sources = scripts::plan(b"motd", declared, listing.as_slice(), &mut faults);
     if faults.is_empty() { Ok(sources) } else { Err(faults.into_boxed()) }
 }
-pub fn rendered_scripts(tasks: &[(&[u8], u16)], template: bool) -> config::Config {
+fn rendered_script_spec(tasks: &[(&[u8], u16)], template: bool, software: bool) -> crate::parts::Spec {
     let mut listing = skein_lib::List::with_capacity(u32::try_from(tasks.len()).expect("fixture count"));
     let mut sources = skein_lib::List::with_capacity(u32::try_from(tasks.len()).expect("fixture count"));
     let mut plans = skein_lib::List::with_capacity(u32::try_from(tasks.len()).expect("fixture count"));
     let mut checked = skein_lib::List::with_capacity(u32::try_from(tasks.len()).expect("fixture count"));
     for &(task, order) in tasks {
-        let suffix: &[u8] = if template { b"/customize.sh.j2" } else { b"/customize.sh" };
+        let suffix: &[u8] = match (software, template) {
+            (false, false) => b"/customize.sh",
+            (false, true) => b"/customize.sh.j2",
+            (true, false) => b"/software.sh",
+            (true, true) => b"/software.sh.j2",
+        };
         let mut path = skein_lib::Writer::new(b"tasks/".len().saturating_add(task.len()).saturating_add(suffix.len()));
         path.put(b"tasks/").expect("room");
         path.put(task).expect("room");
@@ -64,12 +69,18 @@ pub fn rendered_scripts(tasks: &[(&[u8], u16)], template: bool) -> config::Confi
     side.ready = true;
     side.files = true;
     let crate::vocabulary::Answer::Spec(spec) = super::answer(&mut side) else { panic!("script spec") };
-    for part in spec.parts {
-        if let crate::parts::PartRecord::Config(config) = part.record {
-            return config;
+    spec
+}
+pub fn rendered_scripts(tasks: &[(&[u8], u16)], template: bool) -> config::Config {
+    super::config_part(&rendered_script_spec(tasks, template, false).parts).clone()
+}
+pub fn rendered_software_scripts(tasks: &[(&[u8], u16)], template: bool) -> crate::parts::software::Software {
+    for part in rendered_script_spec(tasks, template, true).parts {
+        if let crate::parts::PartRecord::Software(software) = part.record {
+            return software;
         }
     }
-    panic!("config part")
+    panic!("software part")
 }
 
 pub fn missing_script() -> Box<[crate::errors::Error]> {
@@ -79,3 +90,7 @@ pub const HELLO_SHA256: hearth_lib::encode::Digest = hearth_lib::encode::Digest(
     44, 242, 77, 186, 95, 176, 163, 14, 38, 232, 59, 42, 197, 185, 226, 158, 27, 22, 30, 92, 31, 167, 66, 94, 115, 4,
     51, 98, 147, 139, 152, 36,
 ]);
+
+pub const ORDERED_SCRIPTS: &[(&[u8], u16)] = &[(b"z", 200), (b"b", 100), (b"a", 100)];
+
+pub const CACHED_SCRIPT_DIGEST: hearth_lib::encode::Digest = hearth_lib::encode::Digest([1; 32]);

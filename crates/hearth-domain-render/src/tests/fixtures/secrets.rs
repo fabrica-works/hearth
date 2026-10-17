@@ -57,6 +57,7 @@ pub fn config_part(parts: &[crate::parts::Part]) -> &crate::parts::config::Confi
             crate::parts::PartRecord::Config(config) => return config,
             crate::parts::PartRecord::Data(_)
             | crate::parts::PartRecord::Secrets(_)
+            | crate::parts::PartRecord::Software(_)
             | crate::parts::PartRecord::Live(_)
             | crate::parts::PartRecord::Packages(_)
             | crate::parts::PartRecord::Boot(_)

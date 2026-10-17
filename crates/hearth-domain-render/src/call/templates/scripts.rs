@@ -47,12 +47,15 @@ impl Target {
     }
     pub(super) fn script(&mut self, side: &mut Side, task: &[u8]) -> bool {
         let mut source = None;
-        for script in &self.scripts {
+        for (index, script) in self.scripts.iter().enumerate().skip(self.script) {
             if script.task.as_ref() == task {
                 source = Some(script.clone());
+                self.script = index.saturating_add(1);
+                break;
             }
         }
         let Some(source) = source else { return false };
+        let software = source.path.ends_with(b"/software.sh") || source.path.ends_with(b"/software.sh.j2");
         if !source.path.ends_with(b".j2") {
             let oid = &side.listed_entry(&source.path).expect("script listed").oid;
             let script = parts::config::Script {
@@ -60,15 +63,13 @@ impl Target {
                 order: source.order,
                 content_digest: *side.cached.get(oid).expect("script cached"),
             };
-            self.script_rows.insert((script.order, script.task.clone()), script).expect("task bound");
-            return false;
+            let rows = if software { &mut self.software_rows } else { &mut self.script_rows };
+            rows.insert((script.order, script.task.clone()), script).expect("task bound");
+            return true;
         }
         if let Some((digest, bytes)) = self.render(side, &source.path, task, None) {
-            self.keeping = Some(Keeping::Script(parts::config::Script {
-                task: source.task,
-                order: source.order,
-                content_digest: digest,
-            }));
+            let script = parts::config::Script { task: source.task, order: source.order, content_digest: digest };
+            self.keeping = Some(if software { Keeping::SoftwareScript(script) } else { Keeping::Script(script) });
             self.request = Some(Request::Keep { request: Token::new(4), path: source.path, sha256: digest, bytes });
             side.ready = false;
         }

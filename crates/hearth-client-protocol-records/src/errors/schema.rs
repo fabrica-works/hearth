@@ -2,6 +2,7 @@ use super::{Box, Encoder, Lines, Schema, field, json_names, names, signed, valid
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Format {
     DataName,
+    Sha256,
     Link,
     Path,
     Mode,
@@ -31,6 +32,7 @@ impl Format {
             Self::Preseed => b"preseed",
             Self::Module => b"module",
             Self::Param => b"param",
+            Self::Sha256 => b"sha256",
         }
     }
 }

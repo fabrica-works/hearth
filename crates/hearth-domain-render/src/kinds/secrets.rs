@@ -20,7 +20,10 @@ pub(crate) fn formed(value: &[u8], format: Format) -> Result<(), Schema> {
     if forms::check(format, value) { Ok(()) } else { Err(Schema::Malformed { format }) }
 }
 pub(crate) fn mode(entry: &Concrete) -> Result<u16, Schema> {
-    let value = entry.text(Name::Mode).unwrap_or(b"0600");
+    mode_with_default(entry, b"0600")
+}
+pub(crate) fn mode_with_default(entry: &Concrete, default: &[u8]) -> Result<u16, Schema> {
+    let value = entry.text(Name::Mode).unwrap_or(default);
     formed(value, Format::Mode)?;
     let mut mode = 0_u16;
     for byte in value {

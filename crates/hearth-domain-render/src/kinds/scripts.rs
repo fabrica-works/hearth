@@ -1,10 +1,7 @@
 //! Declared script files (format.md, 5.8); software content belongs to its pass.
 use crate::{
     errors::{Error, Kind, Place, Repository},
-    revision::{
-        self,
-        declaration::{Declaration, Fragment},
-    },
+    revision::{self, declaration::Declaration},
     vocabulary::Class,
 };
 use alloc::boxed::Box;
@@ -33,9 +30,7 @@ pub(crate) fn plan(
             }
         }
         if let Some(path) = source {
-            if script.fragment == Fragment::Customize {
-                sources.push(Source { task: copy_of(task), path, order: script.order }).expect("declaration bound");
-            }
+            sources.push(Source { task: copy_of(task), path, order: script.order }).expect("declaration bound");
         } else {
             let mut path = Writer::new(task.len().saturating_add(16));
             path.put(b"tasks/").expect("path room");

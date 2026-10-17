@@ -21,6 +21,7 @@ pub(crate) struct Prepared {
     pub installation: super::scripts::Installation,
     pub expansion: crate::entries::Expansion,
     pub secrets: parts::secrets::Secrets,
+    pub software: parts::software::Software,
     pub packages: parts::packages::Packages,
     pub live: parts::live::Live,
     pub boot: parts::boot::Boot,
@@ -39,6 +40,7 @@ pub(crate) struct Target {
     debian: Value,
     pub(crate) expansion: crate::entries::Expansion,
     secrets: parts::secrets::Secrets,
+    software: parts::software::Software,
     packages: parts::packages::Packages,
     live: parts::live::Live,
     boot: parts::boot::Boot,
@@ -55,7 +57,8 @@ pub(crate) struct Target {
     tmpfiles: Box<[parts::config::Tmpfile]>,
     scripts: Box<[crate::kinds::scripts::Source]>,
     script_rows: Map<(u16, Box<[u8]>), parts::config::Script>,
-    script_done: bool,
+    script: usize,
+    software_rows: Map<(u16, Box<[u8]>), parts::config::Script>,
     request: Option<Request>,
 }
 impl Target {
@@ -68,10 +71,22 @@ impl Target {
         prepared: Prepared,
         capacity: u32,
     ) -> Self {
-        let Prepared { accounts, data, installation, expansion, secrets, packages, live, boot, exports, export_roots } =
-            prepared;
+        let Prepared {
+            accounts,
+            data,
+            installation,
+            expansion,
+            secrets,
+            software,
+            packages,
+            live,
+            boot,
+            exports,
+            export_roots,
+        } = prepared;
         let super::scripts::Installation { plans, presets, tmpfiles, scripts } = installation;
         let script_rows = Map::with_capacity(u32::try_from(scripts.len()).expect("task bound"));
+        let script_capacity = script_rows.capacity();
         let mut tree = Map::with_capacity(capacity);
         for plan in &plans {
             for install in &plan.installs {
@@ -111,6 +126,7 @@ impl Target {
             debian,
             expansion,
             secrets,
+            software,
             packages,
             live,
             boot,
@@ -127,7 +143,8 @@ impl Target {
             tmpfiles,
             scripts,
             script_rows,
-            script_done: false,
+            script: 0,
+            software_rows: Map::with_capacity(script_capacity),
             request: None,
         }
     }
@@ -179,14 +196,11 @@ impl Target {
                 }
                 return true;
             }
-            if !self.script_done {
-                self.script_done = true;
-                if self.script(side, &task_name) {
-                    return true;
-                }
+            if self.script(side, &task_name) {
+                return true;
             }
             self.task = self.task.saturating_add(1);
-            self.script_done = false;
+            self.script = 0;
             self.entry = 0;
             self.roots = None;
         }
@@ -242,6 +256,10 @@ impl Side {
                     assert_eq!(digest, *content_digest, "kept rendered digest");
                     target.tree.insert(file.path.clone(), file).expect("listing capacity");
                 }
+                Keeping::SoftwareScript(script) => {
+                    assert_eq!(digest, script.content_digest, "kept rendered digest");
+                    target.software_rows.insert((script.order, script.task.clone()), script).expect("task bound");
+                }
                 Keeping::Script(script) => {
                     assert_eq!(digest, script.content_digest, "kept rendered digest");
                     target.script_rows.insert((script.order, script.task.clone()), script).expect("task bound");
@@ -295,11 +313,20 @@ impl Side {
             scripts.push(row.clone()).expect("task bound");
         }
         config.scripts = scripts.into_boxed();
+        let mut scripts = List::with_capacity(target.software_rows.len());
+        for (_, row) in &target.software_rows {
+            scripts.push(row.clone()).expect("script bound");
+        }
+        target.software.scripts = scripts.into_boxed();
         let parts = Box::new([
             parts::Part { digest: parts::boot::digest(&target.boot), record: parts::PartRecord::Boot(target.boot) },
             parts::Part {
                 digest: parts::packages::digest(&target.packages),
                 record: parts::PartRecord::Packages(target.packages),
+            },
+            parts::Part {
+                digest: parts::software::digest(&target.software),
+                record: parts::PartRecord::Software(target.software),
             },
             parts::Part { digest: parts::config::digest(&config), record: parts::PartRecord::Config(config) },
             parts::Part { digest: parts::data::digest(&target.data), record: parts::PartRecord::Data(target.data) },
@@ -383,5 +410,6 @@ fn copied(side: &Side, install: &crate::kinds::files::Install, source: &[u8], mo
 enum Keeping {
     File(TreeEntry),
     Script(parts::config::Script),
+    SoftwareScript(parts::config::Script),
 }
 mod scripts;

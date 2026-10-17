@@ -84,9 +84,13 @@ pub(super) fn encode(config: &super::Config, record: &mut hearth_lib::encode::En
         record.key(&preset.unit);
         record.bytes(preset.action.name());
     }
+    encode_scripts(&config.scripts, record);
+    encode_tmpfiles(&config.tmpfiles, record);
+}
+pub(crate) fn encode_scripts(scripts: &[Script], record: &mut hearth_lib::encode::Encoder) {
     record.key(b"scripts");
-    record.list(u64::try_from(config.scripts.len()).expect("task bound"));
-    for script in &config.scripts {
+    record.list(u64::try_from(scripts.len()).expect("task bound"));
+    for script in scripts {
         record.map(3);
         record.key(b"content_digest");
         record.digest(&script.content_digest);
@@ -95,9 +99,11 @@ pub(super) fn encode(config: &super::Config, record: &mut hearth_lib::encode::En
         record.key(b"task");
         record.bytes(&script.task);
     }
+}
+fn encode_tmpfiles(tmpfiles: &[Tmpfile], record: &mut hearth_lib::encode::Encoder) {
     record.key(b"tmpfiles");
-    record.map(u64::try_from(config.tmpfiles.len()).expect("entry bound"));
-    for tmpfile in &config.tmpfiles {
+    record.map(u64::try_from(tmpfiles.len()).expect("entry bound"));
+    for tmpfile in tmpfiles {
         record.key(&tmpfile.path);
         let line = &tmpfile.line;
         let mut fields = 1_u64;

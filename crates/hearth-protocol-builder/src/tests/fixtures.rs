@@ -764,6 +764,8 @@ pub use keep::*;
 mod debian;
 pub use debian::*;
 
+mod software;
+pub use software::software_records;
 mod live;
 pub use live::{live_records, live_specs};
 mod secrets;

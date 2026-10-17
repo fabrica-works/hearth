@@ -14,6 +14,7 @@ pub(super) fn format_back(format: records::Format) -> render::Format {
         records::Format::Preseed => render::Format::Preseed,
         records::Format::Module => render::Format::Module,
         records::Format::Param => render::Format::Param,
+        records::Format::Sha256 => render::Format::Sha256,
     }
 }
 const FORMATS: &[render::Format] = &[
@@ -30,6 +31,7 @@ const FORMATS: &[render::Format] = &[
     render::Format::Preseed,
     render::Format::Module,
     render::Format::Param,
+    render::Format::Sha256,
 ];
 #[test]
 fn each_schema_format_translates_and_back() {

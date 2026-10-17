@@ -3,6 +3,7 @@ pub mod data;
 pub mod identity;
 pub mod live;
 pub mod secrets;
+pub mod software;
 
 pub mod files;
 use crate::{entries::Concrete, errors::Schema, revision::declaration::Name};

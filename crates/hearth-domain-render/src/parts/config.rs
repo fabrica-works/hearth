@@ -231,7 +231,7 @@ mod changes;
 
 mod directives;
 pub use directives::{Action, Line, LineKind, Preset, Script, Tmpfile};
-pub(crate) use directives::{Lists as Directives, build as directives};
+pub(crate) use directives::{Lists as Directives, build as directives, encode_scripts};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PresetKeyed {

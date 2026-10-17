@@ -125,6 +125,9 @@ fn line(json: &mut Encoder, record: &Record, index: usize) {
     json.object_end();
 }
 pub(crate) fn digest(json: &mut Encoder, value: &[u8; 32]) {
+    json.string(&digest_hex(value));
+}
+pub(crate) fn digest_hex(value: &[u8; 32]) -> [u8; 64] {
     let mut digits = [0_u8; 64];
     for (pair, byte) in digits.chunks_exact_mut(2).zip(value) {
         for (digit, nibble) in pair.iter_mut().zip([byte >> 4_u32, byte & 15]) {
@@ -132,7 +135,7 @@ pub(crate) fn digest(json: &mut Encoder, value: &[u8; 32]) {
                 if nibble < 10 { b'0'.saturating_add(nibble) } else { b'a'.saturating_add(nibble.saturating_sub(10)) };
         }
     }
-    json.string(&digits);
+    digits
 }
 
 fn resolution(json: &mut Encoder, resolution: &crate::records::Resolution) {

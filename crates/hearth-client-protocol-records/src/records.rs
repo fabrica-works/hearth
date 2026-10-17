@@ -63,6 +63,7 @@ pub enum PartRecord {
     Secrets(crate::parts::secrets::Secrets),
     Packages(crate::parts::packages::Packages),
     Live(crate::parts::live::Live),
+    Software(crate::parts::software::Software),
     Boot(crate::parts::boot::Boot),
     Exports(crate::parts::exports::Exports),
 }
@@ -74,6 +75,7 @@ impl PartRecord {
             Self::Secrets(_) => b"secrets",
             Self::Packages(_) => b"packages",
             Self::Live(_) => b"live",
+            Self::Software(_) => b"software",
             Self::Boot(_) => b"boot",
             Self::Exports(_) => b"exports",
         }
@@ -85,6 +87,7 @@ impl PartRecord {
             Self::Secrets(secrets) => secrets.json(json),
             Self::Packages(packages) => packages.json(json),
             Self::Live(live) => live.json(json),
+            Self::Software(software) => software.json(json),
             Self::Boot(boot) => boot.json(json),
             Self::Exports(exports) => exports.json(json),
         }
@@ -96,6 +99,7 @@ impl PartRecord {
             Self::Secrets(secrets) => secrets.text(lines),
             Self::Packages(packages) => packages.text(lines),
             Self::Live(live) => live.text(lines),
+            Self::Software(software) => software.text(lines),
             Self::Boot(boot) => boot.text(lines),
             Self::Exports(exports) => exports.text(lines),
         }

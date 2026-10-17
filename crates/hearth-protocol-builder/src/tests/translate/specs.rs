@@ -1,6 +1,6 @@
 use super::{
     boot, client_kind_back, client_meta, config, exports, live, optional_client_firmware_back, packages, records,
-    render, secrets, target,
+    render, secrets, software, target,
 };
 pub(super) fn spec_back(spec: records::records::Spec) -> render::parts::Spec {
     let records::records::Spec { meta, meta_digest, commit, digest, parts, resolution } = spec;
@@ -12,6 +12,7 @@ pub(super) fn spec_back(spec: records::records::Spec) -> render::parts::Spec {
             records::records::PartRecord::Secrets(value) => render::parts::PartRecord::Secrets(secrets::back(value)),
             records::records::PartRecord::Boot(value) => boot::part_back(value),
             records::records::PartRecord::Packages(value) => packages::part_back(value),
+            records::records::PartRecord::Software(value) => render::parts::PartRecord::Software(software::back(value)),
             records::records::PartRecord::Live(value) => render::parts::PartRecord::Live(live::back(value)),
             records::records::PartRecord::Exports(exports) => {
                 render::parts::PartRecord::Exports(exports::exports_back(exports))

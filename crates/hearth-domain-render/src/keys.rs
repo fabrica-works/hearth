@@ -50,6 +50,7 @@ pub fn part(spec: &Spec, name: &[u8]) -> Digest {
             PartRecord::Config(_) => b"config",
             PartRecord::Packages(_) => b"packages",
             PartRecord::Secrets(_) => b"secrets",
+            PartRecord::Software(_) => b"software",
             PartRecord::Live(_) => b"live",
             PartRecord::Boot(_) => b"boot",
             PartRecord::Exports(_) => b"exports",
@@ -58,15 +59,7 @@ pub fn part(spec: &Spec, name: &[u8]) -> Digest {
             return part.digest;
         }
     }
-    // The software part arrives in hearth 19.2; its empty record already has its key.
-    assert_eq!(name, b"software", "every other output part is assembled");
-    let mut hash = H::new(b"part:software", 1);
-    hash.values().map(2);
-    hash.values().key(b"downloads");
-    hash.values().map(0);
-    hash.values().key(b"scripts");
-    hash.values().list(0);
-    hash.finish()
+    unreachable!("every output part is assembled")
 }
 
 #[must_use]

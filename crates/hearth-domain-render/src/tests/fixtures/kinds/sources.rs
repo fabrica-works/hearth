@@ -41,7 +41,7 @@ pub fn source_side(declared: &Declaration, listing: &[Entry]) -> crate::call::Si
     side.templates = skein_lib::Map::with_capacity(capacity);
     side.sizes = skein_lib::Map::with_capacity(SHIPPED.expansion);
     for entry in listing {
-        side.cached.insert(entry.oid.clone(), Digest([1; 32])).expect("fixture count");
+        side.cached.insert(entry.oid.clone(), super::super::CACHED_SCRIPT_DIGEST).expect("fixture count");
         side.templates
             .insert(entry.oid.clone(), super::super::template(&[0], [super::super::text(0, b"hello")]))
             .expect("fixture count");

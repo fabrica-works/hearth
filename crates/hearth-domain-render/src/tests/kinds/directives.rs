@@ -5,10 +5,7 @@ use super::super::fixtures::{
 use crate::{
     errors::{Format, Kind, Repository, Schema},
     parts::config::Action,
-    revision::{
-        Position,
-        declaration::{Fragment, Name},
-    },
+    revision::{Position, declaration::Name},
 };
 const LINE_TYPES: &[(&[u8], crate::parts::config::LineKind)] = &[
     (b"d", crate::parts::config::LineKind::D),
@@ -124,23 +121,13 @@ fn a_script_file_nothing_declares_is_stray() {
     }
 }
 #[test]
-fn a_software_script_is_checked_not_digested() {
-    assert_eq!(
-        fixtures::script_plan(&fixtures::script_declaration(Fragment::Software), &[fixtures::SOFTWARE])
-            .expect("software exists")
-            .as_ref(),
-        []
-    );
-}
-#[test]
 fn customize_sh_j2_is_digested_as_rendered() {
     let config = fixtures::rendered_scripts(&[(b"motd", fixtures::DEFAULT_SCRIPT_ORDER)], true);
     assert_eq!(fixtures::only(&config.scripts).content_digest, fixtures::HELLO_SHA256);
 }
-const ORDERED: &[(&[u8], u16)] = &[(b"z", 200), (b"b", 100), (b"a", 100)];
 #[test]
 fn scripts_sort_by_order_then_task() {
-    let config = fixtures::rendered_scripts(ORDERED, false);
+    let config = fixtures::rendered_scripts(fixtures::ORDERED_SCRIPTS, false);
     let mut scripts = skein_lib::List::with_capacity(u32::try_from(config.scripts.len()).expect("task bound"));
     for row in &config.scripts {
         scripts.push((row.task.as_ref(), row.order)).expect("task bound");

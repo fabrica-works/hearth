@@ -12,7 +12,7 @@ fn line(mode: u16) -> Line {
         argument: None,
     }
 }
-fn script(digest: [u8; 32]) -> Script {
+pub(super) fn script(digest: [u8; 32]) -> Script {
     Script { task: b"motd".as_slice().into(), order: 300, content_digest: digest }
 }
 pub fn directives_spec() -> Record {

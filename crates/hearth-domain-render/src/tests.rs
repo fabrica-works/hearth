@@ -28,6 +28,7 @@ mod debian;
 mod live;
 mod packages;
 mod secrets;
+mod software;
 
 mod boot;
 mod kinds;

@@ -10,6 +10,7 @@ pub mod live;
 pub mod meta;
 pub mod packages;
 pub mod secrets;
+pub mod software;
 pub use meta::Meta;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Spec {
@@ -30,6 +31,7 @@ pub enum PartRecord {
     Config(config::Config),
     Data(data::Data),
     Secrets(secrets::Secrets),
+    Software(software::Software),
     Packages(packages::Packages),
     Live(live::Live),
     Boot(boot::Boot),
@@ -48,6 +50,7 @@ pub fn spec_digest(meta: &Digest, parts: &[Part]) -> Digest {
             PartRecord::Data(_) => b"data",
             PartRecord::Exports(_) => b"exports",
             PartRecord::Secrets(_) => b"secrets",
+            PartRecord::Software(_) => b"software",
             PartRecord::Packages(_) => b"packages",
             PartRecord::Live(_) => b"live",
             PartRecord::Boot(_) => b"boot",

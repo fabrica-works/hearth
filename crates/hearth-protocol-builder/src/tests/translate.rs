@@ -754,6 +754,7 @@ mod fields;
 mod config;
 mod live;
 mod secrets;
+mod software;
 
 mod boot;
 mod exports;

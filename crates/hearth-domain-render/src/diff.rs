@@ -73,6 +73,7 @@ pub const fn layer(part: &PartRecord) -> Layer {
     match part {
         PartRecord::Config(_) => Layer::Config,
         PartRecord::Secrets(_) | PartRecord::Boot(_) | PartRecord::Data(_) => Layer::Slot,
+        PartRecord::Software(_) => Layer::Software,
         PartRecord::Packages(_) => Layer::Packages,
         PartRecord::Live(_) | PartRecord::Exports(_) => Layer::Other,
     }
@@ -156,6 +157,7 @@ fn config_part(spec: &Spec) -> Option<(&Digest, &config::Config)> {
             PartRecord::Config(config) => found = Some((&part.digest, config)),
             PartRecord::Data(_)
             | PartRecord::Secrets(_)
+            | PartRecord::Software(_)
             | PartRecord::Live(_)
             | PartRecord::Packages(_)
             | PartRecord::Boot(_)
@@ -216,6 +218,7 @@ fn package_and_boot(spec: &Spec) -> PackageAndBoot<'_> {
             PartRecord::Data(_)
             | PartRecord::Config(_)
             | PartRecord::Secrets(_)
+            | PartRecord::Software(_)
             | PartRecord::Live(_)
             | PartRecord::Exports(_) => {}
         }
@@ -231,6 +234,7 @@ fn exports_part(spec: &Spec) -> Option<&exports::Exports> {
             PartRecord::Data(_)
             | PartRecord::Config(_)
             | PartRecord::Secrets(_)
+            | PartRecord::Software(_)
             | PartRecord::Live(_)
             | PartRecord::Packages(_)
             | PartRecord::Boot(_) => {}
