@@ -934,6 +934,18 @@ None yet.
 
      What stays unchanged: Done when 1, 2, 4 and 5, which the report found passing, and the session's landed increments. The other closing counts of the plan that list files recursively, 19's Done when 3 and 21's, anchor at `/src/(parts|kinds|translate/parts)/` and `/src/reserved`, so a `src/tests/` module does not match them. A further closing count that a test module matches stops on a question, as this one did.
 
+174. **hearth 19.4's ids error names the entry owned** (plan defect, hearth-19.4's block of 2026-10-17T23:34:53Z).
+     **hearth 19.4's ids error names the entry owned** (plan defect, hearth-19.4's block of 2026-10-17T23:34:53Z).
+
+     Option A, with one name for the field. 19.4's Proof prints "postfix owns mail/tls/mx1.key and has no fixed id: no user postfix is declared", and its sketch's `Owned` and `Ids` carry no entry: the sketch is short of its own Proof. render.md 7.1 gives each kind "its own typed fields", and fixes no ids field; main's kinds carry the name they are about (`Collision::Key { key }`, `Guard { name, message }`, `errors.rs:460`, :467). So:
+
+     - `Owned` gains `pub entry: &'a [u8]`, after `of`: the data path's, secret's, identity file's or download's name as declared.
+     - `Ids` gains `pub entry: Box<[u8]>`, after `of`, copied from the `Owned` at fault.
+     - The records' mirror of `Ids` gains `entry` too, in its text and JSON forms, and the translation carries it both ways; these files are in 19.4's Files already (records `src/errors.rs`, `src/form/{text, json}.rs`; protocol `src/translate/errors.rs`).
+     - The Test shape's reference test now reads `fixtures::owned_by(Owns::Secret, b"mail/tls/mx1.key", b"postfix", b"root", at(1, 71))` and `Ids { owner: …, of: Owns::Secret, entry: Box::from(&b"mail/tls/mx1.key"[..]), why: Why::NoUid }`; `fixtures::owned_by` takes the entry's name second.
+
+     What stays unchanged: the Proof's two exact lines; the error's place (at the owner, `also` the declaration); `Why`'s seven arms; 19.4's Size, at most 260 lines, under the README's four-times rule. No other session file names `Owned` or `Ids` of render's `ids.rs`; a further copy (a fixture, a match on `Ids`) takes the field, and the commit body names its file.
+
 ## For the user
 
 The long-term choices the user may veto:

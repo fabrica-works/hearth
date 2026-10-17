@@ -256,7 +256,7 @@ declared user, group) and `Software` (`root` or package ones), with their
 it is, the group named as the user with the user's `uid` as `gid` (format.md
 5.6; a `groups` entry of that name with another `gid` is 22's collision). A
 package user gives both ids or neither: one alone is `Why::OneId`. A fault is
-`Kind::Ids` at the field, `also` the declaration. `Seeds`: every package user
+`Kind::Ids` at the field, `also` the declaration; it names the entry owned (ruling 174). `Seeds`: every package user
 with both ids, every package group with a `gid` and every owner, by name; a
 package user with neither seeds no line; empty, it is the record's empty
 `seeds` (render.md 4.1): THIN's packages part is `64b1b99b813a`.
@@ -266,9 +266,9 @@ Test shape: unit, `src/tests/ids.rs`, under 20 ms. Reference:
 #[test]
 fn a_secrets_owner_without_a_uid_is_an_ids_fault_at_the_owner() {
     let accounts = fixtures::accounts(&[fixtures::sysusers(b"postfix", None)], &[]);
-    let owned = [fixtures::owned_by(Owns::Secret, b"postfix", b"root", at(1, 71))];
+    let owned = [fixtures::owned_by(Owns::Secret, b"mail/tls/mx1.key", b"postfix", b"root", at(1, 71))];
     let faults = ids::check(&accounts, &owned).expect_err("postfix has no uid");
-    let want = Kind::Ids(Ids { owner: Box::from(&b"postfix"[..]), of: Owns::Secret, why: Why::NoUid });
+    let want = Kind::Ids(Ids { owner: Box::from(&b"postfix"[..]), of: Owns::Secret, entry: Box::from(&b"mail/tls/mx1.key"[..]), why: Why::NoUid });
     let place = faults[0].at.as_ref().expect("placed");
     assert_eq!((&faults[0].kind, place.position), (&want, Some(at(1, 71))), "render.md, 3.3: a fixed id");
 }
@@ -384,7 +384,7 @@ pub struct Change { pub paths: Box<[ConsumersKeyed]> }
 #[must_use] pub fn change(before: &Live, after: &Live) -> Change;
 // crates/hearth-domain-render/src/ids.rs (19.4); parts/packages.rs: `Packages` gains `seeds: Seeds`, its `Change` `seeds: SeedsChange`
 /// One owner and group asked for a fixed id, where each was written.
-pub struct Owned<'a> { pub task: &'a [u8], pub of: Owns, pub owner: &'a [u8], pub owner_at: Position, pub group: &'a [u8], pub group_at: Position }
+pub struct Owned<'a> { pub task: &'a [u8], pub of: Owns, pub entry: &'a [u8], pub owner: &'a [u8], pub owner_at: Position, pub group: &'a [u8], pub group_at: Position }
 pub fn check(accounts: &Accounts, owned: &[Owned<'_>]) -> Result<Seeds, Box<[Error]>>;
 /// render.md 4.2's `seeds`: what build writes into passwd and group.
 pub struct Seeds { pub users: Box<[SeedUser]>, pub groups: Box<[SeedGroup]> }
@@ -396,7 +396,7 @@ pub struct SeedsChange { pub users: Box<[SeedUserKeyed]>, pub groups: Box<[SeedG
 pub struct SeedIds { pub uid: u32, pub gid: Option<u32> }
 // errors.rs: `Kind` gains `Ids(Ids)`, `Schema` gains `Beneath { allowed: Box<[Box<[u8]>]> }`, `Format` gains `Sha256`
 /// render.md 7.2's `ids`: whose id is missing, of what, and why.
-pub struct Ids { pub owner: Box<[u8]>, pub of: Owns, pub why: Why }
+pub struct Ids { pub owner: Box<[u8]>, pub of: Owns, pub entry: Box<[u8]>, pub why: Why }
 pub enum Owns { Data, Secret, Identity, Download }
 pub enum Why { NoUser, NoGroup, NoUid, NoGid, OneId, NotPackageUser, NotPackageGroup }
 // diff.rs: `PartChange` gains `Secrets`, `Software`, `Live`; parts.rs: `PartRecord` too. Translation, both ways:
