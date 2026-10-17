@@ -18,5 +18,6 @@ mod packages;
 
 mod accounts;
 
+mod collisions;
 mod data;
 mod directives;

@@ -36,6 +36,7 @@ mod kinds;
 mod additions;
 mod keys;
 
+mod collisions;
 mod resolution;
 
 mod ids;

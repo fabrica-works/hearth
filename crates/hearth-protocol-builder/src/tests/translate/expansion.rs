@@ -49,11 +49,6 @@ fn an_entrys_interpolated_key_reaches_render_compiled() {
         }]
     );
 }
-fn collision_back(collision: records::errors::Collision) -> render::errors::Collision {
-    match collision {
-        records::errors::Collision::Key { key } => render::errors::Collision::Key { key },
-    }
-}
 #[test]
 fn each_collision_translates_to_records_and_back() {
     for (row, input) in fixtures::collision_faults().into_iter().enumerate() {
@@ -65,7 +60,7 @@ fn each_collision_translates_to_records_and_back() {
         else {
             panic!("collision")
         };
-        let back = collision_back(collision);
+        let back = fixtures::collision_back(collision);
         assert_eq!(back, input, "row {row}: collision");
     }
 }

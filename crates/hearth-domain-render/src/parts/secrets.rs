@@ -63,9 +63,7 @@ pub fn build(expansion: &Expansion) -> Result<Secrets, Box<[Error]>> {
     for located in &files {
         match kinds::secrets::file(located) {
             Ok(file) => {
-                if !kept.contains_key(&file.name) {
-                    kept.insert(file.name.clone(), file).expect("entry count");
-                }
+                kept.insert((file.name.clone(), copy_of(located.task)), file).expect("entry count");
             }
             Err(error) => {
                 faults.push(*error).expect("entry count");
@@ -75,9 +73,7 @@ pub fn build(expansion: &Expansion) -> Result<Secrets, Box<[Error]>> {
     for located in &identity {
         match kinds::identity::entry(located) {
             Ok(item) => {
-                if !keys.contains_key(&item.name) {
-                    keys.insert(item.name.clone(), item).expect("entry count");
-                }
+                keys.insert((item.name.clone(), copy_of(located.task)), item).expect("entry count");
             }
             Err(error) => {
                 faults.push(*error).expect("entry count");

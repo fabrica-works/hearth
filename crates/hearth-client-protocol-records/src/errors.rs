@@ -77,11 +77,7 @@ impl Error {
         match &self.kind {
             Kind::Exported(exported) => exported.text(lines),
             Kind::Ids(ids) => ids.text(lines),
-            Kind::Collision(Collision::Key { key }) => {
-                lines.put(b"the key ");
-                lines.quote(key);
-                lines.put(b" is made twice");
-            }
+            Kind::Collision(collision) => collision.text(lines),
             Kind::Resolution(error) => error.text(lines),
             Kind::Store(error) => error.text(lines),
             Kind::Decode(decode) => decode.text(lines),
@@ -127,13 +123,10 @@ impl Error {
                 json.key(b"exported");
                 exported.json(json);
             }
-            Kind::Collision(Collision::Key { key }) => {
+            Kind::Collision(collision) => {
                 field(json, b"kind", b"collision");
                 json.key(b"collision");
-                json.object_start();
-                field(json, b"key", key);
-                field(json, b"kind", b"key");
-                json.object_end();
+                collision.json(json);
             }
             Kind::Resolution(error) => {
                 field(json, b"kind", b"resolution");
@@ -702,11 +695,8 @@ pub use syntax::Syntax;
 mod composition;
 pub use composition::{Composition, Host};
 
-/// A key produced twice by one task's expanded maps (format.md, 5.2).
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum Collision {
-    Key { key: Box<[u8]> },
-}
+mod collisions;
+pub use collisions::{Collision, Subject};
 
 /// Reference roots restricted to literal names (format.md, 6.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

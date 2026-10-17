@@ -5,6 +5,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 pub mod additions;
 mod call;
+pub mod collisions;
 pub mod compose;
 pub mod diff;
 pub mod entries;

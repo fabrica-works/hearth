@@ -791,3 +791,5 @@ pub mod software;
 mod diff_resolution;
 pub use diff_resolution::*;
 pub mod ids;
+
+pub mod collisions;

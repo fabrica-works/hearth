@@ -496,7 +496,7 @@ impl Side {
                     continue;
                 }
             };
-            let Some(installation) = self.installation(&meta, &checked, &expansion) else { continue };
+            let Some(installation) = self.installation(&meta, &checked, &expansion, &accounts) else { continue };
             self.prepare_rendering(
                 meta,
                 containers,

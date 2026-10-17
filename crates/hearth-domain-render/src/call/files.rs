@@ -11,7 +11,7 @@ use crate::{
     vocabulary::Class,
 };
 use alloc::boxed::Box;
-use skein_lib::{List, Map as Ordered, Writer, bytes::copy_of};
+use skein_lib::{List, Writer, bytes::copy_of};
 impl Side {
     pub(crate) fn plans(
         &self,
@@ -23,8 +23,6 @@ impl Side {
         let rows = expansion.of(Map::Files);
         let capacity = u32::try_from(self.entries.len()).expect("listing bound");
         let mut plans = List::with_capacity(u32::try_from(checked.tasks.len()).expect("task bound"));
-        let mut destinations =
-            Ordered::with_capacity(capacity.saturating_add(u32::try_from(rows.len()).expect("expanded count")));
         let mut valid = true;
         for task in &checked.tasks {
             let Some((document, Some(declaration))) = self.documents.declaration(&task.name) else {
@@ -99,14 +97,7 @@ impl Side {
                     })
                     .expect("fault capacity");
             }
-            let mut installs = List::with_capacity(u32::try_from(plan.installs.len()).expect("plan bound"));
-            for install in plan.installs {
-                if !destinations.contains_key(&install.path) {
-                    destinations.insert(install.path.clone(), ()).expect("destination bound");
-                    installs.push(install).expect("plan bound");
-                }
-            } // transitional: hearth 22
-            plans.push(Plan { task: plan.task, installs: installs.into_boxed() }).expect("task bound");
+            plans.push(plan).expect("task bound");
         }
         if valid { Some(plans.into_boxed()) } else { None }
     }

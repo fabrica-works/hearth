@@ -32,19 +32,17 @@ pub fn build(expansion: &Expansion, scripts: Box<[Script]>) -> Result<Software, 
     let entries = expansion.of(Map::Software);
     let count = u32::try_from(entries.len()).expect("entry bound");
     let mut paths = Ordered::with_capacity(count);
-    let mut names = Ordered::with_capacity(count);
     let mut faults = List::with_capacity(count);
     for located in &entries {
-        if names.contains_key(&located.entry.key) {
-            continue;
-        } // transitional: hearth 22
-        names.insert(located.entry.key.clone(), ()).expect("entry bound");
         match crate::kinds::software::entry(located) {
             Ok((download, fetch)) => {
-                if !paths.contains_key(&download.path) {
-                    paths.insert(download.path.clone(), (download, fetch)).expect("entry bound");
-                }
-            } // transitional: hearth 22
+                paths
+                    .insert(
+                        (download.path.clone(), skein_lib::bytes::copy_of(located.task), located.entry.key.clone()),
+                        (download, fetch),
+                    )
+                    .expect("entry bound");
+            }
             Err(error) => faults.push(*error).expect("entry bound"),
         }
     }

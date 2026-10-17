@@ -56,9 +56,7 @@ pub fn build(expansion: &Expansion) -> Result<Data, Box<[Error]>> {
     for located in &entries {
         match crate::kinds::data::entry(located) {
             Ok(entry) => {
-                if !rows.contains_key(&entry.name) {
-                    rows.insert(entry.name.clone(), (entry, located)).expect("entry bound");
-                } // transitional: hearth 22
+                rows.insert((entry.name.clone(), entry.task.clone()), (entry, located)).expect("entry bound");
             }
             Err(error) => {
                 faults.push(*error).expect("entry bound");
@@ -66,7 +64,7 @@ pub fn build(expansion: &Expansion) -> Result<Data, Box<[Error]>> {
         }
     }
     let mut entries = List::with_capacity(rows.len());
-    for (index, (name, (entry, located))) in rows.iter().enumerate() {
+    for (index, ((name, _task), (entry, located))) in rows.iter().enumerate() {
         if index == usize::try_from(MAX_ENTRIES).expect("entry limit") {
             faults
                 .push(crate::kinds::secrets::fault(located, None, Schema::Above { max: i64::from(MAX_ENTRIES) }))

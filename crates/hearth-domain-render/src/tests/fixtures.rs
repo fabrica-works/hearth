@@ -767,3 +767,4 @@ mod diff_resolution;
 pub use diff_resolution::*;
 mod ids;
 pub use ids::*;
+pub mod collisions;

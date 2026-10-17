@@ -5,6 +5,7 @@ use crate::{
     render::{self, errors as target},
 };
 use skein_json::tokenizer;
+mod collisions;
 #[must_use]
 pub fn fault(
     fault: config::Fault,
@@ -69,9 +70,7 @@ pub fn error(error: target::Error) -> records::errors::Error {
     let kind = match kind {
         target::Kind::Ids(value) => records::errors::Kind::Ids(ids::ids(value)),
         target::Kind::Exported(value) => records::errors::Kind::Exported(exported(value)),
-        target::Kind::Collision(target::Collision::Key { key }) => {
-            records::errors::Kind::Collision(records::errors::Collision::Key { key })
-        }
+        target::Kind::Collision(value) => records::errors::Kind::Collision(collisions::collision(value)),
         target::Kind::Guard(target::Guard { name, message }) => {
             records::errors::Kind::Guard(records::errors::Guard { name, message })
         }

@@ -466,6 +466,20 @@ pub struct Guard {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Collision {
     Key { key: Box<[u8]> },
+    Given { subject: Subject, name: Box<[u8]>, first: Box<[u8]>, second: Box<[u8]> },
+    Hidden { path: Box<[u8]>, data: Box<[u8]>, first: Box<[u8]>, second: Box<[u8]> },
+    Overlap { subject: Subject, first: Box<[u8]>, second: Box<[u8]> },
+}
+
+/// The namespace of a collision (render.md, 3.7).
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum Subject {
+    Tree,
+    DataName,
+    DataPath,
+    Secret,
+    Identity,
+    Download,
 }
 
 /// Reference roots restricted to literal names (format.md, 6.4).

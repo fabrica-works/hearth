@@ -723,5 +723,7 @@ mod diff_resolution;
 #[path = "real/software.rs"]
 mod software;
 
+#[path = "real/collisions.rs"]
+mod collisions;
 #[path = "real/ids.rs"]
 mod ids;

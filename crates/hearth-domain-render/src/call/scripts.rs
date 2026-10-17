@@ -28,6 +28,7 @@ impl Side {
         meta: &Meta,
         checked: &Validated,
         expansion: &Expansion,
+        accounts: &crate::kinds::users::Accounts,
     ) -> Option<Installation> {
         let config::Directives { presets, tmpfiles } = match config::directives(expansion) {
             Ok(directives) => directives,
@@ -64,6 +65,15 @@ impl Side {
             self.outcome = self.outcome.worst(Outcome::Failed);
             return None;
         }
-        Some(Installation { plans: plans?, presets, tmpfiles, scripts: sources.into_boxed() })
+        let plans = plans?;
+        if !crate::collisions::paths(
+            &crate::collisions::Declared { target: &meta.target, expansion, plans: &plans, accounts },
+            &self.limits,
+            &mut self.errors,
+        ) {
+            self.outcome = self.outcome.worst(Outcome::Failed);
+            return None;
+        }
+        Some(Installation { plans, presets, tmpfiles, scripts: sources.into_boxed() })
     }
 }

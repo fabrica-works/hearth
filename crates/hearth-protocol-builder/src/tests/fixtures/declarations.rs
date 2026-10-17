@@ -60,14 +60,6 @@ pub fn every_entry_condition() -> [(config::entries::Entry, hearth_protocol_temp
         )
     })
 }
-#[must_use]
-pub fn collision_faults() -> [render::errors::Collision; 2] {
-    [
-        render::errors::Collision::Key { key: bytes::copy_of(b"ops") },
-        render::errors::Collision::Key { key: bytes::copy_of(b"dev") },
-    ]
-}
-
 pub const FIELD_NAMES: &[config::entries::Name] = &[
     config::entries::Name::Action,
     config::entries::Name::Age,
