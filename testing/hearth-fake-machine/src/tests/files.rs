@@ -200,7 +200,7 @@ fn truncation_zeros_an_extension_and_removes_a_tail() {
     let pid = machine.login(BUILDER, b"/srv");
     let file = fixtures::open(&mut machine, pid, b"/srv/file", How::Write);
     for &(length, expected) in &TRUNCATED {
-        assert_eq!(fixtures::done(&mut machine, pid, Op::Truncate { file, length }), DONE[0]);
+        assert_eq!(fixtures::done(&mut machine, pid, Op::Truncate { file, length }), DONE);
         assert_eq!(machine.contents(b"/srv/file"), Some(expected), "{length}");
     }
 }

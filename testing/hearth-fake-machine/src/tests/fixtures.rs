@@ -2,7 +2,7 @@ use crate::linux::{At, Handle, How, Ids, Item, Machine, Op, Pid, Reply, Sizes};
 pub const SEED: u64 = 26;
 pub const BUILDER: Ids = Ids { user: 1000, group: 1000 };
 pub const OTHER: Ids = Ids { user: 1001, group: 1001 };
-pub const DONE: [Result<(), crate::linux::Refusal>; 1] = [Ok(())];
+pub const DONE: Result<(), crate::linux::Refusal> = Ok(());
 pub fn machine() -> Machine {
     let mut machine = Machine::new(SEED, Sizes::tiny());
     machine.lay(&[Item::directory(b"/srv", 0o755).owner(BUILDER)]);
@@ -220,3 +220,22 @@ MD5sum: d0561fcf207289e483b4f210b502b504\n\
 SHA256: bad1f0b5e68fd252b511a5c02f3d162b04a4cae66a0635581154fb8f5566b9c6\n\
 \n\
 ";
+
+pub const ARCHIVE: &[u8] = b"debian";
+pub fn at(bytes: &[u8]) -> crate::hearth::mirror::Timestamp {
+    crate::hearth::mirror::Timestamp::new(bytes).expect("fixture timestamp")
+}
+pub fn forky(universe: crate::hearth::universe::Universe) -> crate::hearth::mirror::Suite {
+    use crate::hearth::mirror::{Release, Suite};
+    Suite::new(Release::debian(b"testing", b"forky"), b"amd64", Box::new([(Box::from(b"main".as_slice()), universe)]))
+}
+pub fn mirror() -> crate::hearth::mirror::Mirror {
+    use crate::hearth::{mirror::Mirror, universe::Universe};
+    let mut mirror = Mirror::new();
+    let universe = Universe::read(MAWK_KEPT).expect("fixture index");
+    mirror.add(at(b"20261017T143929Z"), forky(universe.clone()));
+    let mut packages = universe.packages().to_vec();
+    packages[0].version = b"9.0".as_slice().into();
+    mirror.add(at(b"20261020T000000Z"), forky(Universe::new(packages.into_boxed_slice())));
+    mirror
+}
