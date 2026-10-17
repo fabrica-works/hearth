@@ -56,6 +56,7 @@ pub fn outcome(outcome: Outcome) -> target::Outcome {
         Outcome::Usage => target::Outcome::Usage,
         Outcome::Failed => target::Outcome::Failed,
         Outcome::TryAgain => target::Outcome::TryAgain,
+        Outcome::Negative => target::Outcome::Negative,
         Outcome::Done => target::Outcome::Done,
     }
 }

@@ -8,6 +8,7 @@ pub use hearth_lib::encode::Digest;
 use skein_lib::Token;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    Diff { repository: Box<[u8]>, from: Box<[u8]>, to: Box<[u8]>, targets: Box<[Box<[u8]>]> },
     Render { repository: Box<[u8]>, revision: Box<[u8]>, targets: Box<[Box<[u8]>]> },
     Listed { request: Token, commit: Oid, entries: Box<[Entry]> },
     Unresolved { request: Token },
@@ -23,7 +24,8 @@ pub enum Request {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
     Spec(Spec),
-    Rendered { outcome: Outcome },
+    Change(crate::diff::Change),
+    Rendered { outcome: Outcome, diff: Option<crate::diff::Tally> },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Output {
@@ -58,6 +60,7 @@ pub enum Outcome {
     Usage,
     Failed,
     TryAgain,
+    Negative,
     Done,
 }
 impl Outcome {

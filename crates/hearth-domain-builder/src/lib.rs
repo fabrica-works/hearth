@@ -37,8 +37,9 @@ impl Builder {
             out.push(match output {
                 Output::Request(request) => Request::Render(request),
                 Output::Answer(RenderAnswer::Spec(spec)) => Request::Answer(Answer::Spec(spec)),
-                Output::Answer(RenderAnswer::Rendered { outcome }) => {
-                    Request::Reply { to: self.reply.take().expect("active call owns its reply"), outcome }
+                Output::Answer(RenderAnswer::Change(change)) => Request::Answer(Answer::Change(change)),
+                Output::Answer(RenderAnswer::Rendered { outcome, diff }) => {
+                    Request::Reply { to: self.reply.take().expect("active call owns its reply"), outcome, diff }
                 }
             });
         }
@@ -50,6 +51,7 @@ pub fn step(builder: &mut Builder, env: &Env<Limits>, ev: Event, out: &mut Queue
             assert!(builder.reply.is_none(), "one builder call at a time");
             builder.reply = Some(reply_to);
             match call {
+                Call::Diff { repository, from, to, targets } => RenderEvent::Diff { repository, from, to, targets },
                 Call::Render { repository, revision, targets } => RenderEvent::Render { repository, revision, targets },
             }
         }

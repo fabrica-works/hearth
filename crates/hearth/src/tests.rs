@@ -111,7 +111,7 @@ fn a_work_tree_s_repository_is_its_dot_git() {
     std::fs::create_dir(scratch.path().join(".git")).expect("git directory");
     let invocation = argv::invocation(&words(&["render", "--store", "/store"]), None, None, scratch.path())
         .expect("repository found");
-    let Call::Render { repository, .. } = invocation.call;
+    let Call::Render { repository, .. } = invocation.call else { panic!("render call") };
     assert_eq!(
         Path::new(OsStr::from_bytes(&repository)).strip_prefix(scratch.path()).expect("inside scratch"),
         Path::new(".git"),
@@ -128,6 +128,6 @@ fn the_revision_defaults_to_head() {
     let invocation =
         argv::invocation(&words(&["render", "--repo", "/", "--store", "/store"]), None, None, Path::new("/"))
             .expect("invocation");
-    let Call::Render { revision, .. } = invocation.call;
+    let Call::Render { revision, .. } = invocation.call else { panic!("render call") };
     assert_eq!(&*revision, b"HEAD", "default revision");
 }

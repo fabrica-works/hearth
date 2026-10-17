@@ -8,3 +8,4 @@ mod evaluate;
 mod operators;
 
 mod compose;
+mod diff;

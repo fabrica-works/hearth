@@ -214,10 +214,10 @@ pub fn config() -> crate::parts::config::Config {
     }
 }
 
-pub fn removed_task() -> (crate::call::Call, crate::compose::Target) {
+pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
     use crate::revision::{Document, Layer, Oid, Position, Task};
     let at = Position { line: 1, column: 1 };
-    let mut call = crate::call::Call::new(bytes::copy_of(b"/repo"), Box::new([]), &limits::SHIPPED);
+    let mut call = crate::call::Side::new(bytes::copy_of(b"/repo"), Box::new([]), &limits::SHIPPED);
     let base = Oid(bytes::copy_of(b"base"));
     let host = Oid(bytes::copy_of(b"host"));
     call.entries = Box::new([
@@ -310,4 +310,83 @@ pub mod composition {
         }
         Value { at, kind: Kind::Map(pairs.into_boxed()) }
     }
+}
+
+pub fn spec(target: &[u8], parts: &[crate::parts::Part]) -> crate::parts::Spec {
+    let mut meta = meta();
+    meta.target = bytes::copy_of(target);
+    crate::parts::Spec {
+        meta,
+        meta_digest: Digest([1; 32]),
+        digest: Digest([2; 32]),
+        commit: crate::revision::Oid(bytes::copy_of(b"0123456789abcdef0123456789abcdef01234567")),
+        parts: parts.into(),
+    }
+}
+
+pub fn diff_trees() -> (crate::parts::config::Config, crate::parts::config::Config) {
+    use crate::parts::config::{self, Config};
+    let before = Config {
+        tree: Box::new([
+            config::file(b"changed", crate::revision::Mode::File, Digest([1; 32])),
+            config::file(b"removed", crate::revision::Mode::File, Digest([1; 32])),
+        ]),
+    };
+    let after = Config {
+        tree: Box::new([
+            config::file(b"added", crate::revision::Mode::File, Digest([2; 32])),
+            config::file(b"changed", crate::revision::Mode::File, Digest([2; 32])),
+        ]),
+    };
+    (before, after)
+}
+
+pub fn changed_specs() -> (crate::parts::Spec, crate::parts::Spec) {
+    use crate::parts::{
+        Part, PartRecord,
+        config::{Config, Node, TreeEntry},
+    };
+    let before = spec(
+        b"x1-prod",
+        &[Part { digest: Digest([1; 32]), record: PartRecord::Config(Config { tree: Box::new([]) }) }],
+    );
+    let mut after = spec(
+        b"x1-prod",
+        &[Part {
+            digest: Digest([2; 32]),
+            record: PartRecord::Config(Config {
+                tree: Box::new([TreeEntry {
+                    path: bytes::copy_of(b"/added"),
+                    node: Node::File {
+                        content_digest: Digest([3; 32]),
+                        mode: 0o644,
+                        owner: bytes::copy_of(b"root"),
+                        group: bytes::copy_of(b"root"),
+                    },
+                }]),
+            }),
+        }],
+    );
+    after.digest = Digest([3; 32]);
+    (before, after)
+}
+
+pub fn diff_call() -> (crate::Render, skein_lib::Env<limits::Limits>, skein_lib::Queue<crate::vocabulary::Output>) {
+    use crate::{Render, limits, vocabulary::Event};
+    use skein_lib::{Env, Queue, Time, Wall};
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits::SHIPPED };
+    let mut render = Render::new(&env.limits);
+    let mut out = Queue::with_capacity(1);
+    crate::step(
+        &mut render,
+        &env,
+        Event::Diff {
+            repository: bytes::copy_of(b"/repo"),
+            from: bytes::copy_of(b"before"),
+            to: bytes::copy_of(b"after"),
+            targets: Box::new([]),
+        },
+        &mut out,
+    );
+    (render, env, out)
 }

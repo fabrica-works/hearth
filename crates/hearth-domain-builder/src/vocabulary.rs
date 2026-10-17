@@ -9,15 +9,17 @@ pub enum Event {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Call {
+    Diff { repository: Box<[u8]>, from: Box<[u8]>, to: Box<[u8]>, targets: Box<[Box<[u8]>]> },
     Render { repository: Box<[u8]>, revision: Box<[u8]>, targets: Box<[Box<[u8]>]> },
 }
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
     Render(render::vocabulary::Request),
     Answer(Answer),
-    Reply { to: ReplyTo, outcome: render::vocabulary::Outcome },
+    Reply { to: ReplyTo, outcome: render::vocabulary::Outcome, diff: Option<render::diff::Tally> },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    Change(render::diff::Change),
     Spec(render::parts::Spec),
 }

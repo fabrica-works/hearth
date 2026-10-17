@@ -66,3 +66,52 @@ fn absolute(path: &[u8]) -> Box<[u8]> {
     writer.put(path).expect("path room");
     writer.finish()
 }
+
+/// Paths changed in byte order (render.md, 6.1).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Change {
+    pub tree: Box<[EntryChange]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum EntryChange {
+    Added { path: Box<[u8]>, node: Node },
+    Removed { path: Box<[u8]>, node: Node },
+    Changed { path: Box<[u8]>, before: Node, after: Node },
+}
+#[must_use]
+pub fn change(before: Option<&Config>, after: Option<&Config>) -> Change {
+    let before = match before {
+        Some(config) => config.tree.as_ref(),
+        None => &[],
+    };
+    let after = match after {
+        Some(config) => config.tree.as_ref(),
+        None => &[],
+    };
+    let capacity = u32::try_from(before.len().saturating_add(after.len())).expect("bounded trees");
+    let mut paths = skein_lib::Map::with_capacity(capacity);
+    for entry in before {
+        paths.insert(entry.path.clone(), (Some(&entry.node), None)).expect("tree capacity");
+    }
+    for entry in after {
+        if let Some((_, node)) = paths.get_mut(&entry.path) {
+            *node = Some(&entry.node);
+        } else {
+            paths.insert(entry.path.clone(), (None, Some(&entry.node))).expect("tree capacity");
+        }
+    }
+    let mut tree = skein_lib::List::with_capacity(capacity);
+    for (path, (old, new)) in &paths {
+        let change = match (old, new) {
+            (None, Some(node)) => EntryChange::Added { path: path.clone(), node: (*node).clone() },
+            (Some(node), None) => EntryChange::Removed { path: path.clone(), node: (*node).clone() },
+            (Some(old), Some(new)) if old != new => {
+                EntryChange::Changed { path: path.clone(), before: (*old).clone(), after: (*new).clone() }
+            }
+            (Some(_), Some(_)) => continue,
+            (None, None) => unreachable!("union path"),
+        };
+        tree.push(change).expect("tree capacity");
+    }
+    Change { tree: tree.into_boxed() }
+}

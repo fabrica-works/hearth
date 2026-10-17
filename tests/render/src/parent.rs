@@ -40,7 +40,8 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
             match output {
                 Output::Answer(answer) => match answer {
                     Answer::Spec(spec) => run.answers.push(Answer::Spec(spec)),
-                    Answer::Rendered { outcome } => {
+                    Answer::Change(change) => run.answers.push(Answer::Change(change)),
+                    Answer::Rendered { outcome, diff: _ } => {
                         run.outcome = outcome;
                     }
                 },
@@ -79,7 +80,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                 | Event::Cached { request, .. }
                 | Event::Unresolved { request }
                 | Event::Failed { request, .. } => *request,
-                Event::Render { .. } => unreachable!("only answers scheduled"),
+                Event::Render { .. } | Event::Diff { .. } => unreachable!("only answers scheduled"),
             };
             let left = ledger.get_mut(token).expect("request in flight");
             *left -= 1;

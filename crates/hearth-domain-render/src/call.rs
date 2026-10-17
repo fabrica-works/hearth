@@ -9,7 +9,7 @@ use crate::{
 use alloc::boxed::Box;
 use skein_lib::{List, Map, Queue, Token};
 #[derive(Debug)]
-pub(crate) struct Call {
+pub(crate) struct Side {
     pub repository: Box<[u8]>,
     pub names: Box<[Box<[u8]>]>,
     pub commit: Option<Oid>,
@@ -27,10 +27,12 @@ pub(crate) struct Call {
     pub next: usize,
     pub ready: bool,
     pub outcome: Outcome,
+    pub made: Map<Box<[u8]>, crate::diff::Made>,
+    pub diff: bool,
 }
-impl Call {
-    pub fn new(repository: Box<[u8]>, names: Box<[Box<[u8]>]>, limits: &Limits) -> Call {
-        Call {
+impl Side {
+    pub fn new(repository: Box<[u8]>, names: Box<[Box<[u8]>]>, limits: &Limits) -> Side {
+        Side {
             repository,
             names,
             commit: None,
@@ -48,6 +50,8 @@ impl Call {
             next: 0,
             ready: false,
             outcome: Outcome::Done,
+            made: Map::with_capacity(0),
+            diff: false,
         }
     }
     pub fn listed(&mut self, limits: Limits, commit: Oid, entries: &[Entry], out: &mut Queue<Output>) {
@@ -76,11 +80,17 @@ impl Call {
                     known = true;
                 }
             }
-            if !known {
+            if !known && !self.diff {
                 self.outcome = self.outcome.worst(Outcome::Usage);
             }
         }
         self.targets = selected.into_boxed();
+        self.made = Map::with_capacity(limits.targets);
+        for target in &self.targets {
+            self.made
+                .insert(target.name.clone(), crate::diff::Made::Failed(crate::vocabulary::Class::Configuration))
+                .expect("target capacity");
+        }
         self.entries = entries.into();
         self.documents = Documents::new(entries);
         let mut blobs = List::with_capacity(u32::try_from(entries.len()).expect("listing capacity"));
@@ -198,6 +208,17 @@ impl Call {
     }
     pub fn fail(&mut self, outcome: Outcome) {
         self.targets = Box::new([]);
+        self.files = true;
+        let mut failed = Map::with_capacity(self.made.capacity());
+        for (name, _) in &self.made {
+            let class = if outcome == Outcome::TryAgain {
+                crate::vocabulary::Class::Operational
+            } else {
+                crate::vocabulary::Class::Configuration
+            };
+            failed.insert(name.clone(), crate::diff::Made::Failed(class)).expect("target capacity");
+        }
+        self.made = failed;
         self.outcome = self.outcome.worst(outcome);
         self.ready = true;
     }
@@ -299,7 +320,7 @@ impl Call {
                 parts,
             });
         }
-        Answer::Rendered { outcome: self.outcome }
+        Answer::Rendered { outcome: self.outcome, diff: None }
     }
 }
 
@@ -310,4 +331,129 @@ fn contains(blobs: &List<Blob>, oid: &Oid, kind: As) -> bool {
         }
     }
     false
+}
+
+/// A render streams one side; a diff renders from, then to, before comparing.
+#[derive(Debug)]
+pub(crate) struct Call {
+    pub side: Side,
+    pub diff: Option<Comparison>,
+}
+#[derive(Debug)]
+pub(crate) struct Comparison {
+    revision: Option<Box<[u8]>>,
+    from: Option<RenderedSide>,
+    names: Box<[Box<[u8]>]>,
+    next: usize,
+    tally: Option<crate::diff::Tally>,
+    outcome: Outcome,
+}
+impl Call {
+    pub fn new(repository: Box<[u8]>, names: Box<[Box<[u8]>]>, limits: &Limits) -> Self {
+        Self { side: Side::new(repository, names, limits), diff: None }
+    }
+    pub fn diff(repository: Box<[u8]>, names: Box<[Box<[u8]>]>, to: Box<[u8]>, limits: &Limits) -> Self {
+        let mut call = Self::new(repository, names, limits);
+        call.side.diff = true;
+        call.diff = Some(Comparison {
+            revision: Some(to),
+            from: None,
+            names: Box::new([]),
+            next: 0,
+            tally: None,
+            outcome: Outcome::Done,
+        });
+        call
+    }
+    pub fn resume(&mut self, limits: Limits, out: &mut Queue<Output>) -> bool {
+        if self.side.files(limits, out) {
+            return false;
+        }
+        let Some(diff) = &mut self.diff else {
+            let answer = self.side.answer();
+            let done = match &answer {
+                Answer::Rendered { .. } => true,
+                Answer::Spec(_) | Answer::Change(_) => false,
+            };
+            out.push(Output::Answer(answer));
+            return done;
+        };
+        if diff.tally.is_none() {
+            match self.side.answer() {
+                Answer::Spec(spec) => {
+                    self.side
+                        .made
+                        .insert(spec.meta.target.clone(), crate::diff::Made::Spec(Box::new(spec)))
+                        .expect("target capacity");
+                    return false;
+                }
+                Answer::Rendered { outcome, diff: _ } => diff.outcome = diff.outcome.worst(outcome),
+                Answer::Change(_) => unreachable!("a side renders specs"),
+            }
+            let Some(commit) = self.side.commit.clone() else {
+                out.push(Output::Answer(Answer::Rendered { outcome: diff.outcome, diff: None }));
+                return true;
+            };
+            if let Some(revision) = diff.revision.take() {
+                let made = core::mem::replace(&mut self.side.made, Map::with_capacity(0));
+                diff.from = Some(RenderedSide { commit, made });
+                self.side = Side::new(self.side.repository.clone(), self.side.names.clone(), &limits);
+                self.side.diff = true;
+                out.push(Output::Request(Request::List {
+                    request: Token::new(1),
+                    repository: self.side.repository.clone(),
+                    revision,
+                }));
+                return false;
+            }
+            let RenderedSide { commit: from, made } = diff.from.as_ref().expect("from rendered first");
+            let mut names = Map::with_capacity(limits.targets.saturating_mul(2));
+            for (name, _) in made.into_iter().chain(&self.side.made) {
+                names.insert(name.clone(), ()).expect("two sides' targets");
+            }
+            for name in &self.side.names {
+                if !names.contains_key(name) {
+                    diff.outcome = diff.outcome.worst(Outcome::Usage);
+                }
+            }
+            let mut ordered = List::with_capacity(names.len());
+            for (name, ()) in &names {
+                ordered.push(name.clone()).expect("union capacity");
+            }
+            diff.names = ordered.into_boxed();
+            diff.tally = Some(crate::diff::Tally {
+                from: from.clone(),
+                to: commit,
+                targets: names.len(),
+                changed: 0,
+                unchanged: 0,
+            });
+        }
+        if let Some(target) = diff.names.get(diff.next) {
+            diff.next = diff.next.saturating_add(1);
+            let RenderedSide { commit: _, made: from } = diff.from.as_ref().expect("from side");
+            let change = crate::diff::compare(from.get(target), self.side.made.get(target), crate::diff::Needs::Needed);
+            let tally = diff.tally.as_mut().expect("both sides listed");
+            match &change {
+                crate::diff::TargetChange::Same => tally.unchanged = tally.unchanged.saturating_add(1),
+                crate::diff::TargetChange::Failed { .. } => {}
+                crate::diff::TargetChange::Added { .. }
+                | crate::diff::TargetChange::Removed
+                | crate::diff::TargetChange::Changed { .. } => {
+                    tally.changed = tally.changed.saturating_add(1);
+                    diff.outcome = diff.outcome.worst(Outcome::Negative);
+                }
+            }
+            out.push(Output::Answer(Answer::Change(crate::diff::Change { target: target.clone(), change })));
+            return false;
+        }
+        out.push(Output::Answer(Answer::Rendered { outcome: diff.outcome, diff: diff.tally.take() }));
+        true
+    }
+}
+
+#[derive(Debug)]
+struct RenderedSide {
+    commit: Oid,
+    made: Map<Box<[u8]>, crate::diff::Made>,
 }

@@ -105,13 +105,17 @@ impl Client {
         assert!(self.takes(), "printer takes one record at a time");
         let record = match request {
             Request::Answer(Answer::Spec(spec)) => records::records::Record::Spec(Box::new(answers::spec(spec))),
-            Request::Reply { to, outcome } => {
+            Request::Answer(Answer::Change(change)) => {
+                records::records::Record::Change(super::translate::changes::change(change))
+            }
+            Request::Reply { to, outcome, diff } => {
                 assert_eq!(to.into_token(), Token::new(0), "the initial call's reply");
                 let outcome =
                     if self.refused { outcome.worst(crate::render::vocabulary::Outcome::Failed) } else { outcome };
                 self.terminal = Some(outcome);
                 let outcome = answers::outcome(outcome);
-                records::records::Record::Terminal(records::records::Terminal { outcome, diff: None, left_out: 0 })
+                let diff = super::translate::changes::optional_tally(diff);
+                records::records::Record::Terminal(records::records::Terminal { outcome, diff, left_out: 0 })
             }
             Request::Render(_) => unreachable!("git requests stay in the protocol"),
         };

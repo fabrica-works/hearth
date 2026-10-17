@@ -80,6 +80,7 @@ fn targets_are_answered_in_name_order_each_once() {
             .map(|answer| match answer {
                 Answer::Spec(spec) => spec.meta.target.as_ref(),
                 Answer::Rendered { .. } => panic!("terminal is separate"),
+                Answer::Change(_) => panic!("render returns specs"),
             })
             .collect();
         assert_eq!(names, [b"a-b-prod".as_slice(), b"x1-prod"], "prefix-based discovery, seed {seed}");

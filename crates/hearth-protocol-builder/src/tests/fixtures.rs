@@ -295,3 +295,20 @@ impl Layer {
         up(&mut self.protocol, &self.env, Told::File(event), &mut self.above, &mut self.below);
     }
 }
+
+pub fn config_change() -> render::diff::Change {
+    use render::{diff, parts::config, revision::Mode};
+    diff::Change {
+        target: bytes::copy_of(b"x1-prod"),
+        change: diff::TargetChange::Changed {
+            parts: Box::new([diff::PartChange::Config(config::Change {
+                tree: Box::new([config::EntryChange::Changed {
+                    path: bytes::copy_of(b"/etc/motd"),
+                    before: config::file(b"etc/motd", Mode::File, hearth_lib::encode::Digest([1; 32])).node,
+                    after: config::file(b"etc/motd", Mode::Executable, hearth_lib::encode::Digest([2; 32])).node,
+                }]),
+            })]),
+            rebuild: diff::Rebuild::FromConfig,
+        },
+    }
+}

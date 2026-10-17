@@ -46,15 +46,37 @@ impl Repository {
     pub fn make_on(path: &OsStr, label: &str, files: &[File]) -> Self {
         let repository = Self::empty(label);
         git(&repository.work_tree, path, &["init", "--quiet", "--initial-branch=main"]);
+        repository.write(files);
+        git(&repository.work_tree, path, &["add", "-A"]);
+        git(&repository.work_tree, path, &["commit", "--allow-empty", "-q", "-m", "thin"]);
+        repository
+    }
+    fn write(&self, files: &[File]) {
         for file in files {
-            let target = repository.work_tree.join(file.path);
+            let target = self.work_tree.join(file.path);
             fs::create_dir_all(target.parent().expect("a parent")).expect("fixture directories");
             fs::write(&target, file.body).expect("fixture file");
             fs::set_permissions(target, fs::Permissions::from_mode(file.mode)).expect("fixture mode");
         }
-        git(&repository.work_tree, path, &["add", "-A"]);
-        git(&repository.work_tree, path, &["commit", "--allow-empty", "-q", "-m", "thin"]);
-        repository
+    }
+    #[must_use]
+    pub fn head(&self) -> String {
+        let path = std::env::var_os("PATH").expect("git is required on PATH");
+        String::from_utf8(git_output(&self.work_tree, &path, &["rev-parse", "HEAD"]))
+            .expect("commit id")
+            .trim()
+            .to_owned()
+    }
+    #[must_use]
+    pub fn next(&self, files: &[File], removed: &[&str]) -> String {
+        self.write(files);
+        for path in removed {
+            fs::remove_file(self.work_tree.join(path)).expect("removed file");
+        }
+        let path = std::env::var_os("PATH").expect("git is required on PATH");
+        git(&self.work_tree, &path, &["add", "-A"]);
+        git(&self.work_tree, &path, &["commit", "--allow-empty", "-q", "-m", "next"]);
+        self.head()
     }
     #[must_use]
     pub fn empty(label: &str) -> Self {
@@ -73,6 +95,9 @@ impl Repository {
     }
 }
 fn git(directory: &Path, path: &OsStr, args: &[&str]) {
+    drop(git_output(directory, path, args));
+}
+fn git_output(directory: &Path, path: &OsStr, args: &[&str]) -> Vec<u8> {
     let result = Command::new("git")
         .current_dir(directory)
         .args(args)
@@ -90,6 +115,7 @@ fn git(directory: &Path, path: &OsStr, args: &[&str]) {
         .output()
         .expect("git is required on the supplied PATH");
     assert!(result.status.success(), "git {args:?} failed: {}", String::from_utf8_lossy(&result.stderr));
+    result.stdout
 }
 #[derive(Debug)]
 pub struct Rendered {
@@ -107,12 +133,23 @@ pub fn render_at(repository: &Repository, at: &str, targets: &[&[u8]], form: For
         revision: at.as_bytes().into(),
         targets: targets.iter().map(|target| Box::<[u8]>::from(*target)).collect(),
     };
+    run(repository, call, form, None)
+}
+fn run(repository: &Repository, call: Call, form: Form, store: Option<&Path>) -> Rendered {
     let output = repository.scratch.path().join("stdout");
     let fd = Fd::new(fs::File::create(&output).expect("output file").into_raw_fd());
     let limits = hearth::limits();
-    let mut client =
-        Client::open(Invocation { call, form, store: repository.scratch.path().join("store") }, &limits, fd, 7)
-            .expect("client startup");
+    let mut client = Client::open(
+        Invocation {
+            call,
+            form,
+            store: store.map_or_else(|| repository.scratch.path().join("store"), Path::to_path_buf),
+        },
+        &limits,
+        fd,
+        7,
+    )
+    .expect("client startup");
     let mut kernel = Kernel::open(Config { operations: client.operations() }).expect("io_uring is required");
     let exit = skein_shell::drive(&mut kernel, &Clock::new(), &mut client);
     Rendered { exit, stdout: fs::read(output).expect("printed output") }
@@ -164,3 +201,69 @@ pub fn lines_starting(stdout: &[u8], prefixes: &[&str]) -> String {
     }
     lines
 }
+#[derive(Debug)]
+pub struct Asked<'a> {
+    pub from: &'a str,
+    pub to: &'a str,
+    pub targets: &'a [&'a [u8]],
+    pub form: Form,
+    pub store: Option<&'a Path>,
+}
+impl<'a> Asked<'a> {
+    #[must_use]
+    pub const fn new(from: &'a str, to: &'a str) -> Self {
+        Self { from, to, targets: &[], form: Form::Text, store: None }
+    }
+}
+#[must_use]
+pub fn diff(repository: &Repository, asked: &Asked<'_>) -> Rendered {
+    run(
+        repository,
+        Call::Diff {
+            repository: repository.work_tree.join(".git").as_os_str().as_bytes().into(),
+            from: asked.from.as_bytes().into(),
+            to: asked.to.as_bytes().into(),
+            targets: asked.targets.iter().map(|target| Box::<[u8]>::from(*target)).collect(),
+        },
+        asked.form,
+        asked.store,
+    )
+}
+pub const MOTD: &[File] = &[
+    File { path: "fleet.json", body: b"{}", mode: 0o644 },
+    File { path: "envs/prod.json", body: b"{}", mode: 0o644 },
+    File { path: "envs/lab.json", body: b"{}", mode: 0o644 },
+    File { path: "hosts/ion/ion.json", body: b"{}", mode: 0o644 },
+    File { path: "hosts/x1/x1.json", body: b"{}", mode: 0o644 },
+    File {
+        path: "hosts/ion/ion-prod.json",
+        body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"},\"motd\":{}}",
+        mode: 0o644,
+    },
+    File {
+        path: "hosts/x1/x1-prod.json",
+        body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"},\"motd\":{}}",
+        mode: 0o644,
+    },
+    File {
+        path: "hosts/ion/ion-lab.json",
+        body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"}}",
+        mode: 0o644,
+    },
+    File {
+        path: "hosts/x1/x1-lab.json",
+        body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"}}",
+        mode: 0o644,
+    },
+    File { path: "tasks/motd/task.json", body: b"{}", mode: 0o644 },
+    File { path: "tasks/motd/tree/etc/motd", body: b"Welcome.\n", mode: 0o644 },
+];
+pub const MOTD_KIND: File = File { path: "tasks/motd/tree/etc/motd", body: b"Welcome, and be kind.\n", mode: 0o644 };
+pub const MOTD_DIFF_TEXT: &str = "ion-prod                                            rebuild from config\n  config   ~ /etc/motd                              0644 root:root\nx1-prod                                             rebuild from config\n  config   ~ /etc/motd                              0644 root:root\n\n2 of 4 targets change; 2 are unchanged.\n";
+pub const BAD_ION_LAB: File = File { path: "hosts/ion/ion-lab.json", body: b"not JSON", mode: 0o644 };
+pub const BAD_X1_LAB: File = File { path: "hosts/x1/x1-lab.json", body: b"not JSON", mode: 0o644 };
+pub const FIXED_X1_LAB: File = File {
+    path: "hosts/x1/x1-lab.json",
+    body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"}}",
+    mode: 0o644,
+};

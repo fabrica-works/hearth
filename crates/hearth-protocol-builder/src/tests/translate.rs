@@ -211,13 +211,13 @@ fn each_client_firmware_translates_and_back() {
         assert_eq!(client_firmware_back(*expected), *source, "firmware {expected:?}");
     }
 }
-fn outcome_back(outcome: records::outcome::Outcome) -> Option<render::vocabulary::Outcome> {
+fn outcome_back(outcome: records::outcome::Outcome) -> render::vocabulary::Outcome {
     match outcome {
-        records::outcome::Outcome::Done => Some(render::vocabulary::Outcome::Done),
-        records::outcome::Outcome::Failed => Some(render::vocabulary::Outcome::Failed),
-        records::outcome::Outcome::Usage => Some(render::vocabulary::Outcome::Usage),
-        records::outcome::Outcome::TryAgain => Some(render::vocabulary::Outcome::TryAgain),
-        records::outcome::Outcome::Negative => None, // hearth 25
+        records::outcome::Outcome::Done => render::vocabulary::Outcome::Done,
+        records::outcome::Outcome::Failed => render::vocabulary::Outcome::Failed,
+        records::outcome::Outcome::Usage => render::vocabulary::Outcome::Usage,
+        records::outcome::Outcome::TryAgain => render::vocabulary::Outcome::TryAgain,
+        records::outcome::Outcome::Negative => render::vocabulary::Outcome::Negative,
     }
 }
 const CLIENT_OUTCOMES: &[(render::vocabulary::Outcome, records::outcome::Outcome)] = &[
@@ -225,12 +225,13 @@ const CLIENT_OUTCOMES: &[(render::vocabulary::Outcome, records::outcome::Outcome
     (render::vocabulary::Outcome::Failed, records::outcome::Outcome::Failed),
     (render::vocabulary::Outcome::Usage, records::outcome::Outcome::Usage),
     (render::vocabulary::Outcome::TryAgain, records::outcome::Outcome::TryAgain),
+    (render::vocabulary::Outcome::Negative, records::outcome::Outcome::Negative),
 ];
 #[test]
 fn each_client_outcome_translates_and_back() {
     for (source, expected) in CLIENT_OUTCOMES {
         assert_eq!(answers::outcome(*source), *expected, "outcome {source:?}");
-        assert_eq!(outcome_back(*expected), Some(*source), "outcome {expected:?}");
+        assert_eq!(outcome_back(*expected), *source, "outcome {expected:?}");
     }
 }
 
@@ -331,5 +332,185 @@ fn nested_configuration_values_keep_their_keys_lists_and_string_bytes() {
                 },
             }])),
         }
+    );
+}
+
+use crate::{records::diff as client_diff, render::diff, translate::changes};
+const CHANGES: &[(diff::TargetChange, client_diff::TargetChange)] = &[
+    (
+        diff::TargetChange::Added { spec_digest: hearth_lib::encode::Digest([9; 32]) },
+        client_diff::TargetChange::Added { spec_digest: [9; 32] },
+    ),
+    (diff::TargetChange::Removed, client_diff::TargetChange::Removed),
+    (diff::TargetChange::Same, client_diff::TargetChange::Same),
+    (
+        diff::TargetChange::Failed { side: diff::Side::From },
+        client_diff::TargetChange::Failed { side: client_diff::Side::From },
+    ),
+    (
+        diff::TargetChange::Failed { side: diff::Side::To },
+        client_diff::TargetChange::Failed { side: client_diff::Side::To },
+    ),
+    (
+        diff::TargetChange::Failed { side: diff::Side::Both },
+        client_diff::TargetChange::Failed { side: client_diff::Side::Both },
+    ),
+];
+fn side_back(side: client_diff::Side) -> diff::Side {
+    match side {
+        client_diff::Side::From => diff::Side::From,
+        client_diff::Side::To => diff::Side::To,
+        client_diff::Side::Both => diff::Side::Both,
+    }
+}
+fn needs_back(needs: client_diff::Needs) -> diff::Needs {
+    match needs {
+        client_diff::Needs::Known => diff::Needs::Known,
+        client_diff::Needs::Needed => diff::Needs::Needed,
+    }
+}
+fn rebuild_back(rebuild: client_diff::Rebuild) -> diff::Rebuild {
+    match rebuild {
+        client_diff::Rebuild::FromPackages { resolution } => {
+            diff::Rebuild::FromPackages { resolution: needs_back(resolution) }
+        }
+        client_diff::Rebuild::FromSoftware => diff::Rebuild::FromSoftware,
+        client_diff::Rebuild::FromConfig => diff::Rebuild::FromConfig,
+        client_diff::Rebuild::SlotOnly => diff::Rebuild::SlotOnly,
+        client_diff::Rebuild::Nothing => diff::Rebuild::Nothing,
+    }
+}
+fn change_back(change: client_diff::TargetChange) -> Option<diff::TargetChange> {
+    Some(match change {
+        client_diff::TargetChange::Added { spec_digest } => {
+            diff::TargetChange::Added { spec_digest: hearth_lib::encode::Digest(spec_digest) }
+        }
+        client_diff::TargetChange::Removed => diff::TargetChange::Removed,
+        client_diff::TargetChange::Same => diff::TargetChange::Same,
+        client_diff::TargetChange::Failed { side } => diff::TargetChange::Failed { side: side_back(side) },
+        client_diff::TargetChange::Changed { parts, rebuild } => {
+            let mut translated = skein_lib::List::with_capacity(u32::try_from(parts.len()).expect("bounded parts"));
+            for part in parts {
+                match part {
+                    client_diff::PartChange::Config(client_diff::ConfigChange { tree }) => {
+                        let mut entries =
+                            skein_lib::List::with_capacity(u32::try_from(tree.len()).expect("bounded tree"));
+                        for entry in tree {
+                            entries.push(entry_back(entry)?).expect("tree room");
+                        }
+                        translated
+                            .push(diff::PartChange::Config(render::parts::config::Change {
+                                tree: entries.into_boxed(),
+                            }))
+                            .expect("part room");
+                    }
+                }
+            }
+            diff::TargetChange::Changed { parts: translated.into_boxed(), rebuild: rebuild_back(rebuild) }
+        }
+    })
+}
+fn node_back(node: records::parts::config::Node) -> render::parts::config::Node {
+    match node {
+        records::parts::config::Node::File { content_digest, mode, owner, group } => {
+            render::parts::config::Node::File {
+                content_digest: hearth_lib::encode::Digest(content_digest),
+                mode,
+                owner,
+                group,
+            }
+        }
+    }
+}
+fn entry_back(entry: client_diff::EntryChange) -> Option<render::parts::config::EntryChange> {
+    use render::parts::config::EntryChange;
+    Some(match entry {
+        client_diff::EntryChange::Added { path, node } => EntryChange::Added { path, node: node_back(node) },
+        client_diff::EntryChange::Removed { path, node } => EntryChange::Removed { path, node: node_back(node) },
+        client_diff::EntryChange::Changed { path, before, after, sizes, hunks } => {
+            if sizes.is_some() || hunks.is_some() {
+                return None;
+            } // hearth 25.2
+            EntryChange::Changed { path, before: node_back(before), after: node_back(after) }
+        }
+    })
+}
+#[test]
+fn each_change_rebuild_and_side_translates_to_the_records_and_back() {
+    for (source, expected) in CHANGES {
+        assert_eq!(changes::target_change(source.clone()), *expected, "change {source:?}");
+        assert_eq!(change_back(expected.clone()), Some(source.clone()), "change {expected:?}");
+    }
+}
+const REBUILDS: &[(diff::Rebuild, client_diff::Rebuild)] = &[
+    (
+        diff::Rebuild::FromPackages { resolution: diff::Needs::Known },
+        client_diff::Rebuild::FromPackages { resolution: client_diff::Needs::Known },
+    ),
+    (
+        diff::Rebuild::FromPackages { resolution: diff::Needs::Needed },
+        client_diff::Rebuild::FromPackages { resolution: client_diff::Needs::Needed },
+    ),
+    (diff::Rebuild::FromSoftware, client_diff::Rebuild::FromSoftware),
+    (diff::Rebuild::FromConfig, client_diff::Rebuild::FromConfig),
+    (diff::Rebuild::SlotOnly, client_diff::Rebuild::SlotOnly),
+    (diff::Rebuild::Nothing, client_diff::Rebuild::Nothing),
+];
+#[test]
+fn each_rebuild_translates_to_the_records_and_back() {
+    for (source, expected) in REBUILDS {
+        assert_eq!(changes::rebuild(*source), *expected, "rebuild {source:?}");
+        assert_eq!(rebuild_back(*expected), *source, "rebuild {expected:?}");
+    }
+}
+#[test]
+fn the_tally_translates_to_the_records_and_back() {
+    let tally = diff::Tally {
+        from: target::Oid(skein_lib::bytes::copy_of(b"from")),
+        to: target::Oid(skein_lib::bytes::copy_of(b"to")),
+        targets: 4,
+        changed: 2,
+        unchanged: 1,
+    };
+    assert_eq!(
+        changes::tally(tally),
+        client_diff::Tally {
+            from: skein_lib::bytes::copy_of(b"from"),
+            to: skein_lib::bytes::copy_of(b"to"),
+            targets: 4,
+            changed: 2,
+            unchanged: 1
+        },
+        "failed target only in total"
+    );
+}
+#[test]
+fn a_changed_config_entry_translates_without_sizes_or_hunks() {
+    let change = super::fixtures::config_change();
+    let translated = changes::change(change.clone());
+    assert_eq!(translated.target.as_ref(), b"x1-prod");
+    assert_eq!(
+        change_back(translated.change),
+        Some(diff::TargetChange::Changed {
+            parts: Box::new([diff::PartChange::Config(render::parts::config::Change {
+                tree: Box::new([render::parts::config::EntryChange::Changed {
+                    path: skein_lib::bytes::copy_of(b"/etc/motd"),
+                    before: render::parts::config::Node::File {
+                        content_digest: hearth_lib::encode::Digest([1; 32]),
+                        mode: 0o644,
+                        owner: skein_lib::bytes::copy_of(b"root"),
+                        group: skein_lib::bytes::copy_of(b"root")
+                    },
+                    after: render::parts::config::Node::File {
+                        content_digest: hearth_lib::encode::Digest([2; 32]),
+                        mode: 0o755,
+                        owner: skein_lib::bytes::copy_of(b"root"),
+                        group: skein_lib::bytes::copy_of(b"root")
+                    },
+                }])
+            })]),
+            rebuild: diff::Rebuild::FromConfig,
+        }),
+        "config node fields and rebuild preserved"
     );
 }
