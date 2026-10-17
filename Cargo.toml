@@ -16,6 +16,8 @@ publish = false
 [workspace.dependencies]
 hearth-recordings = { path = "testing/hearth-recordings" }
 hearth-git-world = { path = "tests/git" }
+hearth-fake-git = { path = "testing/hearth-fake-git" }
+sha1 = "=0.10.7"
 hearth-fake-machine = { path = "testing/hearth-fake-machine" }
 hearth-protocol-tree = { path = "crates/hearth-protocol-tree" }
 hearth-test-mirror = { path = "testing/hearth-test-mirror" }
