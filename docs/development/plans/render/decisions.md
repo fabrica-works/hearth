@@ -416,6 +416,45 @@ None yet.
      5. The opening's 03.1 is what hearth 11.2 needs through 03.3 (11-thin-story.md:175), not 03.1.
      Three design questions go to the designer in one question.md: (a) a container's `mutable` [M5] in M1 (format.md 2.2 and 3.4); (b) where a tokenizer fault inside a JSON string is (render.md 7.1 against skein json.md 3.6); (c) whose world `hearth-tree-world` is (testing.md 8.1 against the plan's code-organization.md). Interim, until the answer to (b) reaches session 03: 03.1 starts; where a tokenizer fault inside a string or a key is waits for it, no test asserts it, and a 03.1 ready to land before it blocks, kind design, naming (b) (03-json.md, 03.1's Shape). (a) bears on 03.3 and (c) on no step of 03. A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+122. **hearth 03's three design questions answered** (design answer, hearth 03.1's ready check of 17:08).
+     The designer's answer, landed as hearth 3f16a56:
+
+
+     (a) **Refused.** Before M5, a container's `mutable` is refused at its
+     key, whatever its value, as its `ids` is: format.md 2.2 now lists "a
+     placement's `ids`, `binds`, `capabilities`, `network` and `bridge`, and
+     a container's `mutable`, whatever its value (3.4)", and 3.4 says
+     "Render accepts it in every layer placement may be in, on metal and a
+     VM, and on a container from M5 (2.2)". The fault is a later
+     milestone's key (render.md 7.2's `schema` row), not a field the kind
+     never takes. So 03.3 refuses it as it refuses `ids` and `binds`
+     (`Shape::Unknown`, in `a_placement_field_m1_lacks_is_refused_at_its_key`,
+     with `true` and `false` rows), not as `Shape::Misplaced { field: Mutable }`.
+     `Field::Mutable` stays, for a `mutable` that is not a bool.
+
+     (b) **The tokenizer's position stands.** render.md 7.1 now says: "In a
+     JSON string or key, a fault of what is written, which skein's tokenizer
+     finds (`Escape`, `Surrogate`, `Utf8`, `Control`, `StringTooLong`), is
+     where the tokenizer places it: the first byte of the character or the
+     escape at fault (skein's json.md, 3.6). A fault of the text decoded,
+     which hearth finds once the tokenizer has read the string (U+0000, a
+     name out of form, an expression's syntax), is at its opening quote."
+     In 03.1, the interim goes: `Failed(e)` is `Error { at: position(),
+     fault: Json(e) }` in a string or a key too, and `Nul` stays at the
+     opening quote. 03.1 gains
+     `a_bad_escape_in_a_string_or_a_key_fails_at_its_backslash` (`"a\q"`,
+     as a value and as a key). 03.2's reference is unchanged: skein 02's
+     reference checks a `Json` fault's error and position.
+
+     (c) **The landed crate keeps the name.** `hearth-tree-world` is the
+     tree's world crate. testing.md 8.1's row is now
+     "`hearth-protocol-tree`'s records, cut and mutated, its machine world
+     (2.4); from M2, also the tree helper's domain, on files with namespace
+     ids", from M1. testing.md 2.9's `tests/<name>` is
+     "hearth-<name>-world: one subject's domain and machine worlds (2.4)".
+     The plan's code-organization.md (:37) and 39-tree-world.md stand
+     unchanged. No step of 03 changes.
+
 ## For the user
 
 The long-term choices the user may veto:
