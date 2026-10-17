@@ -17,7 +17,7 @@ pub enum Interpolated {
 /// Compiles UTF-8, unescaped text supplied by the configuration decoder.
 pub fn compile(text: &[u8], limits: &Limits) -> Result<Interpolated, Error> {
     let openings = bytes::count(text, b"{", u32::MAX);
-    let mut out = List::with_capacity(openings.saturating_mul(3).saturating_add(1));
+    let mut out = List::with_capacity(crate::limits::instruction_capacity(openings));
     let mut cursor = 0;
     let mut plain = true;
     for at in 0..text.len() {

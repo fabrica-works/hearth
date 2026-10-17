@@ -4,7 +4,7 @@ use crate::{Does, Error, ErrorKind, Expected, Expression, Instruction, Names, ex
 use alloc::boxed::Box;
 use skein_lib::{List, Stack, bytes::copy_of};
 #[derive(Debug)]
-enum Block {
+pub(crate) enum Block {
     If { branch: u32, jumps: u32, at: u32 },
     Else { jumps: u32, at: u32 },
     For { enter: u32, at: u32 },

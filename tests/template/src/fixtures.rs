@@ -147,3 +147,58 @@ pub const STRING_KINDS: &[&str] = &[
     "unclosed",
     "interpolation",
 ];
+
+#[derive(Clone, Copy)]
+enum TemplateShape {
+    Text,
+    Outputs,
+    Lines,
+    Ifs,
+    Fors,
+    Expression,
+}
+const TEMPLATE_LIMIT_TEXTS: &[(&str, TemplateShape, bool)] = &[
+    ("template text", TemplateShape::Text, false),
+    ("one past template text", TemplateShape::Text, true),
+    ("template outputs", TemplateShape::Outputs, false),
+    ("one past template outputs", TemplateShape::Outputs, true),
+    ("template line table", TemplateShape::Lines, false),
+    ("one past template line table", TemplateShape::Lines, true),
+    ("nested conditions", TemplateShape::Ifs, false),
+    ("one past nested conditions", TemplateShape::Ifs, true),
+    ("nested loops", TemplateShape::Fors, false),
+    ("one past nested loops", TemplateShape::Fors, true),
+    ("template expression", TemplateShape::Expression, false),
+    ("one past template expression", TemplateShape::Expression, true),
+];
+/// The template entry point's text, instruction, line, nesting and expression bounds.
+#[must_use]
+pub fn templates_at_the_limits(limits: &Limits) -> Vec<(Vec<u8>, &'static str, bool)> {
+    TEMPLATE_LIMIT_TEXTS
+        .iter()
+        .map(|&(what, shape, past)| {
+            let length = limits.template as usize + usize::from(past);
+            let depth = limits.statements as usize + usize::from(past);
+            let text = match shape {
+                TemplateShape::Text => vec![b'a'; length],
+                TemplateShape::Lines => vec![b'\n'; length],
+                TemplateShape::Outputs => [b"{{a}}".repeat(length / 5), vec![b'a'; length % 5]].concat(),
+                TemplateShape::Ifs => {
+                    [b"{% if a %}".repeat(depth), b"body".to_vec(), b"{% endif %}".repeat(depth)].concat()
+                }
+                TemplateShape::Fors => {
+                    [b"{% for x in a %}".repeat(depth), b"body".to_vec(), b"{% endfor %}".repeat(depth)].concat()
+                }
+                TemplateShape::Expression => {
+                    [b"{{".to_vec(), vec![b'a'; limits.expression as usize + usize::from(past)], b"}}".to_vec()]
+                        .concat()
+                }
+            };
+            let text_sized = match shape {
+                TemplateShape::Text | TemplateShape::Outputs | TemplateShape::Lines => true,
+                TemplateShape::Ifs | TemplateShape::Fors | TemplateShape::Expression => false,
+            };
+            (text, what, text_sized)
+        })
+        .collect()
+}

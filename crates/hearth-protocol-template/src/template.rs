@@ -1,14 +1,14 @@
 //! Templates compiled left to right to flat instructions (format.md, 7.2; render.md, 8.3).
 mod raw;
 pub(crate) mod scan;
-mod statement;
+pub(crate) mod statement;
 pub(crate) mod whitespace;
 use crate::{Does, Error, Expression, Instruction, Template, expression, limits::Limits};
 use skein_lib::{List, bytes};
 /// Compiles a whole template, or gives its first refusal at a template offset.
 pub fn compile(text: &[u8], limits: &Limits) -> Result<Template, Error> {
     let (lines, openings) = scan::bytes(text, limits)?;
-    let capacity = openings.saturating_mul(3).saturating_add(1);
+    let capacity = crate::limits::instruction_capacity(openings);
     let mut out = List::with_capacity(capacity);
     let mut statements = statement::Statements::new(limits, openings);
     let mut cursor = 0;

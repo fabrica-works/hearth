@@ -43,6 +43,16 @@ fn parse(text: &[u8], limits: &Limits, conditional: bool) -> Result<Expression, 
     if text.len() > usize::try_from(limits.expression).expect("u32 fits usize") {
         return Err(Error { at: limits.expression, kind: ErrorKind::TooLong });
     }
+    // A one-byte name needs no pending grammar or temporary lexer buffer.
+    if text.len() == 1 {
+        let byte = *text.first().expect("one byte");
+        if byte.is_ascii_alphabetic() || byte == b'_' {
+            let mut out = List::with_capacity(1);
+            out.push(Operation { at: 0, op: Op::Name { name: copy_of(text), missing: Missing::Error } })
+                .expect("one name");
+            return Ok(Expression { operations: out.into_boxed(), values: 1 });
+        }
+    }
     let length = u32::try_from(text.len()).expect("length checked");
     let mut lexer = Lexer { text: copy_of(text), at: 0 };
     let mut parser = Parser {
