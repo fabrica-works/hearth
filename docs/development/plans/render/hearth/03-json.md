@@ -100,12 +100,10 @@ Shape (sketched): `Decoder::new(&Limits)` holds a `Tokenizer` under
 sends `Next`; each `Token` is placed at `tokenizer.position()` and `Next`
 follows, until `Done` after the root: `Decoded(value)`. The tokenizer's
 `Failed(e)` is `Failed(Error { at: position(), fault: Json(e) })`, or
-`Stream(f)` (interim: where a tokenizer fault inside a string or a key
-is, `Escape`, `Surrogate`, `Utf8`, `Control` or `StringTooLong`, waits
-for the designer's answer to the run's question (b) of 2026-10-17,
-render.md 7.1's opening quote against skein json.md 3.6's character at
-fault; until it reaches the session, no test asserts that position, and
-a 03.1 ready to land before it blocks, kind design, naming (b)); on a fault of its own the decoder answers `Failed` and closes
+`Stream(f)`: in a string or a key too, the tokenizer's position stands,
+"the first byte of the character or the escape at fault" (render.md 7.1;
+json.md 3.6), and only hearth's own faults in a string, `Nul`, are at its
+opening quote; on a fault of its own the decoder answers `Failed` and closes
 the tokenizer. `document::document` loops over the root's entries:
 `debian`, a task name with an object or `null`, or `Shape::Reserved`.
 Test shape: `src/tests/fixtures.rs`: `decode(&[u8])`, `decode_under(&[u8],
@@ -136,6 +134,8 @@ fn a_task_value_is_its_settings_object_or_null() {
 `_note` twice), `a_fraction_or_an_exponent_fails_at_the_number`,
 `integers_decode_to_i64_s_edges_and_fail_one_past`,
 `u0000_in_a_string_or_a_key_fails_at_its_opening_quote`,
+`a_bad_escape_in_a_string_or_a_key_fails_at_its_backslash` (`"a\q"`, a
+value and a key: `Json(Escape)` at the `\`, not the quote; render.md 7.1),
 `a_note_is_dropped_from_every_object`,
 `a_note_that_is_not_a_string_fails_at_its_value`,
 `a_document_that_is_not_an_object_fails_at_its_first_byte`,
@@ -245,8 +245,9 @@ Files: `src/{document,error}.rs`, `src/tests/document.rs`,
 `tests/config/tests/world.rs`. hearth 11.2 (Needs 03.3) translates it.
 Shape: `Layer.placement` (sketched). Refused: not an object, `null`
 included, at the value (format.md 3.4: never a removal); a field M1 lacks,
-at its key, a `schema` error (format.md 2.2; render.md 7.2); a wrong type,
-or a `kind` or `firmware` not listed, at the value; a placement is whole
+at its key, a `schema` error (format.md 2.2; render.md 7.2), a
+container's `mutable` among them, whatever its value (format.md 2.2, 3.4);
+a wrong type, or a `kind` or `firmware` not listed, at the value; a placement is whole
 where it is written (format.md 3.4): no `kind`, no `firmware` or
 `hardware` on metal or a VM, no `on` on a container, at the `{`;
 `firmware` or `hardware` on a container, `on` on anything else, at the key.
@@ -254,7 +255,8 @@ Test shape: `src/tests/document.rs`:
 `a_vm_s_placement_decodes_its_kind_firmware_and_hardware` (ion-prod),
 `a_container_s_placement_names_its_host_where_it_is_written` (chat-prod),
 `mutable_is_false_unless_a_placement_sets_it_true`,
-`a_placement_field_m1_lacks_is_refused_at_its_key` (`ids`, `binds`),
+`a_placement_field_m1_lacks_is_refused_at_its_key` (`ids`, `binds`; a
+container's `mutable`, `true` and `false`),
 `firmware_or_hardware_on_a_container_is_refused_at_its_key`,
 `on_for_anything_but_a_container_is_refused_at_its_key`,
 `a_kind_or_firmware_not_listed_is_refused_at_its_value`,
@@ -357,7 +359,7 @@ pub enum Shape {
     Settings { task: Box<[u8]> }, // a task's value neither an object nor null, at the value
     Reserved,                     // `placement`, `members` until 03.3, 03.4: removed by 03.4
     Placement,                    // 03.3: `placement` not an object
-    Unknown { field: Box<[u8]> }, // 03.3: a field placement lacks in M1, at its key
+    Unknown { field: Box<[u8]> }, // 03.3: a field placement lacks in M1, a container's `mutable` included, at its key
     Wrong { field: Field },       // 03.3: a wrong type, or a `kind` or `firmware` not listed
     Missing { field: Field },     // 03.3: no `kind`, `firmware`, `hardware` or `on` its kind needs, at the placement's `{`
     Misplaced { field: Field },   // 03.3: `firmware`, `hardware` on a container; `on` elsewhere

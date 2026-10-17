@@ -1069,8 +1069,15 @@ error
 - **An error's place is where the fault is read,** and an absent thing's
   is where its owner is: a missing setting at the key that gives its
   task to the target, a missing field at its object's `{`, a bad read
-  at the read, a fault inside a JSON string at its opening quote, and a
-  template's fault at its own line and column.
+  at the read, and a template's fault at its own line and column.
+- **In a JSON string or key,** a fault of what is written, which skein's
+  tokenizer finds (`Escape`, `Surrogate`, `Utf8`, `Control`,
+  `StringTooLong`), is where the tokenizer places it: the first byte of
+  the character or the escape at fault (skein's json.md, 3.6). A fault
+  of the text decoded, which hearth finds once the tokenizer has read
+  the string (U+0000, a name out of form, an expression's syntax), is
+  at its opening quote: a decoded string keeps no escapes, so its bytes
+  have no column of their own.
 
 ### 7.2 Kinds
 

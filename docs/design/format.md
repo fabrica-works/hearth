@@ -122,8 +122,9 @@ render.md. Open questions are in section 13.
 - **What a later milestone adds is refused before it.** A key or value
   this document marks [M5] or [M6] is an error at its key until that
   milestone builds it, as an undeclared field is: a placement's `ids`,
-  `binds`, `capabilities`, `network` and `bridge` (3.4), a download's
-  `artifact` (10.2), a task's `checks` (section 11). So nothing in a
+  `binds`, `capabilities`, `network` and `bridge`, and a container's
+  `mutable`, whatever its value (3.4), a download's `artifact` (10.2), a
+  task's `checks` (section 11). So nothing in a
   repository is silently ignored.
 
 ### 2.3 Templates and static files
@@ -300,7 +301,10 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 - **`mutable` is a slot's, never an output's.** Render puts it in the
   `boot` part (render.md, 4.3), so it enters the prepare key and no
   layer key: a mutable target builds the output its sealed twin would.
-  Render accepts it anywhere placement may be; whether a machine takes
+  Render accepts it in every layer placement may be in, on metal and a
+  VM, and on a container from M5 (2.2): before M5 a container's
+  `mutable` is refused at its key, as its `ids` is, since a container in
+  development is M5's (development.md, 3.4). Whether a machine takes
   it is the machine's configuration (machine.md, 8.1), and the run
   side's engine never orders one [M4] (development.md, 4.3). An
   environment such as `dev` sets it for all its targets.

@@ -186,7 +186,7 @@ testing/hearth-client-fake-<tool>   a fake of a tool only the client runs: incus
 testing/recordings/<tool>/<version> recordings of real runs (4.5)
 testing/repos                       the test IaC repositories, cue tasks included (8.2)
 testing/mirror                      the local mirror's pin, its extras, its fetch script (6.2)
-tests/<name>                        a domain's world, hearth-<name>-world
+tests/<name>                        hearth-<name>-world: one subject's domain and machine worlds (2.4)
 tests/system                        hearth-system-world: the system worlds (2.3)
 tests/client, tests/dev             the client's worlds, hearth-client-world and hearth-client-dev-world [M3, M3b]
 tests/*/tests/*.rs                  focused tests
@@ -1271,7 +1271,7 @@ standalone worlds [M3], and `hearth-client-dev-world` under `tests/dev`, with
 | `hearth-builder-world` | the builder's root and its children; tree helper and steward scripted | M1 |
 | `hearth-store-world` | the store, on fake btrfs | M2 |
 | `hearth-build-world` | plans and steps, on the fakes of `apt-helper`, mmdebstrap, dpkg-query and the target's tools, in sandboxes | M2 |
-| `hearth-tree-world` | the tree helper's domain, on files with namespace ids | M2 |
+| `hearth-tree-world` | `hearth-protocol-tree`'s records, cut and mutated, its machine world (2.4); from M2, also the tree helper's domain, on files with namespace ids | M1 |
 | `hearth-system-world` | the system worlds (2.3) | M2 |
 | `hearth-steward-world` | the steward's root and its children; builder and activator scripted (steward.md, section 8) | M3 |
 | `hearth-converge-world` | the desired revision and the orders | M3 |
