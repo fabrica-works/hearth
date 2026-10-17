@@ -19,6 +19,7 @@ hearth-git-world = { path = "tests/git" }
 hearth-fake-git = { path = "testing/hearth-fake-git" }
 sha1 = "=0.10.7"
 hearth-protocol-config = { path = "crates/hearth-protocol-config" }
+hearth-fake-mmdebstrap = { path = "testing/hearth-fake-mmdebstrap" }
 hearth-fake-machine = { path = "testing/hearth-fake-machine" }
 hearth-protocol-tree = { path = "crates/hearth-protocol-tree" }
 hearth-test-mirror = { path = "testing/hearth-test-mirror" }
