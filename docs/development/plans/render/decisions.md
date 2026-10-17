@@ -407,6 +407,15 @@ None yet.
      - `hearth_git_world::expect` gains the ten case names in `CASE_NAMES` as well as `Expected::Failed`.
      44.2's `step` ends a child by a pending TERM (`Exit::Signal(15)`) or a broken stdout (`Exit::Signal(13)`), as testing.md 3.5 lets a process end by a signal; 26.2's `Op::Exit` took only a code, so it becomes `Exit { exit: Exit }` (26-fake-git.md), and session 26 is steered to it.
 
+121. **hearth 03's Shapes against main** (ready check of hearth-03.1).
+     hearth 03's ready check, against hearth dce2e8b and skein b888da9 (fmt and clippy pass, nextest 261, fuzzy 5; skein 02.1, 02.2, 02.s1 and 02.3 landed), corrects 03-json.md; main moved since to hearth a6d270f and skein aaddf88, in no file 03 reads (`git diff --stat`: skein-lib's `digest.rs`, hearth's fake machine, template, tree and plan files):
+     1. The sketches' `tokenizer`, `Decoder::new`, `Decoder::waiting`, `worst_case`, `identifier` and `member` take `#[must_use]` (the root's `pedantic`, `Cargo.toml:60`).
+     2. 03.2's Shared becomes `Cargo.lock`: the `tests/*` glob (`Cargo.toml:3`), the switched `.config/nextest.toml`, `tests/clippy.toml` and four `tests/*/tests/fuzzy_*.rs` are on main, so the Rules' first-fuzzy-test bullet goes, with nothing in its place. 03.1 still adds `hearth-protocol-config` to `[workspace.dependencies]` by path.
+     3. 03.2's `world::check` gives a `Run` whose `Run::value: Option<Value>` is the document decoded: 03.3's and 03.4's proofs read it.
+     4. skein's lines: `tokenizer.rs` `Limits` :66, `Tokenizer::new` :290, `restart` :323, `up` :379, `down` :414, `text_capacity` :603; `tests/json/src/world.rs`'s `check` :279.
+     5. The opening's 03.1 is what hearth 11.2 needs through 03.3 (11-thin-story.md:175), not 03.1.
+     Three design questions go to the designer in one question.md: (a) a container's `mutable` [M5] in M1 (format.md 2.2 and 3.4); (b) where a tokenizer fault inside a JSON string is (render.md 7.1 against skein json.md 3.6); (c) whose world `hearth-tree-world` is (testing.md 8.1 against the plan's code-organization.md). Interim, until the answer to (b) reaches session 03: 03.1 starts; where a tokenizer fault inside a string or a key is waits for it, no test asserts it, and a 03.1 ready to land before it blocks, kind design, naming (b) (03-json.md, 03.1's Shape). (a) bears on 03.3 and (c) on no step of 03. A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

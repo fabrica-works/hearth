@@ -6,8 +6,8 @@ builds one `Value` per document, each value and key at the `Position`
 skein 02 gives its token, refusing what format.md, 2.2 refuses and
 dropping `_note`. Over it, `document::document` gives a configuration
 document's shape (format.md, 3.1 to 3.4, M1's): tasks with their settings
-or `null` and `debian` (03.1, through which hearth 11's thin story
-decodes), then `placement` (03.3) and `members` (03.4). 03.2 opens the
+or `null` and `debian` (03.1; hearth 11.2 needs through 03.3,
+11-thin-story.md:175), then `placement` (03.3) and `members` (03.4). 03.2 opens the
 machine world `tests/config` (`hearth-config-world`), its sweep and the
 worst case. hearth 04 adds declarations after this session. Nothing
 calls the machine until hearth 11's protocol layer routes it.
@@ -17,8 +17,8 @@ calls the machine until hearth 11's protocol layer routes it.
 - hearth's `format.md`: 2.1, 2.2, 2.4, 3.1 to 3.4, 3.6, 4.1, 4.3, 5.3
   (the `debian` bullet); `render.md`: 2.3, 3.1, 7.1 to 7.3, 8.1, 8.2,
   9.4; `README.md`: 4.2, 8.1 (the JSON row); `testing.md`: 2.1, 2.4, 2.9.
-- skein's `json.md`: 3.1 to 3.6, 6, 7; `tokenizer.rs` (`Limits` :56,
-  `Tokenizer::new` :279, `restart` :300, `up` :353, `down` :388) and
+- skein's `json.md`: 3.1 to 3.6, 6, 7; `tokenizer.rs` (`Limits` :66,
+  `Tokenizer::new` :290, `restart` :323, `up` :379, `down` :414) and
   `collector.rs` (`Collector` :179, `up` :328, `tokenizer_env` :406) of
   `crates/skein-json/src/`; skein 02's `Position`.
 - `findings/skein.md`, 2; `findings/skein-testing.md`, 2, 3, 7;
@@ -43,7 +43,7 @@ calls the machine until hearth 11's protocol layer routes it.
 
 - **One `Decoder` per document,** one event above and one demand below a
   call as the collector's `UP_MAX_OUT`: the tokenizer restarts only after
-  its own outcome (`tokenizer.rs:300`).
+  its own outcome (`tokenizer.rs:323`).
 - **One owned tree:** objects as `Box<[Entry]>` in their keys' byte order
   (format.md, 4.3); open, an object's keys sit in a `skein_lib::Map` of
   `Limits::keys`, an array's elements in a `List` regrown by doubling.
@@ -57,7 +57,7 @@ calls the machine until hearth 11's protocol layer routes it.
   key of its object for the 4,096 (format.md 2.2); a shape fault is
   `decode` (render.md 7.2).
 - **The tokenizer's `string` and `number` are the document's length**
-  (`tokenizer.rs:574`); `chunk` is 4 KiB. A non-string `_note` is refused.
+  (`tokenizer.rs:603`); `chunk` is 4 KiB. A non-string `_note` is refused.
 - **One `Document` for the four configuration documents:** what each place
   may hold and what `on` names are composition's (render.md, 7.2; hearth
   12). `debian` stays a `Value` (hearth 17 types it).
@@ -74,10 +74,6 @@ calls the machine until hearth 11's protocol layer routes it.
   log origin/main --all-match --grep='^Plan: render$'
   --grep='^Step: skein-02\.' --format=%H -1`. With no skein in `Cargo.lock` yet, no repin
   commit: the crate's first `heavy cargo check` pins it.
-- **The first fuzzy test:** if 03.2's `fuzzy_documents.rs` is hearth's
-  first `tests/*/tests/fuzzy_*.rs`, 03.2 replaces both profiles' filters
-  in `.config/nextest.toml` with the two lines its comments give and
-  removes the comments; rebased onto a switched `main`, it drops its switch.
 - **No recursion (a review guide: clippy lints only `Vec`, `String`); the
   shipped limits:** open containers live in a
   `skein_lib::Stack` of `Limits::depth`; tests take `limits::SHIPPED`, or
@@ -104,7 +100,12 @@ Shape (sketched): `Decoder::new(&Limits)` holds a `Tokenizer` under
 sends `Next`; each `Token` is placed at `tokenizer.position()` and `Next`
 follows, until `Done` after the root: `Decoded(value)`. The tokenizer's
 `Failed(e)` is `Failed(Error { at: position(), fault: Json(e) })`, or
-`Stream(f)`; on a fault of its own the decoder answers `Failed` and closes
+`Stream(f)` (interim: where a tokenizer fault inside a string or a key
+is, `Escape`, `Surrogate`, `Utf8`, `Control` or `StringTooLong`, waits
+for the designer's answer to the run's question (b) of 2026-10-17,
+render.md 7.1's opening quote against skein json.md 3.6's character at
+fault; until it reaches the session, no test asserts that position, and
+a 03.1 ready to land before it blocks, kind design, naming (b)); on a fault of its own the decoder answers `Failed` and closes
 the tokenizer. `document::document` loops over the root's entries:
 `debian`, a task name with an object or `null`, or `Shape::Reserved`.
 Test shape: `src/tests/fixtures.rs`: `decode(&[u8])`, `decode_under(&[u8],
@@ -164,16 +165,14 @@ Files: `src/json.rs`. `tests/config/` (ordinary Rust, its own `[lints]`,
 `findings/skein-testing.md`, 7): `Cargo.toml` (`skein-lib`, `skein-json`,
 `skein-world`, the crate; dev `skein-heap`), `src/{lib,world,reference,
 generate,examples,fixtures}.rs`, `examples/*.json`,
-`tests/{world,memory,fuzzy_documents}.rs`. Shared: root `Cargo.toml`
-(the `tests/*` glob, if absent), `Cargo.lock`, `.config/nextest.toml` (the switch, if first),
-`tests/clippy.toml` (skein's, copied, if no world has made it).
+`tests/{world,memory,fuzzy_documents}.rs`. Shared: `Cargo.lock`.
 Shape: `json::worst_case(&Limits)`: the tokenizer's, the open containers
 and their keys' maps, and the value being built: at most `document / 2 +
 1` values, their text, an open array's doubling.
 Test shape: `world::Settings::{calm, chaotic}`, `world::limits(rng)`
 (tiny now and then, so each fault falls), `world::check(document,
-&Settings, seed) -> Run`, after skein's `tests/json/src/world.rs` (:30 to
-:119, :271), the side below `skein_world::stream::Wire`
+&Settings, seed) -> Run`, whose `Run::value: Option<Value>` is the document decoded (03.3's and 03.4's proofs read it), after skein's `tests/json/src/world.rs` (:30 to
+:119, :279), the side below `skein_world::stream::Wire`
 (`testing/skein-world/src/stream.rs:16`), ended early or failed by the
 world. `check` holds each run to `reference::decode(document, &Limits)`,
 recursive, sharing no code with the machine (std judges UTF-8 and
@@ -310,7 +309,7 @@ thing starts.
 pub struct Limits { pub document: u32, pub depth: u32, pub keys: u32 }
 pub const SHIPPED: Limits = Limits { document: 1_048_576, depth: 32, keys: 4_096 };
 /// `depth`, `length`, `string` and `number` from `limits`, chunks of 4 KiB.
-pub fn tokenizer(limits: &Limits) -> skein_json::tokenizer::Limits;
+#[must_use] pub fn tokenizer(limits: &Limits) -> skein_json::tokenizer::Limits;
 // hearth_protocol_config::json (format.md, 2.2; render.md, 3.1)
 /// From the side above: a `Decode` gets one answer unless `Close` comes first.
 pub enum Request { Decode, Close }
@@ -320,12 +319,12 @@ pub enum Event { Decoded(Value), Failed(Error), Closed }
 pub enum Waiting { Decode, Bytes, Close, Nothing }
 /// One document's decoder: the tokenizer, the open containers, the state.
 pub struct Decoder { /* private */ }
-impl Decoder { pub fn new(limits: &Limits) -> Decoder; pub fn waiting(&self) -> Waiting; }
+impl Decoder { #[must_use] pub fn new(limits: &Limits) -> Decoder; #[must_use] pub fn waiting(&self) -> Waiting; }
 pub const UP_MAX_OUT: skein_json::tokenizer::MaxOut; pub const DOWN_MAX_OUT: skein_json::tokenizer::MaxOut; // each one above, one below
 pub fn up(decoder: &mut Decoder, env: &Env<Limits>, ev: Up, above: &mut Queue<Event>, below: &mut Queue<Down>);
 pub fn down(decoder: &mut Decoder, env: &Env<Limits>, rq: Request, above: &mut Queue<Event>, below: &mut Queue<Down>);
 /// The most a decoder holds, its value being built included (03.2).
-pub fn worst_case(limits: &Limits) -> Option<u64>;
+#[must_use] pub fn worst_case(limits: &Limits) -> Option<u64>;
 /// A value, at its first byte.
 pub struct Value { pub at: Position, pub kind: Kind }
 /// What a value is.
@@ -391,8 +390,8 @@ pub struct Member { pub name: Box<[u8]>, pub at: Position, pub layer: Option<Lay
 /// The document a decoded value is, or why not.
 pub fn document(value: Value) -> Result<Document, Error>;
 // hearth_protocol_config::names (format.md, 2.4)
-pub fn identifier(name: &[u8]) -> bool; // a task, a setting, an object field
-pub fn member(name: &[u8]) -> bool;     // 03.4: a base, an environment, a member
+#[must_use] pub fn identifier(name: &[u8]) -> bool; // a task, a setting, an object field
+#[must_use] pub fn member(name: &[u8]) -> bool;     // 03.4: a base, an environment, a member
 ```
 
 ## Questions to raise when reached
