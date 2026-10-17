@@ -372,6 +372,18 @@ None yet.
 
      The check's runs, with 14.1 and 14.2 built from the sketches: fmt and clippy clean; default 222 of 222; fuzzy 4 of 4. Its search found no user of `Limits`, `SHIPPED` or `Missing` that the Files miss. A further case listed under the wrong kind of fault moves to its kind's test, and the commit body lists it.
 
+118. **hearth 27's Shapes against main** (ready check of hearth-27.1).
+     hearth 27's Shapes against main (ready check of hearth-27.1), against hearth b961a12 and skein 2112fce: `hearth/27-fake-mmdebstrap.md` corrected. No hearth 26 or 27 step had landed, so its names were checked against 26's plan.
+
+     1. The quote of testing.md 3.6 takes its whole relations row (`:416`): "Depends, Pre-Depends, Provides, Conflicts, with their version relations".
+     2. The fixtures' index is the pin's, `20261017T143929Z` (`testing/mirror/pin`: `archive 20261017T143929Z`), which 08's cache holds, not `20260928T022309Z`; the pin's index has 78,830 relation fields. 41-resolve-recordings.md:58 still names x1's index of `20260928T022309Z`, with counts the 41 check reads against the pin.
+     3. 27.1's Files gain `src/lib.rs` (`pub mod hearth;`, unless 26.2 made it public): 26.2's lib.rs re-exports `hearth::Machine` (26-fake-git.md:129), and 27's tests name `hearth_fake_machine::hearth::universe::Universe`.
+     4. 27.2's Files gain the `pub mod`s `mirror` and `draw`, and `src/tests.rs` (`mod mirror;`).
+     5. The sketches' `pub fn`s that return a value carry `#[must_use]`, elided: 18 fail the workspace's pedantic `must_use_candidate` without it.
+     6. `DEBIAN` is invented in the index's shape: Debian keeps the initramfs alternation on `linux-image-<version>-amd64`, and the pin has dracut 112-7, initramfs-tools 0.151 and tiny-initramfs 0.1-8.
+
+     The check's runs, on stubs of 27's sketches: clippy clean once `#[must_use]` was added; default 224 of 224 landed tests (3 stubs `unimplemented!()`); fuzzy 4 of 4. The closure counts 66 and 157 were not checked. A further fixture or comment that names the old timestamp takes the pin's, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

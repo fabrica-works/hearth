@@ -23,8 +23,8 @@ scenario are hearth 46.
 - **The universe** (3.6): "Drawn from the seed, and shaped like Debian's
   and like the recording of the local mirror (6.2). A fake mirror serves
   it at snapshot timestamps"; "package name, version, architecture,
-  priority, Essential, section / relations Depends, Pre-Depends, Provides
-  / archive Installed-Size; the .deb's size and SHA-256, as Packages lists
+  priority, Essential, section / relations Depends, Pre-Depends, Provides,
+  Conflicts, with their version relations / archive Installed-Size; the .deb's size and SHA-256, as Packages lists
   them"; "A timestamp between two snapshots answers as the earlier one";
   "a bump changes some versions"; "Variants as mmdebstrap defines them".
 - **For real** (decisions.md, 14): "computes the closure from Essential,
@@ -47,8 +47,10 @@ scenario are hearth 46.
   are Policy 7.1's: alternatives, version relations, an architecture
   qualifier (`perl:any` is in test-boot's closure) kept and matched by
   name, M1 having one architecture; `all` counts as the native one. In
-  x1's forky index at `20260928T022309Z`, all 78,685 relation fields are
-  in the form the writer prints, so kept fields round-trip byte for byte.
+  x1's forky index at `20260928T022309Z`, all 78,685 relation fields were
+  in the form the writer prints, so kept fields round-trip byte for byte;
+  the pin's, `20261017T143929Z` (`testing/mirror/pin`), has 78,830
+  `Depends`, `Pre-Depends`, `Provides` and `Conflicts` fields.
 - **Resolution, the plan's model of apt,** held to apt by hearth 46.2: the
   variant's packages, then `--include`'s, all marked before any
   dependency is followed (apt-get marks its requests first); then, in
@@ -78,7 +80,7 @@ scenario are hearth 46.
 ## Rules that bind it
 
 - **No expected value computed by the code under test:** stanzas pasted
-  from x1's forky index at `20260928T022309Z` (08's cache, `checked/main/
+  from the pin's forky index, `20261017T143929Z` (08's cache, `checked/main/
   binary-amd64/Packages`; once, `awk -v RS= '$1=="Package:" && $2=="mawk"'`
   of it), digests and sizes from
   `sha256sum` and `wc -c`, version orders from `dpkg --compare-versions`.
@@ -92,7 +94,8 @@ scenario are hearth 46.
 Scope: 3.6's index fields as typed packages; Debian's version order; a
 `Packages` index read and written.
 Needs: hearth 26 (the machine and its `hearth` half).
-Files: `testing/hearth-fake-machine/src/hearth.rs` (two `pub mod`s); new
+Files: `testing/hearth-fake-machine/src/hearth.rs` (two `pub mod`s),
+`src/lib.rs` (`pub mod hearth;`, unless 26.2 made it public); new
 `src/hearth/universe.rs`, `src/hearth/version.rs`; tests `src/tests.rs`,
 `src/tests/universe.rs` (new), `src/tests/fixtures.rs` (`MAWK`, mawk's
 stanza whole; `MAWK_KEPT`, its kept fields, 306 bytes; `TINY_INITRAMFS`).
@@ -122,7 +125,7 @@ Test shape: `src/tests/universe.rs`, each under 20 ms:
 ```rust
 #[test]
 fn a_real_stanza_written_back_keeps_its_kept_fields_byte_for_byte() {
-    // mawk's stanza, whole, from x1's forky main/binary-amd64/Packages at 20260928T022309Z.
+    // mawk's stanza, whole, from x1's forky main/binary-amd64/Packages at 20261017T143929Z, the pin's.
     let universe = Universe::read(fixtures::MAWK).expect("a real stanza reads");
     assert_eq!(universe.packages().len(), 1);
     assert_eq!(&*universe.index(), fixtures::MAWK_KEPT, "Maintainer, Description, Multi-Arch, Homepage, Tag and MD5sum dropped");
@@ -140,7 +143,8 @@ Scope: suites, snapshots, bumps (3.6); `InRelease`; the mirror on the
 machine's network (3.5); a universe drawn from the seed.
 Needs: 27.1 (`Universe`); `skein_lib::sha256` is in hearth's pin.
 Files: new `src/hearth/mirror.rs`, `src/hearth/draw.rs`; `src/hearth.rs`
-(`served`, `serve`, `unserve`, `reach`); tests `src/tests/mirror.rs`
+(two more `pub mod`s, `mirror` and `draw`; `served`, `serve`, `unserve`,
+`reach`); tests `src/tests.rs` (`mod mirror;`), `src/tests/mirror.rs`
 (new), `src/tests/fixtures.rs` (`forky(universe) -> Suite`; `ARCHIVE`).
 Shape: the sketch's `mirror` and `draw`. `Suite::new` renders each
 component's index, then `InRelease`: `Origin`, `Label`, `Suite`,
@@ -191,7 +195,9 @@ Files: root `Cargo.toml` (shared: `hearth-fake-mmdebstrap`), `Cargo.lock`
 (`hearth-fake-machine`; dev `skein-lib`), `clippy.toml`, `src/lib.rs`
 (`#![forbid(unsafe_code)]`, `extern crate alloc`), `src/resolve.rs`;
 tests `src/tests.rs`, `src/tests/resolve.rs`, `src/tests/fixtures.rs`
-(new: `DEBIAN`, 15 stanzas in `KEPT`'s form: base-files, base-passwd,
+(new: `DEBIAN`, 15 invented stanzas in `KEPT`'s form, shaped like the
+pin's index, which keeps linux-image-amd64's initramfs alternation on
+`linux-image-<version>-amd64`; the fixture folds it in: base-files, base-passwd,
 dpkg, libc6, mawk, gawk, debconf, adduser, apt; exim4-daemon-light and
 postfix, each providing and conflicting with `mail-transport-agent`;
 linux-image-amd64 depending on `dracut (>= 110) | initramfs-tools (>=
@@ -245,7 +251,9 @@ Size: at most 230 lines. Removes: nothing.
 ## Interface sketches
 
 Derives are elided where a line names none (`Clone`, `PartialEq`, `Eq`,
-`Debug`; `Copy` where it holds); elided fields are private.
+`Debug`; `Copy` where it holds); elided fields are private. Every `pub fn`
+that returns a value and takes no `&mut` carries `#[must_use]`, elided like
+the derives.
 
 ```rust
 // testing/hearth-fake-machine/src/hearth/version.rs (27.1)
