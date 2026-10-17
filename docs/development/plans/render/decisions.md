@@ -623,6 +623,9 @@ None yet.
      3. 32.1's commit body gives the count by file and names ruling 136.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+137. **Fields, not an array read by constant index** (steer of 18:24).
+     The hourly check of 2026-10-17T18:24:28Z saw a fixed array read by a constant index a second time, after the 17:12 steer's Pass on text had reached the sessions: hearth 14.1's `tests/render/src/expressions.rs:19` (`pub values: [Value; 5]`, read as `values[0]` to `[4]` there and in `reference.rs:32-36`), and the one-row tables left in fake-machine `src/tests/files.rs` by 27.2 (`CREATED[0]` :11, `DENIED[0]` :54, `ROOT[0]` :138, `CONTENTS[0]` :182, `LOCKS[0]` to `[3]` :147-151). The plan's README, Rules, gains "No fixed array read by a constant index" (development.md, 14.4): a test or a world names fixed elements as struct fields, or asserts the value as a literal; an increment that edits a test file first fixes its one-row tables and constant-index reads. Landed files stay until an increment edits them.
+
 ## For the user
 
 The long-term choices the user may veto:

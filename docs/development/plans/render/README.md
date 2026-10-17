@@ -299,6 +299,12 @@ the closing repins (Repin). The increments of each session are in its file.
   - A test's own time in a session file ("under 20 ms", "under 0.5 s")
     is an aim, development.md 5.6's ceiling: a test the gate's log flags
     `SLOW` is made cheaper before its increment lands.
+- **No fixed array read by a constant index** (ruling 137; the steers of
+  17:12 and 18:24 saw it twice): a test or a world names fixed elements
+  as struct fields (`Roots { target, debian, settings, tasks, exports }`),
+  or asserts the value as a literal, never `values[0]` or `TABLE[2]`. An
+  increment that edits a test file first fixes its one-row tables and
+  constant-index reads.
 - **One land at a time in each repository:** a session runs `land` only
   under its repository's lock, held for the whole of `land`, its retries
   included: `flock ~/src/rust/tmp/hearth/render/land-hearth.lock land …`
