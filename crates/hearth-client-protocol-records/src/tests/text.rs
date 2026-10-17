@@ -72,7 +72,7 @@ fn the_terminal_record_of_a_render_prints_nothing() {
 fn a_record_past_its_limit_is_refused_too_long() {
     let spec = Record::Spec(fixtures::x1_prod());
     assert_eq!(
-        form::print(Form::Text, &spec, None, &limits::Limits { record: 64 }),
+        form::print(Form::Text, &spec, None, &limits::Limits { record: 64, ..limits::SHIPPED }),
         Err(Refusal::TooLong),
         "refused before allocation"
     );

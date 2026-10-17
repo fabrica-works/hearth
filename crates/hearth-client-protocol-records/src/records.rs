@@ -47,6 +47,11 @@ impl PartRecord {
             Self::Config(_) => b"config",
         }
     }
+    pub(crate) fn json(&self, json: &mut skein_json::writer::Encoder) {
+        match self {
+            Self::Config(config) => config.json(json),
+        }
+    }
     pub(crate) fn text(&self, lines: &mut Lines) {
         match self {
             Self::Config(config) => config.text(lines),

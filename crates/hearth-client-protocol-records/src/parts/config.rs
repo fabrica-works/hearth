@@ -40,3 +40,36 @@ impl Config {
         }
     }
 }
+
+impl Config {
+    pub(crate) fn json(&self, json: &mut skein_json::writer::Encoder) {
+        json.object_start();
+        json.key(b"tree");
+        json.object_start();
+        for entry in &*self.tree {
+            json.key(&entry.path);
+            json.object_start();
+            match &entry.node {
+                Node::File { content_digest, mode, owner, group } => {
+                    json.key(b"content_digest");
+                    crate::form::json::digest(json, content_digest);
+                    json.key(b"group");
+                    json.string(group);
+                    json.key(b"kind");
+                    json.string(b"file");
+                    json.key(b"mode");
+                    let mut digits = [b'0'; 4];
+                    for (digit, shift) in digits.iter_mut().zip([9_u32, 6, 3, 0]) {
+                        *digit = b'0'.saturating_add(u8::try_from((mode >> shift) & 7).expect("octal digit"));
+                    }
+                    json.string(&digits);
+                    json.key(b"owner");
+                    json.string(owner);
+                }
+            }
+            json.object_end();
+        }
+        json.object_end();
+        json.object_end();
+    }
+}

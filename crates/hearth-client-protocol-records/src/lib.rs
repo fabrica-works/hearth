@@ -6,6 +6,7 @@ pub mod form;
 pub mod limits;
 pub mod outcome;
 pub mod parts;
+pub mod printer;
 pub mod records;
 /// The client protocol's major version (client/README.md, 3.2).
 pub const CLIENT_VERSION: u32 = 1;

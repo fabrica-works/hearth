@@ -66,3 +66,44 @@ impl Meta {
         lines.put(b"\n");
     }
 }
+
+impl Meta {
+    pub(crate) fn json(&self, json: &mut skein_json::writer::Encoder) {
+        json.object_start();
+        json.key(b"base");
+        json.string(&self.base);
+        json.key(b"environment");
+        json.string(&self.environment);
+        if let Some(member) = &self.member {
+            json.key(b"member");
+            json.string(member);
+        }
+        json.key(b"placement");
+        json.object_start();
+        if let Some(firmware) = self.placement.firmware {
+            json.key(b"firmware");
+            json.string(match firmware {
+                Firmware::Efi => b"efi",
+                Firmware::Bios => b"bios",
+            });
+        }
+        if let Some(hardware) = &self.placement.hardware {
+            json.key(b"hardware");
+            json.string(hardware);
+        }
+        json.key(b"kind");
+        json.string(match self.placement.kind {
+            PlacementKind::Metal => b"metal",
+            PlacementKind::Vm => b"vm",
+            PlacementKind::Container => b"container",
+        });
+        if let Some(on) = &self.placement.on {
+            json.key(b"on");
+            json.string(on);
+        }
+        json.object_end();
+        json.key(b"target");
+        json.string(&self.target);
+        json.object_end();
+    }
+}
