@@ -181,7 +181,9 @@ Don't: read git's standard error beyond its lines; keep a tail of a run
 that succeeded; refuse a file under `hosts/<base>/` that is not `.json`
 (a `file` setting's, hearth 18); check that `templates/` are used
 (hearth 18.2).
-Size: at most 300 lines.
+Size: at most 300 lines; it lands at its count up to 1,100 lines, under the
+README's other conditions for an increment past twice its Size (ruling 150:
+916 prepared before ruling 147's hunk call).
 Removes: git's standard error to `/dev/null` (11.2's transitional
 piece); 11.2's "every `Failed` is operational"; 11.1's
 `a_base_env_without_its_environment_makes_no_target` (now an error);
