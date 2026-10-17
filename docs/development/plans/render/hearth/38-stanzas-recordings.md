@@ -83,8 +83,10 @@ gives apt and their names under `<scratch>/root/var/lib/apt/lists/` (5.3;
 store.md, 6.4).
 Needs: hearth 07.2 (the world crate).
 Files: `src/packages.rs`, `src/lists.rs`, `src/limits.rs` (`stanza`,
-`chunk`, `filename`), `src/lib.rs`, `src/tests/{fixtures,packages}.rs` (fixtures gain
-`opened_list()`, `apt_stanza()`); world:
+`chunk`, `filename`), `src/lib.rs`, `src/vector.rs` (`Component::bytes`
+`pub(crate)`, for `lists::indices`), `src/tests.rs` (`mod packages;`),
+`src/tests/{fixtures,packages}.rs` (fixtures gain `opened_list()`,
+`apt_stanza()`); world:
 `src/generate.rs` (`index`), `src/reference.rs`, `src/world.rs`
 (`read_index`), `tests/mmdebstrap.rs`, `tests/fuzzy_mmdebstrap.rs`,
 `tests/memory.rs`.
@@ -149,8 +151,9 @@ exit: hearth 34's layout; `lists`; `<version>` as 41 names it):
 `no-candidate` (a virtual package alone), `unsatisfiable`,
 `unreachable-mirror` and `absent-snapshot` (its `InRelease` 404); and,
 beside test-min's, `stanzas`, its closure's, cut from the list apt left.
-Files: world: `Cargo.toml` (dev-dependencies `hearth-recordings`, and
-`hearth-test-mirror` for the pin), `Cargo.lock`, `src/recordings.rs` (new),
+Files: world: `Cargo.toml` (`[dependencies]` gain `hearth-recordings`, and
+`hearth-test-mirror` for the pin: `src/` is the world's library), `Cargo.lock`,
+`src/lib.rs` (`pub mod recordings;`), `src/recordings.rs` (new),
 `src/fixtures.rs` (each case's
 inputs, from `testing/mirror`'s pin and `testing/repos`' targets),
 `expect/<version>/<case>.expect` (new), `tests/recordings.rs` (new),
@@ -158,7 +161,7 @@ inputs, from `testing/mirror`'s pin and `testing/repos`' targets),
 lists}.rs` where a recording disagrees with their Shape.
 Shape: `recordings::all() -> Vec<Case>` wraps
 `hearth_recordings::all("mmdebstrap")` (the kit's `Recording`, no second
-reader) with its expectation (`lists` among its files, its stanzas when it has them); an
+reader; its `version` names `expect/<version>/`) with its expectation (`lists` among its files, its stanzas when it has them); an
 `.expect` is `#` lines, then `inst <name> <version> <architecture>` lines,
 `fetched <bytes>` (apt's `Fetched` figure, 0 when it prints none; 5.4),
 then `ended`, or `cause <cause>` and `tail <line>` lines; when one is

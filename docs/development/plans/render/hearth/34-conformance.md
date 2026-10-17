@@ -41,7 +41,7 @@ kit and the scenario.
   (render.md 8.2).
 - **The recordings' layout** (code-organization.md, 3):
   `testing/recordings/<tool>/<version>/<case>/` holds a file for each
-  `Recording` field (34.1): `argv` an argument a line, argv[0] first; `env`
+  `Recording` field (34.1) but `version`, the directory's own name: `argv` an argument a line, argv[0] first; `env`
   `NAME=value` a line; `dir` always, `stdin` where read (testing.md, 4.5); `exit`
   `<code>` or `signal <n>`; `expect` in the tool's world's format, where
   the scenario knows it. `<version>` is `git --version` less `git version
@@ -96,9 +96,10 @@ Shape:
   not binary(/^conformance_/)` on the default and fuzzy filters, and
   `default-filter = "not binary(/^conformance_/)"` on `measure`. No other
   `global-timeout` or `period` line changes (README, Done when 8).
-- `hearth_recordings`: `Recording { argv, env, dir, stdin, stdout, stderr,
-  exit, expect }` (`stdin` and `expect` optional), `read(tool, version,
-  case)`, `all(tool)` (every version's), `write(..)` (the case's directory
+- `hearth_recordings`: `Recording { version, argv, env, dir, stdin, stdout,
+  stderr, exit, expect }` (`stdin` and `expect` optional), `read(tool,
+  version, case)`, `all(tool) -> Vec<(Box<str>, Recording)>` (each case's
+  name and its recording, every version's, by version then case), `write(..)` (the case's directory
   replaced whole), `Mask::new(scratch)`, `recording_on()`.
 - `run::git(args, dir, stdin) -> Run`, real git from ordinary Rust:
   `Command::new` of `invocation::GIT`, `env_clear` then

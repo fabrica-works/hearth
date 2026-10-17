@@ -226,6 +226,16 @@ None yet.
 
      The check compiled the corrected sketches; hearth-lib's suite passed, 23 of 23, the plan's digests among them. Any further copy of these paths in 11's text takes the same form, and the commit body lists it.
 
+105. **hearth 38's Shapes against main** (ready check of hearth-38.1).
+     hearth 38's ready check, against hearth b62b498 (07.1's crate landed) and skein 089ed83: its Files corrected in `hearth/38-stanzas-recordings.md`, and the recordings' version given in `hearth/34-conformance.md`.
+
+     1. 38.1's Files gain `src/vector.rs`: `Component::bytes` is private (`crates/hearth-protocol-mmdebstrap/src/vector.rs:59`, `fn bytes(self)`), and `lists::indices` builds `<component>/binary-<arch>/Packages` with it: it becomes `pub(crate)` (E0624 otherwise; clippy clean once it is).
+     2. 38.1's Files gain `src/tests.rs`, which gains `mod packages;` (it reads `mod fixtures; mod output; mod vector;` on main).
+     3. 38.2's world takes `hearth-recordings` and `hearth-test-mirror` as `[dependencies]`, not dev-dependencies: `tests/mmdebstrap/src/` is the world's library (`src/lib.rs`, and its `[dependencies]` already hold `skein-world`), which a dev-dependency does not reach (E0433). Its Files gain `src/lib.rs` (`pub mod recordings;`).
+     4. The recordings' version: 38.2 finds `expect/<version>/<case>.expect`, and 34.1's `all(tool)` gave no version. 34.1's `Recording` gains `version`, its directory's own name, no file; `all(tool) -> Vec<(Box<str>, Recording)>`, each case's name and its recording, every version's, by version then case. 44 and 46 iterate `(case name, Recording)` as they did. testing.md 4.5 fixes the layout, not the kit's API.
+
+     The check compiled 38.1's sketches against the landed crate under clippy once 1 was made; the workspace's suites passed but for the sketched test on a placeholder fixture (65 of 66), fuzzy 2 of 2. A further file a change reaches (the world's `src/fixtures.rs` for `tests/memory.rs`, say) joins the increment's Files, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:
