@@ -144,11 +144,29 @@ pub fn duplicate() -> crate::errors::Error {
 #[derive(Clone, Copy, Debug)]
 pub enum SchemaInput {
     Task(&'static [u8]),
+    Wrong(&'static crate::errors::TypeName),
+    Enum { value: &'static [u8], listed: &'static [&'static [u8]] },
+    Below(i64),
+    Above(i64),
+    Length(i64),
+    Null,
+    UndeclaredField { field: &'static [u8], declared: &'static [&'static [u8]] },
+    MissingField(&'static [u8]),
     Unread { task: &'static [u8], setting: &'static [u8], declared: &'static [&'static [u8]] },
 }
 pub fn schema_fault(input: SchemaInput) -> crate::errors::Schema {
     use crate::errors::Schema;
     match input {
+        SchemaInput::Wrong(expected) => Schema::Wrong { expected: expected.clone() },
+        SchemaInput::Enum { value, listed } => Schema::Enum { value: copy_of(value), listed: schema_names(listed) },
+        SchemaInput::Below(min) => Schema::Below { min },
+        SchemaInput::Above(max) => Schema::Above { max },
+        SchemaInput::Length(max_length) => Schema::Length { max_length },
+        SchemaInput::Null => Schema::Null,
+        SchemaInput::UndeclaredField { field, declared } => {
+            Schema::UndeclaredField { field: copy_of(field), declared: schema_names(declared) }
+        }
+        SchemaInput::MissingField(field) => Schema::MissingField { field: copy_of(field) },
         SchemaInput::Task(task) => Schema::Task { task: copy_of(task) },
         SchemaInput::Unread { task, setting, declared } => {
             let mut names = skein_lib::List::with_capacity(u32::try_from(declared.len()).expect("fixture count"));
@@ -158,4 +176,12 @@ pub fn schema_fault(input: SchemaInput) -> crate::errors::Schema {
             Schema::Unread { task: copy_of(task), setting: copy_of(setting), declared: names.into_boxed() }
         }
     }
+}
+
+fn schema_names(names: &[&[u8]]) -> Box<[Box<[u8]>]> {
+    let mut copied = skein_lib::List::with_capacity(u32::try_from(names.len()).expect("fixture count"));
+    for name in names {
+        copied.push(copy_of(name)).expect("room");
+    }
+    copied.into_boxed()
 }

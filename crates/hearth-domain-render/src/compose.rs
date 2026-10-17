@@ -92,6 +92,7 @@ fn base_document(documents: &Documents, base: &[u8]) -> Option<u32> {
 /// Ordered layers and each value's origin (render.md, 3.2).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Layer {
+    Defaults,
     Fleet,
     Base,
     Member,

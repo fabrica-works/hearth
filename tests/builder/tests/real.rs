@@ -309,3 +309,17 @@ fn hearth_render_json_gives_left_out_44() {
         Some("{\"record\":\"outcome\",\"outcome\":\"failed\",\"left_out\":44}")
     );
 }
+
+#[test]
+fn a_default_without_its_type_prints_and_fails_its_targets() {
+    let repository = Repository::make("mistyped", &fixtures::thin_with(&[fixtures::MISTYPED]));
+    assert_eq!(
+        String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout),
+        "tasks/motd/task.json:1:54: motd: not an int\n"
+    );
+}
+#[test]
+fn a_default_without_its_type_exits_with_configuration_failure() {
+    let repository = Repository::make("mistyped-exit", &fixtures::thin_with(&[fixtures::MISTYPED]));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}

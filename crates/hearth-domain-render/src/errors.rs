@@ -254,4 +254,29 @@ pub enum Takes {
 pub enum Schema {
     Task { task: Box<[u8]> },
     Unread { task: Box<[u8]>, setting: Box<[u8]>, declared: Box<[Box<[u8]>]> },
+    Wrong { expected: TypeName },
+    Enum { value: Box<[u8]>, listed: Box<[Box<[u8]>]> },
+    Below { min: i64 },
+    Above { max: i64 },
+    Length { max_length: i64 },
+    Null,
+    UndeclaredField { field: Box<[u8]>, declared: Box<[Box<[u8]>]> },
+    MissingField { field: Box<[u8]> },
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum TypeName {
+    Bool,
+    Int,
+    String,
+    Enum,
+    List,
+    Map,
+    Object,
+    Path,
+    Mode,
+    Duration,
+    Secret,
+    Target,
+    File,
 }

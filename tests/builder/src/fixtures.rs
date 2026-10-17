@@ -489,3 +489,9 @@ pub const MISREAD: &[File] = &[
         mode: 0o644,
     },
 ];
+
+pub const MISTYPED: File = File {
+    path: "tasks/motd/task.json",
+    body: br#"{"settings": {"greeting": {"type": "int", "default": "hi", "doc": "The greeting."}}}"#,
+    mode: 0o644,
+};

@@ -257,6 +257,35 @@ fn a_declaration_fault_prints_its_json_fields() {
 }
 
 const SCHEMA_LINES: &[(fixtures::SchemaInput, &str)] = &[
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Bool), "envs/lab.json:1:14: not a bool\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Int), "envs/lab.json:1:14: not an int\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::String), "envs/lab.json:1:14: not a string\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Enum), "envs/lab.json:1:14: not an enum\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::List), "envs/lab.json:1:14: not a list\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Map), "envs/lab.json:1:14: not a map\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Object), "envs/lab.json:1:14: not an object\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Path), "envs/lab.json:1:14: not a path\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Mode), "envs/lab.json:1:14: not a mode\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Duration), "envs/lab.json:1:14: not a duration\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Secret), "envs/lab.json:1:14: not a secret\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Target), "envs/lab.json:1:14: not a target\n"),
+    (fixtures::SchemaInput::Wrong(&crate::errors::TypeName::File), "envs/lab.json:1:14: not a file\n"),
+    (
+        fixtures::SchemaInput::Enum { value: b"x", listed: &[b"main", b"contrib"] },
+        "envs/lab.json:1:14: \"x\" is not one of main, contrib\n",
+    ),
+    (fixtures::SchemaInput::Below(-1000), "envs/lab.json:1:14: below its min -1000\n"),
+    (fixtures::SchemaInput::Above(59999), "envs/lab.json:1:14: past its max 59999\n"),
+    (fixtures::SchemaInput::Length(8), "envs/lab.json:1:14: past its max_length 8\n"),
+    (fixtures::SchemaInput::Null, "envs/lab.json:1:14: null in a default\n"),
+    (
+        fixtures::SchemaInput::UndeclaredField {
+            field: b"shel",
+            declared: &[b"groups", b"password", b"shell", b"uid"],
+        },
+        "envs/lab.json:1:14: undeclared field \"shel\"; the object declares groups, password, shell, uid\n",
+    ),
+    (fixtures::SchemaInput::MissingField(b"uid"), "envs/lab.json:1:14: missing required field uid\n"),
     (fixtures::SchemaInput::Task(b"mail"), "envs/lab.json:1:14: reads mail, which tasks/ lacks\n"),
     (
         fixtures::SchemaInput::Unread { task: b"core", setting: b"domian", declared: &[b"domain"] },
@@ -277,6 +306,59 @@ fn each_schema_fault_prints_its_message() {
     }
 }
 const SCHEMA_JSON: &[(fixtures::SchemaInput, &str)] = &[
+    (
+        fixtures::SchemaInput::Wrong(&crate::errors::TypeName::Int),
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"expected":"int","kind":"wrong"},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+    (
+        fixtures::SchemaInput::Enum { value: b"x", listed: &[b"main", b"contrib"] },
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"kind":"enum","listed":["main","contrib"],"value":"x"},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+    (
+        fixtures::SchemaInput::Below(-1000),
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"kind":"below","min":-1000},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+    (
+        fixtures::SchemaInput::Above(59999),
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"kind":"above","max":59999},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+    (
+        fixtures::SchemaInput::Length(8),
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"kind":"length","max_length":8},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+    (
+        fixtures::SchemaInput::Null,
+        concat!(r#"{"record":"error","kind":"schema","schema":{"kind":"null"},"class":"configuration"}"#, "\n"),
+    ),
+    (
+        fixtures::SchemaInput::UndeclaredField { field: b"shel", declared: &[b"shell", b"uid"] },
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"declared":["shell","uid"],"field":"shel","kind":"undeclared_field"},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+    (
+        fixtures::SchemaInput::MissingField(b"uid"),
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"field":"uid","kind":"missing_field"},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
     (
         fixtures::SchemaInput::Task(b"mail"),
         concat!(

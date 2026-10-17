@@ -637,6 +637,13 @@ pub fn declarations(
 }
 pub fn check_declarations(documents: &crate::revision::Documents) -> Box<[(Box<[u8]>, crate::schema::Fault)]> {
     let mut faults = skein_lib::List::with_capacity(4);
-    drop(crate::schema::declarations(documents, &mut faults));
+    drop(crate::schema::declarations(
+        documents,
+        &mut crate::schema::Validator::new(&limits::SHIPPED),
+        &mut crate::compose::Merge::new(&limits::SHIPPED),
+        &mut faults,
+    ));
     faults.into_boxed()
 }
+
+pub mod schemas;

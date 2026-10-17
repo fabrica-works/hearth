@@ -324,9 +324,38 @@ pub fn declaration_map_to_records(value: render::revision::declaration::Map) -> 
 #[must_use]
 pub fn schema(schema: target::Schema) -> records::errors::Schema {
     match schema {
+        target::Schema::Wrong { expected } => records::errors::Schema::Wrong { expected: type_name(expected) },
+        target::Schema::Enum { value, listed } => records::errors::Schema::Enum { value, listed },
+        target::Schema::Below { min } => records::errors::Schema::Below { min },
+        target::Schema::Above { max } => records::errors::Schema::Above { max },
+        target::Schema::Length { max_length } => records::errors::Schema::Length { max_length },
+        target::Schema::Null => records::errors::Schema::Null,
+        target::Schema::UndeclaredField { field, declared } => {
+            records::errors::Schema::UndeclaredField { field, declared }
+        }
+        target::Schema::MissingField { field } => records::errors::Schema::MissingField { field },
         target::Schema::Task { task } => records::errors::Schema::Task { task },
         target::Schema::Unread { task, setting, declared } => {
             records::errors::Schema::Unread { task, setting, declared }
         }
+    }
+}
+
+#[must_use]
+pub fn type_name(name: target::TypeName) -> records::errors::TypeName {
+    match name {
+        target::TypeName::Bool => records::errors::TypeName::Bool,
+        target::TypeName::Int => records::errors::TypeName::Int,
+        target::TypeName::String => records::errors::TypeName::String,
+        target::TypeName::Enum => records::errors::TypeName::Enum,
+        target::TypeName::List => records::errors::TypeName::List,
+        target::TypeName::Map => records::errors::TypeName::Map,
+        target::TypeName::Object => records::errors::TypeName::Object,
+        target::TypeName::Path => records::errors::TypeName::Path,
+        target::TypeName::Mode => records::errors::TypeName::Mode,
+        target::TypeName::Duration => records::errors::TypeName::Duration,
+        target::TypeName::Secret => records::errors::TypeName::Secret,
+        target::TypeName::Target => records::errors::TypeName::Target,
+        target::TypeName::File => records::errors::TypeName::File,
     }
 }

@@ -203,7 +203,12 @@ impl Side {
         }
         self.files = true;
         let mut faults = List::with_capacity(16);
-        self.defaults = crate::schema::declarations(&self.documents, &mut faults);
+        self.defaults = crate::schema::declarations(
+            &self.documents,
+            &mut crate::schema::Validator::new(&limits),
+            &mut self.merge,
+            &mut faults,
+        );
         for (task, fault) in &faults {
             errors::push(
                 &mut self.errors,

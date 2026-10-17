@@ -555,11 +555,53 @@ impl Required {
 pub enum Schema {
     Task { task: Box<[u8]> },
     Unread { task: Box<[u8]>, setting: Box<[u8]>, declared: Box<[Box<[u8]>]> },
+    Wrong { expected: TypeName },
+    Enum { value: Box<[u8]>, listed: Box<[Box<[u8]>]> },
+    Below { min: i64 },
+    Above { max: i64 },
+    Length { max_length: i64 },
+    Null,
+    UndeclaredField { field: Box<[u8]>, declared: Box<[Box<[u8]>]> },
+    MissingField { field: Box<[u8]> },
 }
 
 impl Schema {
     fn text(&self, lines: &mut Lines) {
         match self {
+            Self::Wrong { expected } => {
+                lines.put(b"not ");
+                lines.put(expected.article());
+                lines.put(expected.name());
+            }
+            Self::Enum { value, listed } => {
+                lines.quote(value);
+                lines.put(b" is not one of ");
+                names(lines, listed);
+            }
+            Self::Below { min } => {
+                lines.put(b"below its min ");
+                signed(lines, *min);
+            }
+            Self::Above { max } => {
+                lines.put(b"past its max ");
+                signed(lines, *max);
+            }
+            Self::Length { max_length } => {
+                lines.put(b"past its max_length ");
+                signed(lines, *max_length);
+            }
+            Self::Null => lines.put(b"null in a default"),
+            Self::UndeclaredField { field, declared } => {
+                lines.put(b"undeclared field ");
+                lines.quote(field);
+                lines.put(b"; the object declares ");
+                names(lines, declared);
+            }
+            Self::MissingField { field } => {
+                lines.put(b"missing required field ");
+                lines.put(field);
+            }
+
             Self::Task { task } => {
                 lines.put(b"reads ");
                 lines.put(task);
@@ -591,6 +633,43 @@ impl Schema {
     fn json(&self, json: &mut Encoder) {
         json.object_start();
         match self {
+            Self::Wrong { expected } => {
+                field(json, b"expected", expected.name());
+                field(json, b"kind", b"wrong");
+            }
+            Self::Enum { value, listed } => {
+                field(json, b"kind", b"enum");
+                json.key(b"listed");
+                json_names(json, listed);
+                field(json, b"value", value);
+            }
+            Self::Below { min } => {
+                field(json, b"kind", b"below");
+                json.key(b"min");
+                json.signed(*min);
+            }
+            Self::Above { max } => {
+                field(json, b"kind", b"above");
+                json.key(b"max");
+                json.signed(*max);
+            }
+            Self::Length { max_length } => {
+                field(json, b"kind", b"length");
+                json.key(b"max_length");
+                json.signed(*max_length);
+            }
+            Self::Null => field(json, b"kind", b"null"),
+            Self::UndeclaredField { field: name, declared } => {
+                json.key(b"declared");
+                json_names(json, declared);
+                field(json, b"field", name);
+                field(json, b"kind", b"undeclared_field");
+            }
+            Self::MissingField { field: name } => {
+                field(json, b"field", name);
+                field(json, b"kind", b"missing_field");
+            }
+
             Self::Task { task } => {
                 field(json, b"kind", b"task");
                 field(json, b"task", task);
@@ -608,5 +687,78 @@ impl Schema {
             }
         }
         json.object_end();
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum TypeName {
+    Bool,
+    Int,
+    String,
+    Enum,
+    List,
+    Map,
+    Object,
+    Path,
+    Mode,
+    Duration,
+    Secret,
+    Target,
+    File,
+}
+
+fn signed(lines: &mut Lines, value: i64) {
+    if value < 0 {
+        lines.put(b"-");
+    }
+    lines.decimal(value.unsigned_abs());
+}
+fn names(lines: &mut Lines, names: &[Box<[u8]>]) {
+    for (index, name) in names.iter().enumerate() {
+        if index != 0 {
+            lines.put(b", ");
+        }
+        lines.put(name);
+    }
+}
+fn json_names(json: &mut Encoder, names: &[Box<[u8]>]) {
+    json.array_start();
+    for name in names {
+        json.string(name);
+    }
+    json.array_end();
+}
+impl TypeName {
+    fn article(&self) -> &'static [u8] {
+        match self {
+            Self::Int | Self::Enum | Self::Object => b"an ",
+            Self::Bool
+            | Self::String
+            | Self::List
+            | Self::Map
+            | Self::Path
+            | Self::Mode
+            | Self::Duration
+            | Self::Secret
+            | Self::Target
+            | Self::File => b"a ",
+        }
+    }
+    fn name(&self) -> &'static [u8] {
+        match self {
+            Self::Bool => b"bool",
+            Self::Int => b"int",
+            Self::String => b"string",
+            Self::Enum => b"enum",
+            Self::List => b"list",
+            Self::Map => b"map",
+            Self::Object => b"object",
+            Self::Path => b"path",
+            Self::Mode => b"mode",
+            Self::Duration => b"duration",
+            Self::Secret => b"secret",
+            Self::Target => b"target",
+            Self::File => b"file",
+        }
     }
 }

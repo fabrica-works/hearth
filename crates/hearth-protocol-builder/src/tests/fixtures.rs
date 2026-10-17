@@ -437,9 +437,23 @@ pub fn every_form() -> [crate::config::schema::Form; 13] {
     ]
 }
 #[must_use]
-pub fn schema_faults() -> [render::errors::Schema; 2] {
+pub fn schema_faults() -> [render::errors::Schema; 10] {
     use render::errors::Schema;
     [
+        Schema::Wrong { expected: render::errors::TypeName::Int },
+        Schema::Enum {
+            value: bytes::copy_of(b"x"),
+            listed: Box::new([bytes::copy_of(b"main"), bytes::copy_of(b"contrib")]),
+        },
+        Schema::Below { min: -1000 },
+        Schema::Above { max: 59999 },
+        Schema::Length { max_length: 8 },
+        Schema::Null,
+        Schema::UndeclaredField {
+            field: bytes::copy_of(b"shel"),
+            declared: Box::new([bytes::copy_of(b"shell"), bytes::copy_of(b"uid")]),
+        },
+        Schema::MissingField { field: bytes::copy_of(b"uid") },
         Schema::Task { task: bytes::copy_of(b"mail") },
         Schema::Unread {
             task: bytes::copy_of(b"core"),
