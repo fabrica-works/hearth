@@ -8,6 +8,9 @@ publish.workspace = true
 
 [dependencies]
 skein-lib.workspace = true
+skein-io.workspace = true
+skein-sim.workspace = true
+skein-world.workspace = true
 
 [lints]
 workspace = true

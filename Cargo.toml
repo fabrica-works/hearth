@@ -15,6 +15,7 @@ publish = false
 # the source's "/skein.git#" (skein's development.md, sections 5.7 and 9.5):
 [workspace.dependencies]
 hearth-protocol-builder = { path = "crates/hearth-protocol-builder" }
+skein-sim = { git = "https://github.com/forgetic/skein.git" }
 skein-io = { git = "https://github.com/forgetic/skein.git" }
 hearth-client-protocol-records = { path = "crates/hearth-client-protocol-records" }
 hearth-recordings = { path = "testing/hearth-recordings" }

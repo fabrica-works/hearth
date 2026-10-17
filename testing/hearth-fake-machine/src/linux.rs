@@ -9,19 +9,19 @@ mod files;
 mod ledger;
 mod processes;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Pid(u32);
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Handle(u64);
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Node(u64);
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Ids {
     pub user: u32,
     pub group: u32,
 }
 /// Scenario-owned bounds. No host resources enter this machine.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Sizes {
     pub files: u32,
     pub bytes: u64,
@@ -35,14 +35,14 @@ impl Sizes {
         Self { files: 64, bytes: 1_048_576, processes: 8, pipe: 4096, ledger: 256 }
     }
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Item {
     pub path: Box<[u8]>,
     pub made: Made,
     pub mode: u32,
     pub ids: Ids,
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum Made {
     File(Box<[u8]>),
     Directory,
@@ -75,13 +75,13 @@ impl Item {
         Self { path: path.into(), made: contents, mode, ids: Ids { user: 0, group: 0 } }
     }
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum At {
     Root,
     Cwd,
     Beneath(Handle),
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum How {
     PathNoFollow,
     Read,
@@ -93,7 +93,7 @@ pub enum How {
     Write,
     WriteNoFollow,
 }
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Hash)]
 pub enum Op {
     Open { at: At, path: Box<[u8]>, how: How },
     Read { file: Handle, at: u64, most: u32 },
@@ -114,7 +114,7 @@ pub enum Op {
     Wait { child: Pid },
     Exit { exit: Exit },
 }
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Hash)]
 pub enum Reply {
     Opened(Handle),
     Read(Box<[u8]>),
@@ -129,7 +129,7 @@ pub enum Reply {
     Running,
     Exited(Exit),
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Refusal {
     NotFound,
     Exists,
@@ -145,7 +145,7 @@ pub enum Refusal {
     BrokenPipe,
     Busy,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Facts {
     pub kind: Kind,
     pub size: u64,
@@ -155,20 +155,20 @@ pub struct Facts {
     pub links: u32,
     pub changes: u64,
 }
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub enum Kind {
     File,
     Directory,
     Link,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 struct Inode {
     facts: Facts,
     bytes: Vec<u8>,
     entries: BTreeMap<Box<[u8]>, Node>,
     parent: Node,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 struct Open {
     pid: Pid,
     node: Node,
@@ -178,32 +178,32 @@ struct Open {
     locked: bool,
     end: Option<End>,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Way {
     In,
     Out,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Signal {
     Terminate,
     Kill,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Target {
     Child,
     Group,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Exit {
     Code(u8),
     Signal(u32),
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Pipe {
     pub child: u32,
     pub way: Way,
 }
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Hash)]
 pub struct Spawn {
     pub program: Box<[u8]>,
     pub args: Box<[Box<[u8]>]>,
@@ -212,7 +212,7 @@ pub struct Spawn {
     pub dir: Box<[u8]>,
     pub pipes: Box<[Pipe]>,
 }
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Hash)]
 pub struct Invocation {
     pub program: Box<[u8]>,
     pub args: Box<[Box<[u8]>]>,
@@ -220,7 +220,7 @@ pub struct Invocation {
     pub dir: Box<[u8]>,
     pub cwd: Handle,
 }
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Hash)]
 pub struct Entry {
     pub pid: Pid,
     pub ids: Ids,
@@ -228,7 +228,7 @@ pub struct Entry {
     pub bytes: u64,
     pub refused: Option<Refusal>,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct Counts {
     pub read: u64,
     pub written: u64,
@@ -238,12 +238,12 @@ pub struct Counts {
 impl Counts {
     const ZERO: Self = Self { read: 0, written: 0, changed: 0, spawned: 0 };
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 enum End {
     Pipe { id: u64, way: Way },
     Null { way: Way },
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 struct Process {
     ids: Ids,
     cwd: Node,
@@ -358,5 +358,20 @@ impl Machine {
     #[must_use]
     pub fn contents(&self, path: &[u8]) -> Option<&[u8]> {
         Some(&self.inode(self.laid(path)?).bytes)
+    }
+}
+
+impl core::hash::Hash for Machine {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.nodes.hash(state);
+        self.handles.hash(state);
+        self.processes.hash(state);
+        self.rng.hash(state);
+        self.sizes.hash(state);
+        self.next_node.hash(state);
+        self.next_handle.hash(state);
+        self.next_pid.hash(state);
+        self.pipes.hash(state);
+        self.next_pipe.hash(state);
     }
 }

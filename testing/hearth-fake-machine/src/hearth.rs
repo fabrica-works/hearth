@@ -6,13 +6,13 @@ pub mod version;
 use crate::linux::{self, Exit, Item, Node, Op, Pid, Refusal, Reply, Sizes};
 use alloc::collections::BTreeMap;
 use mirror::Mirror;
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Machine {
     linux: linux::Machine,
     programs: BTreeMap<Node, Tool>,
     served: Option<(Mirror, Option<u16>)>,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 #[repr(u8)]
 pub enum Tool {
     Git,

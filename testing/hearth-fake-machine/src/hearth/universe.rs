@@ -23,7 +23,7 @@ pub const KEPT: [&str; 14] = [
     "Size",
     "SHA256",
 ];
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub enum Priority {
     Required,
     Important,
@@ -43,7 +43,7 @@ impl Priority {
         }
     }
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Relation {
     Earlier,
     EarlierOrEqual,
@@ -74,18 +74,18 @@ impl Relation {
         }
     }
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Alternative {
     pub name: Box<[u8]>,
     pub qualifier: Option<Box<[u8]>>,
     pub version: Option<(Relation, Box<[u8]>)>,
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Provide {
     pub name: Box<[u8]>,
     pub version: Option<Box<[u8]>>,
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Package {
     pub name: Box<[u8]>,
     pub version: Box<[u8]>,
@@ -102,18 +102,18 @@ pub struct Package {
     pub size: u64,
     pub sha256: [u8; 32],
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Universe {
     packages: Box<[Package]>,
     names: BTreeMap<Box<[u8]>, u32>,
     providers: BTreeMap<Box<[u8]>, Vec<u32>>,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct IndexError {
     pub line: u32,
     pub wrong: Wrong,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum Wrong {
     Missing(&'static str),
     Twice(&'static str),

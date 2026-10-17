@@ -4,7 +4,7 @@ use alloc::{boxed::Box, collections::BTreeMap, format, string::String, vec::Vec}
 use core::fmt::Write;
 use skein_lib::{Rng, sha256};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Timestamp([u8; 16]);
 impl Timestamp {
     #[must_use]
@@ -26,7 +26,7 @@ impl Timestamp {
         &self.0
     }
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Release {
     pub origin: Box<[u8]>,
     pub label: Box<[u8]>,
@@ -46,7 +46,7 @@ impl Release {
         }
     }
 }
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Suite {
     release: Release,
     architecture: Box<[u8]>,
@@ -120,7 +120,7 @@ fn field(out: &mut Vec<u8>, name: &str, value: &[u8]) {
     out.extend_from_slice(value);
     out.push(b'\n');
 }
-#[derive(Clone, PartialEq, Eq, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, Debug, Default, Hash)]
 pub struct Mirror {
     snapshots: BTreeMap<Timestamp, BTreeMap<Box<[u8]>, Suite>>,
 }

@@ -239,3 +239,36 @@ pub fn mirror() -> crate::hearth::mirror::Mirror {
     mirror.add(at(b"20261020T000000Z"), forky(Universe::new(packages.into_boxed_slice())));
     mirror
 }
+
+pub fn behind() -> crate::behind::Behind {
+    let mut machine = whole();
+    machine
+        .linux_mut()
+        .lay(&[Item::directory(b"/srv/store", 0o700).owner(BUILDER), Item::file(b"/usr/bin/unclaimed", 0o755, b"")]);
+    crate::behind::Behind::new(machine, BUILDER)
+}
+pub fn directory(behind: &mut crate::behind::Behind, path: &[u8]) -> skein_sim::Handle {
+    use skein_world::Machine;
+    behind.open_root(path).expect("fixture startup directory")
+}
+pub fn seam_file(
+    behind: &mut crate::behind::Behind,
+    root: skein_sim::Handle,
+    path: &[u8],
+    how: skein_io::kernel::OpenHow,
+) -> skein_sim::Handle {
+    let reply = crate::behind::answer(behind, skein_sim::Ask::Open { root, path: path.into(), how })
+        .expect("fixture seam file");
+    let skein_sim::Reply::Opened(file) = reply else { panic!("Open answers Opened") };
+    file
+}
+pub fn seam_spawn(root: skein_sim::Handle, program: &[u8]) -> skein_sim::Ask {
+    skein_sim::Ask::Spawn {
+        root,
+        program: program.into(),
+        args: Box::default(),
+        env: Box::default(),
+        dir: b"srv/store".as_slice().into(),
+        pipes: Box::default(),
+    }
+}
