@@ -384,6 +384,20 @@ None yet.
 
      The check's runs, on stubs of 27's sketches: clippy clean once `#[must_use]` was added; default 224 of 224 landed tests (3 stubs `unimplemented!()`); fuzzy 4 of 4. The closure counts 66 and 157 were not checked. A further fixture or comment that names the old timestamp takes the pin's, and the commit body lists it.
 
+119. **hearth 34's Shapes against main** (ready check of hearth-34.1).
+     hearth 34's Shapes against main (ready check of hearth-34.1), against hearth b9b8e06 and skein 2112fce (since moved, in no file 34 names): `hearth/34-conformance.md` corrected. The first two were run against real git 2.47.3.
+
+     1. `run::git` takes `env` pairs beside `environment()`'s: under `env_clear` alone `commit-tree` exits 128, "Author identity unknown", and the `1700000000 +0000` date cannot be set. The Scenario passes `GIT_{AUTHOR,COMMITTER}_{NAME,EMAIL,DATE}`; a case passes none.
+     2. The 4 KiB stdin bound is `cat-file`'s: the Scenario's `hash-object -w --stdin` takes the 10,000,000-byte file whole.
+     3. The Shape names what 34.1's test sketch uses: `Settings::whole()` beside `cut(seed)` (`tests/git/src/world.rs:19` has only `cut`), `Scenario::run` and `expected`, `Case::is_listing`, `Run::stderr_text` and `recording`.
+     4. The root `Cargo.toml` gains `hearth-recordings` and `hearth-git-world`; `skein-scratch` is there (`:19`).
+     5. 34.2's Files name their crate, and gain `crates/hearth-protocol-git/src/tests/fixtures.rs`, whose drivers `listed` (`:9`) and `batched` (`:31`) get a `hunked` beside them.
+     6. 34.2: `SMALL` (`tests/git/src/fixtures.rs:4`) gains `hunk_lines: 8` and `hunk_file: 64`, else E0063; `world.rs:232`'s and `:256`'s `match self.decoder` gain `Decoder::Diff`, else E0004.
+     7. `succeeded` holds for a diff's exit 1 (`invocation.rs:131`: `Command::Diff { .. } => exit == Exit::Code(1)`): an exit 1 with nothing on stdout is the decoder's `Malformed`; exit 0 and an exit past 1 fail `succeeded`. Each is a tool error (render.md 2.2).
+     8. This machine's git is 2.47.3: it prints the same `a/./cache/<64 hex>`, exits and lines, and its recordings go in `2.47.3/`, which Done when 2 needs whole.
+
+     The check's runs, with 34.2's types and stubs applied and a stub `conformance_git`: `scripts/check.sh` passed (fmt, clippy, default 221, fuzzy 4); `--profile conformance` 1 of 1. The nextest edit and `conformance_git` land together, as the plan says. A further limits literal or exhaustive match the new fields and variants reach takes them the same way, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

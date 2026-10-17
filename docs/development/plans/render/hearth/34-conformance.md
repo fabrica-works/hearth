@@ -87,7 +87,8 @@ src/lib.rs (`pub mod expect, mutate`), src/expect.rs, src/mutate.rs,
 src/world.rs, tests/recordings.rs,
 tests/fuzzy_git.rs}`; `testing/recordings/git/<version>/` (shared,
 captured); `.config/nextest.toml` (shared); root `Cargo.toml`
-(`skein-scratch`, the two crates), `Cargo.lock`.
+(`hearth-recordings` and `hearth-git-world` in `[workspace.dependencies]`;
+`skein-scratch` is there, `:19`), `Cargo.lock`.
 Shape:
 - `.config/nextest.toml`: `[profile.conformance]` with `default-filter =
   "binary(/^conformance_/)"`, `global-timeout = "2m"`, `slow-timeout = {
@@ -101,11 +102,15 @@ Shape:
   version, case)`, `all(tool) -> Vec<(Box<str>, Recording)>` (each case's
   name and its recording, every version's, by version then case), `write(..)` (the case's directory
   replaced whole), `Mask::new(scratch)`, `recording_on()`.
-- `run::git(args, dir, stdin) -> Run`, real git from ordinary Rust:
+- `run::git(args, dir, stdin, env) -> Run`, real git from ordinary Rust:
   `Command::new` of `invocation::GIT`, `env_clear` then
-  `environment()`'s pairs, `current_dir(dir)`, stdin written whole and
-  closed, `wait_with_output`. Bound: stdin under 4 KiB (41 bytes an id, at
-  most 16); outputs of a few KiB; a hung git ended by the profile's
+  `environment()`'s pairs and `env`'s, `current_dir(dir)`, stdin written
+  whole and closed, `wait_with_output`. A case passes no `env`; the
+  Scenario passes `GIT_AUTHOR_{NAME,EMAIL,DATE}` and
+  `GIT_COMMITTER_{NAME,EMAIL,DATE}`, without which `commit-tree` exits 128
+  ("Author identity unknown"). `Run` has `exit`, `stderr_text()` and
+  `recording()`. Bound: a case's stdin, `cat-file`'s, under 4 KiB (41 bytes
+  an id, at most 16), the Scenario's `hash-object --stdin` a file whole; outputs of a few KiB; a hung git ended by the profile's
   `terminate-after` (run.rs has no timer).
 - `git::{REPOSITORIES, CASES}` as data (files by path, mode and contents),
   which hearth 44 lays into fake git. `fixtures::Scenario::new()` checks
@@ -121,7 +126,10 @@ Shape:
 - `hearth_git_world::expect::Expected::{Revision, Listing, Blobs}`, one
   item a line: `resolved <oid>` | `unresolved`; `entry <mode> <oid> <size>
   <path hex>` … `listed <n>`; `blob <oid> <size> <hex>` | `missing <oid>`.
-  `world::replay(&Recording, &Expected, &limits, &Settings)`;
+  `world::replay(&Recording, &Expected, &limits, &Settings)`, and
+  `Settings::whole()` beside `cut(seed)` (`tests/git/src/world.rs:19`): one
+  delivery, no cut. `Scenario::run(case) -> Run` and `expected(case)`;
+  `Case::is_listing()`;
   `mutate::all(stdout)`: each record or line cut after its first, middle and
   last-but-one byte, each id's first
   digit raised to `A`, the last byte dropped.
@@ -170,9 +178,12 @@ Size: at most 140 lines (the kit; worlds are not counted). Removes: nothing.
 Scope: render.md 2.2's and 6.1's hunks; 5.2's cases on changes whose
 shortest diff is unique, recorded and replayed.
 Needs: nothing beyond 34.1.
-Files: `src/{lib.rs, limits.rs, hunks.rs}`, `src/tests.rs`,
-`src/tests/hunks.rs`; `tests/git/src/{fixtures.rs (`at_the_limits` gains
-`Diff` rows), generate.rs, world.rs, expect.rs}`,
+Files: `crates/hearth-protocol-git/src/{lib.rs, limits.rs, hunks.rs}`,
+`src/tests.rs`, `src/tests/hunks.rs`, `src/tests/fixtures.rs` (a `hunked`
+driver beside `listed`, `:9`, and `batched`, `:31`); `tests/git/src/
+{fixtures.rs (`SMALL`, `:4`, gains `hunk_lines: 8` and `hunk_file: 64`;
+`at_the_limits` gains `Diff` rows), generate.rs, world.rs (`:232`'s and
+`:256`'s matches gain `Decoder::Diff`), expect.rs}`,
 `tests/git/tests/{hunks.rs, fuzzy_git.rs}`; `tests/conformance/src/git.rs`,
 `tests/conformance/tests/conformance_git.rs`;
 `testing/recordings/git/<version>/diff-*/`.
@@ -186,13 +197,15 @@ Failed(Error), Closed}, Diff, up, down, UP_MAX_OUT, DOWN_MAX_OUT}`;
 count runs from the first `@@`, each `@@` line among them (render.md 6.1),
 and `\ No newline at end of file` is a kind, kept and counted; a line past
 `hunk_file`, or kept text past twice it, is `TooLarge`; an end with no
-hunk and no binary line, `Malformed`: so are git's exit 0 and its exit 1
-with nothing on stdout (`succeeded` false), each a tool error that leaves
-the change without its hunks (render.md 2.2). `expect` gains `line <kind> <hex>` …
+hunk and no binary line, `Malformed`, as git's exit 1 with nothing on
+stdout is (`succeeded` holds for a diff's exit 1, `invocation.rs:131`);
+git's exit 0 and an exit past 1 fail `succeeded`; each is a tool error
+that leaves the change without its hunks (render.md 2.2). `expect` gains `line <kind> <hex>` …
 `hunks <left out>` | `binary`. Seven cases, each run as hearth 25.2 runs it
 (Choices): `arguments(Command::Diff { store: b".", before, after })` of two
 literal 32-byte names, from the scratch store's root, so git reads
-`./cache/<64 hex>` and prints `a/./cache/<64 hex>` (2.53.0):
+`./cache/<64 hex>` and prints `a/./cache/<64 hex>` (2.53.0, and 2.47.3, this machine's, whose
+recordings go in its own `2.47.3/`):
 `diff-{line-changed, line-added, line-removed, lines-appended,
 no-newline, binary, past-200-lines}`, their lines literals of the case.
 Test shape: unit, each as hearth 02.2's reference:
