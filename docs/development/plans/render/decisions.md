@@ -343,6 +343,18 @@ None yet.
 
      The check's runs at cea230d: fmt, clippy and nextest 210 of 210, fuzzy 4 of 4. Done when 3 waits on 11.2 and 11.3, as planned. A further exhaustive match on the enums 25.1 grows gains its arms the same way, and the commit body lists it.
 
+115. **hearth 32's Shapes against main** (ready check of hearth-32.1).
+     hearth 32's Shapes against main (ready check of hearth-32.1), against hearth cea230d (and 46e5285, 0fa1b84, dce2e8b, which touch nothing 32 names) and skein b888da9: `hearth/32-static-binary.md` corrected.
+
+     1. 32.1's Files gain render `src/lib.rs` (`:38`'s `match ev` needs `Event::Cached`) and `src/limits.rs`: main's `Limits` is `{ targets, document }` (`limits.rs:3` to `:7`), and 12-compose.md:181 and :195 use `static_file`; the sketch gains `static_file: u32`, `SHIPPED`'s 67_108_864 (render.md 2.3's 64 MiB for a static file). `SHIPPED` is its only literal with named fields; `tests/render/tests/thin.rs:128` takes `..limits::SHIPPED`.
+     2. 32.1's Files gain the render world's `src/parent.rs`: `:87`'s event match gains `Event::Cached`, and its `Read` answers (`:49` to `:69`) answer a blob asked `As::Cached` with `Event::Cached` (size, `skein_lib::sha256` of its bytes) and one asked `As::Declaration` with its bytes.
+     3. The Shape names the new variants' match sites: `call.rs:101`, `compose.rs:22` and `:31`.
+     4. `tests/render/src/fixtures.rs:19`'s `Layer { placement }` becomes `Layer { placement, tasks: Box::new([]) }`.
+     5. `src/tests/revision.rs:11`'s `(b"tasks/motd/task.json", Class::Other)` becomes `Class::Declaration { task: b"motd" }`; `tasks/motd/tree/etc/motd` is `Class::Tree`.
+     6. `parts.rs:24`'s `assert!(parts.is_empty(), "no part records before config")` goes: `spec_digest` is H over the map of parts and the meta.
+
+     The check's runs, with its 13 code corrections applied: fmt clean; clippy clean (4 E0004 before the arms, and 2 in `tests/render`); nextest 210 of 210, among them `the_config_digest_is_h_of_part_config_over_its_tree` and `the_spec_digest_is_h_of_spec_over_its_parts_and_meta`, so both digests reproduce; fuzzy 4 of 4. 32.2 was checked by names only: its suites need 11.2, 11.3 and 40.2. A further exhaustive match on a grown enum gains its arm the same way, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

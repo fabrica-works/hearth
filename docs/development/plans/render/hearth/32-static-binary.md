@@ -67,9 +67,9 @@ synced); `Cached`; the `config` part (4.2's `tree`, files only); the
 service's `FileIo`; `translate/parts.rs`, `parts/config.rs`.
 Needs: nothing beyond hearth 11 (11.3); `skein_lib::sha256` is in hearth's pin.
 Files: root `Cargo.toml`, `Cargo.lock` (shared; `libc = "0.2.186"`, skein's
-version, in `[workspace.dependencies]`); render `src/{vocabulary, revision, compose, call, parts}.rs`
+version, in `[workspace.dependencies]`); render `src/{lib, limits, vocabulary, revision, compose, call, parts}.rs`
 (shared), new `src/parts/config.rs`, `src/tests/{revision, parts}.rs`,
-`tests/render/{src/fixtures.rs, tests/thin.rs}`; protocol `src/{lib,
+`tests/render/{src/fixtures.rs, src/parent.rs, tests/thin.rs}`; protocol `src/{lib,
 read}.rs`, new `src/cache.rs`, `src/translate/{documents, answers}.rs`,
 new `src/translate/parts.rs`, `src/translate/parts/config.rs`,
 `src/tests/{cache, translate}.rs`; the service's `src/{lib, limits}.rs`
@@ -95,7 +95,19 @@ skein-shell's (`unsafe_code = "deny"`, `allow_attributes = "deny"`: an
 to_root, from, to }`, both roots `cache.fd`, if `git -C ~/src/rust/skein
 merge-base --is-ancestor <04.1's landing commit> <the commit Cargo.lock
 names for skein>` succeeds, else `{ owner, root: cache.fd, from, to }`, which
-23.1's repin edits to the first.
+23.1's repin edits to the first. The new variants' exhaustive matches
+gain their arms: `lib.rs:38` (`Event::Cached`), `call.rs:101`,
+`compose.rs:22` and `:31`, and the render world's `src/parent.rs:87`;
+a further one gains its arm the same way, named in the commit body.
+`parts.rs:24`'s `assert!(parts.is_empty(), …)` goes: `spec_digest` is
+H over the map of parts and the meta. `src/tests/revision.rs:11` classes
+`tasks/motd/task.json` as `Class::Declaration { task: b"motd" }`, and
+`tasks/motd/tree/etc/motd` as `Class::Tree`. The world's
+`src/fixtures.rs:19` builds `Layer { placement, tasks: Box::new([]) }`;
+its `src/parent.rs` answers a `Read` (`:49` to `:69`) of a blob asked
+`As::Cached` with `Event::Cached`, the fixture blob's size and
+`skein_lib::sha256` of its bytes, and one asked `As::Declaration` with
+its bytes, as a document's.
 Test shape: unit: `an_executable_blob_is_0755_and_any_other_file_0644`,
 `a_task_removed_by_null_in_the_base_env_gives_no_files`,
 `the_config_digest_is_h_of_part_config_over_its_tree`
@@ -210,6 +222,7 @@ Types derive as hearth 11's do. Each block adds to the type 11 sketches.
 pub enum Event { /* 11.1's, and: */ Cached { request: Token, oid: Oid, size: u64, sha256: Digest } } // a blob in the cache: the last ends the Read
 pub enum As { /* Document, and: */ Declaration, Cached }
 pub enum Decoded { /* 11.1's, and: */ Declaration } // a `task.json` that is one strict JSON object (hearth 13, 16: its declarations)
+// crates/hearth-domain-render/src/limits.rs (32.1): `Limits` gains `static_file: u32` last; `SHIPPED`'s is 67_108_864 (2.3's 64 MiB)
 // crates/hearth-domain-render/src/revision.rs (32.1)
 pub enum Class<'a> { /* 11.1's, and: */
     Declaration { task: &'a [u8] },           // tasks/<task>/task.json
