@@ -16,7 +16,7 @@ pub fn declaration(
         scripts: _,
         exports: _,
         bless: _,
-        entries: _,
+        entries,
     } = declaration;
     let mut translated = List::with_capacity(u32::try_from(types.len()).expect("bounded types"));
     for config::schema::Type { at, form: written } in types {
@@ -32,12 +32,17 @@ pub fn declaration(
     for written in requires {
         guards.push(guard(written, &limits.template)?).expect("guard count");
     }
+    let mut maps = List::with_capacity(u32::try_from(entries.len()).expect("bounded maps"));
+    for written in entries {
+        maps.push(self::entries(written, &limits.template)?).expect("map count");
+    }
     Ok(target::Declaration {
         at: position(at),
         types: translated.into_boxed(),
         settings: specs(settings, limits),
         reads: translated_reads.into_boxed(),
         requires: guards.into_boxed(),
+        entries: maps.into_boxed(),
     })
 }
 #[must_use]
@@ -140,4 +145,52 @@ pub fn guard(
         }
     }
     Ok(target::Guard { name: text(name), at: position(at), when, message: text(message) })
+}
+
+pub fn entries(
+    written: config::entries::Entries,
+    limits: &hearth_protocol_template::limits::Limits,
+) -> Result<target::Entries, Refusal> {
+    let config::entries::Entries { map, at, entries } = written;
+    let mut translated = List::with_capacity(u32::try_from(entries.len()).expect("bounded entries"));
+    for written in entries {
+        translated.push(entry(written, limits)?).expect("entry count");
+    }
+    Ok(target::Entries { map: super::errors::declaration_map(map), at: position(at), entries: translated.into_boxed() })
+}
+pub fn entry(
+    written: config::entries::Entry,
+    limits: &hearth_protocol_template::limits::Limits,
+) -> Result<target::Entry, Refusal> {
+    let config::entries::Entry { key, at, when, for_each, fields: _ } = written;
+    let when = match when {
+        Some(written) => Some(condition(written, limits)?),
+        None => None,
+    };
+    let for_each = match for_each {
+        Some(written) => Some(condition(written, limits)?),
+        None => None,
+    };
+    Ok(target::Entry { key: interpolated(key, limits)?, at: position(at), when, for_each })
+}
+pub fn interpolated(
+    written: config::declaration::Text,
+    limits: &hearth_protocol_template::limits::Limits,
+) -> Result<target::Interpolated, Refusal> {
+    let at = position(written.at);
+    match hearth_protocol_template::interpolation::compile(&written.text, limits) {
+        Ok(hearth_protocol_template::interpolation::Interpolated::Plain) => {
+            Ok(target::Interpolated::Plain { at, text: written.text })
+        }
+        Ok(hearth_protocol_template::interpolation::Interpolated::Parts(parts)) => {
+            let mut translated = List::with_capacity(u32::try_from(parts.len()).expect("bounded parts"));
+            for part in parts {
+                translated.push(super::instructions::instruction(part)).expect("part count");
+            }
+            Ok(target::Interpolated::Parts { at, parts: translated.into_boxed() })
+        }
+        Err(error) => {
+            Err(Refusal { at, fault: crate::render::errors::Decode::Syntax(super::errors::syntax(error.kind)) })
+        }
+    }
 }

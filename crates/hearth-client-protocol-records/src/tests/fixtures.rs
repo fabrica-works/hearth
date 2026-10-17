@@ -319,3 +319,9 @@ pub fn missing_task() -> crate::errors::Error {
     error.task = Some(copy_of(b"motd"));
     error
 }
+
+pub fn key_collision() -> crate::errors::Error {
+    let mut error = duplicate();
+    error.kind = crate::errors::Kind::Collision(crate::errors::Collision::Key { key: copy_of(b"ops") });
+    error
+}

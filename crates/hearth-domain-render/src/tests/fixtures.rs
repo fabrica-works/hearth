@@ -575,6 +575,7 @@ pub fn declaration(
         settings: settings.into(),
         reads: reads.into(),
         requires: Box::new([]),
+        entries: Box::new([]),
     }
 }
 

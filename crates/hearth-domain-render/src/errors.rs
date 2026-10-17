@@ -20,6 +20,7 @@ pub struct Place {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
     Guard(Guard),
+    Collision(Collision),
     Store(StoreError),
     Evaluation(crate::evaluate::FaultKind),
     Schema(Schema),
@@ -428,4 +429,10 @@ pub enum Host {
 pub struct Guard {
     pub name: Box<[u8]>,
     pub message: Box<[u8]>,
+}
+
+/// A key produced twice by one task's expanded maps (format.md, 5.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Collision {
+    Key { key: Box<[u8]> },
 }

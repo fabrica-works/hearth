@@ -37,6 +37,7 @@ pub struct Declaration {
     pub settings: Box<[Spec]>,
     pub reads: Box<[Read]>,
     pub requires: Box<[Guard]>,
+    pub entries: Box<[Entries]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Read {
@@ -91,4 +92,32 @@ pub struct Guard {
     pub at: Position,
     pub when: Condition,
     pub message: Text,
+}
+
+/// A compiled entry key at its opening quote (format.md, 5.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Interpolated {
+    Plain { at: Position, text: Box<[u8]> },
+    Parts { at: Position, parts: Box<[crate::evaluate::template::Instruction]> },
+}
+impl Interpolated {
+    #[must_use]
+    pub const fn at(&self) -> Position {
+        match self {
+            Self::Plain { at, text: _ } | Self::Parts { at, parts: _ } => *at,
+        }
+    }
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Entries {
+    pub map: Map,
+    pub at: Position,
+    pub entries: Box<[Entry]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Entry {
+    pub key: Interpolated,
+    pub at: Position,
+    pub when: Option<Condition>,
+    pub for_each: Option<Condition>,
 }

@@ -44,3 +44,26 @@ pub fn guard_faults() -> [render::errors::Guard; 2] {
         render::errors::Guard { name: bytes::copy_of(b"web"), message: bytes::copy_of(b"web needed") },
     ]
 }
+
+#[must_use]
+pub fn every_entry_condition() -> [(config::entries::Entry, hearth_protocol_template::Expression); 2] {
+    guard_conditions().map(|(guard, expression)| {
+        (
+            config::entries::Entry {
+                key: guard.name,
+                at: guard.at,
+                when: Some(guard.when.clone()),
+                for_each: Some(guard.when),
+                fields: Box::new([]),
+            },
+            expression,
+        )
+    })
+}
+#[must_use]
+pub fn collision_faults() -> [render::errors::Collision; 2] {
+    [
+        render::errors::Collision::Key { key: bytes::copy_of(b"ops") },
+        render::errors::Collision::Key { key: bytes::copy_of(b"dev") },
+    ]
+}

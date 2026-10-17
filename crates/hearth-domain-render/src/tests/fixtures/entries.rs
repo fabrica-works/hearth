@@ -57,3 +57,89 @@ pub fn only_mut<T>(items: &mut [T]) -> &mut T {
     let [item] = items else { panic!("one item") };
     item
 }
+
+use crate::{
+    evaluate::template::{Does, Instruction},
+    revision::declaration::{Entries, Entry, Interpolated, Map},
+};
+pub const THREE_ENTRIES: crate::limits::Limits = crate::limits::Limits { expansion: 3, ..crate::limits::SHIPPED };
+pub fn parts<const N: usize>(parts: [Does; N]) -> Interpolated {
+    Interpolated::Parts { at: at(3, 5), parts: Box::new(parts.map(instruction)) }
+}
+fn instruction(does: Does) -> Instruction {
+    Instruction { at: 0, does }
+}
+pub fn entry_output<const N: usize>(operations: [crate::evaluate::Operation; N]) -> Does {
+    super::output(0, expr(8, operations)).does
+}
+pub fn condition<const N: usize>(operations: [crate::evaluate::Operation; N]) -> Condition {
+    Condition { at: at(3, 20), expression: expr(8, operations) }
+}
+pub fn plain(text: &[u8]) -> Interpolated {
+    Interpolated::Plain { at: at(3, 5), text: copy_of(text) }
+}
+pub fn entry(key: Interpolated, for_each: Option<Condition>, when: Option<Condition>) -> Entry {
+    Entry { key, at: at(3, 15), when, for_each }
+}
+pub fn entry_maps<const N: usize>(maps: [Entries; N]) -> Declaration {
+    let mut declaration = declaration(&[], &[]);
+    declaration.entries = Box::new(maps);
+    declaration
+}
+pub fn entries<const N: usize>(entries: [Entry; N]) -> Declaration {
+    entry_maps([entry_map(Map::Groups, entries)])
+}
+pub fn entry_map<const N: usize>(map: Map, entries: [Entry; N]) -> Entries {
+    Entries { map, at: at(2, 11), entries: Box::new(entries) }
+}
+pub fn setting(name: &[u8]) -> Condition {
+    condition([super::name(0, b"settings", Missing::Error), key(9, name, Missing::Error)])
+}
+pub fn list_entry() -> Entry {
+    entry(
+        parts([
+            Does::Text(copy_of(b"/etc/")),
+            entry_output([name(0, b"key", Missing::Error)]),
+            Does::Text(copy_of(b"-")),
+            entry_output([name(0, b"value", Missing::Error)]),
+        ]),
+        Some(setting(b"tags")),
+        None,
+    )
+}
+pub fn numeric_entry(length: u32) -> Entry {
+    let mut operations = skein_lib::List::with_capacity(length.saturating_add(1));
+    for value in 0..length {
+        operations.push(op(0, Op::Integer(i64::from(value)))).expect("length");
+    }
+    operations.push(op(0, Op::List { length })).expect("length");
+    entry(
+        parts([entry_output([name(0, b"key", Missing::Error)])]),
+        Some(Condition {
+            at: at(3, 20),
+            expression: crate::evaluate::Expression { operations: operations.into_boxed(), values: length },
+        }),
+        None,
+    )
+}
+pub fn expanded_keys(expanded: &crate::entries::Expanded) -> Box<[&[u8]]> {
+    let mut keys = skein_lib::List::with_capacity(crate::limits::SHIPPED.expansion);
+    for group in &expanded.groups {
+        for entry in &group.entries {
+            keys.push(entry.key.as_ref()).expect("bounded entries");
+        }
+    }
+    keys.into_boxed()
+}
+pub fn peers_with_absent() -> super::Roots {
+    let mut roots = super::Roots::x1_prod();
+    roots.settings = super::map(&[(
+        b"peers",
+        Some(super::map(&[
+            (b"a", Some(crate::evaluate::Value::Int(1))),
+            (b"absent", None),
+            (b"b", Some(crate::evaluate::Value::Int(2))),
+        ])),
+    )]);
+    roots
+}

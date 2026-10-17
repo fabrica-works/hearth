@@ -562,3 +562,17 @@ fn a_missing_task_error_names_its_task_in_json() {
 }
 
 mod forms;
+
+#[test]
+fn a_collision_prints_its_key_and_both_places() {
+    assert_eq!(
+        print(&Record::Error(fixtures::key_collision())).as_deref(),
+        Ok(b"envs/lab.json:1:14: the key \"ops\" is made twice (envs/lab.json:1:2)\n".as_slice())
+    );
+}
+#[test]
+fn a_collision_prints_its_json_kind_and_key() {
+    let printed =
+        form::print(Form::JsonLines, &Record::Error(fixtures::key_collision()), Some(Type::Error), &limits::SHIPPED);
+    assert_eq!(printed.as_deref(), Ok(b"{\"record\":\"error\",\"kind\":\"collision\",\"collision\":{\"key\":\"ops\",\"kind\":\"key\"},\"class\":\"configuration\",\"at\":{\"column\":14,\"line\":1,\"path\":\"envs/lab.json\"},\"also\":{\"column\":2,\"line\":1,\"path\":\"envs/lab.json\"}}\n".as_slice()));
+}

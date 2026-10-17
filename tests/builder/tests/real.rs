@@ -567,3 +567,29 @@ fn a_target_with_a_schema_fault_and_a_false_guard_prints_the_schema_fault_only()
         b"hosts/x1/x1.json:1:21: x1-prod: motd: not a string\n"
     );
 }
+
+#[test]
+fn a_for_each_making_a_key_twice_prints_a_collision_at_its_entry() {
+    let repository = Repository::make("twice", &fixtures::thin_with(core::slice::from_ref(&fixtures::TWICE)));
+    assert_eq!(
+        fixtures::render(&repository, &[], Form::Text).stdout,
+        b"tasks/motd/task.json:3:5: x1-prod: motd: the key \"ops\" is made twice (tasks/motd/task.json:3:5)\n"
+    );
+}
+#[test]
+fn a_for_each_making_a_key_twice_exits_with_configuration_failure() {
+    let repository = Repository::make("twice-exit", &fixtures::thin_with(core::slice::from_ref(&fixtures::TWICE)));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
+#[test]
+fn distinct_for_each_keys_render_with_no_error() {
+    let repository =
+        Repository::make("distinct-keys", &fixtures::thin_with(&[fixtures::TWICE, fixtures::DISTINCT_TEAMS]));
+    assert_eq!(String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout), fixtures::THIN_TEXT);
+}
+#[test]
+fn distinct_for_each_keys_leave_the_call_successful() {
+    let repository =
+        Repository::make("distinct-keys-exit", &fixtures::thin_with(&[fixtures::TWICE, fixtures::DISTINCT_TEAMS]));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(0));
+}

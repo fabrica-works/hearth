@@ -66,6 +66,9 @@ fn config_field(field: config::Field) -> target::Field {
 pub fn error(error: target::Error) -> records::errors::Error {
     let target::Error { kind, class, at, also, target, task, side } = error;
     let kind = match kind {
+        target::Kind::Collision(target::Collision::Key { key }) => {
+            records::errors::Kind::Collision(records::errors::Collision::Key { key })
+        }
         target::Kind::Guard(target::Guard { name, message }) => {
             records::errors::Kind::Guard(records::errors::Guard { name, message })
         }

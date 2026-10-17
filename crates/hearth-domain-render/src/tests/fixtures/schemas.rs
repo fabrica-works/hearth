@@ -42,6 +42,7 @@ pub fn users() -> Declaration {
         ]),
         settings: Box::new([Spec { default: Some(map(at(1, 60), &[])), ..schema_spec(b"accounts", 0) }]),
         requires: Box::new([]),
+        entries: Box::new([]),
         reads: Box::new([]),
     }
 }

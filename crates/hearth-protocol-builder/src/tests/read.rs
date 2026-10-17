@@ -188,6 +188,7 @@ fn a_task_json_reaches_render_through_declaration() {
                 types: Box::new([]),
                 settings: Box::new([]),
                 requires: Box::new([]),
+                entries: Box::new([]),
                 reads: Box::new([])
             })
         })
@@ -295,6 +296,7 @@ fn a_read_waiting_for_stderr_end_allows_its_completion_through() {
                 types: Box::new([]),
                 settings: Box::new([]),
                 requires: Box::new([]),
+                entries: Box::new([]),
                 reads: Box::new([])
             })
         })

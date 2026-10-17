@@ -22,6 +22,7 @@ pub enum Kind {
     Evaluation(Evaluation),
     Schema(Schema),
     Guard(Guard),
+    Collision(Collision),
     Decode(Decode),
     Repository(Repository),
     Tool(Tool),
@@ -68,6 +69,11 @@ impl Error {
             lines.put(b": ");
         }
         match &self.kind {
+            Kind::Collision(Collision::Key { key }) => {
+                lines.put(b"the key ");
+                lines.quote(key);
+                lines.put(b" is made twice");
+            }
             Kind::Store(error) => error.text(lines),
             Kind::Decode(decode) => decode.text(lines),
             Kind::Repository(why) => why.text(lines),
@@ -102,6 +108,14 @@ impl Error {
             field(json, b"side", side.name());
         }
         match &self.kind {
+            Kind::Collision(Collision::Key { key }) => {
+                field(json, b"kind", b"collision");
+                json.key(b"collision");
+                json.object_start();
+                field(json, b"key", key);
+                field(json, b"kind", b"key");
+                json.object_end();
+            }
             Kind::Store(error) => {
                 field(json, b"kind", b"store");
                 error.json(json);
@@ -651,3 +665,9 @@ pub mod syntax;
 pub use syntax::Syntax;
 mod composition;
 pub use composition::{Composition, Host};
+
+/// A key produced twice by one task's expanded maps (format.md, 5.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Collision {
+    Key { key: Box<[u8]> },
+}

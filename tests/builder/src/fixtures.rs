@@ -694,3 +694,7 @@ pub const TARGET_OUTPUT_LIMIT: u64 = 8;
 pub const GUARDED: File = File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"greeting\": {\"type\": \"string\", \"default\": \"hello\", \"doc\": \"The greeting.\"}},\n\"requires\": {\n    \"greeting\": {\"if\": \"settings.greeting != 'hello'\", \"message\": \"set a greeting of your own\"}}}" };
 pub const GREETING: File = File { path: "hosts/x1/x1.json", mode: 0o644, body: br#"{"motd":{"greeting":"hi"}}"# };
 pub const WRONG_GREETING: File = File { path: "hosts/x1/x1.json", mode: 0o644, body: br#"{"motd":{"greeting":1}}"# };
+
+pub const TWICE: File = File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"teams\": {\"type\": {\"list\": \"string\"}, \"default\": [\"ops\", \"dev\", \"ops\"], \"doc\": \"Teams.\"}},\n\"groups\": {\n    \"{{ value }}\": {\"for_each\": \"settings.teams\"}}}" };
+pub const DISTINCT_TEAMS: File =
+    File { path: "hosts/x1/x1.json", mode: 0o644, body: br#"{"motd":{"teams":["ops","dev"]}}"# };
