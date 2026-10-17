@@ -273,6 +273,17 @@ None yet.
 
      A further `Terminal` literal, or a further outcome-line literal, that a later landing meets is refreshed the same way, and the commit body lists it.
 
+109. **hearth 38's Shapes against main, re-checked after 07.2** (ready check of hearth-38.1).
+     hearth 38's re-check after hearth 07.2 (5ead93f), against hearth f61c250: `hearth/38-stanzas-recordings.md` corrected.
+
+     1. 38.1's sketched test drains `below` after each `up`: `UP_MAX_OUT.below` is 1 and each `Up::Bytes` queues the next demand, as `output.rs` does; undrained, the second line panics at skein `queue.rs:57` ("the loop reserves room for every output"). With `assert!(below.pop().is_some(), "each scan is followed by the next demand");` in the loop it passes (on a stub of the reader).
+     2. The sketch's `Stanzas::new`, `largest_demand`, `worst_case`, `lists::indices` and `lists::listed` carry `#[must_use]`, as `output.rs` does (`Reader::new`, `tail`, `waiting`): pedantic's `must_use_candidate` fails five otherwise.
+     3. 38.1's world Files gain `src/fixtures.rs` (a list at the limits; `fixtures::at_the_limits` builds only an output) and `read_index_metered` beside `read_index`, as `read_output_metered` (`tests/mmdebstrap/src/world.rs:77`) for `tests/memory.rs`.
+     4. 38.2's Files gain `src/world.rs` (`read_recording`, which the sketch calls) and `src/reference.rs` (the `.expect`'s draft).
+     5. `SHIPPED`'s new fields: `stanza: 1_048_576` (render.md 5.3, "at most 1 MiB a stanza"), `chunk: 16_384` and `filename: 4_096`, the plan's.
+
+     The re-check's runs: the crate and world 28 of 28 with the corrected sketch on a stub, fuzzy 1 of 1, clippy clean after 2. A further sketch call that queues a demand drains it the same way.
+
 ## For the user
 
 The long-term choices the user may veto:

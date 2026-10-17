@@ -83,12 +83,15 @@ gives apt and their names under `<scratch>/root/var/lib/apt/lists/` (5.3;
 store.md, 6.4).
 Needs: hearth 07.2 (the world crate).
 Files: `src/packages.rs`, `src/lists.rs`, `src/limits.rs` (`stanza`,
-`chunk`, `filename`), `src/lib.rs`, `src/vector.rs` (`Component::bytes`
+`chunk`, `filename`; in `SHIPPED`, `1_048_576`, render.md 5.3, then the
+plan's `16_384` and `4_096`), `src/lib.rs`, `src/vector.rs` (`Component::bytes`
 `pub(crate)`, for `lists::indices`), `src/tests.rs` (`mod packages;`),
 `src/tests/{fixtures,packages}.rs` (fixtures gain `opened_list()`,
 `apt_stanza()`); world:
 `src/generate.rs` (`index`), `src/reference.rs`, `src/world.rs`
-(`read_index`), `tests/mmdebstrap.rs`, `tests/fuzzy_mmdebstrap.rs`,
+(`read_index`, and `read_index_metered` for `tests/memory.rs`, as
+`read_output_metered`), `src/fixtures.rs` (a list at the limits),
+`tests/mmdebstrap.rs`, `tests/fuzzy_mmdebstrap.rs`,
 `tests/memory.rs`.
 Shape: the sketch's `packages` and `lists`. Scans of at most `chunk`; a
 longer line comes in pieces, and only the six values are held. A stanza
@@ -126,7 +129,10 @@ fn a_stanza_gives_its_six_fields_and_skips_the_rest() {
     let lines: [&[u8]; 9] = [b"Package: apt\n", b"Description: package manager\n", b" for Debian\n", b"Version: 3.1.6\n",
         b"Architecture: amd64\n", b"Filename: pool/main/a/apt/apt_3.1.6_amd64.deb\n", b"Size: 1736\n",
         b"SHA256: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae\n", b"\n"];
-    for line in lines { packages::up(&mut stanzas, &env, Up::Bytes(bytes::copy_of(line)), &mut above, &mut below); }
+    for line in lines {
+        packages::up(&mut stanzas, &env, Up::Bytes(bytes::copy_of(line)), &mut above, &mut below);
+        assert!(below.pop().is_some(), "each scan is followed by the next demand");
+    }
     assert_eq!(above.pop(), Some(Found::Stanza(fixtures::apt_stanza())));
     assert_eq!(above.pop(), None);
 }
@@ -154,7 +160,8 @@ beside test-min's, `stanzas`, its closure's, cut from the list apt left.
 Files: world: `Cargo.toml` (`[dependencies]` gain `hearth-recordings`, and
 `hearth-test-mirror` for the pin: `src/` is the world's library), `Cargo.lock`,
 `src/lib.rs` (`pub mod recordings;`), `src/recordings.rs` (new),
-`src/fixtures.rs` (each case's
+`src/world.rs` (`read_recording`), `src/reference.rs` (the `.expect`'s
+draft), `src/fixtures.rs` (each case's
 inputs, from `testing/mirror`'s pin and `testing/repos`' targets),
 `expect/<version>/<case>.expect` (new), `tests/recordings.rs` (new),
 `tests/fuzzy_mmdebstrap.rs`; the crate's `src/{output, tail, packages,
@@ -235,10 +242,10 @@ pub enum StanzaError { TooLong, Malformed, Missing(Field), Repeated(Field), Valu
 /// To the owner, at most two an entry point (the last stanza, then `Ended`); `Ended` or `Failed`, the terminal.
 pub enum Found { Stanza(Stanza), Ended, Failed(StanzaError) }
 pub struct Stanzas { /* private */ }
-impl Stanzas { pub fn new(limits: &Limits) -> Stanzas; }
+impl Stanzas { #[must_use] pub fn new(limits: &Limits) -> Stanzas; }
 pub const UP_MAX_OUT: MaxOut = MaxOut { above: 2, below: 1 };
-pub fn largest_demand(limits: &Limits) -> u32;
-pub fn worst_case(limits: &Limits) -> Option<u64>;
+#[must_use] pub fn largest_demand(limits: &Limits) -> u32;
+#[must_use] pub fn worst_case(limits: &Limits) -> Option<u64>;
 pub fn open(stanzas: &mut Stanzas, env: &Env<Limits>, below: &mut Queue<Down>);
 pub fn up(stanzas: &mut Stanzas, env: &Env<Limits>, event: Up, above: &mut Queue<Found>, below: &mut Queue<Down>);
 pub fn close(stanzas: &mut Stanzas, below: &mut Queue<Down>);
@@ -251,8 +258,8 @@ pub const LISTS: &[u8] = b"root/var/lib/apt/lists";
 pub struct Index { pub line: u8, pub component: Option<Component>, pub path: Box<[u8]>, pub name: Box<[u8]> }
 /// A name under `LISTS`: one of the indices; a compressed copy of one, refused (render.md, 10); anything else.
 pub enum Listed { Index(u32), Compressed(u32), Other }
-pub fn indices(lines: &[Line], architecture: &Name) -> Box<[Index]>;
-pub fn listed(name: &[u8], indices: &[Index]) -> Listed;
+#[must_use] pub fn indices(lines: &[Line], architecture: &Name) -> Box<[Index]>;
+#[must_use] pub fn listed(name: &[u8], indices: &[Index]) -> Listed;
 ```
 
 ## Questions to raise when reached
