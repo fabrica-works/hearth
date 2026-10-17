@@ -1,4 +1,5 @@
 mod diff;
+mod errors;
 mod fixtures;
 mod json;
 mod outcome;

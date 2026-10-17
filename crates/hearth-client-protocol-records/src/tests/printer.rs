@@ -87,7 +87,7 @@ impl Machine {
     }
 }
 fn terminal() -> Record {
-    Record::Terminal(Terminal { outcome: Outcome::Done, diff: None })
+    Record::Terminal(Terminal { outcome: Outcome::Done, diff: None, left_out: 0 })
 }
 #[test]
 fn a_record_goes_down_in_pieces_of_at_most_a_chunk() {
@@ -97,16 +97,19 @@ fn a_record_goes_down_in_pieces_of_at_most_a_chunk() {
     assert!(printed.largest <= 16, "no piece past the chunk");
     assert_eq!(&*printed.events, &[Event::Printed], "one Printed answers the record");
 }
+const VERSION_LINES: [(&[u8], &[u8]); 1] = [(
+    b"{\"record\":\"version\",\"client\":1}\n{\"record\":\"outcome\",\"outcome\":\"done\",\"left_out\":0}\n",
+    b"{\"record\":\"outcome\",\"outcome\":\"done\",\"left_out\":0}\n",
+)];
 #[test]
 fn only_the_answers_first_record_follows_the_version_line() {
-    let mut machine = Machine::new(Form::JsonLines, limits::SHIPPED);
-    let first = machine.print(terminal());
-    let second = machine.print(terminal());
-    assert_eq!(
-        &*first.bytes, b"{\"record\":\"version\",\"client\":1}\n{\"record\":\"outcome\",\"outcome\":\"done\"}\n",
-        "version first"
-    );
-    assert_eq!(&*second.bytes, b"{\"record\":\"outcome\",\"outcome\":\"done\"}\n", "version only once");
+    for (expected_first, expected_second) in VERSION_LINES {
+        let mut machine = Machine::new(Form::JsonLines, limits::SHIPPED);
+        let first = machine.print(terminal());
+        let second = machine.print(terminal());
+        assert_eq!(&*first.bytes, expected_first, "version first");
+        assert_eq!(&*second.bytes, expected_second, "version only once");
+    }
 }
 #[test]
 fn a_record_that_prints_nothing_is_printed_at_once() {

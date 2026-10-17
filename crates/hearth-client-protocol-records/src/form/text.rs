@@ -113,7 +113,18 @@ fn render(lines: &mut Lines, record: &Record, after: Option<Type>) {
             }
         }
         Record::Change(change) => change.text(lines),
+        Record::Error(error) => {
+            if after.is_some() && after != Some(Type::Error) {
+                lines.put(b"\n");
+            }
+            error.text(lines);
+        }
+        Record::Startup(startup) => startup.text(lines),
         Record::Terminal(terminal) => {
+            if terminal.left_out != 0 {
+                lines.decimal(u64::from(terminal.left_out));
+                lines.put(if terminal.left_out == 1 { b" more error\n" } else { b" more errors\n" });
+            }
             if let Some(tally) = &terminal.diff {
                 tally.text(lines);
             }

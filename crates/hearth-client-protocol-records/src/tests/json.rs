@@ -23,16 +23,16 @@ fn json_lines_start_with_the_version_and_give_digests_whole() {
 #[test]
 fn the_terminal_record_gives_its_outcome_by_name() {
     const ROWS: [(Outcome, &[u8]); 5] = [
-        (Outcome::Done, b"{\"record\":\"outcome\",\"outcome\":\"done\"}\n"),
-        (Outcome::Negative, b"{\"record\":\"outcome\",\"outcome\":\"negative\"}\n"),
-        (Outcome::Failed, b"{\"record\":\"outcome\",\"outcome\":\"failed\"}\n"),
-        (Outcome::Usage, b"{\"record\":\"outcome\",\"outcome\":\"usage\"}\n"),
-        (Outcome::TryAgain, b"{\"record\":\"outcome\",\"outcome\":\"try_again\"}\n"),
+        (Outcome::Done, b"{\"record\":\"outcome\",\"outcome\":\"done\",\"left_out\":0}\n"),
+        (Outcome::Negative, b"{\"record\":\"outcome\",\"outcome\":\"negative\",\"left_out\":0}\n"),
+        (Outcome::Failed, b"{\"record\":\"outcome\",\"outcome\":\"failed\",\"left_out\":0}\n"),
+        (Outcome::Usage, b"{\"record\":\"outcome\",\"outcome\":\"usage\",\"left_out\":0}\n"),
+        (Outcome::TryAgain, b"{\"record\":\"outcome\",\"outcome\":\"try_again\",\"left_out\":0}\n"),
     ];
     for (outcome, expected) in ROWS {
         let printed = form::print(
             Form::JsonLines,
-            &Record::Terminal(Terminal { outcome, diff: None }),
+            &Record::Terminal(Terminal { outcome, diff: None, left_out: 0 }),
             Some(crate::records::Type::Spec),
             &limits::SHIPPED,
         );

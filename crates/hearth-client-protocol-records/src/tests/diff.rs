@@ -69,7 +69,7 @@ fn json_gives_a_change_with_its_rebuild_and_parts() {
     assert_eq!(printed.as_deref(), Ok((*JSON_CHANGE.first().expect("one expected row")).as_bytes()));
 }
 const JSON_TALLY: [&str; 1] = [concat!(
-    r#"{"record":"outcome","outcome":"negative","from":"main","to":"HEAD","targets":11,"changed":2,"unchanged":9}"#,
+    r#"{"record":"outcome","outcome":"negative","from":"main","to":"HEAD","targets":11,"changed":2,"unchanged":9,"left_out":0}"#,
     "\n"
 )];
 #[test]
@@ -155,7 +155,11 @@ fn text(record: &Record) -> Result<Box<[u8]>, form::Refusal> {
     form::print(Form::Text, record, Some(Type::Change), &limits::SHIPPED)
 }
 fn terminal(targets: u32, changed: u32, unchanged: u32) -> Record {
-    Record::Terminal(Terminal { outcome: Outcome::Negative, diff: Some(fixtures::tally(targets, changed, unchanged)) })
+    Record::Terminal(Terminal {
+        outcome: Outcome::Negative,
+        diff: Some(fixtures::tally(targets, changed, unchanged)),
+        left_out: 0,
+    })
 }
 fn hunks(value: &mut Change) -> &mut Hunks {
     match &mut value.change {

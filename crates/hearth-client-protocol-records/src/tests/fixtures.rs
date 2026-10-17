@@ -113,3 +113,18 @@ pub const WG0_TEXT: &str = concat!(
 pub fn tally(targets: u32, changed: u32, unchanged: u32) -> crate::diff::Tally {
     crate::diff::Tally { from: copy_of(b"main"), to: copy_of(b"HEAD"), targets, changed, unchanged }
 }
+
+pub fn modules_guard() -> crate::errors::Error {
+    use crate::errors::{Class, Error, Guard, Kind, Place, Position};
+    Error {
+        kind: Kind::Guard(Guard {
+            name: copy_of(b"modules"),
+            message: copy_of(b"no initramfs modules for this hardware"),
+        }),
+        class: Class::Configuration,
+        at: Some(Place { path: copy_of(b"tasks/boot/task.json"), position: Some(Position { line: 22, column: 7 }) }),
+        also: None,
+        target: Some(copy_of(b"carbon-lab")),
+        task: Some(copy_of(b"boot")),
+    }
+}

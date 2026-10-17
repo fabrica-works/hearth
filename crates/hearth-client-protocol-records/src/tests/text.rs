@@ -62,7 +62,7 @@ fn a_second_spec_follows_a_blank_line() {
 fn the_terminal_record_of_a_render_prints_nothing() {
     let printed = form::print(
         Form::Text,
-        &Record::Terminal(Terminal { outcome: Outcome::Done, diff: None }),
+        &Record::Terminal(Terminal { outcome: Outcome::Done, diff: None, left_out: 0 }),
         Some(Type::Spec),
         &limits::SHIPPED,
     );

@@ -18,3 +18,12 @@ pub fn code(outcome: Outcome) -> u8 {
         Outcome::TryAgain => 75,
     }
 }
+
+/// An error class's terminal outcome (client/README.md, 3.3).
+#[must_use]
+pub fn of(class: crate::errors::Class) -> Outcome {
+    match class {
+        crate::errors::Class::Configuration => Outcome::Failed,
+        crate::errors::Class::Operational => Outcome::TryAgain,
+    }
+}
