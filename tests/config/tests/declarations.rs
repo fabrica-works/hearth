@@ -5,6 +5,7 @@ use hearth_config_world::{
 use hearth_protocol_config::{
     Position,
     declaration::{Fragment, Script},
+    entries::Map,
     limits::SHIPPED,
 };
 use skein_lib::Rng;
@@ -89,5 +90,62 @@ fn the_bless_example_decodes_cut_anywhere() {
         let [unit] = &bless.ignore_failed[..] else { panic!("one unit") };
         assert_eq!(bless.at, Position { offset: 11, line: 1, column: 12 });
         assert_eq!((&*unit.text, unit.at), (b"foo.service".as_slice(), Position { offset: 31, line: 1, column: 32 }));
+    }
+}
+
+const ENTRY_EXAMPLES: &[(&str, usize, Map, usize)] = &[
+    ("users-accounts", 1, Map::Users, 1),
+    ("ssh", 1, Map::Files, 2),
+    ("mail-accounts", 2, Map::Groups, 1),
+    ("mail-accounts", 2, Map::Users, 1),
+    ("core-journal", 2, Map::Data, 1),
+    ("core-journal", 2, Map::Groups, 1),
+    ("wifi", 2, Map::Data, 1),
+    ("wifi", 2, Map::Packages, 1),
+    ("mail-data", 2, Map::Data, 2),
+    ("mail-data", 2, Map::Groups, 1),
+    ("firmware", 1, Map::Packages, 4),
+    ("core-gettys", 1, Map::Files, 1),
+    ("mail-live", 1, Map::Live, 1),
+    ("stoa", 4, Map::Files, 2),
+    ("stoa", 4, Map::Live, 1),
+    ("stoa", 4, Map::Presets, 1),
+    ("stoa", 4, Map::Software, 1),
+    ("ripgrep", 1, Map::Live, 1),
+    ("dkim", 1, Map::Secrets, 1),
+    ("ssh-identity", 1, Map::Identity, 1),
+    ("software", 1, Map::Software, 2),
+];
+#[test]
+fn every_entry_example_decodes_to_its_entries_cut_anywhere() {
+    for &(name, maps, map, entries) in ENTRY_EXAMPLES {
+        for seed in 0..8 {
+            let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
+            let declaration =
+                world::declare(examples::task(name).bytes, &settings, seed).expect("format.md entry example");
+            assert_eq!(declaration.entries.len(), maps, "{name}, seed {seed}");
+            let actual = declaration.entries.iter().find(|actual| actual.map == map).expect("expected map");
+            assert_eq!(actual.entries.len(), entries, "{name}, {map:?}, seed {seed}");
+        }
+    }
+}
+const LATER_EXAMPLES: &[(&str, Position)] = &[
+    ("checks-ssh", Position { offset: 2, line: 1, column: 3 }),
+    ("artifact-stoa", Position { offset: 38, line: 4, column: 7 }),
+];
+#[test]
+fn the_m5_and_m6_examples_are_refused_at_their_keys() {
+    for &(name, at) in LATER_EXAMPLES {
+        for seed in 0..8 {
+            let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
+            assert_eq!(
+                world::declare(examples::task(name).bytes, &settings, seed),
+                Err(hearth_protocol_config::Error {
+                    at,
+                    fault: hearth_protocol_config::Fault::Declaration(hearth_protocol_config::Declared::Later)
+                }),
+                "{name}, seed {seed}"
+            );
+        }
     }
 }

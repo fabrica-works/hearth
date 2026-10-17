@@ -1,0 +1,4 @@
+{
+  "users": { "postfix": { "from": "package", "uid": 107, "gid": 113 } },
+  "groups": { "opendkim": { "from": "package", "gid": 120 } }
+}

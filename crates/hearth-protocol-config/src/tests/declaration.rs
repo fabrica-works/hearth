@@ -15,9 +15,10 @@ fn an_empty_object_is_a_task_that_declares_nothing() {
             declaration.reads.len(),
             declaration.requires.len(),
             declaration.scripts.len(),
-            declaration.bless
+            declaration.bless,
+            declaration.entries.len(),
         ),
-        (Position { offset: 0, line: 1, column: 1 }, 0, 0, 0, None)
+        (Position { offset: 0, line: 1, column: 1 }, 0, 0, 0, None, 0)
     );
 }
 #[test]
@@ -155,20 +156,6 @@ fn a_script_order_outside_0_to_999_is_refused_at_its_value() {
 const THE_KEYS_DECODED_LATER_ARE_REFUSED_UNTIL_THEIR_INCREMENT: &[(&[u8], Position, Declared)] = &[
     (br#"{"settings":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
     (br#"{"exports":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"packages":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"preseeds":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"initramfs":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"cmdline":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"files":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"users":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"groups":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"presets":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"tmpfiles":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"data":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"secrets":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"identity":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"software":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
-    (br#"{"live":5}"#, Position { offset: 1, line: 1, column: 2 }, Declared::Undecoded),
 ];
 #[test]
 fn the_keys_decoded_later_are_refused_until_their_increment() {

@@ -1,0 +1,13 @@
+{
+  "software": {
+    "stoa": {
+      "artifact": {
+        "repository": "https://git.ekanayaka.io/ai/stoa.git",
+        "commit": "4e1d0c3a…",
+        "recipe": "stoa",
+        "key": "9f2c71e0…"
+      },
+      "path": "/opt/stoa"
+    }
+  }
+}

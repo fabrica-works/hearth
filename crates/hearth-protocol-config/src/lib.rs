@@ -4,6 +4,7 @@
 extern crate alloc;
 pub mod declaration;
 pub mod document;
+pub mod entries;
 mod error;
 pub mod json;
 pub mod limits;

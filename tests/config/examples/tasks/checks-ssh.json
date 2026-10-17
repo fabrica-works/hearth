@@ -1,0 +1,1 @@
+{ "checks": { "ssh": { "kind": "probe", "probe": "tcp", "host": "127.0.0.1", "port": "{{ settings.port }}", "class": "blessing" } } }

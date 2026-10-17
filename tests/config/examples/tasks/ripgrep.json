@@ -1,0 +1,1 @@
+{ "live": { "ripgrep": { "action": "none", "paths": ["/opt/ripgrep/"] } } }

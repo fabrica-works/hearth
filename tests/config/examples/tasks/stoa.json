@@ -1,0 +1,16 @@
+{
+  "software": {
+    "stoa": {
+      "url": "https://git.ekanayaka.io/ai/stoa/releases/download/v0.4.0/stoa-x86_64-linux.tar.gz",
+      "sha256": "…", "unpack": "tar", "strip": 1, "path": "/opt/stoa"
+    }
+  },
+  "files": {
+    "/etc/systemd/system/stoa.service": {},
+    "/etc/stoa/stoa.json": { "template": "templates/stoa.json.j2" }
+  },
+  "presets": { "stoa.service": { "action": "enable" } },
+  "live": {
+    "stoa": { "unit": "stoa.service", "action": "restart", "paths": ["/opt/stoa/", "/etc/stoa/"] }
+  }
+}

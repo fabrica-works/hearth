@@ -1,0 +1,12 @@
+{
+  "users": {
+    "{{ key }}": {
+      "for_each": "settings.accounts",
+      "uid": "{{ value.uid }}",
+      "home": "/home/{{ key }}",
+      "shell": "{{ value.shell }}",
+      "groups": "{{ value.groups }}",
+      "password": "{{ value.password }}"
+    }
+  }
+}

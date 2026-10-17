@@ -1,0 +1,9 @@
+{
+  "files": {
+    "/etc/systemd/system/{{ value }}": {
+      "for_each": "['getty@.service', 'serial-getty@.service', 'console-getty.service']",
+      "if": "target.placement.kind == 'container'",
+      "link": "/dev/null"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "files": {
+    "/etc/ssh/sshd_config.d/local.conf": { "if": "settings.allow" },
+    "/etc/ssh/authorized_keys_{{ key }}": {
+      "for_each": "settings.authorized",
+      "if": "key in settings.allow",
+      "template": "templates/authorized_keys.j2"
+    }
+  }
+}

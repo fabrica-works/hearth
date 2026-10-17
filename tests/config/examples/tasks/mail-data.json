@@ -1,0 +1,7 @@
+{
+  "data": {
+    "postfix": { "path": "/var/spool/postfix" },
+    "mail": { "path": "/var/mail", "mode": "2775", "group": "mail" }
+  },
+  "groups": { "mail": { "from": "package", "gid": 8 } }
+}

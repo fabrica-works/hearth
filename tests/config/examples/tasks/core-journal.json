@@ -1,0 +1,9 @@
+{
+  "data": {
+    "journal": {
+      "if": "target.placement.kind != 'container'",
+      "class": "core", "path": "/var/log/journal", "mode": "2755", "group": "systemd-journal"
+    }
+  },
+  "groups": { "systemd-journal": { "from": "package", "gid": 999 } }
+}

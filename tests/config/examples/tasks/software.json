@@ -1,0 +1,12 @@
+{
+  "software": {
+    "forgejo": {
+      "url": "https://codeberg.org/forgejo/forgejo/releases/download/v15.0.0/forgejo-15.0.0-linux-amd64",
+      "sha256": "…", "unpack": "file", "path": "/opt/forgejo/bin/forgejo"
+    },
+    "ripgrep": {
+      "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz",
+      "sha256": "…", "unpack": "tar", "strip": 1, "path": "/opt/ripgrep"
+    }
+  }
+}

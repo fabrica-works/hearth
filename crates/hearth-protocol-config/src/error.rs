@@ -39,6 +39,8 @@ pub enum Object {
     Guard,
     Script,
     Bless,
+    Entry(crate::entries::Map),
+    Range,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Expected {
@@ -47,6 +49,7 @@ pub enum Expected {
     Strings,
     Bool,
     Int,
+    Field(crate::entries::Takes),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Required {

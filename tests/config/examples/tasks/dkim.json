@@ -1,0 +1,9 @@
+{
+  "secrets": {
+    "mail/dkim/{{ key }}.key": {
+      "for_each": "settings.domains",
+      "path": "/etc/dkimkeys/{{ key }}.key",
+      "mode": "0640", "group": "opendkim"
+    }
+  }
+}

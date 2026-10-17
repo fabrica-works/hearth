@@ -1,0 +1,9 @@
+{
+  "doc": "Firmware for Intel 7th-generation laptops.",
+  "packages": {
+    "firmware-intel-sound": { "component": "non-free-firmware" },
+    "firmware-iwlwifi": { "component": "non-free-firmware" },
+    "firmware-linux-free": {},
+    "firmware-sof-signed": { "component": "non-free-firmware" }
+  }
+}

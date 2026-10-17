@@ -22,6 +22,7 @@ pub struct Declaration {
     pub requires: Box<[Guard]>,
     pub scripts: Box<[Script]>,
     pub bless: Option<Bless>,
+    pub entries: Box<[crate::entries::Entries]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Read {
@@ -64,6 +65,7 @@ enum Key {
     Bless,
     Later,
     Undecoded,
+    Map(crate::entries::Map),
 }
 const KEYS: &[(&[u8], Key)] = &[
     (b"doc", Key::Doc),
@@ -74,27 +76,34 @@ const KEYS: &[(&[u8], Key)] = &[
     (b"checks", Key::Later),
     (b"settings", Key::Undecoded),
     (b"exports", Key::Undecoded),
-    (b"packages", Key::Undecoded),
-    (b"preseeds", Key::Undecoded),
-    (b"initramfs", Key::Undecoded),
-    (b"cmdline", Key::Undecoded),
-    (b"files", Key::Undecoded),
-    (b"users", Key::Undecoded),
-    (b"groups", Key::Undecoded),
-    (b"presets", Key::Undecoded),
-    (b"tmpfiles", Key::Undecoded),
-    (b"data", Key::Undecoded),
-    (b"secrets", Key::Undecoded),
-    (b"identity", Key::Undecoded),
-    (b"software", Key::Undecoded),
-    (b"live", Key::Undecoded),
+    (b"packages", Key::Map(crate::entries::Map::Packages)),
+    (b"preseeds", Key::Map(crate::entries::Map::Preseeds)),
+    (b"initramfs", Key::Map(crate::entries::Map::Initramfs)),
+    (b"cmdline", Key::Map(crate::entries::Map::Cmdline)),
+    (b"files", Key::Map(crate::entries::Map::Files)),
+    (b"users", Key::Map(crate::entries::Map::Users)),
+    (b"groups", Key::Map(crate::entries::Map::Groups)),
+    (b"presets", Key::Map(crate::entries::Map::Presets)),
+    (b"tmpfiles", Key::Map(crate::entries::Map::Tmpfiles)),
+    (b"data", Key::Map(crate::entries::Map::Data)),
+    (b"secrets", Key::Map(crate::entries::Map::Secrets)),
+    (b"identity", Key::Map(crate::entries::Map::Identity)),
+    (b"software", Key::Map(crate::entries::Map::Software)),
+    (b"live", Key::Map(crate::entries::Map::Live)),
 ];
 pub fn declaration(value: Value, _limits: &Limits) -> Result<Declaration, Error> {
     let Kind::Map(entries) = value.kind else {
         return Err(Error { at: value.at, fault: Fault::NotObject });
     };
-    let mut declaration =
-        Declaration { at: value.at, reads: Box::new([]), requires: Box::new([]), scripts: Box::new([]), bless: None };
+    let mut declaration = Declaration {
+        at: value.at,
+        reads: Box::new([]),
+        requires: Box::new([]),
+        scripts: Box::new([]),
+        bless: None,
+        entries: Box::new([]),
+    };
+    let mut maps = List::with_capacity(u32::try_from(entries.len()).expect("document bounded by u32"));
     for entry in entries {
         let mut key = None;
         for &(name, candidate) in KEYS {
@@ -116,8 +125,13 @@ pub fn declaration(value: Value, _limits: &Limits) -> Result<Declaration, Error>
             Key::Bless => declaration.bless = Some(bless(entry.value)?),
             Key::Later => return Err(fault(entry.at, Declared::Later)),
             Key::Undecoded => return Err(fault(entry.at, Declared::Undecoded)),
+            Key::Map(map) => {
+                let entries = crate::entries::read(map, entry.at, entry.value)?;
+                maps.push(entries).expect("one map per source entry");
+            }
         }
     }
+    declaration.entries = maps.into_boxed();
     Ok(declaration)
 }
 pub(crate) fn fault(at: Position, declared: Declared) -> Error {
@@ -239,4 +253,11 @@ fn bless(value: Value) -> Result<Bless, Error> {
         bless.ignore_failed = texts(field.value, false)?;
     }
     Ok(bless)
+}
+
+/// An integer at its first byte in task.json.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Number {
+    pub at: Position,
+    pub value: i64,
 }
