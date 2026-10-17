@@ -9,6 +9,25 @@ pub const LIMITS: Limits = SHIPPED;
 pub struct Shape {
     pub width: u32,
 }
+pub const SMALL_TEMPLATES: Shape = Shape { width: 8 };
+pub const WIDE_TEMPLATES: Shape = Shape { width: 48 };
+pub const TEMPLATE_KINDS: &[&str] = &[
+    "long",
+    "character",
+    "unterminated",
+    "escape",
+    "integer",
+    "expected",
+    "deep",
+    "misplaced",
+    "filter",
+    "arity",
+    "test",
+    "utf8",
+    "return",
+    "unclosed",
+    "statement",
+];
 pub const SMALL: Shape = Shape { width: 16 };
 pub const WIDE: Shape = Shape { width: 260 };
 #[must_use]
@@ -18,6 +37,7 @@ pub fn limits(rng: &mut Rng) -> Limits {
     } else {
         Limits {
             expression: u32::try_from(rng.between(1, 256)).expect("bounded by fixture or checked text"),
+            template: u32::try_from(rng.between(64, 4096)).expect("tiny template limit"),
             nesting: u32::try_from(rng.between(1, 8)).expect("bounded by fixture or checked text"),
         }
     }
@@ -25,6 +45,10 @@ pub fn limits(rng: &mut Rng) -> Limits {
 #[must_use]
 pub fn kind(kind: &ErrorKind) -> &'static str {
     match kind {
+        ErrorKind::Utf8 => "utf8",
+        ErrorKind::Return => "return",
+        ErrorKind::Unclosed => "unclosed",
+        ErrorKind::UnknownStatement => "statement",
         ErrorKind::TooLong => "long",
         ErrorKind::Character => "character",
         ErrorKind::Unterminated => "unterminated",
@@ -51,8 +75,8 @@ pub const EVERY_KIND: &[&str] = &[
     "arity",
     "test",
 ];
-pub fn assert_fell(fell: &BTreeSet<&str>) {
-    for kind in EVERY_KIND {
+pub fn assert_fell(fell: &BTreeSet<&str>, kinds: &[&str]) {
+    for kind in kinds {
         assert!(fell.contains(kind), "missing {kind}");
     }
 }

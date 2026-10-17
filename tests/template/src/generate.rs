@@ -1,3 +1,4 @@
+pub mod template;
 use crate::fixtures;
 use crate::fixtures::Shape;
 use skein_lib::Rng;

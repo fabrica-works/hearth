@@ -22,7 +22,7 @@ fn cut_and_mutated_texts_compile_as_the_reference_compiles_them() {
             }
         }
     }
-    fixtures::assert_fell(&fell);
+    fixtures::assert_fell(&fell, fixtures::EVERY_KIND);
 }
 
 #[test]

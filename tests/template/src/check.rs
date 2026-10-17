@@ -1,4 +1,4 @@
-use hearth_protocol_template::{Expression, Op};
+use hearth_protocol_template::{Does, Expression, Op, Template};
 pub fn invariants(expression: &Expression, text: &[u8]) {
     let mut depths = vec![None; expression.operations.len() + 1];
     depths[0] = Some(0_u32);
@@ -61,4 +61,23 @@ fn arrive(depths: &mut [Option<u32>], index: usize, over: u32, depth: u32) {
         assert_eq!(previous, depth, "target {target}");
     }
     depths[target] = Some(depth);
+}
+
+pub fn template(compiled: &Template, text: &[u8]) {
+    let lines: Vec<_> = std::iter::once(0)
+        .chain(
+            text.iter()
+                .enumerate()
+                .filter(|(_, b)| **b == b'\n')
+                .map(|(at, _)| u32::try_from(at + 1).expect("validated template length")),
+        )
+        .collect();
+    assert_eq!(&*compiled.lines, lines);
+    for instruction in &compiled.instructions {
+        assert!((instruction.at as usize) < text.len());
+        match &instruction.does {
+            Does::Text(bytes) => assert!(!bytes.is_empty()),
+            Does::Output(e) => invariants(e, text),
+        }
+    }
 }

@@ -8,6 +8,10 @@ pub struct Error {
 /// Why expression text was refused (format.md, 7.4).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ErrorKind {
+    Utf8,
+    Return,
+    Unclosed,
+    UnknownStatement,
     TooLong,
     Character,
     Unterminated,
@@ -23,6 +27,7 @@ pub enum ErrorKind {
 /// The next grammatical token required.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Expected {
+    TagEnd,
     Operand,
     Operator,
     Name,

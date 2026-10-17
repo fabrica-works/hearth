@@ -106,7 +106,7 @@ fn an_unknown_filter_is_refused_at_its_name() {
     assert_eq!(compile(b"x|unknown"), Err(Error { at: 2, kind: ErrorKind::UnknownFilter }));
 }
 /// One open level suffices to prove every nesting construct refuses a second.
-const ONE: Limits = Limits { expression: SHIPPED.expression, nesting: 1 };
+const ONE: Limits = Limits { nesting: 1, ..SHIPPED };
 #[test]
 fn nesting_past_the_limit_is_refused_where_the_level_opens() {
     for (text, at) in [(b"((1))".as_slice(), 1), (b"[[1]]", 1), (b"[a[1]]", 2), (b"[a|first()]", 8)] {

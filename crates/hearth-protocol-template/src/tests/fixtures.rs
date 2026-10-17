@@ -19,3 +19,15 @@ pub fn key(at: u32, text: &[u8]) -> Operation {
 pub fn item(at: u32) -> Operation {
     op(at, Op::Item { missing: Missing::Error })
 }
+pub fn template(text: &[u8]) -> Result<crate::Template, Error> {
+    crate::template::compile(text, &SHIPPED)
+}
+pub fn text(at: u32, value: &[u8]) -> crate::Instruction {
+    crate::Instruction { at, does: crate::Does::Text(bytes(value)) }
+}
+pub fn expr<const N: usize>(values: u32, operations: [Operation; N]) -> Expression {
+    Expression { values, operations: operations.into() }
+}
+pub fn output(at: u32, value: Expression) -> crate::Instruction {
+    crate::Instruction { at, does: crate::Does::Output(value) }
+}
