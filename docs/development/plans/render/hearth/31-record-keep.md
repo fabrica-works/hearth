@@ -121,14 +121,18 @@ rename into `cache/` with its kind-5 record (6.8), or refused; `resolving` and
 `resolved` progress on standard error (client/README.md 3.2).
 Needs: nothing beyond 31.1.
 Files: protocol `src/{indices, store, lib}.rs` (`Beneath::Rename`),
-`src/translate/store.rs` (`progress` too), `src/tests/{indices, store}.rs`;
+`src/translate/store.rs` (`progress` too), `src/tests/{indices, store}.rs`,
+`src/tests/fixtures/resolve.rs` (its `Beneath` match, :92);
 service `src/lib.rs` (`Beneath::Rename` by `FileIo::descriptor`),
 `src/tests.rs`; root `src/{lib, vocabulary}.rs`, `src/tests.rs`; records
 `src/{records, progress}.rs`, `src/form/{text, json}.rs`,
 `src/tests/progress.rs`; `tests/builder/tests/conformance_render.rs`.
 Shape: the sketches. At an index's `Ended`: `Sync { file }`, `Close`,
 `builder::Event::Index`, the next index after the store's terminal; the root
-steps `Arrived { origin: Index { resolution: key } }` (33.1). `Keep`:
+steps `Arrived { origin: Index { resolution: key } }` (33.1), `key` render's
+`Request::Resolve`'s (render `vocabulary.rs:90`), which the root keeps:
+`Event::Index` has none. `TEST_MIN_KEY` is
+`tests/builder/src/fixtures/resolution.rs:5`. `Keep`:
 `Beneath::Rename { from_root: <lists' token>, from, to_root: cache.fd, to: <hex>
 }`, `SyncDirectory { cache.fd }`, its record by `Store`; `Discard`: the walk
 takes it. A `Refused` index: the root withholds `Resolved`, gives render `Failed

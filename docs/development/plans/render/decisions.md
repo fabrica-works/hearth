@@ -907,6 +907,22 @@ None yet.
 
      The README's rule stays at four times: a further increment past it stops on a question, as this one did. A further counted file outside the Files takes a line in the commit body, with its count.
 
+172. **hearth 31's Shapes against main, again** (re-check of hearth-31.1).
+     31.1 landed as hearth 9e1f31d. The re-check from e116e1d to 1b95d31 found three misses in 31.2, its open increment. 31.2's Files and Shape now say:
+
+     1. **Files gain protocol `src/tests/fixtures/resolve.rs`.** Its `Beneath` match is exhaustive (:92-93, `Remove` and `OpenDirectory`), so `Beneath::Rename` breaks it. The file is unchanged on main.
+     2. **The root keeps render's `Request::Resolve` key.** The Shape's `Arrived { origin: Index { resolution: key } }` takes `key` from render's `Request::Resolve` (`hearth-domain-render/src/vocabulary.rs:90`). The root keeps it, because `builder::Event::Index` carries none.
+     3. **`TEST_MIN_KEY` is in `tests/builder/src/fixtures/resolution.rs:5`.** It is not in `fixtures.rs`.
+
+     Any further exhaustive match on a type 31.2 extends breaks the same way. Add its arm, and list the file in the commit body.
+
+     ## Checked
+
+     - `git grep -n 'Beneath::' origin/main -- crates/hearth-protocol-builder/src/tests/fixtures/resolve.rs`: `:92: Asked::Beneath(crate::Beneath::Remove { owner, .. }) => …`, `:93: Asked::Beneath(crate::Beneath::OpenDirectory { .. }) => panic!("empty fixture scratch")`.
+     - `git grep -n 'TEST_MIN_KEY' origin/main -- tests/builder/src`: `tests/builder/src/fixtures/resolution.rs:5: pub const TEST_MIN_KEY: &str = "21e9a02f…"`.
+     - `git show origin/main:crates/hearth-domain-render/src/vocabulary.rs | sed -n 88,90p`: `Resolve {`, `request: Token,`, `key: Digest,`.
+     - The sub-agent's suites passed at 1b95d31 with these corrections and 31.1's sketched: clippy `-D warnings`, fmt, nextest 1516, fuzzy 20, and conformance_render 2.
+
 ## For the user
 
 The long-term choices the user may veto:
