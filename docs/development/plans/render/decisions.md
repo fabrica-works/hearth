@@ -653,6 +653,16 @@ None yet.
      11. The reference test's `let limits` line is wrapped at 120 columns, as rustfmt does.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+140. **hearth 43's Shapes against main** (ready check of hearth-43.1).
+     hearth 43's ready check, against hearth 339ba63 to f725453 and skein 841f487 (clippy clean with the corrections; default 639 of 639 and fuzzy 17 of 17 at d0df92f, with a stand-in for 43.2's five functions), corrects 43-evaluate-translated.md, its names grepped again at hearth 76d7da7:
+     1. 43.1's `tojson` sketch: `bytes` is the module `skein_lib::bytes`, so the string is `bytes::copy_of(..)`, with `use skein_lib::bytes;` (as render `src/tests/evaluate.rs:4`, `:199`); its `peers` line and 43.3's `expression` call are wrapped within 120 columns.
+     2. 43.1's sweep asserts each fault kind fell at least once: `assert_fell` (world `src/fixtures.rs:102`) checks fault-kind names, the only ones `tests/fuzzy_evaluate.rs:15` records, and 43.1 adds `"empty"` and `"path"` to `expressions::KINDS` (`:16`).
+     3. 43.2's world compiles at `Limits { expression: <the text's length>, ..SHIPPED }`: the template's `SHIPPED` limits an expression to 4,096 bytes (`limits.rs:12`), `compile` refuses past it (`expression.rs:44`, `TooLong`), and the generator's strings pass it in 25 of 200 SMALL seeds and 2,089 of 10,000 WIDE rounds, so "for every seed" holds only so. Its depth (`SMALL` 3, `WIDE` 6, world `expressions.rs:14-15`) stays under the nesting limit 64.
+     4. 43.2's printer wraps by precedence: 37.1's generator (`tests/template/src/generate.rs:84-119`) wraps every operand but a chain before `is` or `default`, so it is no model for the rest.
+     5. 43.3: `ELEMENT` is 14.1's (render `evaluate.rs:53`), as are `FaultKind::Empty` and `Path` (`:67-68`); `at_the_limits()` and `wide_roots()` are `#[must_use]` (pedantic `must_use_candidate`); `skein-heap` goes under `[dev-dependencies]` of `tests/render/Cargo.toml`, as `tests/template/Cargo.toml:12-13`.
+     The `Path` rows of 43.1 stand: format.md's `path` is "absolute; no empty, `.` or `..` segment; no trailing `/`" (`format.md:1558`), though this machine's systemd 257 escapes `/a//b/`, `/a/./b`, `a/b` and `''`; the unit tests take literals, not the tool.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

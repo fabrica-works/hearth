@@ -108,18 +108,22 @@ Test shape: in `src/tests/filters.rs`, each under 20 ms:
 `a`, `.`; `a/b`: `b`, `a`; `''`, `a/`, `/a/../b`: `Path`).
 ```rust
 // crates/hearth-domain-render/src/tests/filters.rs
+use skein_lib::bytes;
+
 #[test]
 fn tojson_is_compact_with_keys_in_order_and_controls_escaped() {
     let roots = Roots::x1_prod();
-    let peers = [name(0, b"settings", Missing::Error), key(9, b"peers", Missing::Error), op(17, Op::Filter(Filter::Tojson))];
+    let peers =
+        [name(0, b"settings", Missing::Error), key(9, b"peers", Missing::Error), op(17, Op::Filter(Filter::Tojson))];
     assert_eq!(fixtures::evaluate(&roots, &peers), Ok(Some(string(br#"{"a":{"port":51820},"b":{"port":51821}}"#))));
-    let text = [op(0, Op::String(bytes(b"\"\\\n\x01</>\xc3\xa9"))), op(9, Op::Filter(Filter::Tojson))];
+    let text = [op(0, Op::String(bytes::copy_of(b"\"\\\n\x01</>\xc3\xa9"))), op(9, Op::Filter(Filter::Tojson))];
     let escaped = b"\"\\\"\\\\\\n\\u0001</>\xc3\xa9\"";
     assert_eq!(fixtures::evaluate(&roots, &text), Ok(Some(string(escaped))), "format.md, 7.5: skein-json's forms");
 }
 ```
-The world's trees gain every filter at its arity; 14.1's sweep asserts each of
-the 17 filters fell at least once (`assert_fell`'s kinds).
+The world's trees gain every filter at its arity; 14.1's sweep asserts each
+fault kind fell at least once (`assert_fell` over `expressions::KINDS`, which
+gains `"empty"` and `"path"`).
 Proof: world, `generated_expressions_evaluate_as_the_reference_evaluates_them`,
 now with filters: each of the 17 gives the reference's value on generated
 input. Nothing calls `evaluate` until hearth 15.2. Bound 0.5 s.
@@ -142,14 +146,16 @@ op, missing, filter}`, total matches over render's types),
 `Cargo.toml`, `Cargo.lock`. World: `tests/render/Cargo.toml`
 (`hearth-protocol-template`, `hearth-protocol-builder`),
 `src/expressions.rs` (`text(&Tree)`; `evaluate` compiles at the template
-machine's `SHIPPED`, translates, evaluates), `src/reference.rs` (05's
+machine's `Limits { expression: <the text's length>, ..SHIPPED }`, translates,
+evaluates), `src/reference.rs` (05's
 marking: a chain is a bound name and its lookups, the name marked `Error`,
 format.md, 7.6).
 Shape: the sketch's five functions, matches with no wildcard, patterns with
 no `..`; boxes moved; the operations rebuilt through `List::with_capacity`
 and `into_boxed`. The printer writes the parentheses precedence needs, none
 around a chain before `is` or `default`, and wrapping none that a literal or
-parentheses start (as 37.1's generator; 7.6: no chain).
+parentheses start (by precedence: 37.1's generator wraps every operand but a
+chain before `is` or `default`; 7.6: no chain).
 Test shape: in `src/tests/translate.rs`, each under 20 ms:
 `each_operation_translates_to_render_and_back` (26 rows),
 `each_filter_translates_to_render_and_back` (17 rows),
@@ -180,10 +186,12 @@ Scope: `evaluate::worst_case` (programming-model.md, 6.3): both stacks at
 capacity and a `Budget`'s `made`, checked at the shipped limits.
 Needs: hearth 37.3 (`skein-heap` is a workspace dependency since it).
 Files: `src/evaluate.rs`, `src/tests/evaluate.rs`; world
-`tests/render/Cargo.toml` (`skein-heap`), `src/fixtures.rs`
+`tests/render/Cargo.toml` (`skein-heap` under `[dev-dependencies]`, as
+`tests/template/Cargo.toml:12-13`), `src/fixtures.rs`
 (`at_the_limits()`, `wide_roots()`, the world's `Roots` of 14.1), new
 `tests/memory.rs`.
-Shape: `worst_case`, `ELEMENT`. `at_the_limits()` compiles: a 4,096-byte
+Shape: `worst_case` (`ELEMENT` is 14.1's, `evaluate.rs:53`); `at_the_limits()`
+and `wide_roots()` are `#[must_use]`. `at_the_limits()` compiles: a 4,096-byte
 list (2,048 values), 64 nested lists, a `~` chain and a `replace` past
 `made`, `tojson` and `sort` of a 4,096-entry setting, `split` of a 1 MiB
 string.
@@ -204,7 +212,8 @@ fn evaluating_at_the_limits_holds_no_more_than_the_worst_case() {
         meter.start();
         let mut evaluator = Evaluator::new(&limits::SHIPPED);
         let mut budget = Budget::new(&limits::SHIPPED);
-        let evaluated = evaluate::expression(&mut evaluator, &expression, &roots.context(), &Bindings::with_capacity(0), &mut budget);
+        let (context, bindings) = (roots.context(), Bindings::with_capacity(0));
+        let evaluated = evaluate::expression(&mut evaluator, &expression, &context, &bindings, &mut budget);
         drop(evaluated);
         drop(evaluator);
         let step = meter.end();
@@ -222,7 +231,7 @@ Removes: nothing.
 ## Interface sketches
 
 render owns these, beside hearth 14's `Op`, `Missing`, `FaultKind`
-(`Empty`, `Path` are 43.1's); 43.2 maps hearth 05's types to them. Types
+(`Empty` and `Path` are 14.1's, `evaluate.rs:67-68`); 43.2 maps hearth 05's types to them. Types
 derive `Clone, PartialEq, Eq, Hash, Debug` unless said.
 
 ```rust
