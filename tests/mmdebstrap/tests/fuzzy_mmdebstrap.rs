@@ -31,3 +31,31 @@ fn generated_and_mutated_lists_read_as_the_reference_reads_them() {
         );
     }
 }
+#[test]
+fn recordings_cut_and_mutated_read_as_the_reference_reads_them() {
+    let cases = hearth_mmdebstrap_world::recordings::all();
+    for seed in 0..128 {
+        let case = &cases[usize::try_from(seed).unwrap() % cases.len()];
+        let mut rng = Rng::new(0x3802_f000 + seed);
+        for bytes in [&case.recording.stderr, &case.recording.stdout] {
+            let bytes = generate::mutate(&mut rng, bytes);
+            let end = world::end(&mut rng, &bytes);
+            assert_eq!(
+                world::read_output(&bytes, seed, &LIMITS, end).decoded,
+                reference::output(&bytes, end, &LIMITS),
+                "{}: seed {seed}, {end:?}",
+                case.case
+            );
+        }
+        if let Some(bytes) = &case.recording.stanzas {
+            let bytes = generate::mutate(&mut rng, bytes);
+            let end = world::end(&mut rng, &bytes);
+            assert_eq!(
+                world::read_index(&bytes, seed, &LIMITS, end),
+                reference::index(&bytes, end, &LIMITS),
+                "{} stanzas: seed {seed}, {end:?}",
+                case.case
+            );
+        }
+    }
+}

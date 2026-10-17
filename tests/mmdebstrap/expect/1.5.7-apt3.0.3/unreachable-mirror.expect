@@ -1,0 +1,8 @@
+# Captured mmdebstrap output; reviewed against both pipes.
+fetched 0
+cause fetch
+tail Err:1 http://snapshot.debian.org/archive/debian/20261017T143929Z forky InRelease
+tail   Could not connect to 127.0.0.1:PORT (127.0.0.1). - connect (111: Connection refused)
+tail   Unable to connect to 127.0.0.1:PORT:
+tail E: Failed to fetch http://snapshot.debian.org/archive/debian/20261017T143929Z/dists/forky/InRelease  Unable to connect to 127.0.0.1:PORT:
+tail E: Some index files failed to download. They have been ignored, or old ones used instead.

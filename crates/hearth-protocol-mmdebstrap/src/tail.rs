@@ -48,6 +48,7 @@ pub struct Tail {
     cause: Cause,
     continuation: bool,
     package: bool,
+    pending_fetch: Option<Cause>,
 }
 impl Tail {
     #[must_use]
@@ -57,6 +58,7 @@ impl Tail {
             cause: Cause::Other,
             continuation: false,
             package: false,
+            pending_fetch: None,
         }
     }
     #[must_use]
@@ -121,6 +123,7 @@ pub fn admit(tail: &mut Tail, line: &[u8], limits: &Limits) {
     if !possible {
         tail.continuation = false;
         tail.package = false;
+        tail.pending_fetch = None;
         return;
     }
     let bound = usize::try_from(limits.line).expect("u32 fits usize");
@@ -133,17 +136,22 @@ pub fn admit(tail: &mut Tail, line: &[u8], limits: &Limits) {
     if denied(&line) {
         tail.continuation = false;
         tail.package = false;
+        tail.pending_fetch = None;
         return;
     }
     let indented = line.starts_with(b" ");
     let mut keep = tail.continuation && indented;
     for pattern in ALLOW {
-        keep |= has(&line, pattern);
+        keep |= match *pattern {
+            b"E: " | b"Err:" | b"dpkg: error" => line.starts_with(pattern),
+            _ => has(&line, pattern),
+        };
     }
     keep |= has(&line, UNMET) || has(&line, REPLACE);
     if !keep {
         tail.continuation = false;
         tail.package = false;
+        tail.pending_fetch = None;
         return;
     }
     if tail.package && indented {
@@ -161,17 +169,35 @@ pub fn admit(tail: &mut Tail, line: &[u8], limits: &Limits) {
         }
         tail.package = false;
     }
-    let candidate = cause(&line, limits);
+    if !indented {
+        tail.pending_fetch = None;
+    }
+    let mut candidate = cause(&line, limits);
+    // Apt prints the status on the indented line after Err, not its URI line.
+    if indented
+        && (has(&line, b"404  Not Found") || has(&line, b"NOT FOUND"))
+        && let Some(previous) = tail.pending_fetch.take()
+    {
+        tail.cause = previous;
+        candidate = Cause::Absent;
+    }
+
     if candidate != Cause::Other
         && (tail.cause == Cause::Other
             || (tail.cause.class() == Class::Configuration && candidate.class() == Class::Operational))
     {
-        tail.cause = candidate;
+        if candidate == Cause::Fetch && has(&line, b"Err:") {
+            tail.pending_fetch = Some(core::mem::replace(&mut tail.cause, candidate));
+        } else {
+            tail.cause = candidate;
+            tail.pending_fetch = None;
+        }
     }
     tail.package = has(&line, UNMET);
     tail.continuation = (tail.continuation && indented)
         || has(&line, b"dpkg: error")
-        || has(&line, b"E: ")
+        || line.starts_with(b"E: ")
+        || line.starts_with(b"Err:")
         || has(&line, UNMET)
         || has(&line, REPLACE);
     if limits.tail_lines != 0 {

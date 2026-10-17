@@ -1,0 +1,6 @@
+# Captured mmdebstrap output; reviewed against both pipes.
+fetched 0
+cause absent
+tail Err:2 http://snapshot.debian.org/archive/debian/20000101T000000Z forky Release
+tail   404  Not Found [IP: 127.0.0.1 PORT]
+tail E: The repository 'http://snapshot.debian.org/archive/debian/20000101T000000Z forky Release' does not have a Release file.

@@ -27,13 +27,14 @@ pub fn output(bytes: &[u8], end: End, limits: &Limits) -> Decoded {
     let max = usize::try_from(limits.line.max(1)).expect("bounded fixture value");
     let mut continuation = false;
     let mut package = false;
+    let mut pending_fetch = None;
     for raw in bytes.split_inclusive(|b| *b == b'\n') {
         if !raw.ends_with(b"\n") && raw.len() < max {
             continue;
         }
         let line = &raw[..raw.len().min(max)];
         let line = line.strip_suffix(b"\n").unwrap_or(line);
-        admit(&mut decoded, &mut continuation, &mut package, line, limits);
+        admit(&mut decoded, &mut continuation, &mut package, &mut pending_fetch, line, limits);
         if line.starts_with(b"Inst ") && decoded.error.is_none() {
             if count >= limits.insts {
                 decoded.error = Some(OutputError::TooMany);
@@ -117,7 +118,14 @@ fn fetched(line: &[u8]) -> Option<u64> {
     whole.checked_add(fractional)
 }
 
-fn admit(decoded: &mut Decoded, continuation: &mut bool, package: &mut bool, bytes: &[u8], limits: &Limits) {
+fn admit(
+    decoded: &mut Decoded,
+    continuation: &mut bool,
+    package: &mut bool,
+    pending_fetch: &mut Option<Cause>,
+    bytes: &[u8],
+    limits: &Limits,
+) {
     let line: Vec<u8> = bytes
         .iter()
         .take(usize::try_from(limits.line).expect("line bound"))
@@ -143,9 +151,15 @@ fn admit(decoded: &mut Decoded, continuation: &mut bool, package: &mut bool, byt
         b"However the following packages replace it:",
     ];
     let indented = line.starts_with(b" ");
-    if denied || !(allow.iter().any(|p| has(p)) || *continuation && indented) {
+    if denied
+        || !(allow.iter().any(|p| match *p {
+            b"E: " | b"Err:" | b"dpkg: error" => line.starts_with(p),
+            _ => has(p),
+        }) || *continuation && indented)
+    {
         *continuation = false;
         *package = false;
+        *pending_fetch = None;
         return;
     }
     if *package && indented {
@@ -159,17 +173,34 @@ fn admit(decoded: &mut Decoded, continuation: &mut bool, package: &mut bool, byt
             decoded.cause = Cause::Unsatisfiable(Some(name));
         }
     }
-    let candidate = failure_cause(&line, limits);
+    if !indented {
+        *pending_fetch = None;
+    }
+    let mut candidate = failure_cause(&line, limits);
+    if indented
+        && (has(b"404  Not Found") || has(b"NOT FOUND"))
+        && let Some(previous) = pending_fetch.take()
+    {
+        decoded.cause = previous;
+        candidate = Cause::Absent;
+    }
+
     if candidate != Cause::Other
         && (decoded.cause == Cause::Other
             || (decoded.cause.class() == Class::Configuration && candidate.class() == Class::Operational))
     {
-        decoded.cause = candidate;
+        if candidate == Cause::Fetch && has(b"Err:") {
+            *pending_fetch = Some(std::mem::replace(&mut decoded.cause, candidate));
+        } else {
+            decoded.cause = candidate;
+            *pending_fetch = None;
+        }
     }
     *package = has(b"The following packages have unmet dependencies:");
     *continuation = (*continuation && indented)
         || has(b"dpkg: error")
-        || has(b"E: ")
+        || line.starts_with(b"E: ")
+        || line.starts_with(b"Err:")
         || *package
         || has(b"However the following packages replace it:");
     if limits.tail_lines > 0 {
@@ -378,4 +409,104 @@ fn reference_stanza(
         size,
         sha256,
     })
+}
+
+/// The independent reference's observation of a complete tool run.
+#[must_use]
+pub fn recording(recording: &hearth_recordings::Recording, limits: &Limits) -> Decoded {
+    let mut decoded = output(&recording.stderr, End::Whole, limits);
+    let stdout = output(&recording.stdout, End::Whole, limits);
+    decoded.insts.extend(stdout.insts);
+    if stdout.fetched > 0 {
+        decoded.fetched = stdout.fetched;
+    }
+    decoded.error = decoded.error.or(stdout.error);
+    if recording.exit.as_ref() == "0" {
+        decoded.cause = Cause::Other;
+        decoded.tail.clear();
+    } else if decoded.tail.is_empty() {
+        decoded.cause = stdout.cause;
+        decoded.tail = stdout.tail;
+    }
+    decoded
+}
+/// Draft an expectation for review against a capture; never writes it.
+#[must_use]
+pub fn draft(decoded: &Decoded, exit: &str) -> String {
+    use std::fmt::Write;
+    assert_eq!(decoded.error, None, "the recording's pipes decode");
+    let mut text = String::from("# Captured mmdebstrap output; reviewed against both pipes.\n");
+    for inst in &decoded.insts {
+        writeln!(
+            text,
+            "inst {} {} {}",
+            String::from_utf8_lossy(inst.name.as_bytes()),
+            String::from_utf8_lossy(&inst.version),
+            String::from_utf8_lossy(inst.architecture.as_bytes())
+        )
+        .expect("String write");
+    }
+    writeln!(text, "fetched {}", decoded.fetched).expect("String write");
+    if exit == "0" {
+        text.push_str("ended\n");
+    } else {
+        let cause = match &decoded.cause {
+            Cause::Fetch => "fetch".into(),
+            Cause::Resolve => "resolve".into(),
+            Cause::Space => "space".into(),
+            Cause::Absent => "absent".into(),
+            Cause::Other => "other".into(),
+            Cause::Unknown(name) => format!("unknown {}", String::from_utf8_lossy(name.as_bytes())),
+            Cause::Unsatisfiable(None) => "unsatisfiable".into(),
+            Cause::Unsatisfiable(Some(name)) => format!("unsatisfiable {}", String::from_utf8_lossy(name.as_bytes())),
+        };
+        writeln!(text, "cause {cause}").expect("String write");
+        for line in &decoded.tail {
+            writeln!(text, "tail {}", String::from_utf8_lossy(line)).expect("String write");
+        }
+    }
+    text
+}
+/// Read the hand-reviewed expectation, including the failure tail's exact bytes.
+#[must_use]
+pub fn expectation(text: &str) -> Decoded {
+    use hearth_protocol_mmdebstrap::limits;
+    let mut decoded = Decoded { insts: Vec::new(), fetched: 0, error: None, tail: Vec::new(), cause: Cause::Other };
+    let name = |text: &str| Name::new(text.as_bytes(), &limits::SHIPPED).expect("expected name");
+    let mut terminal = false;
+    for line in text.lines().filter(|line| !line.starts_with('#') && !line.is_empty()) {
+        if let Some(rest) = line.strip_prefix("inst ") {
+            assert!(!terminal, "inst precedes terminal");
+            let words: Vec<_> = rest.split(' ').collect();
+            assert_eq!(words.len(), 3, "three Inst fields");
+            decoded.insts.push(Inst {
+                name: name(words[0]),
+                version: words[1].as_bytes().into(),
+                architecture: name(words[2]),
+            });
+        } else if let Some(rest) = line.strip_prefix("fetched ") {
+            decoded.fetched = rest.parse().expect("expected byte count");
+        } else if line == "ended" {
+            terminal = true;
+        } else if let Some(rest) = line.strip_prefix("cause ") {
+            terminal = true;
+            decoded.cause = match rest {
+                "fetch" => Cause::Fetch,
+                "resolve" => Cause::Resolve,
+                "space" => Cause::Space,
+                "absent" => Cause::Absent,
+                "other" => Cause::Other,
+                "unsatisfiable" => Cause::Unsatisfiable(None),
+                rest if rest.starts_with("unknown ") => Cause::Unknown(name(&rest[8..])),
+                rest if rest.starts_with("unsatisfiable ") => Cause::Unsatisfiable(Some(name(&rest[14..]))),
+                _ => panic!("unknown expected cause {rest}"),
+            };
+        } else if let Some(rest) = line.strip_prefix("tail ") {
+            decoded.tail.push(rest.as_bytes().to_vec());
+        } else {
+            panic!("unknown expected line {line}");
+        }
+    }
+    assert!(terminal, "an expectation ends with ended or cause");
+    decoded
 }

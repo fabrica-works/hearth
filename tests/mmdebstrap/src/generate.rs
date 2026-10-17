@@ -33,6 +33,9 @@ pub fn output(rng: &mut Rng, limits: &Limits) -> Vec<u8> {
 }
 #[must_use]
 pub fn mutate(rng: &mut Rng, bytes: &[u8]) -> Vec<u8> {
+    if bytes.is_empty() {
+        return Vec::new();
+    }
     let mut bytes = bytes.to_vec();
     let at = usize::try_from(rng.between(0, u64::try_from(bytes.len()).expect("bounded fixture value").max(1)))
         .expect("bounded fixture value");

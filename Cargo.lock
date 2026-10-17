@@ -149,6 +149,8 @@ name = "hearth-mmdebstrap-world"
 version = "0.0.0"
 dependencies = [
  "hearth-protocol-mmdebstrap",
+ "hearth-recordings",
+ "hearth-test-mirror",
  "skein-heap",
  "skein-lib",
  "skein-world",

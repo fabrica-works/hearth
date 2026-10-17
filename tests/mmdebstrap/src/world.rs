@@ -198,3 +198,23 @@ pub fn read_index_metered(bytes: &[u8], limits: &Limits) -> u64 {
     packages::close(&mut reader, &mut below);
     most.max(meter.check(meter.end(), bound, &"close"))
 }
+
+/// Observe both pipes, preferring stderr's failure tail as the real owner does.
+#[must_use]
+pub fn read_recording(case: &crate::recordings::Case, seed: u64, limits: &Limits) -> Run {
+    let mut stderr = read_output(&case.recording.stderr, seed, limits, End::Whole).decoded;
+    let stdout = read_output(&case.recording.stdout, seed ^ 0x3802_0000, limits, End::Whole).decoded;
+    stderr.insts.extend(stdout.insts);
+    if stdout.fetched != 0 {
+        stderr.fetched = stdout.fetched;
+    }
+    stderr.error = stderr.error.or(stdout.error);
+    if case.recording.exit.as_ref() == "0" {
+        stderr.tail.clear();
+        stderr.cause = Cause::Other;
+    } else if stderr.tail.is_empty() {
+        stderr.tail = stdout.tail;
+        stderr.cause = stdout.cause;
+    }
+    Run { decoded: stderr }
+}

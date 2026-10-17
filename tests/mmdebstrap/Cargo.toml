@@ -10,6 +10,8 @@ skein-lib.workspace = true
 hearth-protocol-mmdebstrap.workspace = true
 skein-world.workspace = true
 skein-heap.workspace = true
+hearth-recordings = { path = "../../testing/hearth-recordings" }
+hearth-test-mirror.workspace = true
 
 [lints.rust]
 unsafe_code = "forbid"
