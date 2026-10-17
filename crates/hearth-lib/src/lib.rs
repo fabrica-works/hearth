@@ -6,6 +6,7 @@
 extern crate alloc;
 
 pub mod encode;
+pub mod hash;
 
 #[cfg(test)]
 mod tests;

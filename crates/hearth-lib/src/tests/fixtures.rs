@@ -50,3 +50,8 @@ pub fn encode(items: &[Item]) -> Box<[u8]> {
     put(&mut writer, items);
     writer.written()
 }
+
+pub fn digest(text: &str) -> crate::encode::Digest {
+    let bytes = hex(text);
+    crate::encode::Digest(bytes.as_ref().try_into().expect("a digest has thirty-two bytes"))
+}

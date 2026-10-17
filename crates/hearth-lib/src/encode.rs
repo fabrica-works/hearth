@@ -1,7 +1,7 @@
 //! One value, encoded in pre-order without recursion (store.md, 3.1).
 
 use alloc::boxed::Box;
-use skein_lib::{Stack, Writer, bytes};
+use skein_lib::{Stack, Writer, bytes, sha256::Sha256};
 
 /// The first byte of `none` (store.md, 3.1).
 pub const NONE: u8 = 0x00;
@@ -52,6 +52,7 @@ pub struct Encoder {
 enum Sink {
     Measure { len: u64 },
     Write { writer: Writer },
+    Hash { sha: Sha256 },
 }
 
 #[derive(Debug)]
@@ -144,7 +145,9 @@ impl Encoder {
         self.whole();
         match self.sink {
             Sink::Measure { len } => len,
-            Sink::Write { .. } => unreachable!("a measuring encoder returns its length"),
+            Sink::Write { .. } | Sink::Hash { .. } => {
+                unreachable!("a measuring encoder returns its length")
+            }
         }
     }
 
@@ -153,7 +156,23 @@ impl Encoder {
         self.whole();
         match self.sink {
             Sink::Write { writer } => writer.finish(),
-            Sink::Measure { .. } => unreachable!("a writing encoder returns its bytes"),
+            Sink::Measure { .. } | Sink::Hash { .. } => {
+                unreachable!("a writing encoder returns its bytes")
+            }
+        }
+    }
+
+    pub(crate) fn hashing() -> Encoder {
+        Encoder { sink: Sink::Hash { sha: Sha256::new() }, open: Stack::with_capacity(DEPTH), placed: false }
+    }
+
+    pub(crate) fn hashed(self) -> [u8; 32] {
+        self.whole();
+        match self.sink {
+            Sink::Hash { sha } => sha.finish(),
+            Sink::Measure { .. } | Sink::Write { .. } => {
+                unreachable!("a hashing encoder returns its digest")
+            }
         }
     }
 
@@ -209,6 +228,7 @@ impl Encoder {
             Sink::Write { writer } => {
                 writer.put(value).expect("an encoder writes within the length it measured");
             }
+            Sink::Hash { sha } => sha.update(value),
         }
     }
 }
