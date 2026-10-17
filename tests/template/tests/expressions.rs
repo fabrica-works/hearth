@@ -11,3 +11,21 @@ fn generated_expressions_compile_as_the_reference_compiles_them() {
         check::invariants(&got, &text);
     }
 }
+
+#[test]
+fn a_filter_after_a_test_is_refused_at_its_pipe() {
+    const CASES: &[(&[u8], u32)] = &[(b"not (\t5892802747607251180  is defined | replace('a', 'b') | length())", 38)];
+    for (text, at) in CASES {
+        assert_eq!(expression::compile(text, &fixtures::LIMITS).map_err(|error| error.at), Err(*at));
+        assert_eq!(reference::compile(text, &fixtures::LIMITS), Err(*at));
+    }
+}
+
+#[test]
+fn a_second_comparison_is_refused_before_reading_its_in() {
+    const CASES: &[(&[u8], u32)] = &[(b"not ((not (name_1\n.and  < s not defined)))", 28)];
+    for (text, at) in CASES {
+        assert_eq!(expression::compile(text, &fixtures::LIMITS).map_err(|error| error.at), Err(*at));
+        assert_eq!(reference::compile(text, &fixtures::LIMITS), Err(*at));
+    }
+}

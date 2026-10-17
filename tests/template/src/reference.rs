@@ -1,5 +1,5 @@
 //! Recursive descent over format.md, 7.4, independent of the machine's stack.
-use hearth_protocol_template::{Expression, Filter, Op, Operation, limits::Limits};
+use hearth_protocol_template::{Expression, Filter, Missing, Op, Operation, limits::Limits};
 #[derive(Clone)]
 enum Token {
     Value(Op),
@@ -49,8 +49,21 @@ impl Parser<'_> {
         let at = u32::try_from(self.at).expect("length checked");
         let token = match self.text.get(self.at).copied() {
             None => Token::End,
-            Some(byte @ (b'.' | b'|' | b'[' | b']' | b'(' | b')' | b',')) => {
+            Some(b'-') if operand && self.text.get(self.at + 1).is_some_and(u8::is_ascii_digit) => {
+                Token::Value(self.literal(true)?)
+            }
+            Some(
+                byte
+                @ (b'.' | b'|' | b'[' | b']' | b'(' | b')' | b',' | b'+' | b'-' | b'~' | b'=' | b'!' | b'<' | b'>'),
+            ) => {
                 self.at += 1;
+                if [b'=', b'!', b'<', b'>'].contains(&byte) {
+                    if self.text.get(self.at) == Some(&b'=') {
+                        self.at += 1;
+                    } else if byte == b'=' || byte == b'!' {
+                        return Err(at);
+                    }
+                }
                 Token::Symbol(byte)
             }
             Some(b'a'..=b'z' | b'A'..=b'Z' | b'_') => {
@@ -63,7 +76,7 @@ impl Parser<'_> {
                     b"false" => Token::Value(Op::Boolean(false)),
                     b"and" | b"or" | b"not" | b"if" | b"else" | b"is" | b"in" | b"none" | b"None" | b"True"
                     | b"False" => Token::Word,
-                    name => Token::Value(Op::Name { name: name.into() }),
+                    name => Token::Value(Op::Name { name: name.into(), missing: Missing::Error }),
                 }
             }
             Some(_) => Token::Value(self.literal(operand)?),
@@ -96,19 +109,133 @@ impl Parser<'_> {
             Token::Word | Token::Value(Op::Name { .. } | Op::Boolean(_)) => {
                 Ok((at, self.text[usize::try_from(at).expect("offset fits")..self.at].to_vec()))
             }
-            Token::Value(
-                Op::String(_) | Op::Integer(_) | Op::Key { .. } | Op::Item | Op::List { .. } | Op::Filter(_),
-            )
-            | Token::Symbol(_)
-            | Token::End => Err(at),
+            Token::Value(_) | Token::Symbol(_) | Token::End => Err(at),
         }
     }
     fn expression(&mut self) -> Result<(), u32> {
-        self.postfix()?;
+        self.negation()
+    }
+    fn word(&mut self, wanted: &[u8], operand: bool) -> Result<bool, u32> {
+        let (at, token) = self.peek(operand)?;
+        Ok(matches!(token, Token::Word | Token::Value(Op::Name { .. }))
+            && &self.text[usize::try_from(at).expect("offset fits")..self.at] == wanted)
+    }
+    fn negation(&mut self) -> Result<(), u32> {
+        if self.word(b"not", true)? {
+            let (at, _) = self.take(true)?;
+            self.open(at)?;
+            self.negation()?;
+            self.depth -= 1;
+            self.emit(at, Op::Not, 1);
+            Ok(())
+        } else {
+            self.test()
+        }
+    }
+    fn test(&mut self) -> Result<(), u32> {
+        let links = self.compare()?;
+        if self.word(b"is", false)? {
+            let (at, _) = self.take(false)?;
+            let negated = self.word(b"not", false)?;
+            if negated {
+                self.take(false)?;
+            }
+            if !self.word(b"defined", false)? {
+                return Err(self.peek(false)?.0);
+            }
+            self.take(false)?;
+            self.mark(&links);
+            self.emit(at, if negated { Op::NotDefined } else { Op::Defined }, 1);
+        }
+        Ok(())
+    }
+    fn compare(&mut self) -> Result<Vec<usize>, u32> {
+        let links = self.concat()?;
+        let (at, token) = self.peek(false)?;
+        let spelling = &self.text[usize::try_from(at).expect("offset fits")..self.at];
+        let op = match spelling {
+            b"==" => Some(Op::Equal),
+            b"!=" => Some(Op::NotEqual),
+            b"<" => Some(Op::Less),
+            b"<=" => Some(Op::LessOrEqual),
+            b">" => Some(Op::Greater),
+            b">=" => Some(Op::GreaterOrEqual),
+            b"in" if matches!(token, Token::Word) => Some(Op::In),
+            b"not" if matches!(token, Token::Word) => Some(Op::NotIn),
+            _ => None,
+        };
+        if let Some(op) = op {
+            self.take(false)?;
+            if op == Op::NotIn {
+                if !self.word(b"in", false)? {
+                    return Err(self.peek(false)?.0);
+                }
+                self.take(false)?;
+            }
+            self.concat()?;
+            self.emit(at, op, 2);
+            Ok(Vec::new())
+        } else {
+            Ok(links)
+        }
+    }
+    fn concat(&mut self) -> Result<Vec<usize>, u32> {
+        let mut links = self.sum()?;
+        while let (at, Token::Symbol(b'~')) = self.peek(false)? {
+            self.take(false)?;
+            self.sum()?;
+            self.emit(at, Op::Concat, 2);
+            links.clear();
+        }
+        Ok(links)
+    }
+    fn sum(&mut self) -> Result<Vec<usize>, u32> {
+        let mut links = self.filtered()?;
+        while let (at, Token::Symbol(byte @ (b'+' | b'-'))) = self.peek(false)? {
+            self.take(false)?;
+            self.filtered()?;
+            self.emit(at, if byte == b'+' { Op::Add } else { Op::Subtract }, 2);
+            links.clear();
+        }
+        Ok(links)
+    }
+    fn mark(&mut self, links: &[usize]) {
+        for index in links {
+            match &mut self.out[*index].op {
+                Op::Key { missing, .. } | Op::Item { missing } => *missing = Missing::Undefined,
+                Op::Name { .. }
+                | Op::String(_)
+                | Op::Integer(_)
+                | Op::Boolean(_)
+                | Op::List { .. }
+                | Op::Filter(_)
+                | Op::Not
+                | Op::Equal
+                | Op::NotEqual
+                | Op::Less
+                | Op::LessOrEqual
+                | Op::Greater
+                | Op::GreaterOrEqual
+                | Op::In
+                | Op::NotIn
+                | Op::Concat
+                | Op::Add
+                | Op::Subtract
+                | Op::Defined
+                | Op::NotDefined => unreachable!("postfix links only"),
+            }
+        }
+    }
+    fn filtered(&mut self) -> Result<Vec<usize>, u32> {
+        let mut links = self.postfix()?;
         while let (pipe, Token::Symbol(b'|')) = self.peek(false)? {
             self.take(false)?;
             let (at, name) = self.name()?;
             let filter = filter(&name).ok_or(at)?;
+            if filter == Filter::Default {
+                self.mark(&links);
+            }
+            links.clear();
             let mut given = 0;
             if let (open, Token::Symbol(b'(')) = self.peek(false)? {
                 self.take(false)?;
@@ -135,16 +262,20 @@ impl Parser<'_> {
             }
             let _ = pipe;
         }
-        Ok(())
+        Ok(links)
     }
-    fn postfix(&mut self) -> Result<(), u32> {
-        self.primary()?;
+    fn postfix(&mut self) -> Result<Vec<usize>, u32> {
+        let bound = self.primary()?;
+        let mut links = Vec::new();
         loop {
             match self.peek(false)? {
                 (_, Token::Symbol(b'.')) => {
                     self.take(false)?;
                     let (at, name) = self.name()?;
-                    self.emit(at, Op::Key { name: name.into_boxed_slice() }, 1);
+                    if bound {
+                        links.push(self.out.len());
+                    }
+                    self.emit(at, Op::Key { name: name.into_boxed_slice(), missing: Missing::Error }, 1);
                 }
                 (at, Token::Symbol(b'[')) => {
                     self.take(false)?;
@@ -152,15 +283,19 @@ impl Parser<'_> {
                     self.expression()?;
                     self.expect(b']')?;
                     self.depth -= 1;
-                    self.emit(at, Op::Item, 2);
+                    if bound {
+                        links.push(self.out.len());
+                    }
+                    self.emit(at, Op::Item { missing: Missing::Error }, 2);
                 }
                 (_, Token::Value(_) | Token::Word | Token::End | Token::Symbol(_)) => break,
             }
         }
-        Ok(())
+        Ok(links)
     }
-    fn primary(&mut self) -> Result<(), u32> {
+    fn primary(&mut self) -> Result<bool, u32> {
         let (at, token) = self.take(true)?;
+        let bound = matches!(token, Token::Value(Op::Name { .. }));
         match token {
             Token::Value(op) => self.emit(at, op, 0),
             Token::Symbol(b'(') => {
@@ -188,7 +323,7 @@ impl Parser<'_> {
             }
             Token::Word | Token::Symbol(_) | Token::End => return Err(at),
         }
-        Ok(())
+        Ok(bound)
     }
     fn literal(&mut self, operand: bool) -> Result<Op, u32> {
         let start = self.at;
@@ -259,7 +394,7 @@ impl Parser<'_> {
                 b"and" | b"or" | b"not" | b"if" | b"else" | b"is" | b"in" | b"none" | b"None" | b"True" | b"False" => {
                     Err(error)
                 }
-                name => Ok(Op::Name { name: name.into() }),
+                name => Ok(Op::Name { name: name.into(), missing: Missing::Error }),
             };
         }
         Err(error)

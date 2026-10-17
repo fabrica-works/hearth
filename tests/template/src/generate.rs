@@ -38,8 +38,23 @@ pub fn cut(rng: &mut Rng, text: &[u8]) -> Vec<u8> {
 pub fn mutate(rng: &mut Rng, text: &[u8]) -> Vec<u8> {
     let mut out = text.to_vec();
     let at = usize::try_from(rng.below(out.len() as u64 + 1)).expect("bounded by fixture or checked text");
-    let pieces: &[&[u8]] =
-        &[b"@", b"\r", b"'", b"\\q", b" and ", b" none ", b"9223372036854775808", b"[", b"\xff", b"\"", b" "];
+    let pieces: &[&[u8]] = &[
+        b"@",
+        b"\r",
+        b"'",
+        b"\\q",
+        b" and ",
+        b" is nope ",
+        b" < ",
+        b" + ",
+        b" is defined ",
+        b" none ",
+        b"9223372036854775808",
+        b"[",
+        b"\xff",
+        b"\"",
+        b" ",
+    ];
     let piece = pieces[usize::try_from(rng.below(pieces.len() as u64)).expect("bounded by fixture or checked text")];
     match rng.below(4) {
         0 => {
@@ -63,13 +78,28 @@ pub fn mutate(rng: &mut Rng, text: &[u8]) -> Vec<u8> {
 /// Generates nested grammar forms, including filter arguments and lookups.
 #[must_use]
 pub fn text(rng: &mut Rng, shape: Shape) -> Vec<u8> {
-    expression(rng, shape, if shape.width == fixtures::SMALL.width { 3 } else { 7 })
+    expression(rng, shape, if shape.width == fixtures::SMALL.width { 3 } else { 6 })
 }
 fn expression(rng: &mut Rng, shape: Shape, depth: u32) -> Vec<u8> {
     if depth == 0 {
         return literal(rng, shape);
     }
-    let mut out = match rng.below(4) {
+    let form = rng.below(9);
+    if form >= 4 {
+        let a = expression(rng, shape, depth - 1);
+        return match form {
+            4 => [b"not (".as_slice(), &a, b")"].concat(),
+            5 => [b"(".as_slice(), &a, b") is defined"].concat(),
+            _ => {
+                const OPS: &[&[u8]] =
+                    &[b" + ", b" - ", b" ~ ", b" == ", b" != ", b" < ", b" <= ", b" > ", b" >= ", b" in ", b" not in "];
+                let b = expression(rng, shape, depth - 1);
+                let op = OPS[usize::try_from(rng.below(OPS.len() as u64)).expect("operator index")];
+                [b"(".as_slice(), &a, b")", op, b"(", &b, b")"].concat()
+            }
+        };
+    }
+    let mut out = match form {
         0 => {
             let inner = expression(rng, shape, depth - 1);
             [b"(".as_slice(), &inner, b")"].concat()
@@ -96,7 +126,8 @@ fn expression(rng: &mut Rng, shape: Shape, depth: u32) -> Vec<u8> {
             out.push(b']');
         }
     }
-    match rng.below(5) {
+    match rng.below(6) {
+        5 => out.extend_from_slice(b" is not defined"),
         0 => out.extend_from_slice(b" | first"),
         1 => {
             out.extend_from_slice(b" | default(");

@@ -48,8 +48,21 @@ fn a_byte_that_begins_no_token_is_refused_where_it_stands() {
 }
 #[test]
 fn a_word_is_no_operand() {
-    for text in [b"and".as_slice(), b"or", b"not", b"in", b"is", b"if", b"else", b"none", b"None", b"True", b"False"] {
-        assert_eq!(compile(text), Err(Error { at: 0, kind: ErrorKind::Expected(Expected::Operand) }));
+    const WORDS: &[(&[u8], u32)] = &[
+        (b"and", 0),
+        (b"or", 0),
+        (b"not", 3),
+        (b"in", 0),
+        (b"is", 0),
+        (b"if", 0),
+        (b"else", 0),
+        (b"none", 0),
+        (b"None", 0),
+        (b"True", 0),
+        (b"False", 0),
+    ];
+    for (text, at) in WORDS {
+        assert_eq!(compile(text), Err(Error { at: *at, kind: ErrorKind::Expected(Expected::Operand) }));
     }
     assert_eq!(*compile(b"true").expect("boolean").operations, [op(0, Op::Boolean(true))]);
     assert_eq!(*compile(b"false").expect("boolean").operations, [op(0, Op::Boolean(false))]);

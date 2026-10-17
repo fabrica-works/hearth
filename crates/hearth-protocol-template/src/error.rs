@@ -17,6 +17,7 @@ pub enum ErrorKind {
     TooDeep,
     Misplaced,
     UnknownFilter,
+    UnknownTest,
     Arity { filter: Filter, given: u32 },
 }
 /// The next grammatical token required.
@@ -27,4 +28,5 @@ pub enum Expected {
     Name,
     CloseParen,
     CloseBracket,
+    In,
 }

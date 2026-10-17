@@ -18,9 +18,30 @@ pub enum Op {
     String(Box<[u8]>),
     Integer(i64),
     Boolean(bool),
-    Name { name: Box<[u8]> },
-    Key { name: Box<[u8]> },
-    Item,
+    Name { name: Box<[u8]>, missing: Missing },
+    Key { name: Box<[u8]>, missing: Missing },
+    Item { missing: Missing },
     List { length: u32 },
     Filter(Filter),
+    Not,
+    Equal,
+    NotEqual,
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual,
+    In,
+    NotIn,
+    Concat,
+    Add,
+    Subtract,
+    Defined,
+    NotDefined,
+}
+
+/// A missing lookup's result (format.md, 7.6); the root name is no link.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Missing {
+    Error,
+    Undefined,
 }

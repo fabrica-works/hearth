@@ -1,4 +1,4 @@
-use super::fixtures::{bytes, compile, name, op};
+use super::fixtures::{bytes, compile, item, key, name, op};
 use crate::{
     Error, ErrorKind, Expected, Filter, Op, expression,
     limits::{Limits, SHIPPED},
@@ -8,14 +8,7 @@ fn a_chain_of_keys_and_items_compiles_left_to_right() {
     let e = compile(b"a.b['c'][0]").expect("chain");
     assert_eq!(
         *e.operations,
-        [
-            name(0, b"a"),
-            op(2, Op::Key { name: bytes(b"b") }),
-            op(4, Op::String(bytes(b"c"))),
-            op(3, Op::Item),
-            op(9, Op::Integer(0)),
-            op(8, Op::Item)
-        ]
+        [name(0, b"a"), key(2, b"b"), op(4, Op::String(bytes(b"c"))), item(3), op(9, Op::Integer(0)), item(8)]
     );
     assert_eq!(e.values, 2);
 }
@@ -24,11 +17,8 @@ fn u_keys_is_always_the_key_keys() {
     for (text, expected) in [(b"u.keys".as_slice(), None), (b"u.keys | keys", Some(Filter::Keys))] {
         let e = compile(text).expect("key");
         match expected {
-            None => assert_eq!(*e.operations, [name(0, b"u"), op(2, Op::Key { name: bytes(b"keys") })]),
-            Some(filter) => assert_eq!(
-                *e.operations,
-                [name(0, b"u"), op(2, Op::Key { name: bytes(b"keys") }), op(9, Op::Filter(filter))]
-            ),
+            None => assert_eq!(*e.operations, [name(0, b"u"), key(2, b"keys")]),
+            Some(filter) => assert_eq!(*e.operations, [name(0, b"u"), key(2, b"keys"), op(9, Op::Filter(filter))]),
         }
     }
 }
@@ -139,7 +129,7 @@ fn a_word_after_a_dot_is_a_key() {
     for (text, key) in
         [(b"a.and".as_slice(), b"and".as_slice()), (b"a.in", b"in"), (b"a.true", b"true"), (b"a.none", b"none")]
     {
-        assert_eq!(*compile(text).expect("word key").operations, [name(0, b"a"), op(2, Op::Key { name: bytes(key) })]);
+        assert_eq!(*compile(text).expect("word key").operations, [name(0, b"a"), super::fixtures::key(2, key)]);
     }
 }
 #[test]
@@ -151,10 +141,7 @@ fn a_lookup_after_a_filter_is_refused_at_its_dot() {
 #[test]
 fn parentheses_group_a_value_without_an_operation() {
     let e = compile(b"([1])[0]").expect("grouped list");
-    assert_eq!(
-        *e.operations,
-        [op(2, Op::Integer(1)), op(1, Op::List { length: 1 }), op(6, Op::Integer(0)), op(5, Op::Item)]
-    );
+    assert_eq!(*e.operations, [op(2, Op::Integer(1)), op(1, Op::List { length: 1 }), op(6, Op::Integer(0)), item(5)]);
     assert_eq!(e.values, 2);
 }
 #[test]

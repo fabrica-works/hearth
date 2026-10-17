@@ -6,8 +6,19 @@ pub fn invariants(expression: &Expression, text: &[u8]) {
         assert!(usize::try_from(operation.at).expect("bounded by fixture or checked text") < text.len());
         match &operation.op {
             Op::String(_) | Op::Integer(_) | Op::Boolean(_) | Op::Name { .. } => depth += 1,
-            Op::Key { .. } => assert!(depth >= 1),
-            Op::Item => {
+            Op::Key { .. } | Op::Not | Op::Defined | Op::NotDefined => assert!(depth >= 1),
+            Op::Item { .. }
+            | Op::Equal
+            | Op::NotEqual
+            | Op::Less
+            | Op::LessOrEqual
+            | Op::Greater
+            | Op::GreaterOrEqual
+            | Op::In
+            | Op::NotIn
+            | Op::Concat
+            | Op::Add
+            | Op::Subtract => {
                 assert!(depth >= 2);
                 depth -= 1;
             }

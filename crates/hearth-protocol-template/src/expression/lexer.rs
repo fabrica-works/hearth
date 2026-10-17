@@ -1,4 +1,4 @@
-use crate::{Error, ErrorKind, Op};
+use crate::{Error, ErrorKind, Missing, Op};
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};
 #[derive(Debug)]
@@ -31,13 +31,22 @@ impl Lexer {
         let token = match self.text.get(start).copied() {
             None => Token::End,
             Some(b'\'' | b'"') => Token::Value(Op::String(self.string()?)),
-            Some(byte @ (b'.' | b'|' | b'[' | b']' | b'(' | b')' | b',')) => {
+            Some(b'-') if operand && digit(self.text.get(start.saturating_add(1))) => {
+                Token::Value(Op::Integer(self.integer()?))
+            }
+            Some(byte @ (b'.' | b'|' | b'[' | b']' | b'(' | b')' | b',' | b'+' | b'-' | b'~')) => {
                 self.at = self.at.saturating_add(1);
                 Token::Symbol(byte)
             }
             Some(b'0'..=b'9') => Token::Value(Op::Integer(self.integer()?)),
-            Some(b'-') if operand && digit(self.text.get(start.saturating_add(1))) => {
-                Token::Value(Op::Integer(self.integer()?))
+            Some(byte @ (b'=' | b'!' | b'<' | b'>')) => {
+                self.at = self.at.saturating_add(1);
+                if self.text.get(self.at) == Some(&b'=') {
+                    self.at = self.at.saturating_add(1);
+                } else if byte == b'=' || byte == b'!' {
+                    return Err(Error { at, kind: ErrorKind::Character });
+                }
+                Token::Symbol(byte)
             }
             Some(b'a'..=b'z' | b'A'..=b'Z' | b'_') => self.name(),
             Some(_) => return Err(Error { at, kind: ErrorKind::Character }),
@@ -61,7 +70,7 @@ impl Lexer {
             b"and" | b"or" | b"not" | b"if" | b"else" | b"is" | b"in" | b"none" | b"None" | b"True" | b"False" => {
                 Token::Word
             }
-            name => Token::Value(Op::Name { name: copy_of(name) }),
+            name => Token::Value(Op::Name { name: copy_of(name), missing: Missing::Error }),
         }
     }
     fn integer(&mut self) -> Result<i64, Error> {
