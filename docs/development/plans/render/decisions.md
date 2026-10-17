@@ -494,6 +494,16 @@ None yet.
      4. The recording's `dir`, `/scratch/store`, is spawned as `scratch/store` under the root handle, as 44.2's `tests/fixtures.rs` does: an absolute one is `Refusal::Escape` (`testing/hearth-fake-machine/src/linux/files.rs:118`). `big` is 10,000,000 bytes of `x`, by `length`; the repositories are bare at `/scratch/<name>`, the store at `/scratch/store`.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+127. **hearth 46's Shapes against main** (ready check of hearth-46.1).
+     hearth 46's ready check, against hearth eb6b8e4 and again eeca0d2 (27.1, 27.2, 34.2 and 44.2 landed; 27.3, 38.1, 41 and 44.3 not), skein 78dd8fa, hearth's skein pin 303c829 (fmt and clippy clean with the corrections; default 427 of 427, fuzzy 11 of 11; the conformance profile could not run 46's tests), corrects 46-fake-mmdebstrap-resolve.md:
+     1. `programs` has no `expect` (`testing/hearth-fake-machine/src/hearth.rs`; ruling 123): 46.1 adds `Tool::Mmdebstrap`, and `Tool` keeps its `#[repr(u8)]`.
+     2. `Spawned`'s `argv` and `env` are `&'a [Vec<u8>]`, as `Recording`'s are (`testing/hearth-recordings/src/lib.rs:9-10`): `&real.argv` fails E0308 against `&[Box<[u8]>]`.
+     3. `Spawned::argv` is whole, `PROGRAM` first, as every recording holds it (`/usr/bin/git` first in each git recording): the live side puts `PROGRAM` before `Invocation::args`, and `run` splits it into `Spawn::program` and `Spawn::args`.
+     4. A recording's `dir` is absolute (`/scratch`): `run` spawns it without its leading `/`, under the root handle, as an absolute one is `Refusal::Escape` (`linux/files.rs:118`).
+     5. `CONFORMANCE`'s literal names `hearth_fake_machine::linux::Sizes` in full, as its type does.
+     6. Done when 1 names at least 74 tests (hearth 26's 39 in hearth-fake-machine, ruling 123; hearth 27's 27; this session's 8).
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

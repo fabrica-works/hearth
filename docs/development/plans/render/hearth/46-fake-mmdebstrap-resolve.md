@@ -86,8 +86,8 @@ mirror reached, apt's lists left, mmdebstrap's lines printed (4.1, 4.3);
 `Tool::Mmdebstrap`.
 Needs: hearth 27.3 (the closure), hearth 38.1 (apt's list names), hearth
 41 (41.1's recordings: the lines to follow).
-Files: `testing/hearth-fake-machine/src/hearth.rs` (`Tool::Mmdebstrap`; the
-`expect` on `programs` goes);
+Files: `testing/hearth-fake-machine/src/hearth.rs` (`Tool::Mmdebstrap`; `Tool`
+keeps its `#[repr(u8)]`, and `programs` has no `expect` to drop);
 `testing/hearth-fake-mmdebstrap/src/{lib.rs, face.rs, process.rs}`;
 tests `src/tests/face.rs` (new), `src/tests/fixtures.rs` (hearth 27.3's; adds `args(proxy)`:
 07.1's reference vector, empty request, scratch `/scratch`; `PORT` 3142;
@@ -256,9 +256,9 @@ Derives are elided where a line names none (`Clone`, `PartialEq`, `Eq`,
 /// What `closure` reads for `request` (marked, candidates weighed, providers ranked), in universe order (46.2).
 pub fn read_by(request: &Request<'_>) -> Box<[Selected]>;
 
-// testing/hearth-fake-machine/src/hearth.rs (hearth 26's, 27.2's; 46.1 adds `Tool::Mmdebstrap` and drops the `expect` on `programs`)
+// testing/hearth-fake-machine/src/hearth.rs (hearth 26's, 27.2's; 46.1 adds `Tool::Mmdebstrap`)
 /// A tool whose fake a world starts on a spawn of it: git (hearth 26), mmdebstrap.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)] pub enum Tool { Git, Mmdebstrap }
+#[derive(Clone, Copy, PartialEq, Eq, Debug)] #[repr(u8)] pub enum Tool { Git, Mmdebstrap }
 
 // testing/hearth-fake-mmdebstrap/src/face.rs (46.1)
 /// What 07.1's vector asks, in the fake's words; `include` split into names.
@@ -291,15 +291,18 @@ impl Mmdebstrap { pub fn step(&mut self, machine: &mut hearth_fake_machine::Mach
 use hearth_fake_machine::hearth::mirror::Mirror as Served; // 27.2's, the fake's
 use hearth_test_mirror::Mirror as Fetched; // 08.1's, the files in the cache
 /// The machine of the live and replayed runs.
-pub const CONFORMANCE: hearth_fake_machine::linux::Sizes = Sizes { files: 64, bytes: 256 << 20, processes: 8, pipe: 65_536, ledger: 4_096 };
+pub const CONFORMANCE: hearth_fake_machine::linux::Sizes = hearth_fake_machine::linux::Sizes { files: 64, bytes: 256 << 20, processes: 8, pipe: 65_536, ledger: 4_096 };
 /// The pinned snapshot as the fake's mirror.
 pub fn mirror(scenario: &Resolve) -> Served;
 /// The gate's mirror: `testing/mirror/universe`, at the committed pin's timestamp.
 pub fn committed() -> Served;
 /// The cut `testing/mirror/universe` holds, from the whole index and the seven cases.
 pub fn cut(mirror: &Fetched, pin: &Pin) -> Box<[u8]>;
-/// What a run spawns: the argv, env and dir of a live vector or of a recording.
-pub struct Spawned<'a> { pub argv: &'a [Box<[u8]>], pub env: &'a [Box<[u8]>], pub dir: &'a [u8] }
+/// What a run spawns: the argv, env and dir of a live vector or of a recording. `argv` is whole, `PROGRAM` first,
+/// as every recording holds it: the live side puts `PROGRAM` before `Invocation::args`, and `run` splits it into
+/// `Spawn::program` and `Spawn::args`. `dir` is a recording's, absolute (`/scratch`): `run` spawns it without its
+/// leading `/`, under the root handle, as an absolute one is `Refusal::Escape` (`linux/files.rs:118`).
+pub struct Spawned<'a> { pub argv: &'a [Vec<u8>], pub env: &'a [Vec<u8>], pub dir: &'a [u8] }
 /// One case on the fake, its mirror moved in and back, masked as 41.1 masks the real run.
 pub fn run(mirror: &mut Option<Served>, case: &Case, spawned: &Spawned<'_>) -> Recording;
 /// What an allowed difference covers: the lists' sizes; stanza fields outside `KEPT`; a case's error lines.
@@ -326,7 +329,7 @@ None.
 
 1. In a worktree at `origin/main`, `heavy cargo nextest run -p
    hearth-fake-machine -p hearth-fake-mmdebstrap` passes, its `Summary`
-   naming at least 59 tests (hearth 26's 24 and hearth 27's 27 there,
+   naming at least 74 tests (hearth 26's 39 and hearth 27's 27 there,
    this session's 8).
 2. There, 46.2's Proof command passes, once; and `XDG_CACHE_HOME=$(mktemp -d) heavy cargo nextest run -p hearth-conformance-world -E 'test(=the_fake_prints_each_mmdebstrap_recording_as_recorded)'` passes
    with no fetched mirror.
