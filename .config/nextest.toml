@@ -13,7 +13,7 @@
 # it otherwise (workflow.md, section 1).
 
 [profile.default]
-# With the first fuzzy test: default-filter = "not binary(/^fuzzy_/)"
+default-filter = "not binary(/^fuzzy_/)"
 global-timeout = "15s"
 slow-timeout = { period = "500ms" }
 
@@ -24,8 +24,7 @@ filter = "kind(test)"
 priority = 10
 
 [profile.fuzzy]
-# With the first fuzzy test: default-filter = "binary(/^fuzzy_/)"
-default-filter = "none()"
+default-filter = "binary(/^fuzzy_/)"
 global-timeout = "60s"
 slow-timeout = { period = "5s" }
 
