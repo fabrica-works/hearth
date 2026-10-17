@@ -25,6 +25,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-protocol-mmdebstrap"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
+]
+
+[[package]]
 name = "hearth-protocol-template"
 version = "0.0.0"
 dependencies = [
