@@ -288,6 +288,7 @@ pub fn write(record: &Resolution, limits: &Limits) -> Result<Box<[u8]>, Refused>
 }
 fn validate(record: &Resolution, limits: &Limits) -> Result<(), Refused> {
     let l = limits.resolution;
+    length(record.sources.len(), l.lines, b"sources")?;
     if limits.key < 10 {
         return Err(Refused::Limit(b"key"));
     }
@@ -299,7 +300,6 @@ fn validate(record: &Resolution, limits: &Limits) -> Result<(), Refused> {
         return Err(Refused::Limit(b"depth"));
     }
     length(record.closure.len(), l.packages, b"closure")?;
-    length(record.sources.len(), l.lines, b"sources")?;
     let mut previous = None;
     for package in &record.closure {
         length(package.name.len(), l.name, b"name")?;
