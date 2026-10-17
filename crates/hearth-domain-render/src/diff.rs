@@ -1,6 +1,6 @@
 //! Typed differences and the lowest changed layer (render.md, 6.1, 6.2).
 use crate::{
-    parts::{PartRecord, Spec, boot, config, packages},
+    parts::{PartRecord, Spec, boot, config, exports, packages},
     revision::Oid,
     vocabulary::Class,
 };
@@ -36,6 +36,7 @@ pub enum PartChange {
     Config(config::Change),
     Packages(packages::Change),
     Boot(boot::Change),
+    Exports(exports::Change),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Rebuild {
@@ -72,7 +73,7 @@ pub const fn layer(part: &PartRecord) -> Layer {
         PartRecord::Config(_) => Layer::Config,
         PartRecord::Secrets(_) | PartRecord::Boot(_) => Layer::Slot,
         PartRecord::Packages(_) => Layer::Packages,
-        PartRecord::Live(_) | PartRecord::Exports(_) => Layer::Other, // transitional: hearth-20.4
+        PartRecord::Live(_) | PartRecord::Exports(_) => Layer::Other,
     }
 }
 #[must_use]
@@ -99,7 +100,7 @@ pub fn compare(from: Option<&Made>, to: Option<&Made>, resolution: Needs) -> Tar
             }
             let from = config_part(before);
             let to = config_part(after);
-            let mut parts = skein_lib::List::with_capacity(4);
+            let mut parts = skein_lib::List::with_capacity(5);
             if let Some(meta) = crate::parts::meta::change(&before.meta, &after.meta) {
                 parts.push(PartChange::Meta(meta)).expect("one meta change");
             }
@@ -129,6 +130,10 @@ pub fn compare(from: Option<&Made>, to: Option<&Made>, resolution: Needs) -> Tar
                 parts.push(PartChange::Config(config::change(old, new))).expect("one config");
                 layers.push(Layer::Config).expect("one config");
             }
+            let exports = exports::change(exports_part(before), exports_part(after));
+            if !exports.entries.is_empty() {
+                parts.push(PartChange::Exports(exports)).expect("one exports");
+            }
             TargetChange::Changed { parts: parts.into_boxed(), rebuild: rebuild(layers.as_slice(), resolution) }
         }
         (None, None) => unreachable!("a compared target exists on a side"),
@@ -147,7 +152,7 @@ fn config_part(spec: &Spec) -> Option<(&Digest, &config::Config)> {
             | PartRecord::Live(_)
             | PartRecord::Packages(_)
             | PartRecord::Boot(_)
-            | PartRecord::Exports(_) => {} // transitional: hearth 19.5 and 20.4
+            | PartRecord::Exports(_) => {} // transitional: hearth 19.5
         }
     }
     found
@@ -180,7 +185,7 @@ pub(crate) fn tree(change: &mut TargetChange) -> &mut [config::EntryChange] {
         for part in parts {
             match part {
                 PartChange::Config(config) => tree = &mut config.tree,
-                PartChange::Meta(_) | PartChange::Packages(_) | PartChange::Boot(_) => {}
+                PartChange::Meta(_) | PartChange::Packages(_) | PartChange::Boot(_) | PartChange::Exports(_) => {}
             }
         }
     }
@@ -198,6 +203,21 @@ fn package_and_boot(spec: &Spec) -> PackageAndBoot<'_> {
             PartRecord::Packages(packages) => found.packages = Some((&part.digest, packages)),
             PartRecord::Boot(boot) => found.boot = Some((&part.digest, boot)),
             PartRecord::Config(_) | PartRecord::Secrets(_) | PartRecord::Live(_) | PartRecord::Exports(_) => {}
+        }
+    }
+    found
+}
+
+fn exports_part(spec: &Spec) -> Option<&exports::Exports> {
+    let mut found = None;
+    for part in &spec.parts {
+        match &part.record {
+            PartRecord::Exports(exports) => found = Some(exports),
+            PartRecord::Config(_)
+            | PartRecord::Secrets(_)
+            | PartRecord::Live(_)
+            | PartRecord::Packages(_)
+            | PartRecord::Boot(_) => {}
         }
     }
     found

@@ -50,3 +50,37 @@ pub fn exported_error(cause: render::errors::Cause) -> render::errors::Error {
         task: Some(copy_of(b"reader")),
     }
 }
+
+#[must_use]
+pub fn export_changes() -> [render::parts::exports::Change; 3] {
+    use render::{
+        evaluate::Value,
+        parts::exports::{Change, ExportChange},
+    };
+    [
+        Change {
+            entries: Box::new([ExportChange {
+                task: copy_of(b"vpn"),
+                name: copy_of(b"endpoint"),
+                before: Some(Value::String(copy_of(b"a"))),
+                after: Some(Value::String(copy_of(b"b"))),
+            }]),
+        },
+        Change {
+            entries: Box::new([ExportChange {
+                task: copy_of(b"vpn"),
+                name: copy_of(b"port"),
+                before: None,
+                after: Some(Value::Int(51820)),
+            }]),
+        },
+        Change {
+            entries: Box::new([ExportChange {
+                task: copy_of(b"core"),
+                name: copy_of(b"nest"),
+                before: Some(nested_export(EXPORT_PRINT_DEPTH)),
+                after: None,
+            }]),
+        },
+    ]
+}

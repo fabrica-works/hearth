@@ -29,3 +29,27 @@ pub fn vpn(broken: bool) -> Rendered {
     };
     render(&repository, names, Form::Text)
 }
+
+pub const VPN_MOVED: File = File {
+    path: "hosts/ion/ion-prod.json",
+    mode: 0o644,
+    body: br#"{"placement":{"kind":"vm","firmware":"bios","hardware":"ionos"},"vpn":{"endpoint":"194.164.162.158"}}"#,
+};
+pub const VPN_MTU: File = File {
+    path: "hosts/ion/ion-prod.json", mode: 0o644,
+    body: br#"{"placement":{"kind":"vm","firmware":"bios","hardware":"ionos"},"vpn":{"endpoint":"194.164.162.157","mtu":1280}}"#,
+};
+pub const VPN_NO_ENDPOINT: File = File {
+    path: "hosts/ion/ion-prod.json",
+    mode: 0o644,
+    body: br#"{"placement":{"kind":"vm","firmware":"bios","hardware":"ionos"}}"#,
+};
+#[must_use]
+pub fn vpn_diff(file: File, form: Form) -> Rendered {
+    let repository = Repository::make("vpn-diff", &thin_with(VPN));
+    let from = repository.head();
+    let to = repository.next(&[file], &[]);
+    let mut asked = super::Asked::new(&from, &to);
+    asked.form = form;
+    super::diff(&repository, &asked)
+}

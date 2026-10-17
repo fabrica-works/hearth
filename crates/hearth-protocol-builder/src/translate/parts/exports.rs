@@ -88,3 +88,23 @@ fn present<'a>(each: &mut core::slice::Iter<'a, source::Entry>) -> Option<(Box<[
     }
     None
 }
+
+#[must_use]
+pub fn change(change: crate::render::parts::exports::Change) -> crate::records::diff::ExportsChange {
+    let mut entries = List::with_capacity(u32::try_from(change.entries.len()).expect("export count"));
+    for entry in change.entries {
+        entries
+            .push(crate::records::diff::ExportChange {
+                task: entry.task,
+                name: entry.name,
+                before: optional_value(entry.before),
+                after: optional_value(entry.after),
+            })
+            .expect("export count");
+    }
+    crate::records::diff::ExportsChange { entries: entries.into_boxed() }
+}
+
+fn optional_value(value: Option<source::Value>) -> Option<target::Value> {
+    Some(self::value(value?))
+}

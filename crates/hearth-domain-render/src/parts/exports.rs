@@ -13,6 +13,60 @@ use skein_lib::{List, Map, Stack, bytes};
 pub struct Exports {
     pub tasks: Box<[Exported]>,
 }
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Change {
+    pub entries: Box<[ExportChange]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ExportChange {
+    pub task: Box<[u8]>,
+    pub name: Box<[u8]>,
+    pub before: Option<Value>,
+    pub after: Option<Value>,
+}
+/// Pair published values by task and name, comparing their canonical records.
+#[must_use]
+pub fn change(before: Option<&Exports>, after: Option<&Exports>) -> Change {
+    let mut count = 0_usize;
+    for part in before.into_iter().chain(after) {
+        for task in &part.tasks {
+            count = count.saturating_add(task.values.len());
+        }
+    }
+    let mut pairs = Map::with_capacity(u32::try_from(count).expect("bounded exports"));
+    for (part, from) in [(before, true), (after, false)] {
+        let Some(part) = part else { continue };
+        for task in &part.tasks {
+            for entry in &task.values {
+                if let Some(value) = &entry.value {
+                    let key = (task.task.as_ref(), entry.key.as_ref());
+                    let (before, after) = pairs.get(&key).copied().unwrap_or((None, None));
+                    let pair = if from { (Some(value), after) } else { (before, Some(value)) };
+                    pairs.insert(key, pair).expect("export count");
+                }
+            }
+        }
+    }
+    let mut entries = List::with_capacity(pairs.len());
+    for ((task, name), (before, after)) in &pairs {
+        let same = match (before, after) {
+            (Some(before), Some(after)) => value_items(before) == value_items(after),
+            (None, None) => true,
+            (Some(_), None) | (None, Some(_)) => false,
+        };
+        if !same {
+            entries
+                .push(ExportChange {
+                    task: bytes::copy_of(task),
+                    name: bytes::copy_of(name),
+                    before: before.cloned(),
+                    after: after.cloned(),
+                })
+                .expect("export count");
+        }
+    }
+    Change { entries: entries.into_boxed() }
+}
 #[must_use]
 pub fn build(exported: Box<[Exported]>) -> Exports {
     let mut tasks = Map::with_capacity(u32::try_from(exported.len()).expect("task count"));

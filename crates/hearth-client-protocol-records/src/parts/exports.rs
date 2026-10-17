@@ -119,3 +119,57 @@ impl Value {
         json.finish()
     }
 }
+
+impl crate::diff::ExportsChange {
+    pub(crate) fn text(&self, lines: &mut Lines) {
+        let mut width = 0_usize;
+        for entry in &self.entries {
+            width = width.max(entry.task.len().saturating_add(entry.name.len()).saturating_add(1));
+        }
+        for entry in &self.entries {
+            lines.put(b"  exports  ");
+            lines.put(match (&entry.before, &entry.after) {
+                (Some(_), Some(_)) => b"~ ",
+                (None, Some(_)) => b"+ ",
+                (Some(_), None) => b"- ",
+                (None, None) => unreachable!("a changed export has a side"),
+            });
+            lines.put(&entry.task);
+            lines.put(b".");
+            lines.put(&entry.name);
+            lines.pad_to(width.saturating_add(16));
+            if let Some(before) = &entry.before {
+                lines.put(&before.compact());
+            }
+            if entry.before.is_some() && entry.after.is_some() {
+                lines.put(" → ".as_bytes());
+            }
+            if let Some(after) = &entry.after {
+                lines.put(&after.compact());
+            }
+            lines.put(b"\n");
+        }
+    }
+    pub(crate) fn json(&self, json: &mut Encoder) {
+        json.object_start();
+        crate::form::json::field(json, b"kind", b"exports");
+        json.key(b"exports");
+        json.array_start();
+        for entry in &self.entries {
+            json.object_start();
+            if let Some(after) = &entry.after {
+                json.key(b"after");
+                after.json(json);
+            }
+            if let Some(before) = &entry.before {
+                json.key(b"before");
+                before.json(json);
+            }
+            crate::form::json::field(json, b"name", &entry.name);
+            crate::form::json::field(json, b"task", &entry.task);
+            json.object_end();
+        }
+        json.array_end();
+        json.object_end();
+    }
+}

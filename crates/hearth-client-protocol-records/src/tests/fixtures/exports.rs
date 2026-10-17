@@ -62,3 +62,20 @@ pub fn exported_error() -> crate::errors::Error {
     error.task = Some(copy_of(b"vpn"));
     error
 }
+
+pub fn printed_export_change(form: crate::form::Form, before: Option<&[u8]>, after: Option<&[u8]>) -> Box<[u8]> {
+    let part = crate::diff::PartChange::Exports(crate::diff::ExportsChange {
+        entries: Box::new([crate::diff::ExportChange {
+            task: copy_of(b"vpn"),
+            name: copy_of(b"endpoint"),
+            before: optional_string(before),
+            after: optional_string(after),
+        }]),
+    });
+    crate::form::print(form, &super::change_record(part), Some(crate::records::Type::Change), &crate::limits::SHIPPED)
+        .expect("export change fits")
+}
+
+fn optional_string(value: Option<&[u8]>) -> Option<Value> {
+    Some(Value::String(copy_of(value?)))
+}

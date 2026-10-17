@@ -386,4 +386,5 @@ fn a_diff_whose_listing_fails_keeps_its_error() {
     );
 }
 
+mod exports;
 mod packages;

@@ -83,3 +83,29 @@ pub fn optional_export(optional: bool) -> Declaration {
 
 pub const MIN_UID: i64 = 1000;
 pub const MAX_UID: i64 = 59999;
+
+pub fn export_endpoint(value: Value) -> Exports {
+    exports(&[(b"vpn", &[(b"endpoint", value)])])
+}
+pub fn exports_compared(config: bool) -> crate::diff::TargetChange {
+    use crate::{
+        diff::{self, Made, Needs},
+        parts::{Part, PartRecord},
+    };
+    use hearth_lib::encode::Digest;
+    let (mut before, mut after) =
+        if config { super::changed_specs() } else { (super::spec(b"ion-prod", &[]), super::spec(b"ion-prod", &[])) };
+    for (spec, value) in [(&mut before, 1), (&mut after, 2)] {
+        let exports = export_endpoint(Value::Int(value));
+        let mut parts = List::with_capacity(u32::try_from(spec.parts.len()).expect("fixture count").saturating_add(1));
+        for part in &spec.parts {
+            parts.push(part.clone()).expect("fixture count");
+        }
+        parts
+            .push(Part { digest: crate::parts::exports::digest(&exports), record: PartRecord::Exports(exports) })
+            .expect("fixture count");
+        spec.parts = parts.into_boxed();
+    }
+    after.digest = Digest([3; 32]);
+    diff::compare(Some(&Made::Spec(Box::new(before))), Some(&Made::Spec(Box::new(after))), Needs::Known)
+}

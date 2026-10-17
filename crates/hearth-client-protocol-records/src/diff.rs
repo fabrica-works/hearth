@@ -46,6 +46,18 @@ pub enum PartChange {
     Config(ConfigChange),
     Packages(crate::parts::packages::Change),
     Boot(crate::parts::boot::Change),
+    Exports(ExportsChange),
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ExportsChange {
+    pub entries: Box<[ExportChange]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct ExportChange {
+    pub task: Box<[u8]>,
+    pub name: Box<[u8]>,
+    pub before: Option<crate::parts::exports::Value>,
+    pub after: Option<crate::parts::exports::Value>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct MetaChange {
@@ -141,6 +153,7 @@ impl Change {
                         PartChange::Meta(meta) => meta.text(lines),
                         PartChange::Packages(packages) => packages.text(lines),
                         PartChange::Boot(boot) => boot.text(lines),
+                        PartChange::Exports(exports) => exports.text(lines),
                     }
                 }
             }
@@ -180,6 +193,7 @@ impl Change {
                         PartChange::Meta(meta) => meta.json(json),
                         PartChange::Packages(packages) => packages.json(json),
                         PartChange::Boot(boot) => boot.json(json),
+                        PartChange::Exports(exports) => exports.json(json),
                     }
                 }
                 json.array_end();

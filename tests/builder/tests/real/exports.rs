@@ -109,3 +109,52 @@ fn an_exporters_fault_leaves_the_other_environment_rendering() {
 fn an_exporters_fault_makes_the_render_fail() {
     assert_eq!(fixtures::vpn(true).exit, Exit::Code(2));
 }
+
+#[test]
+fn a_changed_export_rebuilds_its_readers_and_builds_nothing_where_it_is_made() {
+    assert_eq!(
+        fixtures::lines_starting(
+            &fixtures::vpn_diff(fixtures::VPN_MOVED, Form::Text).stdout,
+            &["carbon-prod", "ion-prod", "  exports "]
+        ),
+        concat!(
+            "carbon-prod                                         rebuild from config\n",
+            "ion-prod                                            nothing to build\n",
+            "  exports  ~ vpn.endpoint   \"194.164.162.157\" → \"194.164.162.158\"\n",
+        )
+    );
+}
+#[test]
+fn a_changed_export_leaves_the_other_environment_unchanged() {
+    assert_eq!(
+        fixtures::lines_starting(
+            &fixtures::vpn_diff(fixtures::VPN_MOVED, Form::Text).stdout,
+            &["carbon-lab", "ion-lab"]
+        ),
+        ""
+    );
+}
+#[test]
+fn a_changed_export_makes_the_diff_negative() {
+    assert_eq!(fixtures::vpn_diff(fixtures::VPN_MOVED, Form::Text).exit, Exit::Code(1));
+}
+#[test]
+fn a_setting_no_export_reads_changes_its_target_alone() {
+    assert_eq!(
+        fixtures::lines_starting(
+            &fixtures::vpn_diff(fixtures::VPN_MTU, Form::Text).stdout,
+            &["carbon-prod", "ion-prod", "carbon-lab", "ion-lab"]
+        ),
+        "ion-prod                                            rebuild from config\n"
+    );
+}
+#[test]
+fn json_gives_an_exports_change_with_one_side_absent() {
+    assert!(
+        skein_lib::bytes::find(
+            &fixtures::vpn_diff(fixtures::VPN_NO_ENDPOINT, Form::JsonLines).stdout,
+            br#"{"kind":"exports","exports":[{"before":"194.164.162.157","name":"endpoint","task":"vpn"}]}"#,
+        )
+        .is_some()
+    );
+}
