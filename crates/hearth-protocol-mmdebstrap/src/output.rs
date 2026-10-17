@@ -1,5 +1,10 @@
 //! The two pipe readers and apt's install triples (render.md, 5.3).
-use crate::{MaxOut, limits::Limits, vector::Name};
+use crate::{
+    MaxOut,
+    limits::Limits,
+    tail::{self, Tail},
+    vector::Name,
+};
 use alloc::boxed::Box;
 use skein_lib::stream::{Delimiter, Down, Fault, Read, Up};
 use skein_lib::{Env, Queue, bytes};
@@ -34,11 +39,16 @@ pub struct Reader {
     dropping: bool,
     count: u32,
     error: Option<OutputError>,
+    tail: Tail,
 }
 impl Reader {
     #[must_use]
-    pub fn new(_limits: &Limits) -> Reader {
-        Reader { waiting: false, ended: false, dropping: false, count: 0, error: None }
+    pub fn new(limits: &Limits) -> Reader {
+        Reader { waiting: false, ended: false, dropping: false, count: 0, error: None, tail: Tail::new(limits) }
+    }
+    #[must_use]
+    pub fn tail(&self) -> &Tail {
+        &self.tail
     }
     #[must_use]
     pub const fn waiting(&self) -> bool {
@@ -53,7 +63,10 @@ pub fn largest_demand(limits: &Limits) -> u32 {
 /// A scan delivery together with the triple decoded from it.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    u64::from(largest_demand(limits)).checked_mul(2)?.checked_add(u64::from(limits.name).checked_mul(2)?)
+    u64::from(largest_demand(limits))
+        .checked_mul(3)?
+        .checked_add(u64::from(limits.name).checked_mul(3)?)?
+        .checked_add(Tail::worst_case(limits)?)
 }
 fn demand(reader: &mut Reader, limits: &Limits, below: &mut Queue<Down>) {
     reader.waiting = true;
@@ -112,6 +125,7 @@ pub fn close(reader: &mut Reader, below: &mut Queue<Down>) {
     reader.ended = true;
 }
 fn line(reader: &mut Reader, bytes: &[u8], limits: &Limits) -> Option<Seen> {
+    tail::admit(&mut reader.tail, bytes, limits);
     if bytes.starts_with(b"Inst ") && reader.error.is_none() {
         if reader.count >= limits.insts {
             reader.error = Some(OutputError::TooMany);

@@ -6,11 +6,12 @@ use std::fmt::Write;
 pub fn output(rng: &mut Rng, limits: &Limits) -> Vec<u8> {
     let mut text = String::new();
     for i in 0..rng.between(1, 12) {
-        match rng.between(0, 7) {
+        match rng.between(0, 9) {
             0 => text.push_str("I: downloading packages with apt...\n"),
             1 => text.push_str("Get:1 http://example.invalid/ forky InRelease\n"),
             2 => text.push_str("Conf aa (1 Debian [amd64])\n"),
             3 => writeln!(text, "Fetched {}.3 kB in 1s", rng.between(0, 1000)).expect("writing a String"),
+            5 => text.push_str(std::str::from_utf8(&failures(rng)).expect("ASCII failures")),
             4 => {
                 text.push_str(&"x".repeat(usize::try_from(limits.line).expect("bounded fixture value") + 5));
                 text.push('\n');
@@ -62,4 +63,41 @@ pub fn end(rng: &mut Rng, bytes: &[u8]) -> End {
         1 => End::Break(at),
         _ => End::Whole,
     }
+}
+
+#[must_use]
+pub fn failures(rng: &mut Rng) -> Vec<u8> {
+    const LINES: &[&str] = &[
+        "I: running apt-get update...",
+        "E: setup failed: E: Unable to locate package denied-package",
+        "E: apt-get update failed: process exited with 100",
+        "W: hooklistener errored out",
+        "I: PID 12 exited with exit code 1",
+        "E: mmdebstrap failed to run",
+        "Err:1 URI 404  Not Found",
+        "E: URI does not have a Release file",
+        "E: Failed to fetch URI Could not resolve host",
+        "E: Failed to fetch URI Hash Sum mismatch",
+        "E: No space left on device",
+        "E: Unable to locate package absent-package",
+        "E: Package 'virtual-package' has no installation candidate",
+        "The following packages have unmet dependencies:",
+        " aa : Depends: bb",
+        "However the following packages replace it:",
+        "  aa",
+        "E: ignored diagnostic",
+        "\tcontinued\rtext",
+        "not admitted",
+        " orphan",
+        "dpkg: error: install failed",
+        " continuation",
+    ];
+    let mut text = String::new();
+    for _ in 0..rng.between(1, 32) {
+        let at =
+            usize::try_from(rng.between(0, u64::try_from(LINES.len() - 1).expect("short list"))).expect("small index");
+        text.push_str(LINES[at]);
+        text.push('\n');
+    }
+    text.into_bytes()
 }

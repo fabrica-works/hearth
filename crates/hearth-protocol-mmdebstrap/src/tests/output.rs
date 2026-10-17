@@ -165,3 +165,181 @@ fn a_broken_pipe_reports_its_stream_fault_once() {
     assert_eq!(above.pop(), None);
     assert_eq!(below.pop(), None);
 }
+
+use crate::tail::{self, Cause, Class, Kind, Tail};
+fn selected(lines: &[&[u8]]) -> Tail {
+    let mut tail = Tail::new(&limits::SHIPPED);
+    for line in lines {
+        tail::admit(&mut tail, line, &limits::SHIPPED);
+    }
+    tail
+}
+#[test]
+fn a_failed_fetch_keeps_its_err_and_e_lines_and_is_operational() {
+    let lines: [&[u8]; 4] = [b"I: running apt-get update...", b"Err:1 http://snapshot.debian.org/archive/debian/20261001T030405Z forky InRelease", b"E: Failed to fetch http://snapshot.debian.org/archive/debian/20261001T030405Z/dists/forky/InRelease  Could not connect to snapshot.debian.org:80", b"E: mmdebstrap failed to run"];
+    let tail = selected(&lines);
+    assert_eq!(tail.lines().len(), 2);
+    for (line, want) in tail.lines().iter().zip([lines[1], lines[2]]) {
+        assert_eq!(&**line, want);
+    }
+    assert_eq!(
+        (tail.cause(), tail.cause().class(), tail.cause().kind()),
+        (&Cause::Fetch, Class::Operational, Kind::Tool)
+    );
+}
+#[test]
+fn mmdebstrap_s_own_framing_is_never_in_the_tail() {
+    let tail = selected(&[
+        b"E: setup failed: E: Failed to fetch",
+        b"E: apt-get update failed: process exited with 100",
+        b"W: hooklistener errored out",
+        b"I: PID 123 exited with exit code 1",
+        b"E: mmdebstrap failed to run",
+    ]);
+    assert_eq!(tail.lines().len(), 0);
+    assert_eq!(tail.cause(), &Cause::Other);
+}
+#[test]
+fn the_unmet_dependencies_and_replace_blocks_are_kept_whole() {
+    let lines: [&[u8]; 4] = [
+        b"The following packages have unmet dependencies:",
+        b" apt : Depends: libc6",
+        b"However the following packages replace it:",
+        b"  apt-new",
+    ];
+    let tail = selected(&lines);
+    assert_eq!(tail.lines().len(), 4);
+    for (line, want) in tail.lines().iter().zip(lines) {
+        assert_eq!(&**line, want);
+    }
+}
+const ABSENT: &[&[u8]] = &[
+    b"Err:1 URI 404  Not Found",
+    b"E: Failed to fetch URI 404  Not Found",
+    b"E: Failed to fetch URI NOT FOUND",
+    b"E: The repository 'URI' does not have a Release file",
+];
+#[test]
+fn a_404_or_a_missing_release_file_is_absent_and_configuration() {
+    for line in ABSENT {
+        let tail = selected(&[line]);
+        assert_eq!(tail.cause(), &Cause::Absent);
+        assert_eq!((tail.cause().class(), tail.cause().kind()), (Class::Configuration, Kind::Resolution));
+    }
+}
+const FETCH: &[&[u8]] = &[
+    b"Err:1 URI 503 Service Unavailable",
+    b"E: Failed to fetch URI Hash Sum mismatch",
+    b"E: Failed to fetch URI File has unexpected size",
+    b"E: Failed to fetch URI Connection timed out",
+];
+#[test]
+fn a_5xx_a_mismatch_or_a_timeout_is_a_fetch_and_operational() {
+    for line in FETCH {
+        let tail = selected(&[line]);
+        assert_eq!((tail.cause(), tail.cause().class()), (&Cause::Fetch, Class::Operational));
+    }
+}
+#[test]
+fn no_space_left_is_operational() {
+    let tail = selected(&[b"dpkg: error: No space left on device"]);
+    assert_eq!((tail.cause(), tail.cause().class()), (&Cause::Space, Class::Operational));
+}
+#[test]
+fn an_indented_line_after_an_e_line_stays_with_it() {
+    let tail = selected(&[
+        b"E: invalid package",
+        b"\tcontinued\rdiagnostic",
+        b"not an error",
+        b" ignored",
+        b"dpkg: error invalid",
+        b" continuation",
+    ]);
+    let want: [&[u8]; 4] = [b"E: invalid package", b" continued diagnostic", b"dpkg: error invalid", b" continuation"];
+    assert_eq!(tail.lines().len(), 4);
+    for (line, want) in tail.lines().iter().zip(want) {
+        assert_eq!(&**line, want);
+    }
+}
+#[test]
+fn only_the_last_twenty_lines_are_kept_each_cut_at_160_bytes() {
+    let mut line = [b'x'; 200];
+    for (byte, prefix) in line.iter_mut().zip(b"E: ") {
+        *byte = *prefix;
+    }
+    let mut tail = Tail::new(&limits::SHIPPED);
+    for at in b'a'..=b'y' {
+        line[3] = at;
+        tail::admit(&mut tail, &line, &limits::SHIPPED);
+    }
+    assert_eq!(tail.lines().len(), 20);
+    for (line, at) in tail.lines().iter().zip(b'f'..=b'y') {
+        assert_eq!(line.len(), 160);
+        assert_eq!(line[3], at);
+    }
+}
+#[test]
+fn unable_to_locate_package_is_configuration_naming_the_package() {
+    let tail = selected(&[b"E: Unable to locate package missing-package"]);
+    assert_eq!(tail.cause(), &Cause::Unknown(fixtures::name(b"missing-package")));
+    assert_eq!((tail.cause().class(), tail.cause().kind()), (Class::Configuration, Kind::Resolution));
+}
+#[test]
+fn no_installation_candidate_is_configuration_naming_the_package() {
+    let tail = selected(&[b"E: Package 'virtual-package' has no installation candidate"]);
+    assert_eq!(tail.cause(), &Cause::Unknown(fixtures::name(b"virtual-package")));
+    assert_eq!(tail.cause().class(), Class::Configuration);
+}
+#[test]
+fn unmet_dependencies_name_the_first_package_apt_lists() {
+    let tail = selected(&[
+        b"The following packages have unmet dependencies:",
+        b" apt : Depends: libc6",
+        b" libc6 : Depends: something",
+        b"E: Unable to correct problems, you have held broken packages.",
+    ]);
+    assert_eq!(tail.cause(), &Cause::Unsatisfiable(Some(fixtures::name(b"apt"))));
+    assert_eq!((tail.cause().class(), tail.cause().kind()), (Class::Configuration, Kind::Resolution));
+}
+#[test]
+fn an_operational_cause_anywhere_outranks_a_configuration_one() {
+    let mut tail = selected(&[
+        b"E: Unable to locate package missing-package",
+        b"E: Failed to fetch URI Temporary failure resolving host",
+    ]);
+    for _ in 0_u32..25 {
+        tail::admit(&mut tail, b"E: Unable to locate package other-package", &limits::SHIPPED);
+    }
+    assert_eq!(tail.cause(), &Cause::Resolve);
+    assert_eq!(tail.lines().len(), 20);
+}
+#[test]
+fn stderr_s_tail_is_taken_unless_it_is_empty() {
+    let (env, mut stdout, mut above, mut below) = fixtures::opened();
+    output::up(
+        &mut stdout,
+        &env,
+        Up::Bytes(bytes::copy_of(b"E: Unable to locate package stdout-package\n")),
+        &mut above,
+        &mut below,
+    );
+    drop(below.pop());
+    let (_, mut stderr, _, _) = fixtures::opened();
+    let stdout_failure = tail::failure(&stderr, &stdout);
+    assert_eq!(stdout_failure.cause, Cause::Unknown(fixtures::name(b"stdout-package")));
+    output::up(&mut stderr, &env, Up::Bytes(bytes::copy_of(b"E: No space left on device\n")), &mut above, &mut below);
+    let failure = tail::failure(&stderr, &stdout);
+    assert_eq!(failure.cause, Cause::Space);
+    assert_eq!(failure.tail.as_ref(), &[bytes::copy_of(b"E: No space left on device")]);
+}
+#[test]
+fn a_200_byte_package_name_is_named_whole_though_its_line_is_cut() {
+    let mut line = [b'a'; 228];
+    let prefix = b"E: Unable to locate package ";
+    for (byte, prefix) in line.iter_mut().zip(prefix) {
+        *byte = *prefix;
+    }
+    let tail = selected(&[&line]);
+    assert_eq!(tail.cause(), &Cause::Unknown(fixtures::name(&[b'a'; 200])));
+    assert_eq!(tail.lines().iter().next().unwrap().len(), 160);
+}

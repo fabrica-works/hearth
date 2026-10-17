@@ -38,3 +38,12 @@ fn a_pipe_that_breaks_fails_the_reader_with_its_fault() {
         assert_eq!(run.decoded.error, Some(OutputError::Stream(Fault::Reset)));
     }
 }
+#[test]
+fn generated_failures_keep_the_reference_s_tail_and_cause() {
+    for seed in 0..32 {
+        let mut rng = Rng::new(0x0703_0000 + seed);
+        let output = generate::failures(&mut rng);
+        let run = world::read_output(&output, seed, &LIMITS, End::Whole);
+        assert_eq!(run.decoded, reference::output(&output, End::Whole, &LIMITS), "seed {seed}");
+    }
+}

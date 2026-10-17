@@ -7,6 +7,8 @@ pub struct Limits {
     pub include: u32,
     pub line: u32,
     pub insts: u32,
+    pub tail_lines: u32,
+    pub tail_line: u32,
     pub idle: skein_lib::Duration,
 }
 /// Design defaults: the shipped profile.
@@ -17,5 +19,7 @@ pub const SHIPPED: Limits = Limits {
     include: 65_536,
     line: 4_096,
     insts: 16_384,
+    tail_lines: 20,
+    tail_line: 160,
     idle: skein_lib::Duration::from_secs(60),
 };

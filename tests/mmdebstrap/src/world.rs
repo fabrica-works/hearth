@@ -2,6 +2,7 @@ use crate::reference::Decoded;
 use hearth_protocol_mmdebstrap::{
     limits::Limits,
     output::{self, Reader, Seen},
+    tail::Cause,
 };
 use skein_heap::Meter;
 use skein_lib::{
@@ -40,7 +41,7 @@ pub fn read_output(bytes: &[u8], seed: u64, limits: &Limits, end: End) -> Run {
     let mut below = Queue::with_capacity(output::UP_MAX_OUT.below);
     let mut reader = Reader::new(limits);
     output::open(&mut reader, &env, &mut below);
-    let mut decoded = Decoded { insts: Vec::new(), fetched: 0, error: None };
+    let mut decoded = Decoded { insts: Vec::new(), fetched: 0, error: None, tail: Vec::new(), cause: Cause::Other };
     for _ in 0..bytes.len() * 10 + 100 {
         if let Some(down) = below.pop() {
             wire.take(down);
@@ -56,9 +57,11 @@ pub fn read_output(bytes: &[u8], seed: u64, limits: &Limits, end: End) -> Run {
             Some(Seen::Fetched(bytes)) => decoded.fetched = bytes,
             Some(Seen::Failed(error)) => {
                 decoded.error = Some(error);
+                finish(&reader, &mut decoded);
                 return Run { decoded };
             }
             Some(Seen::Ended) => {
+                finish(&reader, &mut decoded);
                 if let Some(withdraw) = below.pop() {
                     wire.take(withdraw);
                 }
@@ -107,4 +110,9 @@ pub fn read_output_metered(bytes: &[u8], limits: &Limits) -> u64 {
     meter.start();
     output::close(&mut reader, &mut below);
     most.max(meter.check(meter.end(), bound, &"close"))
+}
+
+fn finish(reader: &Reader, decoded: &mut Decoded) {
+    decoded.cause = reader.tail().cause().clone();
+    decoded.tail = reader.tail().lines().iter().map(|line| line.to_vec()).collect();
 }
