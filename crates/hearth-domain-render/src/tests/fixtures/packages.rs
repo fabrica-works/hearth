@@ -157,3 +157,15 @@ pub fn boot_expansion(rows: &[ParameterRow<'_>]) -> Expansion {
 pub fn built_boot(rows: &[ParameterRow<'_>]) -> crate::parts::boot::Boot {
     crate::parts::boot::build(&boot_expansion(rows), &super::containers::placement(None)).expect("valid parameters")
 }
+
+#[must_use]
+pub fn parts_changed(before: crate::parts::PartRecord, after: crate::parts::PartRecord) -> crate::diff::TargetChange {
+    use crate::{
+        diff::{self, Made, Needs},
+        parts::Part,
+    };
+    let before = super::spec(b"x1-prod", &[Part { digest: hearth_lib::encode::Digest([1; 32]), record: before }]);
+    let mut after = super::spec(b"x1-prod", &[Part { digest: hearth_lib::encode::Digest([2; 32]), record: after }]);
+    after.digest = hearth_lib::encode::Digest([3; 32]);
+    diff::compare(Some(&Made::Spec(Box::new(before))), Some(&Made::Spec(Box::new(after))), Needs::Known)
+}

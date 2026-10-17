@@ -1,6 +1,6 @@
 //! Typed differences and the lowest changed layer (render.md, 6.1, 6.2).
 use crate::{
-    parts::{PartRecord, Spec, config},
+    parts::{PartRecord, Spec, boot, config, packages},
     revision::Oid,
     vocabulary::Class,
 };
@@ -34,6 +34,8 @@ pub enum Made {
 pub enum PartChange {
     Meta(crate::parts::meta::Change),
     Config(config::Change),
+    Packages(packages::Change),
+    Boot(boot::Change),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Rebuild {
@@ -97,11 +99,25 @@ pub fn compare(from: Option<&Made>, to: Option<&Made>, resolution: Needs) -> Tar
             }
             let from = config_part(before);
             let to = config_part(after);
-            let mut parts = skein_lib::List::with_capacity(2);
+            let mut parts = skein_lib::List::with_capacity(4);
             if let Some(meta) = crate::parts::meta::change(&before.meta, &after.meta) {
                 parts.push(PartChange::Meta(meta)).expect("one meta change");
             }
-            let mut layers = skein_lib::List::with_capacity(1);
+            let mut layers = skein_lib::List::with_capacity(3);
+            let old = package_and_boot(before);
+            let new = package_and_boot(after);
+            if let (Some((from, before)), Some((to, after))) = (old.packages, new.packages)
+                && from != to
+            {
+                parts.push(PartChange::Packages(packages::change(before, after))).expect("one packages");
+                layers.push(Layer::Packages).expect("three layers");
+            }
+            if let (Some((from, before)), Some((to, after))) = (old.boot, new.boot)
+                && from != to
+            {
+                parts.push(PartChange::Boot(boot::change(before, after))).expect("one boot");
+                layers.push(Layer::Slot).expect("three layers");
+            }
             let changed = match (from, to) {
                 (Some((old, _)), Some((new, _))) => old != new,
                 (None, None) => false,
@@ -131,7 +147,7 @@ fn config_part(spec: &Spec) -> Option<(&Digest, &config::Config)> {
             | PartRecord::Live(_)
             | PartRecord::Packages(_)
             | PartRecord::Boot(_)
-            | PartRecord::Exports(_) => {} // transitional: hearth 19.5, 17.5 and 20.4
+            | PartRecord::Exports(_) => {} // transitional: hearth 19.5 and 20.4
         }
     }
     found
@@ -164,9 +180,25 @@ pub(crate) fn tree(change: &mut TargetChange) -> &mut [config::EntryChange] {
         for part in parts {
             match part {
                 PartChange::Config(config) => tree = &mut config.tree,
-                PartChange::Meta(_) => {}
+                PartChange::Meta(_) | PartChange::Packages(_) | PartChange::Boot(_) => {}
             }
         }
     }
     tree
+}
+
+struct PackageAndBoot<'a> {
+    packages: Option<(&'a Digest, &'a packages::Packages)>,
+    boot: Option<(&'a Digest, &'a boot::Boot)>,
+}
+fn package_and_boot(spec: &Spec) -> PackageAndBoot<'_> {
+    let mut found = PackageAndBoot { packages: None, boot: None };
+    for part in &spec.parts {
+        match &part.record {
+            PartRecord::Packages(packages) => found.packages = Some((&part.digest, packages)),
+            PartRecord::Boot(boot) => found.boot = Some((&part.digest, boot)),
+            PartRecord::Config(_) | PartRecord::Secrets(_) | PartRecord::Live(_) | PartRecord::Exports(_) => {}
+        }
+    }
+    found
 }

@@ -152,9 +152,9 @@ fn terminal(targets: u32, changed: u32, unchanged: u32) -> Record {
 }
 fn hunks(value: &mut Change) -> &mut Hunks {
     match &mut value.change {
-        TargetChange::Changed { parts, .. } => match parts.first_mut().expect("config part") {
-            PartChange::Meta(_) => panic!("config change"),
-            PartChange::Config(config) => match config.tree.first_mut().expect("file change") {
+        TargetChange::Changed { parts, .. } => match fixtures::only_mut(parts) {
+            PartChange::Meta(_) | PartChange::Packages(_) | PartChange::Boot(_) => panic!("config change"),
+            PartChange::Config(config) => match fixtures::only_mut(&mut config.tree) {
                 EntryChange::Changed { hunks, .. } => hunks.as_mut().expect("fixture hunks"),
                 EntryChange::Added { .. } | EntryChange::Removed { .. } => unreachable!("changed file fixture"),
             },
@@ -230,3 +230,5 @@ fn meta_json_keeps_each_before_and_after_and_omits_unchanged_fields() {
         );
     }
 }
+
+mod packages;

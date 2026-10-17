@@ -795,3 +795,5 @@ mod boot;
 
 #[path = "real/exports.rs"]
 mod exports;
+#[path = "real/package_changes.rs"]
+mod package_changes;

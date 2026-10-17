@@ -52,6 +52,8 @@ pub const fn needs(needs: source::Needs) -> target::Needs {
 #[must_use]
 pub fn part_change(part: source::PartChange) -> target::PartChange {
     match part {
+        source::PartChange::Packages(value) => target::PartChange::Packages(super::parts::packages::change(value)),
+        source::PartChange::Boot(value) => target::PartChange::Boot(super::parts::boot::change(value)),
         source::PartChange::Meta(meta) => target::PartChange::Meta(target::MetaChange {
             base: optional_name_pair(meta.base),
             member: optional_member_pair(meta.member),

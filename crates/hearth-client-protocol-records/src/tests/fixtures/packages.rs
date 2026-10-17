@@ -66,3 +66,62 @@ pub fn boot_spec() -> Box<Spec> {
     }]);
     spec
 }
+
+#[must_use]
+pub fn package_change(request: Names) -> crate::diff::PartChange {
+    crate::diff::PartChange::Packages(Change {
+        request,
+        sources: None,
+        variant: None,
+        preseeds: None,
+        initramfs: None,
+        apt: None,
+    })
+}
+#[must_use]
+pub fn change_record(part: crate::diff::PartChange) -> crate::records::Record {
+    crate::records::Record::Change(crate::diff::Change {
+        target: copy_of(b"ion-prod"),
+        change: crate::diff::TargetChange::Changed { parts: Box::new([part]), rebuild: crate::diff::Rebuild::Nothing },
+    })
+}
+#[must_use]
+pub fn boot_change() -> crate::diff::PartChange {
+    use crate::parts::boot::{Boot, Change};
+    crate::diff::PartChange::Boot(Change {
+        before: Boot { params: Box::new([copy_of(b"quiet")]), mutable: false },
+        after: Boot { params: Box::new([]), mutable: true },
+    })
+}
+
+#[must_use]
+pub fn requested_packages_change() -> crate::diff::PartChange {
+    package_change(Names { added: Box::new([copy_of(b"vim")]), removed: Box::new([copy_of(b"nano")]) })
+}
+#[must_use]
+pub fn preseed_change() -> crate::diff::PartChange {
+    let mut part = unchanged_packages_change();
+    let crate::diff::PartChange::Packages(change) = &mut part else { panic!("packages") };
+    let spec = preseeded_spec();
+    for part in spec.parts {
+        if let PartRecord::Packages(packages) = part.record {
+            change.preseeds = Some(PreseedsPair { before: Box::new([]), after: packages.preseeds });
+        }
+    }
+    part
+}
+#[must_use]
+pub fn initramfs_change() -> crate::diff::PartChange {
+    let mut part = unchanged_packages_change();
+    let crate::diff::PartChange::Packages(change) = &mut part else { panic!("packages") };
+    change.initramfs = Some(InitramfsPair {
+        before: None,
+        after: Some(Initramfs { modules: Box::new([copy_of(b"nvme")]), microcode: Microcode::Generic }),
+    });
+    part
+}
+
+#[must_use]
+pub fn unchanged_packages_change() -> crate::diff::PartChange {
+    package_change(Names { added: Box::new([]), removed: Box::new([]) })
+}

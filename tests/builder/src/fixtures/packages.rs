@@ -49,3 +49,18 @@ pub fn command_line_repository(name: &str, order_fault: bool) -> Repository {
     }
     Repository::make(name, &files)
 }
+
+#[must_use]
+pub fn packages_diff(name: &str) -> super::Rendered {
+    let repository = packages_repository(name, true);
+    let from = repository.head();
+    let to = repository.next(&[File { path: "tasks/base/task.json", body: br#"{"packages": {"curl": {}, "tzdata": {}, "vim": {}, "firmware-linux": {"component": "non-free-firmware"}}}"#, mode: 0o644 }], &[]);
+    super::diff(&repository, &super::Asked { form: hearth::Form::JsonLines, ..super::Asked::new(&from, &to) })
+}
+#[must_use]
+pub fn boot_diff(name: &str) -> super::Rendered {
+    let repository = command_line_repository(name, false);
+    let from = repository.head();
+    let to = repository.next(&[File { path: "tasks/params/task.json", body: br#"{"cmdline": {"console": {"param": "console=ttyS0,115200n8", "order": 900}, "audit": {"param": "audit=0"}}}"#, mode: 0o644 }], &[]);
+    super::diff(&repository, &super::Asked { form: hearth::Form::JsonLines, ..super::Asked::new(&from, &to) })
+}

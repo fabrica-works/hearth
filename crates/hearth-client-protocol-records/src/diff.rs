@@ -44,6 +44,8 @@ pub enum Needs {
 pub enum PartChange {
     Meta(MetaChange),
     Config(ConfigChange),
+    Packages(crate::parts::packages::Change),
+    Boot(crate::parts::boot::Change),
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct MetaChange {
@@ -137,6 +139,8 @@ impl Change {
                     match part {
                         PartChange::Config(config) => config.text(lines),
                         PartChange::Meta(meta) => meta.text(lines),
+                        PartChange::Packages(packages) => packages.text(lines),
+                        PartChange::Boot(boot) => boot.text(lines),
                     }
                 }
             }
@@ -174,6 +178,8 @@ impl Change {
                     match part {
                         PartChange::Config(config) => config.json(json),
                         PartChange::Meta(meta) => meta.json(json),
+                        PartChange::Packages(packages) => packages.json(json),
+                        PartChange::Boot(boot) => boot.json(json),
                     }
                 }
                 json.array_end();

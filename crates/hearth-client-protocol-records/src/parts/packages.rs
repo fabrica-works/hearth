@@ -1,6 +1,9 @@
 //! The packages record in client forms (render.md, 4.2).
 use crate::form::text::Lines;
 use alloc::boxed::Box;
+mod change;
+pub(crate) use change::value_text;
+pub use change::*;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Packages {
     pub sources: Sources,
@@ -165,58 +168,19 @@ impl Packages {
     pub(crate) fn json(&self, json: &mut skein_json::writer::Encoder) {
         json.object_start();
         json.key(b"apt");
-        json.object_start();
-        json.key(b"install_recommends");
-        json.boolean(self.apt.install_recommends);
-        json.object_end();
-        if let Some(initramfs) = &self.initramfs {
+        apt(json, &self.apt);
+        if self.initramfs.is_some() {
             json.key(b"initramfs");
-            json.object_start();
-            json.key(b"microcode");
-            json.string(initramfs.microcode.name());
-            json.key(b"modules");
-            names(json, &initramfs.modules);
-            json.object_end();
+            initramfs(json, self.initramfs.as_ref());
         }
         json.key(b"preseeds");
-        json.object_start();
-        for preseed in &self.preseeds {
-            json.key(&preseed.question);
-            json.object_start();
-            json.key(b"owner");
-            json.string(&preseed.owner);
-            json.key(b"type");
-            json.string(preseed.kind.name());
-            json.key(b"value");
-            json.string(&preseed.value);
-            json.object_end();
-        }
-        json.object_end();
+        preseeds(json, &self.preseeds);
         json.key(b"request");
         names(json, &self.request);
         json.key(b"sources");
-        json.object_start();
-        json.key(b"architecture");
-        json.string(&self.sources.architecture);
-        json.key(b"archive");
-        json.string(&self.sources.archive);
-        json.key(b"components");
-        json.array_start();
-        for component in &self.sources.components {
-            json.string(component.name());
-        }
-        json.array_end();
-        if let Some(security) = &self.sources.security {
-            json.key(b"security");
-            json.string(security);
-        }
-        json.key(b"suite");
-        json.string(&self.sources.suite);
-        json.key(b"updates");
-        json.boolean(self.sources.updates);
-        json.object_end();
+        sources(json, &self.sources);
         json.key(b"variant");
-        json.string(self.variant.name());
+        variant(json, self.variant);
         json.object_end();
     }
 }
@@ -226,4 +190,67 @@ fn names(json: &mut skein_json::writer::Encoder, names: &[Box<[u8]>]) {
         json.string(name);
     }
     json.array_end();
+}
+
+fn apt(json: &mut skein_json::writer::Encoder, value: &Apt) {
+    json.object_start();
+    json.key(b"install_recommends");
+    json.boolean(value.install_recommends);
+    json.object_end();
+}
+
+fn initramfs(json: &mut skein_json::writer::Encoder, value: Option<&Initramfs>) {
+    if let Some(initramfs) = value {
+        json.object_start();
+        json.key(b"microcode");
+        json.string(initramfs.microcode.name());
+        json.key(b"modules");
+        names(json, &initramfs.modules);
+        json.object_end();
+    } else {
+        json.null();
+    }
+}
+
+fn preseeds(json: &mut skein_json::writer::Encoder, value: &[Preseed]) {
+    json.object_start();
+    for preseed in value {
+        json.key(&preseed.question);
+        json.object_start();
+        json.key(b"owner");
+        json.string(&preseed.owner);
+        json.key(b"type");
+        json.string(preseed.kind.name());
+        json.key(b"value");
+        json.string(&preseed.value);
+        json.object_end();
+    }
+    json.object_end();
+}
+
+fn sources(json: &mut skein_json::writer::Encoder, value: &Sources) {
+    json.object_start();
+    json.key(b"architecture");
+    json.string(&value.architecture);
+    json.key(b"archive");
+    json.string(&value.archive);
+    json.key(b"components");
+    json.array_start();
+    for component in &value.components {
+        json.string(component.name());
+    }
+    json.array_end();
+    if let Some(security) = &value.security {
+        json.key(b"security");
+        json.string(security);
+    }
+    json.key(b"suite");
+    json.string(&value.suite);
+    json.key(b"updates");
+    json.boolean(value.updates);
+    json.object_end();
+}
+
+fn variant(json: &mut skein_json::writer::Encoder, value: Variant) {
+    json.string(value.name());
 }

@@ -5,6 +5,11 @@ use crate::{
     revision::{self, declaration::Map},
 };
 use alloc::boxed::Box;
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Change {
+    pub before: Boot,
+    pub after: Boot,
+}
 use hearth_lib::{encode::Digest, hash::H};
 use skein_lib::{List, Map as Sorted};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -65,4 +70,9 @@ pub fn build(expansion: &Expansion, placement: &revision::Placement) -> Result<B
         ordered.push(param.clone()).expect("entry count");
     }
     Ok(Boot { params: ordered.into_boxed(), mutable: placement.mutable })
+}
+
+#[must_use]
+pub fn change(before: &Boot, after: &Boot) -> Change {
+    Change { before: before.clone(), after: after.clone() }
 }

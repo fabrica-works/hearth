@@ -768,7 +768,7 @@ mod secrets;
 pub use secrets::*;
 
 pub mod kinds;
-mod packages;
+pub mod packages;
 pub use packages::*;
 
 mod exports;
