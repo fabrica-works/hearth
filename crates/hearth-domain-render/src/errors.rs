@@ -19,6 +19,7 @@ pub struct Place {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
+    Guard(Guard),
     Store(StoreError),
     Evaluation(crate::evaluate::FaultKind),
     Schema(Schema),
@@ -420,4 +421,11 @@ pub enum Host {
     Unknown,
     Elsewhere { environment: Box<[u8]> },
     Container,
+}
+
+/// A false guard's name and message (format.md, 5.9).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Guard {
+    pub name: Box<[u8]>,
+    pub message: Box<[u8]>,
 }

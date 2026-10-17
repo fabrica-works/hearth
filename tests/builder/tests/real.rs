@@ -538,3 +538,32 @@ fn a_target_past_its_rendered_bytes_fails_the_call() {
     let repository = Repository::make("template-target-limit-exit", &fixtures::thin_with(fixtures::TEMPLATED));
     assert_eq!(fixtures::render_with(&repository, &fixtures::target_output_limit()).exit, Exit::Code(2));
 }
+
+#[test]
+fn a_false_guard_prints_its_message_at_its_key_and_leaves_its_target_out() {
+    let repository = Repository::make("guard", &fixtures::thin_with(core::slice::from_ref(&fixtures::GUARDED)));
+    assert_eq!(
+        fixtures::render(&repository, &[], Form::Text).stdout,
+        b"tasks/motd/task.json:3:5: x1-prod: motd: requires greeting: set a greeting of your own\n"
+    );
+}
+#[test]
+fn a_false_guard_exits_with_configuration_failure() {
+    let repository = Repository::make("guard-exit", &fixtures::thin_with(core::slice::from_ref(&fixtures::GUARDED)));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
+#[test]
+fn a_guard_the_settings_satisfy_leaves_the_thin_spec_as_it_was() {
+    let repository =
+        Repository::make("guard-satisfied", &fixtures::thin_with(&[fixtures::GUARDED, fixtures::GREETING]));
+    assert_eq!(String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout), fixtures::THIN_TEXT);
+}
+#[test]
+fn a_target_with_a_schema_fault_and_a_false_guard_prints_the_schema_fault_only() {
+    let repository =
+        Repository::make("guard-schema", &fixtures::thin_with(&[fixtures::GUARDED, fixtures::WRONG_GREETING]));
+    assert_eq!(
+        fixtures::render(&repository, &[], Form::Text).stdout,
+        b"hosts/x1/x1.json:1:21: x1-prod: motd: not a string\n"
+    );
+}

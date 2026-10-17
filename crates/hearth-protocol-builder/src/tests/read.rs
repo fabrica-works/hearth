@@ -187,6 +187,7 @@ fn a_task_json_reaches_render_through_declaration() {
                 at: Position { line: 1, column: 1 },
                 types: Box::new([]),
                 settings: Box::new([]),
+                requires: Box::new([]),
                 reads: Box::new([])
             })
         })
@@ -293,6 +294,7 @@ fn a_read_waiting_for_stderr_end_allows_its_completion_through() {
                 at: Position { line: 1, column: 1 },
                 types: Box::new([]),
                 settings: Box::new([]),
+                requires: Box::new([]),
                 reads: Box::new([])
             })
         })
@@ -338,4 +340,66 @@ fn a_template_that_does_not_compile_is_refused_at_its_line_and_column() {
             },
         })
     );
+}
+
+#[test]
+fn a_guards_condition_reaches_render_compiled_and_its_message_as_written() {
+    use crate::render::{
+        evaluate::{Expression, Op, Operation},
+        revision::declaration::{Condition, Guard, Text},
+    };
+    let declaration = fixtures::read_declaration(fixtures::GUARDED);
+    assert_eq!(
+        declaration.requires.as_ref(),
+        &[Guard {
+            name: Text { at: Position { line: 1, column: 14 }, text: bytes::copy_of(b"ssh") },
+            at: Position { line: 1, column: 20 },
+            when: Condition {
+                at: Position { line: 1, column: 26 },
+                expression: Expression {
+                    values: 1,
+                    operations: Box::new([Operation { at: 0, op: Op::Boolean(true) }])
+                }
+            },
+            message: Text { at: Position { line: 1, column: 43 }, text: bytes::copy_of(b"keep as written") },
+        }]
+    );
+}
+#[test]
+fn a_condition_that_does_not_compile_refuses_its_declaration_at_the_string() {
+    assert_eq!(
+        fixtures::declaration_event(br#"{"requires":{"ssh":{"if":"@","message":"plain"}}}"#),
+        RootEvent::Render(Event::Read {
+            request: REQUEST,
+            oid: fixtures::oid(),
+            read: Decoded::Refused {
+                at: Position { line: 1, column: 26 },
+                fault: crate::render::errors::Decode::Syntax(crate::render::errors::Syntax::Character),
+                also: None
+            }
+        })
+    );
+}
+const TAG_MESSAGES: &[&[u8]] = &[
+    br#"{"requires":{"ssh":{"if":"true","message":"{{ x }}"}}}"#,
+    br#"{"requires":{"ssh":{"if":"true","message":"{% if %}"}}}"#,
+    br#"{"requires":{"ssh":{"if":"true","message":"{# #}"}}}"#,
+];
+#[test]
+fn a_message_holding_a_tag_or_a_comment_is_refused_at_its_string() {
+    for (row, body) in TAG_MESSAGES.iter().enumerate() {
+        assert_eq!(
+            fixtures::declaration_event(body),
+            RootEvent::Render(Event::Read {
+                request: REQUEST,
+                oid: fixtures::oid(),
+                read: Decoded::Refused {
+                    at: Position { line: 1, column: 43 },
+                    fault: crate::render::errors::Decode::Syntax(crate::render::errors::Syntax::Interpolation),
+                    also: None
+                }
+            }),
+            "row {row}"
+        );
+    }
 }

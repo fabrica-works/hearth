@@ -226,3 +226,12 @@ fn each_schema_type_name_translates_and_back() {
         assert_eq!(back, *input, "row {row}: type name");
     }
 }
+
+#[test]
+fn a_declarations_requires_cross_to_render_and_back() {
+    for (row, (guard, input)) in fixtures::guard_conditions().into_iter().enumerate() {
+        let guard = declarations::guard(guard, &crate::limits::SHIPPED.template).expect("guard compiles");
+        let back = super::back::expression(guard.when.expression);
+        assert_eq!(back, input, "row {row}: guard condition");
+    }
+}

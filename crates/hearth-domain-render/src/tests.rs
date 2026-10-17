@@ -18,3 +18,5 @@ mod schema;
 mod templates;
 
 mod forms;
+
+mod entries;

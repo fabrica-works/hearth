@@ -3,14 +3,16 @@ use super::documents::{position, value};
 use crate::{Limits, config, render::revision::declaration as target};
 use alloc::boxed::Box;
 use skein_lib::List;
-#[must_use]
-pub fn declaration(declaration: config::declaration::Declaration, limits: &Limits) -> target::Declaration {
+pub fn declaration(
+    declaration: config::declaration::Declaration,
+    limits: &Limits,
+) -> Result<target::Declaration, Refusal> {
     let config::declaration::Declaration {
         at,
         types,
         settings,
         reads,
-        requires: _,
+        requires,
         scripts: _,
         exports: _,
         bless: _,
@@ -26,12 +28,17 @@ pub fn declaration(declaration: config::declaration::Declaration, limits: &Limit
             .push(target::Read { task: text(task), at: position(at), settings: texts(settings), exports, optional })
             .expect("read count");
     }
-    target::Declaration {
+    let mut guards = List::with_capacity(u32::try_from(requires.len()).expect("bounded guards"));
+    for written in requires {
+        guards.push(guard(written, &limits.template)?).expect("guard count");
+    }
+    Ok(target::Declaration {
         at: position(at),
         types: translated.into_boxed(),
         settings: specs(settings, limits),
         reads: translated_reads.into_boxed(),
-    }
+        requires: guards.into_boxed(),
+    })
 }
 #[must_use]
 pub fn text(text: config::declaration::Text) -> target::Text {
@@ -87,4 +94,50 @@ pub fn form(form: config::schema::Form, limits: &Limits) -> target::Form {
         config::schema::Form::Map(ty) => target::Form::Map(ty),
         config::schema::Form::Object(fields) => target::Form::Object(specs(fields, limits)),
     }
+}
+
+#[derive(Debug)]
+pub struct Refusal {
+    pub at: crate::render::revision::Position,
+    pub fault: crate::render::errors::Decode,
+}
+pub fn condition(
+    written: config::declaration::Text,
+    limits: &hearth_protocol_template::limits::Limits,
+) -> Result<target::Condition, Refusal> {
+    let at = position(written.at);
+    let expression = match hearth_protocol_template::expression::compile(&written.text, limits) {
+        Ok(expression) => expression,
+        Err(error) => {
+            return Err(Refusal {
+                at,
+                fault: crate::render::errors::Decode::Syntax(super::errors::syntax(error.kind)),
+            });
+        }
+    };
+    Ok(target::Condition { at, expression: super::operations::expression(expression) })
+}
+pub fn guard(
+    written: config::declaration::Guard,
+    limits: &hearth_protocol_template::limits::Limits,
+) -> Result<target::Guard, Refusal> {
+    let config::declaration::Guard { name, at, when, message } = written;
+    let when = condition(when, limits)?;
+    let at_message = position(message.at);
+    match hearth_protocol_template::interpolation::compile(&message.text, limits) {
+        Ok(hearth_protocol_template::interpolation::Interpolated::Plain) => {}
+        Ok(hearth_protocol_template::interpolation::Interpolated::Parts(_)) => {
+            return Err(Refusal {
+                at: at_message,
+                fault: crate::render::errors::Decode::Syntax(crate::render::errors::Syntax::Interpolation),
+            });
+        }
+        Err(error) => {
+            return Err(Refusal {
+                at: at_message,
+                fault: crate::render::errors::Decode::Syntax(super::errors::syntax(error.kind)),
+            });
+        }
+    }
+    Ok(target::Guard { name: text(name), at: position(at), when, message: text(message) })
 }

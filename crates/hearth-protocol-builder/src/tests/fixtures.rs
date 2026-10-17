@@ -491,19 +491,8 @@ pub fn schema_faults() -> [render::errors::Schema; 19] {
         },
     ]
 }
-#[must_use]
-pub fn read_declaration(body: &[u8]) -> render::revision::declaration::Declaration {
-    let mut layer = Layer::new();
-    layer.read(Box::new([render::vocabulary::Blob { kind: render::vocabulary::As::Declaration, ..blob(body) }]));
-    let builder::vocabulary::Event::Render(render::vocabulary::Event::Read {
-        read: render::vocabulary::Decoded::Declaration(declaration),
-        ..
-    }) = layer.run(&batch(body), Exit::Code(0))
-    else {
-        panic!("decoded declaration")
-    };
-    declaration
-}
+mod declarations;
+pub use declarations::*;
 
 pub const PARAMS: &[u8] = b"{\"settings\": {\"params\": {\n  \"type\": {\"map\": {\"object\": {\n    \"param\": {\"type\": \"string\", \"doc\": \"One parameter.\"},\n    \"order\": {\"type\": \"int\", \"min\": 0, \"max\": 999, \"default\": 500, \"doc\": \"Its place.\"}}}},\n  \"default\": {}, \"doc\": \"Parameters, by name.\"}}}";
 pub const READS: &[u8] = br#"{"reads":{"core":{"settings":["domain"],"optional":true,"exports":true}}}"#;

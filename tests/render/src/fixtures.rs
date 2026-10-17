@@ -135,6 +135,7 @@ pub fn with_task() -> Repository {
             at: Position { line: 1, column: 1 },
             types: Box::new([]),
             settings: Box::new([]),
+            requires: Box::new([]),
             reads: Box::new([]),
         }),
     ));
@@ -291,6 +292,7 @@ fn with_default_setting(form: hearth_domain_render::revision::declaration::Form,
         Decoded::Declaration(Declaration {
             at,
             types: Box::new([Type { at, form }]),
+            requires: Box::new([]),
             reads: Box::new([]),
             settings: Box::new([Spec {
                 name: Text { at, text: Box::from(b"x".as_slice()) },

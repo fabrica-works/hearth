@@ -1,4 +1,5 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
+pub(crate) mod guards;
 pub(crate) mod templates;
 mod validation;
 use crate::{
@@ -520,6 +521,10 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
+            if !guards::check(&self.documents, &mut self.errors, &self.limits, &meta, &checked) {
+                self.outcome = self.outcome.worst(Outcome::Failed);
+                continue;
+            }
             let Some(config) = self.config(self.settings.get(self.next.saturating_sub(1)).expect("target settings"))
             else {
                 self.outcome = self.outcome.worst(Outcome::Failed);

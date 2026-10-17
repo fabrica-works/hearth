@@ -36,6 +36,7 @@ pub struct Declaration {
     pub types: Box<[Type]>,
     pub settings: Box<[Spec]>,
     pub reads: Box<[Read]>,
+    pub requires: Box<[Guard]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Read {
@@ -76,4 +77,18 @@ pub struct Spec {
     pub min: Option<Number>,
     pub max: Option<Number>,
     pub max_length: Option<Number>,
+}
+
+/// A declaration expression at its JSON string (format.md, 5.9).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Condition {
+    pub at: Position,
+    pub expression: crate::evaluate::Expression,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Guard {
+    pub name: Text,
+    pub at: Position,
+    pub when: Condition,
+    pub message: Text,
 }

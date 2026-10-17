@@ -41,6 +41,7 @@ pub fn users() -> Declaration {
             Type { at: at(1, 7), form: Form::Int },
         ]),
         settings: Box::new([Spec { default: Some(map(at(1, 60), &[])), ..schema_spec(b"accounts", 0) }]),
+        requires: Box::new([]),
         reads: Box::new([]),
     }
 }

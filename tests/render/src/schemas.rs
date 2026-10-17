@@ -27,7 +27,13 @@ pub fn declaration(rng: &mut Rng, shape: Shape) -> Declaration {
     let mut serial = 1;
     let ty = generate_type(rng, shape, &mut types, &mut serial);
     let spec = generate_spec(rng, b"x", ty, &types, &mut serial);
-    Declaration { at: AT, types: types.into_boxed_slice(), settings: Box::new([spec]), reads: Box::new([]) }
+    Declaration {
+        at: AT,
+        types: types.into_boxed_slice(),
+        settings: Box::new([spec]),
+        requires: Box::new([]),
+        reads: Box::new([]),
+    }
 }
 fn generate_type(rng: &mut Rng, shape: Shape, types: &mut Vec<Type>, serial: &mut u32) -> u32 {
     let index = u32::try_from(types.len()).expect("small arena");

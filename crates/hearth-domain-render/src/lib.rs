@@ -6,6 +6,7 @@ use alloc::boxed::Box;
 mod call;
 pub mod compose;
 pub mod diff;
+pub mod entries;
 pub mod errors;
 pub mod evaluate;
 pub mod limits;

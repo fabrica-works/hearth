@@ -690,3 +690,7 @@ pub fn target_output_limit() -> hearth::Limits {
 }
 
 pub const TARGET_OUTPUT_LIMIT: u64 = 8;
+
+pub const GUARDED: File = File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"greeting\": {\"type\": \"string\", \"default\": \"hello\", \"doc\": \"The greeting.\"}},\n\"requires\": {\n    \"greeting\": {\"if\": \"settings.greeting != 'hello'\", \"message\": \"set a greeting of your own\"}}}" };
+pub const GREETING: File = File { path: "hosts/x1/x1.json", mode: 0o644, body: br#"{"motd":{"greeting":"hi"}}"# };
+pub const WRONG_GREETING: File = File { path: "hosts/x1/x1.json", mode: 0o644, body: br#"{"motd":{"greeting":1}}"# };

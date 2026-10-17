@@ -574,6 +574,7 @@ pub fn declaration(
         types: Box::new([]),
         settings: settings.into(),
         reads: reads.into(),
+        requires: Box::new([]),
     }
 }
 
@@ -775,3 +776,6 @@ mod templates;
 pub use templates::*;
 
 pub mod forms;
+
+mod entries;
+pub use entries::*;

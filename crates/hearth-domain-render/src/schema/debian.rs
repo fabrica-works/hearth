@@ -183,5 +183,5 @@ fn declaration() -> Declaration {
             form: Form::Object(Box::new([spec(b"archive", 1, 9, None, false), spec(b"security", 1, 10, None, true)])),
         },
     ]);
-    Declaration { at: AT, types, settings: Box::new([]), reads: Box::new([]) }
+    Declaration { at: AT, types, settings: Box::new([]), requires: Box::new([]), reads: Box::new([]) }
 }
