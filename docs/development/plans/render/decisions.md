@@ -294,6 +294,15 @@ None yet.
 
      Unchanged: the two files, the cache's layout, the pin's form, 08.2's tests, and the `unshare --net` check, which is no run.
 
+111. **skein 02.3's retry, hearth-09.s1 and skein-04.s1** (process and plan defect, skein 02's, hearth 09's and skein 04's blocks of 2026-10-17T16:32:44Z to 16:36:34Z).
+     Ruling 111, three answers:
+
+     1. **skein 02.3, process: one gate retry.** `terminal_is_controlling_and_the_persons_interrupt_reaches_only_the_child` (skein `tests/world/tests/end_to_end.rs:168`) failed in 0.005 s in `logs/20261017T163049-21.log` and passed in the six other gate logs of this run that ran it, `logs/20261017T163427-9.log` the latest. skein 02.3 runs it once alone (`heavy cargo nextest run -p skein-world-tests --test end_to_end -E 'test(=terminal_is_controlling_and_the_persons_interrupt_reaches_only_the_child)'`), then, if it passes, retries `land --gate` once with the README's skein gate as written. A failure of either is a block naming both logs; no fix to skein's terminal code in 02.3. A second failure of this test in any gate of this run is a block too, whichever session meets it.
+     2. **hearth 09.s1, plan defect: the step is authorized** as `hearth/09.s1-source-count.md` says, hearth 09's, after 09.3: `length(record.sources.len(), l.lines, b"sources")` moves above `validate`'s depth scan, as 09's Rules ask ("each `for` runs over a count already checked against a limit", `hearth/09-records.md:73`).
+     3. **skein 04.1, process: the repair is skein-04.s1,** as `skein/04.s1-directory-parent.md` says, skein 04's, from its commit 4baf858. Its gate failed on a `target/` the coordinator removed while it ran (`logs/20261017T163427-9.log`, ENOENT under `target/wasm32-unknown-unknown/debug/deps`), an infrastructure failure that counts against no retry of the step: it retries `land --gate` once, with the README's skein gate as written.
+
+     The coordinator adds `hearth-09.s1` and `skein-04.s1` to the ledger, each its session's, and removes a session's `target/` only after the session's final report and the end of its turn, until the run's end.
+
 ## For the user
 
 The long-term choices the user may veto:
