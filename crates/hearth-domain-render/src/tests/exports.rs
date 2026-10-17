@@ -159,3 +159,5 @@ fn the_empty_exports_digest_hashes_its_canonical_record() {
         fixtures::digest("970579fd41bed6fd7965e6a303fb756dfa50b8b3e3a9d94d24489233967aaf46")
     );
 }
+
+mod environment;

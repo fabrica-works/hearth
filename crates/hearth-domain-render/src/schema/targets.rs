@@ -103,7 +103,7 @@ pub fn validate(
                     entries.push(entry.clone()).expect("read count");
                 }
                 value = Some(Value::Map(entries.into_boxed()));
-            } else if !read.optional {
+            } else if !(read.optional || read.exports && read.settings.is_empty()) {
                 push(
                     faults,
                     &task.name,

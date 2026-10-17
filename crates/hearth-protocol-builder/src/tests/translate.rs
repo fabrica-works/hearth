@@ -747,4 +747,5 @@ mod packages;
 mod resolution;
 mod specs;
 
+mod exported;
 mod package_changes;

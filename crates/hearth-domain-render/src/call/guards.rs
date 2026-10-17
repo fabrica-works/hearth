@@ -7,7 +7,12 @@ use crate::{
     schema::Validated,
     vocabulary::Class,
 };
+#[cfg(test)]
 use alloc::boxed::Box;
+pub(crate) struct ReadRoots<'a> {
+    pub debian: &'a Value,
+    pub exports: &'a Value,
+}
 pub(crate) fn contained(
     documents: &crate::revision::Documents,
     errors: &mut crate::errors::Collector,
@@ -15,15 +20,19 @@ pub(crate) fn contained(
     meta: &Meta,
     checked: &Validated,
     containers: &[crate::compose::Container],
-    debian: &Value,
+    roots: &ReadRoots<'_>,
 ) -> Option<entries::Expansion> {
     let target = context::target(meta, containers);
-    let empty = Value::Map(Box::new([]));
     let mut valid = true;
     for task in &checked.tasks {
         let Some((document, Some(declaration))) = documents.declaration(&task.name) else { continue };
-        let context =
-            Context { target: &target, debian, settings: &task.settings, tasks: &task.tasks, exports: &empty };
+        let context = Context {
+            target: &target,
+            debian: roots.debian,
+            settings: &task.settings,
+            tasks: &task.tasks,
+            exports: crate::exports::of(roots.exports, &task.name),
+        };
         for fault in entries::guards(declaration, &context, limits) {
             valid = false;
             errors.push(Error {
@@ -44,8 +53,13 @@ pub(crate) fn contained(
     let mut left = limits.expanded;
     for task in &checked.tasks {
         let Some((document, Some(declaration))) = documents.declaration(&task.name) else { continue };
-        let context =
-            Context { target: &target, debian, settings: &task.settings, tasks: &task.tasks, exports: &empty };
+        let context = Context {
+            target: &target,
+            debian: roots.debian,
+            settings: &task.settings,
+            tasks: &task.tasks,
+            exports: crate::exports::of(roots.exports, &task.name),
+        };
         match entries::expand(declaration, &context, limits, &mut left) {
             Ok(mut entries) => {
                 entries.task.clone_from(&task.name);
@@ -82,5 +96,6 @@ pub(crate) fn check(
     checked: &Validated,
     debian: &Value,
 ) -> bool {
-    contained(documents, errors, limits, meta, checked, &[], debian).is_some()
+    contained(documents, errors, limits, meta, checked, &[], &ReadRoots { debian, exports: &Value::Map(Box::new([])) })
+        .is_some()
 }

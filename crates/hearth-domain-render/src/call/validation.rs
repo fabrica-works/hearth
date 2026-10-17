@@ -49,6 +49,13 @@ pub(super) fn schema_errors(
 }
 
 impl Side {
+    pub(super) fn validated_target(&mut self, target: &Target) -> Option<crate::schema::Validated> {
+        let revision =
+            crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
+        let settings = self.settings.get(self.next.saturating_sub(1)).expect("target settings");
+        checked(settings, &revision, target, &self.targets, &mut self.validator, self.validated, &mut self.errors)
+    }
+
     pub(super) fn repository_valid(&self, target: &Target, index: usize) -> bool {
         for (entry, invalid) in self.entries.iter().zip(&self.invalid) {
             if !invalid {

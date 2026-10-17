@@ -68,6 +68,13 @@ pub fn with_document(
             extended.set(&entry.oid, document.clone());
         }
     }
+    for entry in documents.entries() {
+        if let crate::revision::Class::Declaration { task } = crate::revision::class(&entry.path)
+            && let Some((_, Some(declaration))) = documents.declaration(task)
+        {
+            extended.set_declaration(&entry.oid, declaration.clone());
+        }
+    }
     extended.set(&oid, document);
     extended
 }

@@ -20,6 +20,7 @@ pub struct Limits {
     pub hunk_file: u32,
     pub expansion: u32,
     pub expanded: u64,
+    pub exported: u64,
 }
 pub const SHIPPED: Limits = Limits {
     targets: 1_024,
@@ -41,6 +42,7 @@ pub const SHIPPED: Limits = Limits {
     hunk_file: 1_048_576,
     expansion: 65_536,
     expanded: 67_108_864,
+    exported: 67_108_864,
 };
 
 /// A literal that is five bytes cannot fit, for budget refusal tests.

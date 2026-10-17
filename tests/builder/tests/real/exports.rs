@@ -71,3 +71,41 @@ fn an_export_reading_tasks_is_refused() {
         "tasks/vpn/task.json:2:53: vpn: an export reads settings and target alone, not tasks\n"
     );
 }
+#[test]
+fn a_reader_sees_the_exports_of_its_own_environment_alone() {
+    assert_eq!(
+        fixtures::lines_starting(&fixtures::vpn(false).stdout, &["  /etc/vpn/peers"]),
+        concat!(
+            "  /etc/vpn/peers           file 0644 root:root afd16377136a\n",
+            "  /etc/vpn/peers           file 0644 root:root 0ed834effddb\n",
+        )
+    );
+}
+#[test]
+fn environment_exports_leave_the_render_successful() {
+    assert_eq!(fixtures::vpn(false).exit, Exit::Code(0));
+}
+#[test]
+fn an_exporters_fault_prints_for_it_and_for_its_reader() {
+    assert_eq!(
+        fixtures::lines_starting(&fixtures::vpn(true).stdout, &["hosts/ion/ion-prod.json:"]),
+        concat!(
+            "hosts/ion/ion-prod.json:1:92: carbon-prod: vpn: exports.vpn of ion-prod: not a string\n",
+            "hosts/ion/ion-prod.json:1:92: ion-prod: vpn: not a string\n",
+        )
+    );
+}
+#[test]
+fn an_exporters_fault_leaves_the_other_environment_rendering() {
+    assert_eq!(
+        fixtures::lines_starting(&fixtures::vpn(true).stdout, &["target       "]),
+        concat!(
+            "target       carbon-lab   base carbon   environment lab\n",
+            "target       ion-lab   base ion   environment lab\n",
+        )
+    );
+}
+#[test]
+fn an_exporters_fault_makes_the_render_fail() {
+    assert_eq!(fixtures::vpn(true).exit, Exit::Code(2));
+}

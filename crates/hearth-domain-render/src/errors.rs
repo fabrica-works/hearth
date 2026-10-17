@@ -19,6 +19,7 @@ pub struct Place {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
+    Exported(Exported),
     Guard(Guard),
     Collision(Collision),
     Store(StoreError),
@@ -468,4 +469,20 @@ pub enum Root {
 pub enum ExportFault {
     Form,
     Root { root: Root },
+}
+
+/// Another target's exports failed (render.md, 3.4).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Exported {
+    pub exporter: Box<[u8]>,
+    pub task: Box<[u8]>,
+    pub cause: Cause,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Cause {
+    Decode(Decode),
+    Repository(Repository),
+    Composition(Composition),
+    Schema(Schema),
+    Evaluation(crate::evaluate::FaultKind),
 }

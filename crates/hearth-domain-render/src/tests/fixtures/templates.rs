@@ -112,6 +112,7 @@ pub fn template_prepared(
         packages: super::thin_packages(),
         live: crate::parts::live::Live { paths: Box::new([]) },
         exports: crate::parts::exports::build(Box::new([])),
+        export_roots: crate::evaluate::Value::Map(Box::new([])),
     }
 }
 

@@ -34,6 +34,7 @@ pub(crate) struct Side {
     pub merge: compose::Merge,
     pub defaults: crate::schema::Defaults,
     pub validator: crate::schema::Validator,
+    pub exports: crate::exports::Cache,
     pub validated: u64,
     pub budget: Budget,
     pub pending: Box<[Blob]>,
@@ -70,6 +71,7 @@ impl Side {
             merge: compose::Merge::new(limits),
             defaults: crate::schema::Defaults::new(),
             validator: crate::schema::Validator::new(limits),
+            exports: crate::exports::Cache::new(limits),
             validated: limits.validated,
             budget: Budget::new(limits),
             pending: Box::new([]),
@@ -434,7 +436,9 @@ impl Side {
         if self.rendering.is_some() {
             return self.template();
         }
-        for target in self.targets.get(self.next..).expect("answer cursor within targets") {
+        for index in self.next..self.targets.len() {
+            let target = self.targets.get(index).expect("answer cursor within targets").clone();
+            let target = &target;
             self.next = self.next.saturating_add(1);
             if !self.eligible(target) {
                 continue;
@@ -446,6 +450,10 @@ impl Side {
                     continue;
                 }
             };
+            if self.prime_exports(target) {
+                self.next = self.next.saturating_sub(1);
+                return None;
+            }
             let revision = crate::schema::Revision {
                 documents: &self.documents,
                 defaults: &self.defaults,
@@ -467,16 +475,7 @@ impl Side {
             }
             let meta = compose::metadata(target, p.clone());
             let meta_digest = meta::digest(&meta);
-            let settings = self.settings.get(self.next.saturating_sub(1)).expect("target settings");
-            let checked = validation::checked(
-                settings,
-                &revision,
-                target,
-                &self.targets,
-                &mut self.validator,
-                self.validated,
-                &mut self.errors,
-            );
+            let checked = self.validated_target(target);
             let Some(checked) = checked else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
@@ -484,21 +483,23 @@ impl Side {
             let Some((debian, set)) = debian::check(&self.documents, &mut self.merge, &mut self.errors, target) else {
                 continue;
             };
-            let Some((exports, left)) = exports::prepare(
+            let (exports, export_roots) = match self.read_exports(target, &checked) {
+                Ok(prepared) => prepared,
+                Err(error) => {
+                    self.errors.push(*error);
+                    continue;
+                }
+            };
+            let limits = self.limits;
+            let Some(expansion) = guards::contained(
+                &self.documents,
+                &mut self.errors,
+                &limits,
                 &meta,
                 &checked,
                 &containers,
-                &revision,
-                &self.targets,
-                &self.limits,
-                &mut self.errors,
+                &guards::ReadRoots { debian: &debian, exports: &export_roots },
             ) else {
-                continue;
-            };
-            let limits = Limits { expanded: left, ..self.limits };
-            let Some(expansion) =
-                guards::contained(&self.documents, &mut self.errors, &limits, &meta, &checked, &containers, &debian)
-            else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
@@ -524,7 +525,7 @@ impl Side {
                 meta_digest,
                 checked,
                 debian,
-                templates::Prepared { plans, expansion, secrets, packages, live, boot, exports },
+                templates::Prepared { plans, expansion, secrets, packages, live, boot, exports, export_roots },
                 capacity,
             ));
             return self.template();

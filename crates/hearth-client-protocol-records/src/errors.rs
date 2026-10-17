@@ -18,6 +18,7 @@ pub struct Error {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
+    Exported(Exported),
     Store(StoreError),
     Evaluation(Evaluation),
     Schema(Schema),
@@ -69,6 +70,7 @@ impl Error {
             lines.put(b": ");
         }
         match &self.kind {
+            Kind::Exported(exported) => exported.text(lines),
             Kind::Collision(Collision::Key { key }) => {
                 lines.put(b"the key ");
                 lines.quote(key);
@@ -108,6 +110,11 @@ impl Error {
             field(json, b"side", side.name());
         }
         match &self.kind {
+            Kind::Exported(exported) => {
+                field(json, b"kind", b"exported");
+                json.key(b"exported");
+                exported.json(json);
+            }
             Kind::Collision(Collision::Key { key }) => {
                 field(json, b"kind", b"collision");
                 json.key(b"collision");
@@ -690,4 +697,65 @@ pub enum Root {
 pub enum ExportFault {
     Form,
     Root { root: Root },
+}
+
+/// Another target's exports failed (render.md, 3.4).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Exported {
+    pub exporter: Box<[u8]>,
+    pub task: Box<[u8]>,
+    pub cause: Cause,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Cause {
+    Decode(Decode),
+    Repository(Repository),
+    Composition(Composition),
+    Schema(Schema),
+    Evaluation(Evaluation),
+}
+
+impl Exported {
+    fn text(&self, lines: &mut Lines) {
+        lines.put(b"exports.");
+        lines.put(&self.task);
+        lines.put(b" of ");
+        lines.put(&self.exporter);
+        lines.put(b": ");
+        match &self.cause {
+            Cause::Decode(value) => value.text(lines),
+            Cause::Repository(value) => value.text(lines),
+            Cause::Composition(value) => value.text(lines, Some(&self.exporter), Some(&self.task)),
+            Cause::Schema(value) => value.text(lines, Some(&self.task)),
+            Cause::Evaluation(value) => lines.put(value.message()),
+        }
+    }
+    fn json(&self, json: &mut Encoder) {
+        json.object_start();
+        json.key(b"cause");
+        json.object_start();
+        match &self.cause {
+            Cause::Decode(value) => {
+                json.key(b"decode");
+                value.json(json);
+            }
+            Cause::Repository(value) => {
+                json.key(b"repository");
+                value.json(json);
+            }
+            Cause::Composition(value) => {
+                json.key(b"composition");
+                value.json(json);
+            }
+            Cause::Schema(value) => {
+                json.key(b"schema");
+                value.json(json);
+            }
+            Cause::Evaluation(value) => field(json, b"evaluation", value.name()),
+        }
+        json.object_end();
+        field(json, b"exporter", &self.exporter);
+        field(json, b"task", &self.task);
+        json.object_end();
+    }
 }

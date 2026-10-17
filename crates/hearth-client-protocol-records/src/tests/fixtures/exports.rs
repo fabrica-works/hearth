@@ -50,3 +50,15 @@ pub fn export_error(fault: crate::errors::ExportFault) -> crate::errors::Error {
     error.kind = crate::errors::Kind::Schema(crate::errors::Schema::Export { fault });
     error
 }
+pub fn exported_error() -> crate::errors::Error {
+    use crate::errors::{Cause, Exported, Kind, Schema, TypeName};
+    let mut error = super::modules_guard();
+    error.kind = Kind::Exported(Exported {
+        exporter: copy_of(b"ion-prod"),
+        task: copy_of(b"vpn"),
+        cause: Cause::Schema(Schema::Wrong { expected: TypeName::String }),
+    });
+    error.target = Some(copy_of(b"carbon-prod"));
+    error.task = Some(copy_of(b"vpn"));
+    error
+}

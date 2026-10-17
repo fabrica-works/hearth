@@ -784,3 +784,5 @@ pub use packages::*;
 pub const THIN_RECORDS: usize = 10;
 mod resolution;
 pub use resolution::*;
+mod vpn;
+pub use vpn::*;

@@ -1,53 +1,64 @@
-//! Publish present tasks before rendering their files (format.md, 8.1).
+//! Publish cached pairs and assemble each reader task's environment root.
 use crate::{
-    errors::{Error, Place},
-    evaluate::context,
-    parts::{exports::Exports, meta::Meta},
-    schema::{self, Validated},
+    compose::Target,
+    errors::Error,
+    evaluate::{Entry, Value},
+    exports::{Cache, Fleet},
+    parts::exports::Exports,
+    schema::Validated,
 };
+use alloc::boxed::Box;
 use skein_lib::List;
 pub(super) fn prepare(
-    meta: &Meta,
+    target: &Target,
     checked: &Validated,
-    containers: &[crate::compose::Container],
-    revision: &schema::Revision<'_>,
-    targets: &[crate::compose::Target],
-    limits: &crate::limits::Limits,
-    errors: &mut crate::errors::Collector,
-) -> Option<(Exports, u64)> {
-    let mut exported = List::with_capacity(u32::try_from(checked.tasks.len()).expect("task count"));
-    let mut left = limits.expanded;
-    let names = super::validation::targets(targets, &meta.environment);
-    let check = schema::Check::Target { environment: &meta.environment, targets: &names };
-    let target = context::target(meta, containers);
+    fleet: &Fleet<'_>,
+    cache: &Cache,
+) -> Result<(Exports, Value), Box<Error>> {
+    let capacity = u32::try_from(checked.tasks.len()).expect("tasks");
+    let mut exported = List::with_capacity(capacity);
+    let mut roots = List::with_capacity(capacity);
     for task in &checked.tasks {
-        let Some((document, Some(declaration))) = revision.documents.declaration(&task.name) else { continue };
-        let against = schema::Against {
-            declaration,
-            defaults: revision.defaults.of(&task.name).expect("validated task"),
-            listing: revision.listing,
-        };
-        match crate::exports::evaluate(&against, &check, &task.settings, &target, limits, &mut left) {
-            Ok(mut values) => {
-                values.task.clone_from(&task.name);
-                exported.push(values).expect("task count");
-            }
-            Err(fault) => {
-                errors.push(Error {
-                    side: None,
-                    kind: fault.kind,
-                    class: crate::errors::Class::Configuration,
-                    at: Some(Place {
-                        path: skein_lib::bytes::copy_of(revision.documents.path(document)),
-                        position: Some(fault.at),
-                    }),
-                    also: None,
-                    target: Some(meta.target.clone()),
-                    task: Some(task.name.clone()),
-                });
-                return None;
-            }
+        if let Some(values) = cache.published(target, &task.name)? {
+            exported.push(values).expect("tasks");
         }
+        let Some((_, Some(declaration))) = fleet.revision.documents.declaration(&task.name) else { continue };
+        let root = match cache.root(target, declaration, fleet) {
+            Ok(root) => root,
+            Err(mut error) => {
+                error.target = Some(target.name.clone());
+                error.task = Some(task.name.clone());
+                return Err(error);
+            }
+        };
+        roots.push(Entry { key: task.name.clone(), value: Some(root) }).expect("tasks");
     }
-    Some((crate::parts::exports::build(exported.into_boxed()), left))
+    Ok((crate::parts::exports::build(exported.into_boxed()), Value::Map(roots.into_boxed())))
+}
+
+impl super::Side {
+    pub(super) fn prime_exports(&mut self, target: &Target) -> bool {
+        let revision =
+            crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
+        let fleet = Fleet {
+            revision: &revision,
+            targets: &self.targets,
+            settings: &self.settings,
+            faults: &self.errors,
+            limits: &self.limits,
+        };
+        self.exports.prime(target, &fleet)
+    }
+    pub(super) fn read_exports(&self, target: &Target, checked: &Validated) -> Result<(Exports, Value), Box<Error>> {
+        let revision =
+            crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
+        let fleet = Fleet {
+            revision: &revision,
+            targets: &self.targets,
+            settings: &self.settings,
+            faults: &self.errors,
+            limits: &self.limits,
+        };
+        prepare(target, checked, &fleet, &self.exports)
+    }
 }

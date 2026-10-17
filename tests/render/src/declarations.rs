@@ -229,6 +229,7 @@ pub fn expand(tree: &Tree, roots: &Roots, limits: &Limits) -> Expansion {
             | Kind::Repository(_)
             | Kind::Tool(_)
             | Kind::Composition(_)
-            | Kind::Guard(_) => unreachable!("expansion faults"),
+            | Kind::Guard(_)
+            | Kind::Exported(_) => unreachable!("expansion faults"),
         })
 }

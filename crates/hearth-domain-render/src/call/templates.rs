@@ -27,6 +27,7 @@ pub(crate) struct Prepared {
     pub live: parts::live::Live,
     pub boot: parts::boot::Boot,
     pub exports: parts::exports::Exports,
+    pub export_roots: Value,
 }
 #[derive(Debug)]
 pub(crate) struct Target {
@@ -34,6 +35,7 @@ pub(crate) struct Target {
     containers: Box<[crate::compose::Container]>,
     meta_digest: Digest,
     exports: parts::exports::Exports,
+    export_roots: Value,
     tasks: Box<[schema::Checked]>,
     debian: Value,
     pub(crate) expansion: crate::entries::Expansion,
@@ -61,7 +63,7 @@ impl Target {
         prepared: Prepared,
         capacity: u32,
     ) -> Self {
-        let Prepared { plans, expansion, secrets, packages, live, boot, exports } = prepared;
+        let Prepared { plans, expansion, secrets, packages, live, boot, exports, export_roots } = prepared;
         let mut tree = Map::with_capacity(capacity);
         for plan in &plans {
             for install in &plan.installs {
@@ -95,6 +97,7 @@ impl Target {
             containers,
             meta_digest,
             exports,
+            export_roots,
             tasks: checked.tasks,
             debian,
             expansion,
@@ -126,7 +129,7 @@ impl Target {
                     debian: self.debian.clone(),
                     settings: core::mem::replace(&mut task.settings, Value::Map(Box::new([]))),
                     tasks: core::mem::replace(&mut task.tasks, Value::Map(Box::new([]))),
-                    exports: Value::Map(Box::new([])),
+                    exports: crate::exports::of(&self.export_roots, &task.name).clone(),
                 });
             }
             let plan = self.plans.get(self.task).expect("task plan");

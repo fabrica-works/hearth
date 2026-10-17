@@ -66,6 +66,7 @@ fn config_field(field: config::Field) -> target::Field {
 pub fn error(error: target::Error) -> records::errors::Error {
     let target::Error { kind, class, at, also, target, task, side } = error;
     let kind = match kind {
+        target::Kind::Exported(value) => records::errors::Kind::Exported(exported(value)),
         target::Kind::Collision(target::Collision::Key { key }) => {
             records::errors::Kind::Collision(records::errors::Collision::Key { key })
         }
@@ -636,4 +637,16 @@ fn reference_root(root: target::Root) -> records::errors::Root {
         target::Root::Tasks => records::errors::Root::Tasks,
         target::Root::Exports => records::errors::Root::Exports,
     }
+}
+
+fn exported(value: target::Exported) -> records::errors::Exported {
+    let target::Exported { exporter, task, cause } = value;
+    let cause = match cause {
+        target::Cause::Decode(value) => records::errors::Cause::Decode(decode(value)),
+        target::Cause::Repository(value) => records::errors::Cause::Repository(repository(value)),
+        target::Cause::Composition(value) => records::errors::Cause::Composition(composition(value)),
+        target::Cause::Schema(value) => records::errors::Cause::Schema(schema(value)),
+        target::Cause::Evaluation(value) => records::errors::Cause::Evaluation(evaluation(value)),
+    };
+    records::errors::Exported { exporter, task, cause }
 }

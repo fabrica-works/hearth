@@ -9,6 +9,8 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_lib::List;
+mod cache;
+pub(crate) use cache::{Cache, Fleet};
 mod conform;
 mod value;
 pub use conform::conform;
@@ -76,6 +78,17 @@ pub fn evaluate(
     limits: &Limits,
     left: &mut u64,
 ) -> Result<Exported, Fault> {
+    evaluation(against, check, settings, target, limits, left, &mut false)
+}
+fn evaluation(
+    against: &Against<'_>,
+    check: &Check<'_>,
+    settings: &Value,
+    target: &Value,
+    limits: &Limits,
+    left: &mut u64,
+    limited: &mut bool,
+) -> Result<Exported, Fault> {
     let empty = Value::Map(Box::new([]));
     let context = Context { target, settings, debian: &empty, tasks: &empty, exports: &empty };
     let mut values =
@@ -112,7 +125,10 @@ pub fn evaluate(
         charge = charge.saturating_add(stored);
         *left = match left.checked_sub(charge) {
             Some(left) => left,
-            None => return Err(failure(Kind::Evaluation(evaluate::FaultKind::Limit), at)),
+            None => {
+                *limited = true;
+                return Err(failure(Kind::Evaluation(evaluate::FaultKind::Limit), at));
+            }
         };
         values.insert(export.name.text.clone(), Entry { key: export.name.text.clone(), value }).expect("export count");
     }
@@ -125,4 +141,16 @@ pub fn evaluate(
 
 fn failure(kind: Kind, at: crate::revision::Position) -> Fault {
     Fault { kind, at, also: None }
+}
+
+/// An absent read list is the empty root, including guard-only test contexts.
+pub(crate) fn of<'a>(roots: &'a Value, task: &[u8]) -> &'a Value {
+    if let Value::Map(tasks) = roots {
+        for entry in tasks {
+            if entry.key.as_ref() == task {
+                return entry.value.as_ref().expect("assembled export root");
+            }
+        }
+    }
+    roots
 }
