@@ -709,5 +709,7 @@ mod package_changes;
 #[path = "real/diff.rs"]
 mod diff;
 
+#[path = "real/data.rs"]
+mod data;
 #[path = "real/scripts.rs"]
 mod scripts;

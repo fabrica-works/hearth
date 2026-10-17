@@ -623,6 +623,7 @@ pub fn evaluation(kind: render::evaluate::FaultKind) -> records::errors::Evaluat
 #[must_use]
 pub fn format(format: target::Format) -> records::errors::Format {
     match format {
+        target::Format::DataName => records::errors::Format::DataName,
         target::Format::Link => records::errors::Format::Link,
         target::Format::Path => records::errors::Format::Path,
         target::Format::Mode => records::errors::Format::Mode,

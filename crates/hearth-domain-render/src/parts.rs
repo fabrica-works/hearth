@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 use hearth_lib::{encode::Digest, hash::H};
 pub mod boot;
 pub mod config;
+pub mod data;
 pub mod exports;
 pub mod live;
 pub mod meta;
@@ -27,6 +28,7 @@ pub struct Part {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PartRecord {
     Config(config::Config),
+    Data(data::Data),
     Secrets(secrets::Secrets),
     Packages(packages::Packages),
     Live(live::Live),
@@ -43,6 +45,7 @@ pub fn spec_digest(meta: &Digest, parts: &[Part]) -> Digest {
     for part in parts {
         let name: &[u8] = match &part.record {
             PartRecord::Config(_) => b"config",
+            PartRecord::Data(_) => b"data",
             PartRecord::Exports(_) => b"exports",
             PartRecord::Secrets(_) => b"secrets",
             PartRecord::Packages(_) => b"packages",

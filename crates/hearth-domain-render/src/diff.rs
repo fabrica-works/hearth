@@ -1,6 +1,6 @@
 //! Typed differences and the lowest changed layer (render.md, 6.1, 6.2).
 use crate::{
-    parts::{PartRecord, Spec, boot, config, exports, packages},
+    parts::{PartRecord, Spec, boot, config, data, exports, packages},
     revision::Oid,
     vocabulary::Class,
 };
@@ -34,6 +34,7 @@ pub enum Made {
 pub enum PartChange {
     Meta(crate::parts::meta::Change),
     Config(config::Change),
+    Data(data::DataChange),
     Packages(packages::Change),
     Boot(boot::Change),
     Exports(exports::Change),
@@ -71,7 +72,7 @@ pub struct Tally {
 pub const fn layer(part: &PartRecord) -> Layer {
     match part {
         PartRecord::Config(_) => Layer::Config,
-        PartRecord::Secrets(_) | PartRecord::Boot(_) => Layer::Slot,
+        PartRecord::Secrets(_) | PartRecord::Boot(_) | PartRecord::Data(_) => Layer::Slot,
         PartRecord::Packages(_) => Layer::Packages,
         PartRecord::Live(_) | PartRecord::Exports(_) => Layer::Other,
     }
@@ -100,11 +101,11 @@ pub fn compare(from: Option<&Made>, to: Option<&Made>, resolution: Needs) -> Tar
             }
             let from = config_part(before);
             let to = config_part(after);
-            let mut parts = skein_lib::List::with_capacity(5);
+            let mut parts = skein_lib::List::with_capacity(6);
             if let Some(meta) = crate::parts::meta::change(&before.meta, &after.meta) {
                 parts.push(PartChange::Meta(meta)).expect("one meta change");
             }
-            let mut layers = skein_lib::List::with_capacity(3);
+            let mut layers = skein_lib::List::with_capacity(4);
             let old = package_and_boot(before);
             let new = package_and_boot(after);
             if let (Some((from, before)), Some((to, after))) = (old.packages, new.packages)
@@ -130,6 +131,11 @@ pub fn compare(from: Option<&Made>, to: Option<&Made>, resolution: Needs) -> Tar
                 parts.push(PartChange::Config(config::change(old, new))).expect("one config");
                 layers.push(Layer::Config).expect("one config");
             }
+            let data = data::change(data_part(before), data_part(after));
+            if !data.entries.is_empty() {
+                parts.push(PartChange::Data(data)).expect("one data");
+                layers.push(Layer::Slot).expect("four layers");
+            }
             let exports = exports::change(exports_part(before), exports_part(after));
             if !exports.entries.is_empty() {
                 parts.push(PartChange::Exports(exports)).expect("one exports");
@@ -148,7 +154,8 @@ fn config_part(spec: &Spec) -> Option<(&Digest, &config::Config)> {
     for part in &spec.parts {
         match &part.record {
             PartRecord::Config(config) => found = Some((&part.digest, config)),
-            PartRecord::Secrets(_)
+            PartRecord::Data(_)
+            | PartRecord::Secrets(_)
             | PartRecord::Live(_)
             | PartRecord::Packages(_)
             | PartRecord::Boot(_)
@@ -185,7 +192,11 @@ pub(crate) fn tree(change: &mut TargetChange) -> &mut [config::EntryChange] {
         for part in parts {
             match part {
                 PartChange::Config(config) => tree = &mut config.tree,
-                PartChange::Meta(_) | PartChange::Packages(_) | PartChange::Boot(_) | PartChange::Exports(_) => {}
+                PartChange::Data(_)
+                | PartChange::Meta(_)
+                | PartChange::Packages(_)
+                | PartChange::Boot(_)
+                | PartChange::Exports(_) => {}
             }
         }
     }
@@ -202,7 +213,11 @@ fn package_and_boot(spec: &Spec) -> PackageAndBoot<'_> {
         match &part.record {
             PartRecord::Packages(packages) => found.packages = Some((&part.digest, packages)),
             PartRecord::Boot(boot) => found.boot = Some((&part.digest, boot)),
-            PartRecord::Config(_) | PartRecord::Secrets(_) | PartRecord::Live(_) | PartRecord::Exports(_) => {}
+            PartRecord::Data(_)
+            | PartRecord::Config(_)
+            | PartRecord::Secrets(_)
+            | PartRecord::Live(_)
+            | PartRecord::Exports(_) => {}
         }
     }
     found
@@ -213,11 +228,22 @@ fn exports_part(spec: &Spec) -> Option<&exports::Exports> {
     for part in &spec.parts {
         match &part.record {
             PartRecord::Exports(exports) => found = Some(exports),
-            PartRecord::Config(_)
+            PartRecord::Data(_)
+            | PartRecord::Config(_)
             | PartRecord::Secrets(_)
             | PartRecord::Live(_)
             | PartRecord::Packages(_)
             | PartRecord::Boot(_) => {}
+        }
+    }
+    found
+}
+
+fn data_part(spec: &Spec) -> Option<&data::Data> {
+    let mut found = None;
+    for part in &spec.parts {
+        if let PartRecord::Data(data) = &part.record {
+            found = Some(data);
         }
     }
     found

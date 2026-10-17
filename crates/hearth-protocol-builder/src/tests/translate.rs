@@ -326,6 +326,9 @@ fn change_back(change: client_diff::TargetChange) -> diff::TargetChange {
             let mut translated = skein_lib::List::with_capacity(u32::try_from(parts.len()).expect("bounded parts"));
             for part in parts {
                 match part {
+                    client_diff::PartChange::Data(value) => {
+                        translated.push(diff::PartChange::Data(data::change_back(value))).expect("parts");
+                    }
                     client_diff::PartChange::Exports(value) => {
                         translated.push(diff::PartChange::Exports(export_changes::change_back(value))).expect("parts");
                     }
@@ -767,5 +770,6 @@ mod export_changes;
 
 mod resolve;
 
+mod data;
 mod directives;
 mod record_store;

@@ -484,6 +484,17 @@ impl Side {
             else {
                 continue;
             };
+            let data = match parts::data::build(&expansion) {
+                Ok(data) => data,
+                Err(faults) => {
+                    for mut fault in faults {
+                        fault.target = Some(meta.target.clone());
+                        self.errors.push(fault);
+                    }
+                    self.outcome = self.outcome.worst(Outcome::Failed);
+                    continue;
+                }
+            };
             let Some(installation) = self.installation(&meta, &checked, &expansion) else { continue };
             self.prepare_rendering(
                 meta,
@@ -492,6 +503,7 @@ impl Side {
                 checked,
                 debian,
                 templates::Prepared {
+                    data,
                     accounts,
                     installation,
                     expansion,

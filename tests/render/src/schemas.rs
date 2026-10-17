@@ -441,7 +441,8 @@ fn valid_form(format: hearth_domain_render::errors::Format, value: &[u8]) -> boo
                 && string.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "._-/".contains(c))
         }
         Format::File => segments(string),
-        Format::Link
+        Format::DataName
+        | Format::Link
         | Format::Key
         | Format::Timestamp
         | Format::Debian

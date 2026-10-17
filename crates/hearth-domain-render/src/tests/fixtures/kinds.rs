@@ -75,5 +75,7 @@ pub use sources::*;
 mod accounts;
 pub use accounts::*;
 
+pub mod data;
+
 mod directives;
 pub use directives::*;

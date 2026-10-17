@@ -16,6 +16,7 @@ use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
 use skein_lib::{List, Map, Queue, Token};
 pub(crate) struct Prepared {
+    pub data: parts::data::Data,
     pub accounts: crate::kinds::users::Accounts,
     pub installation: super::scripts::Installation,
     pub expansion: crate::entries::Expansion,
@@ -28,6 +29,7 @@ pub(crate) struct Prepared {
 }
 #[derive(Debug)]
 pub(crate) struct Target {
+    data: parts::data::Data,
     meta: Meta,
     containers: Box<[crate::compose::Container]>,
     meta_digest: Digest,
@@ -66,7 +68,7 @@ impl Target {
         prepared: Prepared,
         capacity: u32,
     ) -> Self {
-        let Prepared { accounts, installation, expansion, secrets, packages, live, boot, exports, export_roots } =
+        let Prepared { accounts, data, installation, expansion, secrets, packages, live, boot, exports, export_roots } =
             prepared;
         let super::scripts::Installation { plans, presets, tmpfiles, scripts } = installation;
         let script_rows = Map::with_capacity(u32::try_from(scripts.len()).expect("task bound"));
@@ -99,6 +101,7 @@ impl Target {
             }
         }
         Self {
+            data,
             meta,
             containers,
             meta_digest,
@@ -299,6 +302,7 @@ impl Side {
                 record: parts::PartRecord::Packages(target.packages),
             },
             parts::Part { digest: parts::config::digest(&config), record: parts::PartRecord::Config(config) },
+            parts::Part { digest: parts::data::digest(&target.data), record: parts::PartRecord::Data(target.data) },
             parts::Part {
                 digest: parts::secrets::digest(&target.secrets),
                 record: parts::PartRecord::Secrets(target.secrets),

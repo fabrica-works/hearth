@@ -157,7 +157,7 @@ fn run(repository: &Repository, call: Call, form: Form, store: Option<&Path>) ->
         .rendered
 }
 
-pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         c67cc933c0b9\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part 369415fd653c\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
+pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         7c44cfafc9a2\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part 369415fd653c\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ndata         part 2d4765200bab\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
 
 mod binary;
 pub use binary::{Ended, binary};
@@ -431,7 +431,7 @@ pub fn broken_task() -> Vec<File> {
     files
 }
 pub const BROKEN_LAB_TEXT: &str = concat!(
-    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         c67cc933c0b9\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part 369415fd653c\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n",
+    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         7c44cfafc9a2\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part 369415fd653c\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ndata         part 2d4765200bab\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n",
     "\nenvs/lab.json:1:14: duplicate key \"motd\" (envs/lab.json:1:2)\n"
 );
 pub const D1: hearth::service::domain::render::vocabulary::Digest =
@@ -774,14 +774,15 @@ mod packages;
 pub use exports::*;
 pub use packages::*;
 
-/// Version, spec, meta, boot, packages, config, secrets, live, exports and outcome.
-pub const THIN_RECORDS: usize = 10;
+/// Version, spec, meta, boot, packages, config, data, secrets, live, exports and outcome.
+pub const THIN_RECORDS: usize = 11;
 mod resolution;
 pub use resolution::*;
 mod vpn;
 pub use vpn::*;
 pub mod accounts;
 
-pub const DISTINCT_TEAMS_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         095e7535bff7\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part d8c246718666\n  groups     dev -\n  groups     ops -\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
+pub const DISTINCT_TEAMS_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         5371ef79e047\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276   resolution 4ee22520f418 needed\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part d8c246718666\n  groups     dev -\n  groups     ops -\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\ndata         part 2d4765200bab\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
 
+pub mod data;
 pub mod scripts;

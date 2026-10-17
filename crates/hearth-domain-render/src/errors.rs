@@ -317,6 +317,7 @@ pub enum Schema {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Format {
+    DataName,
     Link,
     Path,
     Mode,

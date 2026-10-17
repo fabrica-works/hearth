@@ -101,6 +101,7 @@ pub fn template_prepared(
     expansion: crate::entries::Expansion,
 ) -> crate::call::templates::Prepared {
     crate::call::templates::Prepared {
+        data: crate::parts::data::Data { entries: Box::new([]) },
         accounts: crate::kinds::users::Accounts { users: Box::new([]), groups: Box::new([]) },
         boot: super::built_boot(&[]),
         installation: crate::call::scripts::Installation {

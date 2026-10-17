@@ -2,6 +2,7 @@
 use crate::{records::records as target, render::parts as source};
 pub mod boot;
 pub mod config;
+pub mod data;
 pub mod exports;
 pub mod live;
 pub mod packages;
@@ -12,6 +13,7 @@ pub fn part(part: source::Part) -> target::Part {
     target::Part {
         digest: digest.0,
         record: match record {
+            source::PartRecord::Data(value) => target::PartRecord::Data(data::data(value)),
             source::PartRecord::Config(value) => target::PartRecord::Config(config::config(value)),
             source::PartRecord::Secrets(value) => target::PartRecord::Secrets(secrets::secrets(value)),
             source::PartRecord::Packages(value) => target::PartRecord::Packages(packages::packages(value)),

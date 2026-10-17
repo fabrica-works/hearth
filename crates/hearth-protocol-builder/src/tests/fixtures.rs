@@ -785,5 +785,6 @@ pub use accounts::*;
 
 mod indices;
 pub use indices::*;
+pub mod data;
 mod directives;
 pub use directives::*;

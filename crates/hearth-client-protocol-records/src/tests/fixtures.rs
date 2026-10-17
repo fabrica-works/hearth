@@ -380,7 +380,8 @@ pub fn config_mut(spec: &mut Spec) -> &mut Config {
     for part in &mut spec.parts {
         match &mut part.record {
             PartRecord::Config(config) => return config,
-            PartRecord::Secrets(_)
+            PartRecord::Data(_)
+            | PartRecord::Secrets(_)
             | PartRecord::Live(_)
             | PartRecord::Packages(_)
             | PartRecord::Boot(_)
@@ -440,5 +441,6 @@ pub use accounts::*;
 mod diff;
 pub use diff::*;
 
+pub mod data;
 mod directives;
 pub use directives::*;

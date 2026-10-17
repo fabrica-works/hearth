@@ -46,6 +46,7 @@ fn layer(tag: &[u8], parent: &Digest, part: &Digest) -> Digest {
 pub fn part(spec: &Spec, name: &[u8]) -> Digest {
     for part in &spec.parts {
         let tag: &[u8] = match &part.record {
+            PartRecord::Data(_) => b"data",
             PartRecord::Config(_) => b"config",
             PartRecord::Packages(_) => b"packages",
             PartRecord::Secrets(_) => b"secrets",

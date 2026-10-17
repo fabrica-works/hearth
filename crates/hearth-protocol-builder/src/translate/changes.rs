@@ -53,6 +53,7 @@ pub const fn needs(needs: source::Needs) -> target::Needs {
 pub fn part_change(part: source::PartChange) -> target::PartChange {
     match part {
         source::PartChange::Packages(value) => target::PartChange::Packages(super::parts::packages::change(value)),
+        source::PartChange::Data(value) => target::PartChange::Data(super::parts::data::change(value)),
         source::PartChange::Exports(value) => target::PartChange::Exports(super::parts::exports::change(value)),
         source::PartChange::Boot(value) => target::PartChange::Boot(super::parts::boot::change(value)),
         source::PartChange::Meta(meta) => target::PartChange::Meta(target::MetaChange {

@@ -42,6 +42,7 @@ pub enum Needs {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PartChange {
+    Data(crate::parts::data::DataChange),
     Meta(MetaChange),
     Config(ConfigChange),
     Packages(crate::parts::packages::Change),
@@ -160,6 +161,7 @@ impl Change {
                         PartChange::Packages(packages) => packages.text(lines),
                         PartChange::Boot(boot) => boot.text(lines),
                         PartChange::Exports(exports) => exports.text(lines),
+                        PartChange::Data(data) => data.text(lines),
                     }
                 }
             }
@@ -200,6 +202,7 @@ impl Change {
                         PartChange::Packages(packages) => packages.json(json),
                         PartChange::Boot(boot) => boot.json(json),
                         PartChange::Exports(exports) => exports.json(json),
+                        PartChange::Data(data) => data.json(json),
                     }
                 }
                 json.array_end();
@@ -647,4 +650,5 @@ pub struct ScriptsChange {
     pub after: Box<[Script]>,
 }
 
+mod data;
 mod directives;

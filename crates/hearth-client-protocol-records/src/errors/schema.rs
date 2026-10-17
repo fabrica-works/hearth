@@ -1,6 +1,7 @@
 use super::{Box, Encoder, Lines, Schema, field, json_names, names, signed, validation};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Format {
+    DataName,
     Link,
     Path,
     Mode,
@@ -17,6 +18,7 @@ pub enum Format {
 impl Format {
     pub(super) fn name(self) -> &'static [u8] {
         match self {
+            Self::DataName => b"data name",
             Self::Link => b"link",
             Self::Path => b"path",
             Self::Mode => b"mode",

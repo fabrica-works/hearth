@@ -23,7 +23,11 @@ pub fn diff_terminal(targets: u32, changed: u32, unchanged: u32) -> Record {
 pub fn fixture_hunks(value: &mut Change) -> &mut Hunks {
     match &mut value.change {
         TargetChange::Changed { parts, .. } => match super::only_mut(parts) {
-            PartChange::Meta(_) | PartChange::Packages(_) | PartChange::Boot(_) | PartChange::Exports(_) => {
+            PartChange::Data(_)
+            | PartChange::Meta(_)
+            | PartChange::Packages(_)
+            | PartChange::Boot(_)
+            | PartChange::Exports(_) => {
                 panic!("config change")
             }
             PartChange::Config(config) => match super::only_mut(&mut config.tree) {

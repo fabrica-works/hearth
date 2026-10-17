@@ -1,4 +1,5 @@
 //! Shared requirements of concrete declaration kinds (format.md, 5.2).
+pub mod data;
 pub mod identity;
 pub mod live;
 pub mod secrets;

@@ -7,6 +7,7 @@ pub(super) fn spec_back(spec: records::records::Spec) -> render::parts::Spec {
     let mut translated = skein_lib::List::with_capacity(u32::try_from(parts.len()).expect("bounded parts"));
     for records::records::Part { digest, record } in parts {
         let record = match record {
+            records::records::PartRecord::Data(value) => render::parts::PartRecord::Data(super::data::back(value)),
             records::records::PartRecord::Config(value) => config::part_back(value),
             records::records::PartRecord::Secrets(value) => render::parts::PartRecord::Secrets(secrets::back(value)),
             records::records::PartRecord::Boot(value) => boot::part_back(value),
