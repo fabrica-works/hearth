@@ -17,6 +17,7 @@ publish = false
 hearth-protocol-mmdebstrap = { path = "crates/hearth-protocol-mmdebstrap" }
 skein-world = { git = "https://github.com/forgetic/skein.git" }
 skein-heap = { git = "https://github.com/forgetic/skein.git" }
+hearth-lib = { path = "crates/hearth-lib" }
 hearth-protocol-template = { path = "crates/hearth-protocol-template" }
 skein-lib = { git = "https://github.com/forgetic/skein.git" }
 hearth-protocol-git = { path = "crates/hearth-protocol-git" }

@@ -70,6 +70,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-protocol-tree"
+version = "0.0.0"
+dependencies = [
+ "hearth-lib",
+ "skein-lib",
+]
+
+[[package]]
 name = "hearth-template-world"
 version = "0.0.0"
 dependencies = [
