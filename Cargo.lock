@@ -71,6 +71,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-config-world"
+version = "0.0.0"
+dependencies = [
+ "hearth-protocol-config",
+ "skein-heap",
+ "skein-json",
+ "skein-lib",
+ "skein-world",
+]
+
+[[package]]
 name = "hearth-conformance-world"
 version = "0.0.0"
 dependencies = [

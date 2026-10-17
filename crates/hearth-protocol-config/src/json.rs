@@ -307,3 +307,21 @@ fn finish(frame: Frame) -> Value {
         }
     }
 }
+
+/// The decoder's peak heap, including the tree under construction
+/// (programming-model.md, 6.3; render.md, 2.3).
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    let tokenizer = tk::worst_case(&limits::tokenizer(limits))?;
+    let frames = Stack::<Frame>::worst_case(limits.depth)?;
+    let events = Queue::<tk::Event>::worst_case(1)?;
+    let maps = Map::<Box<[u8]>, Held>::worst_case(limits.keys)?.checked_mul(u64::from(limits.depth))?;
+    let values = u64::from(limits.document).checked_div(2)?.checked_add(1)?;
+    // The tree, a doubling list's old and new storage, and object finishing's
+    // entry list may coexist; all have at most this many values/entries.
+    let records = u64::try_from(size_of::<Value>().max(size_of::<Entry>())).ok()?;
+    let storage = values.checked_mul(records)?.checked_mul(4)?;
+    // Decoded text, counted keys, pending keys and a finishing key's copy.
+    let text = u64::from(limits.document).checked_mul(4)?;
+    tokenizer.checked_add(frames)?.checked_add(events)?.checked_add(maps)?.checked_add(storage)?.checked_add(text)
+}

@@ -1,0 +1,9 @@
+{
+  "core": { "hostname": "stoa" },
+  "stoa": { "port": 7000 },
+  "members": {
+    "1": { "stoa": { "index": 1 } },
+    "2": { "stoa": { "index": 2 } },
+    "3": { "stoa": { "index": 3 } }
+  }
+}
