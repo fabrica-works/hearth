@@ -9,6 +9,7 @@ pub mod limits;
 pub mod outcome;
 pub mod parts;
 pub mod printer;
+pub mod progress;
 pub mod records;
 pub mod startup;
 /// The client protocol's major version (client/README.md, 3.2).

@@ -1,7 +1,7 @@
 use super::fixtures::{self, ARRIVAL, D1, MOTD};
 use crate::{
     limits,
-    vocabulary::{Answer, CacheFile, Event, Origin, Output, Request},
+    vocabulary::{Answer, CacheFile, Event, Limit, Origin, Output, Request, Step},
 };
 use skein_lib::{Duration, Time, Wall};
 #[test]
@@ -41,7 +41,13 @@ fn a_file_past_the_cache_limit_is_refused_and_discarded() {
         &*store.step(Time::ZERO, fixtures::blob(ARRIVAL, MOTD)),
         &[Output::Request(Request::Discard { arrival: ARRIVAL })]
     );
-    assert_eq!(&*store.step(Time::ZERO, Event::Done), &[Output::Answer(Answer::Refused { arrival: ARRIVAL })]);
+    assert_eq!(
+        &*store.step(Time::ZERO, Event::Done),
+        &[
+            Output::Answer(Answer::Full { limit: Limit::CacheFiles, most: 1 }),
+            Output::Answer(Answer::Refused { arrival: ARRIVAL })
+        ]
+    );
     assert!(store.indexed(&D1));
 }
 #[test]
@@ -57,7 +63,10 @@ fn a_full_store_refuses_every_arrival() {
 fn a_failed_keep_removes_its_index_entry_and_refuses_later_arrivals() {
     let mut store = fixtures::ready(limits::SHIPPED, &[]);
     drop(store.step(Time::ZERO, fixtures::blob(ARRIVAL, MOTD)));
-    assert_eq!(&*store.step(Time::ZERO, Event::Failed), &[Output::Answer(Answer::Refused { arrival: ARRIVAL })]);
+    assert_eq!(
+        &*store.step(Time::ZERO, Event::Failed),
+        &[Output::Answer(Answer::Unusable { step: Step::Keep }), Output::Answer(Answer::Refused { arrival: ARRIVAL })]
+    );
     assert!(!store.indexed(&MOTD));
     assert_eq!(
         &*store.step(Time::ZERO, fixtures::blob(ARRIVAL, MOTD)),

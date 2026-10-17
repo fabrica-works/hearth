@@ -88,3 +88,22 @@ fn rendered_left_out_reaches_the_terminal_record() {
         b"{\"record\":\"version\",\"client\":1}\n{\"record\":\"outcome\",\"outcome\":\"failed\",\"left_out\":44}\n"
     );
 }
+
+#[test]
+fn progress_prints_on_standard_error_and_answers_on_standard_output() {
+    let mut layer = Layer::new();
+    layer.bind_output();
+    layer.bind_error();
+    layer.client(Request::Progress(crate::builder::vocabulary::Progress::Waiting));
+    let Some(Asked::Io(io::Request::Stream { stream, down: Down::Demand { .. } })) = layer.asked() else {
+        panic!("notice demand")
+    };
+    assert_eq!(stream, fixtures::ERROR);
+    layer.up(io::Event::Stream { owner: stream, up: Up::Room });
+    assert_eq!(&*layer.printed(), &[Down::Send(b"waiting for the store's lock: /store\n".as_slice().into())]);
+    layer.client(Request::Answer(Answer::Spec(fixtures::spec())));
+    let Some(Asked::Io(io::Request::Stream { stream, down: Down::Demand { .. } })) = layer.asked() else {
+        panic!("answer demand")
+    };
+    assert_eq!(stream, CLIENT);
+}

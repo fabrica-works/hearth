@@ -1,5 +1,6 @@
 //! Errors in the answer (render.md, 7.1 to 7.3).
 use crate::form::{json::field, text::Lines};
+pub use crate::progress::{Step, StoreError, StoreFault, StoreLimit};
 use alloc::boxed::Box;
 use skein_json::writer::Encoder;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -13,6 +14,7 @@ pub struct Error {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
+    Store(StoreError),
     Schema(Schema),
     Guard(Guard),
     Decode(Decode),
@@ -54,6 +56,7 @@ impl Error {
             lines.put(b": ");
         }
         match &self.kind {
+            Kind::Store(error) => error.text(lines),
             Kind::Decode(decode) => decode.text(lines),
             Kind::Schema(schema) => schema.text(lines),
             Kind::Repository(why) => why.text(lines),
@@ -82,6 +85,10 @@ impl Error {
     pub(crate) fn json(&self, json: &mut Encoder) {
         field(json, b"record", b"error");
         match &self.kind {
+            Kind::Store(error) => {
+                field(json, b"kind", b"store");
+                error.json(json);
+            }
             Kind::Schema(schema) => {
                 field(json, b"kind", b"schema");
                 json.key(b"schema");

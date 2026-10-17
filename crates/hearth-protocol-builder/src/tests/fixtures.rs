@@ -68,7 +68,7 @@ impl Layer {
     }
     pub fn with_form(form: crate::Form, limits: limits::Limits) -> Self {
         let mut layer = Self {
-            protocol: Protocol::new(&limits, call(), form, roots(), 7),
+            protocol: Protocol::new(&limits, call(), form, roots(), b"/store", 7),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             above: Queue::with_capacity(1),
             below: Queue::with_capacity(1),
@@ -83,6 +83,9 @@ impl Layer {
     }
     pub fn bind_output(&mut self) {
         self.protocol.bind_output(CLIENT);
+    }
+    pub fn bind_error(&mut self) {
+        self.protocol.bind_error(ERROR);
     }
     pub fn code(&self) -> Option<u8> {
         self.protocol.code()

@@ -13,7 +13,12 @@ pub(crate) fn print(record: &Record, after: Option<Type>, most: u32) -> Result<B
     let limits = Limits { depth: DEPTH, length: most };
     let count = match record {
         Record::Spec(spec) => spec.parts.len().checked_add(3),
-        Record::Terminal(_) | Record::Change(_) | Record::Error(_) | Record::Startup(_) => Some(2),
+        Record::Terminal(_)
+        | Record::Change(_)
+        | Record::Error(_)
+        | Record::Startup(_)
+        | Record::Waiting(_)
+        | Record::Strays(_) => Some(2),
     }
     .ok_or(Refusal::TooLong)?;
     let start = usize::from(after.is_some());
@@ -61,6 +66,8 @@ fn line(json: &mut Encoder, record: &Record, index: usize) {
         json.unsigned(u64::from(CLIENT_VERSION));
     } else {
         match record {
+            Record::Waiting(waiting) => waiting.json(json),
+            Record::Strays(strays) => strays.json(json),
             Record::Change(change) => change.json(json),
             Record::Error(error) => error.json(json),
             Record::Startup(startup) => startup.json(json),

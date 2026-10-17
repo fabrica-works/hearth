@@ -9,14 +9,20 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Qu
     let request = match ev {
         Event::Open => {
             store.phase = Phase::Locking;
+            store.said = false;
             Request::Lock
         }
         Event::Busy => {
-            store.timers.arm(Timer::Retry, env.now.saturating_add(env.limits.retry)).expect("one retry");
+            store.timers.arm(Timer::Retry, env.now.saturating_add(env.limits.retry)).expect("two timers");
+            if !store.said {
+                store.said = true;
+                store.timers.arm(Timer::Said, env.now.saturating_add(env.limits.said)).expect("two timers");
+            }
             return;
         }
         Event::Locked => {
             store.timers.cancel(Timer::Retry);
+            store.timers.cancel(Timer::Said);
             store.phase = Phase::Recording;
             Request::LoadRecord
         }
@@ -47,6 +53,7 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Qu
         Event::Failed => {
             let why = if store.phase == Phase::Locking { Why::Lock } else { Why::Record };
             store.timers.cancel(Timer::Retry);
+            store.timers.cancel(Timer::Said);
             store.phase = Phase::Closed;
             out.push(Output::Answer(Answer::Unopened { why }));
             return;

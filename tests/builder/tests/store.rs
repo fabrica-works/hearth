@@ -172,7 +172,10 @@ fn a_store_past_its_cache_limit_refuses_every_new_file() {
         &fixtures::with_store(store::limits::Limits { cache_files: 2, ..store::limits::SHIPPED }),
     );
     assert_eq!(rendered.exit, skein_io::kernel::Exit::Code(75));
-    assert_eq!(rendered.stdout, b"");
+    assert_eq!(
+        String::from_utf8_lossy(&rendered.stdout).replace(store.to_str().expect("store path"), "/store"),
+        "the store /store is full: 2 cache files\n"
+    );
     for &(name, _, _) in STATIC {
         assert!(!store.join("cache").join(name).exists(), "{name}");
     }
@@ -287,4 +290,70 @@ fn the_scan_empties_staging_and_keeps_it() {
     assert_eq!(fixtures::names(&staging).as_slice(), &[] as &[String]);
     assert_eq!(fs::metadata(staging).expect("kept staging").permissions().mode() & 0o7777, 0o700);
     assert_eq!(fs::read(outside).expect("link target kept"), b"outside");
+}
+
+#[test]
+fn a_render_waiting_past_its_notice_says_once_that_it_waits() {
+    let repository = Repository::make("waiting-notice", fixtures::THIN);
+    let held = fixtures::render_holding(&repository, &fixtures::notice_limits(), Release::OnNotice);
+    let store = repository.scratch().path().join("store");
+    assert_eq!(held.rendered.stderr, format!("waiting for the store's lock: {}\n", store.display()).as_bytes());
+    assert_eq!(held.rendered.stdout, fixtures::THIN_TEXT.as_bytes());
+    assert_eq!(held.rendered.exit, skein_io::kernel::Exit::Code(0));
+}
+#[test]
+fn a_lock_released_before_the_notice_says_nothing() {
+    let repository = Repository::make("quick-lock", fixtures::THIN);
+    let held =
+        fixtures::render_holding(&repository, &fixtures::notice_limits(), Release::After(Duration::from_millis(20)));
+    assert_eq!(held.rendered.stderr, b"");
+    assert_eq!(held.rendered.stdout, fixtures::THIN_TEXT.as_bytes());
+}
+#[test]
+fn a_stray_in_the_cache_is_reported_once_on_standard_error() {
+    let repository = Repository::make("stray-notice", fixtures::THIN);
+    let store = repository.scratch().path().join("store");
+    fixtures::lay(&store, std::slice::from_ref(&fixtures::Laid::File("cache/notes")));
+    let rendered = fixtures::render_with(&repository, &hearth::limits());
+    assert_eq!(
+        String::from_utf8_lossy(&rendered.stderr).replace(store.to_str().expect("store path"), "/store"),
+        "strays in the store /store: 1, the first cache/notes\n"
+    );
+    assert_eq!(rendered.stdout, fixtures::THIN_TEXT.as_bytes());
+}
+#[test]
+fn a_full_store_answers_its_error_naming_the_store_and_the_limit() {
+    let repository = Repository::make("full-error", fixtures::THIN);
+    let store = repository.scratch().path().join("store");
+    fixtures::lay(&store, FULL_CACHE);
+    let rendered = fixtures::render_with(
+        &repository,
+        &fixtures::with_store(store::limits::Limits { cache_files: 2, ..store::limits::SHIPPED }),
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&rendered.stdout).replace(store.to_str().expect("store path"), "/store"),
+        "the store /store is full: 2 cache files\n"
+    );
+    assert_eq!(rendered.stderr, b"");
+    assert_eq!(rendered.exit, skein_io::kernel::Exit::Code(75));
+}
+#[test]
+fn a_store_recorded_by_another_uid_is_refused_on_standard_error() {
+    let repository = Repository::make("other-owner", fixtures::THIN);
+    drop(fixtures::render_with(&repository, &hearth::limits()));
+    let store = repository.scratch().path().join("store");
+    let uid = fs::metadata(&store).expect("store owner").uid();
+    let record = record::Store { layout: 1, made: skein_lib::Wall::EPOCH, range: None, uid: uid + 1 };
+    fs::write(store.join("store.record"), record::write(&record, &limits::SHIPPED).expect("record"))
+        .expect("foreign owner");
+    let rendered = fixtures::render_with(&repository, &hearth::limits());
+    assert_eq!(rendered.stdout, b"");
+    assert_eq!(
+        String::from_utf8_lossy(&rendered.stderr)
+            .replace(store.to_str().expect("store path"), "/store")
+            .replace(&format!("uid {}'s", uid + 1), "uid recorded's")
+            .replace(&format!("uid {uid}'s"), "uid builder's"),
+        "hearth: cannot open the store /store: store.record is uid recorded's, not uid builder's\n"
+    );
+    assert_eq!(rendered.exit, skein_io::kernel::Exit::Code(75));
 }

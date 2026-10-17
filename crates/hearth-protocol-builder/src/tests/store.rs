@@ -51,11 +51,11 @@ fn an_absent_store_record_is_none_and_a_written_one_is_framed_as_kind_1() {
     );
 }
 const STARTUP: &[(Why, &[u8])] = &[
-    (Why::Lock, b"hearth: cannot open the store: lock failed\n"),
-    (Why::Record, b"hearth: cannot open the store: store.record failed\n"),
+    (Why::Lock, b"hearth: cannot open the store /store: lock failed\n"),
+    (Why::Record, b"hearth: cannot open the store /store: store.record failed\n"),
     (
         Why::Owner { recorded: 1001, builder: 1000 },
-        b"hearth: cannot open the store: store.record is uid 1001's, not uid 1000's\n",
+        b"hearth: cannot open the store /store: store.record is uid 1001's, not uid 1000's\n",
     ),
 ];
 #[test]

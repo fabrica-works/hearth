@@ -84,7 +84,7 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
         Event::Done => {
             scan.removing = false;
             if scan.pass == Pass::Closing {
-                finish(store, store.scan.full, out);
+                finish(store, store.scan.full.clone(), out);
                 return;
             }
             if scan.pass == Pass::Empty {
@@ -223,7 +223,7 @@ fn full(limits: &Limits, limit: Limit) -> Answer {
 fn stop_full(store: &mut Store, limits: &Limits, limit: Limit, out: &mut Queue<Output>) {
     store.scan.full = full(limits, limit);
     if store.scan.last {
-        finish(store, store.scan.full, out);
+        finish(store, store.scan.full.clone(), out);
     } else {
         store.scan.pass = Pass::Closing;
         out.push(Output::Request(Request::Close));
@@ -236,6 +236,11 @@ fn finish(store: &mut Store, answer: Answer, out: &mut Queue<Output>) {
     if answer != Answer::Ready {
         store.scan.index = index::Index::with_capacity(0);
         store.scan.resolutions = Map::with_capacity(0);
+    }
+    if answer == Answer::Ready
+        && let Some(first) = store.scan.first.take()
+    {
+        out.push(Output::Answer(Answer::Strays { count: u64::from(store.scan.strays), first }));
     }
     out.push(Output::Answer(answer));
 }

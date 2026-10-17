@@ -18,6 +18,7 @@ pub struct Place {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
+    Store(StoreError),
     Schema(Schema),
     Decode(Decode),
     Repository(Repository),
@@ -338,4 +339,29 @@ pub(crate) fn repository(path: &[u8], task: Option<&[u8]>, why: Repository) -> E
 
 fn copy_task(task: Option<&[u8]>) -> Option<Box<[u8]>> {
     Some(skein_lib::bytes::copy_of(task?))
+}
+
+/// A store failure in an answer (render.md, 7.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct StoreError {
+    pub store: Box<[u8]>,
+    pub fault: StoreFault,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum StoreFault {
+    Full { limit: StoreLimit, most: u32 },
+    Failed { step: Step },
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum StoreLimit {
+    Resolutions,
+    CacheFiles,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Step {
+    List,
+    Remove,
+    Load,
+    Empty,
+    Keep,
 }

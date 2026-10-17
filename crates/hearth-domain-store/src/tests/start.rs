@@ -90,3 +90,21 @@ fn a_record_of_another_uid_leaves_the_store_unopened_naming_both() {
         &[Output::Answer(Answer::Unopened { why: Why::Owner { recorded: 1001, builder: 1000 } })]
     );
 }
+
+#[test]
+fn the_wait_is_said_once_a_second_after_the_first_busy() {
+    let mut store = fixtures::waiting();
+    assert_eq!(store.next_deadline(), Some(Time::from_nanos(1_000_000_000)));
+    assert!(store.fire(Time::from_nanos(999_999_999)).is_empty());
+    assert_eq!(&*store.fire(Time::from_nanos(1_000_000_000)), &[Output::Answer(Answer::Waiting)]);
+    assert!(store.fire(Time::from_nanos(1_000_000_001)).is_empty());
+    drop(store.step(Time::from_nanos(1_000_000_001), Event::Busy));
+    assert_eq!(store.next_deadline(), Some(Time::from_nanos(3_000_000_001)));
+}
+#[test]
+fn a_lock_taken_within_the_second_says_nothing() {
+    let mut store = fixtures::waiting();
+    drop(store.step(Time::from_nanos(500_000_000), Event::Locked));
+    assert_eq!(store.next_deadline(), None);
+    assert!(store.fire(Time::from_nanos(1_000_000_000)).is_empty());
+}

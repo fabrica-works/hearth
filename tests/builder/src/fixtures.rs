@@ -133,6 +133,7 @@ fn git_output(directory: &Path, path: &OsStr, args: &[&str]) -> Vec<u8> {
 pub struct Rendered {
     pub exit: Exit,
     pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
 }
 #[must_use]
 pub fn render(repository: &Repository, targets: &[&[u8]], form: Form) -> Rendered {
@@ -272,8 +273,9 @@ pub fn with_store(store: hearth_domain_store::limits::Limits) -> hearth::Limits 
 pub fn render_with(repository: &Repository, limits: &hearth::Limits) -> Rendered {
     render_call(repository, "HEAD", &[], Form::Text, limits, Release::After(skein_lib::Duration::ZERO)).rendered
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Release {
+    OnNotice,
     After(skein_lib::Duration),
 }
 #[derive(Debug)]
@@ -314,20 +316,35 @@ fn run_holding(
     let store = store.map_or_else(|| repository.scratch.path().join("store"), Path::to_path_buf);
     fs::create_dir_all(&store).expect("store directory");
     fs::set_permissions(&store, fs::Permissions::from_mode(0o700)).expect("private store");
-    let Release::After(span) = release;
-    let lock = if span == skein_lib::Duration::ZERO {
+    let lock = if release == Release::After(skein_lib::Duration::ZERO) {
         None
     } else {
         let lock = fs::File::open(&store).expect("lock root");
         lock.lock().expect("lock store");
         Some(lock)
     };
-    let client = Client::open(Invocation { call, form, store }, limits, fd, 7).expect("client startup");
-    let mut held = Holding { client, lock, first: None, span, output: output.clone(), printed: Vec::new() };
+    let mut client = Client::open(Invocation { call, form, store }, limits, fd, 7).expect("client startup");
+    let error = repository.scratch.path().join("stderr");
+    client
+        .adopt_error(Fd::new(fs::File::create(&error).expect("error output").into_raw_fd()))
+        .expect("error output adoption");
+    let mut held = Holding {
+        client,
+        lock,
+        first: None,
+        release,
+        error: error.clone(),
+        output: output.clone(),
+        printed: Vec::new(),
+    };
     let mut kernel = Kernel::open(Config { operations: held.operations() }).expect("io_uring is required");
     let exit = skein_shell::drive(&mut kernel, &Clock::new(), &mut held);
     Held {
-        rendered: Rendered { exit, stdout: fs::read(output).expect("printed output") },
+        rendered: Rendered {
+            exit,
+            stdout: fs::read(output).expect("printed output"),
+            stderr: fs::read(error).expect("printed error"),
+        },
         printed_while_held: held.printed,
     }
 }
@@ -337,14 +354,19 @@ struct Holding {
     client: Client,
     lock: Option<fs::File>,
     first: Option<skein_lib::Time>,
-    span: skein_lib::Duration,
+    release: Release,
+    error: PathBuf,
     output: PathBuf,
     printed: Vec<u8>,
 }
 impl Host for Holding {
     fn iterate(&mut self, now: skein_lib::Time, wall: skein_lib::Wall) {
         let first = *self.first.get_or_insert(now);
-        if self.lock.is_some() && now >= first.saturating_add(self.span) {
+        let release = match self.release {
+            Release::After(span) => now >= first.saturating_add(span),
+            Release::OnNotice => !fs::read(&self.error).expect("notice output").is_empty(),
+        };
+        if self.lock.is_some() && release {
             self.printed = fs::read(&self.output).expect("output while lock held");
             self.lock = None;
         }
@@ -378,6 +400,15 @@ impl Host for Holding {
         self.client.worst_case()
     }
     fn drain(&mut self) {
+        if let Some(bytes) = self.client.take_startup() {
+            use std::io::Write;
+            fs::OpenOptions::new()
+                .append(true)
+                .open(&self.error)
+                .expect("startup output")
+                .write_all(&bytes)
+                .expect("startup written");
+        }
         self.client.drain();
     }
 }
@@ -562,3 +593,12 @@ pub const CLOSURE: hearth::service::domain::render::vocabulary::Digest =
         15, 124, 191, 52, 95, 192, 174, 126, 227,
     ]);
 pub const STRAY: File = File { path: "tasks/motd/tre/etc/motd", body: b"stray", mode: 0o644 };
+
+#[must_use]
+pub fn notice_limits() -> hearth::Limits {
+    with_store(hearth_domain_store::limits::Limits {
+        said: skein_lib::Duration::from_millis(100),
+        retry: skein_lib::Duration::from_millis(20),
+        ..hearth_domain_store::limits::SHIPPED
+    })
+}

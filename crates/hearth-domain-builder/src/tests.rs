@@ -151,3 +151,64 @@ fn a_refused_blob_fails_its_read_at_its_last_blob() {
         Some(Request::Reply { to: ReplyTo::new(Token::new(1)), outcome: Outcome::TryAgain, diff: None, left_out: 0 })
     );
 }
+
+#[test]
+fn a_full_store_is_answered_once_before_renders_answers() {
+    use crate::{
+        render::errors::{Error, Kind, StoreError, StoreFault, StoreLimit},
+        store::vocabulary::{Answer as StoreAnswer, Limit, Output as StoreOutput},
+    };
+    let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+    builder.call = Some(fixtures::call());
+    let mut out = Queue::with_capacity(2);
+    builder.store_output.push(StoreOutput::Answer(StoreAnswer::Full { limit: Limit::CacheFiles, most: 2 }));
+    crate::store_forward(&mut builder, &fixtures::env(), &mut out);
+    assert_eq!(
+        out.pop(),
+        Some(Request::Answer(Answer::Error(Error {
+            kind: Kind::Store(StoreError {
+                store: Box::new([]),
+                fault: StoreFault::Full { limit: StoreLimit::CacheFiles, most: 2 }
+            }),
+            class: crate::render::vocabulary::Class::Operational,
+            at: None,
+            also: None,
+            target: None,
+            task: None,
+        })))
+    );
+    assert_eq!(
+        out.pop(),
+        Some(Request::Render(crate::render::vocabulary::Request::List {
+            request: Token::new(1),
+            repository: bytes::copy_of(b"/repo"),
+            revision: bytes::copy_of(b"HEAD")
+        }))
+    );
+    builder.store_output.push(StoreOutput::Answer(StoreAnswer::Full { limit: Limit::CacheFiles, most: 2 }));
+    crate::store_forward(&mut builder, &fixtures::env(), &mut out);
+    assert_eq!(out.pop(), None);
+}
+
+#[test]
+fn a_store_error_makes_the_call_operational_even_without_an_arrival() {
+    let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+    builder.store_error = true;
+    builder.reply = Some(ReplyTo::new(Token::new(0)));
+    builder.output.push(Output::Answer(RenderAnswer::Rendered {
+        outcome: crate::render::vocabulary::Outcome::Done,
+        diff: None,
+        left_out: 0,
+    }));
+    let mut out = Queue::with_capacity(2);
+    builder.forward(&mut out);
+    assert_eq!(
+        out.pop(),
+        Some(Request::Reply {
+            to: ReplyTo::new(Token::new(0)),
+            outcome: crate::render::vocabulary::Outcome::TryAgain,
+            diff: None,
+            left_out: 0
+        })
+    );
+}

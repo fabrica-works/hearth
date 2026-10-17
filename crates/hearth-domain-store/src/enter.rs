@@ -2,7 +2,7 @@
 use crate::{
     Store,
     limits::Limits,
-    vocabulary::{Answer, CacheFile, Event, Output, Request},
+    vocabulary::{Answer, CacheFile, Event, Limit, Output, Request, Step},
 };
 use hearth_lib::encode::Digest;
 use skein_lib::{Env, Queue, Token};
@@ -37,6 +37,13 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
                     store.scan.index.remove(&entering.sha256);
                 }
                 store.usable = false;
+            }
+            if failed {
+                out.push(Output::Answer(Answer::Unusable {
+                    step: if entering.kept { Step::Keep } else { Step::Remove },
+                }));
+            } else if entering.refused && store.usable {
+                out.push(Output::Answer(Answer::Full { limit: Limit::CacheFiles, most: env.limits.cache_files }));
             }
             let answer = if entering.refused || failed {
                 Answer::Refused { arrival: entering.arrival }

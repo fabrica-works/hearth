@@ -101,11 +101,15 @@ impl Client {
     pub fn takes(&self) -> bool {
         !self.active && self.terminal.is_none() && self.requests.is_empty() && self.events.is_empty()
     }
-    pub fn down(&mut self, env: &Env<records::limits::Limits>, request: Request) {
+    pub fn down(&mut self, env: &Env<records::limits::Limits>, request: Request, store: &[u8]) {
         assert!(self.takes(), "printer takes one record at a time");
         let record = match request {
+            Request::Progress(progress) => crate::translate::store::progress(progress, store),
             Request::Answer(Answer::Spec(spec)) => records::records::Record::Spec(Box::new(answers::spec(spec))),
-            Request::Answer(Answer::Error(error)) => {
+            Request::Answer(Answer::Error(mut error)) => {
+                if let crate::render::errors::Kind::Store(fault) = &mut error.kind {
+                    fault.store = skein_lib::bytes::copy_of(store);
+                }
                 records::records::Record::Error(crate::translate::errors::error(error))
             }
             Request::Answer(Answer::Change(change)) => {
@@ -133,6 +137,12 @@ impl Client {
                 &mut self.events,
                 &mut self.requests,
             );
+        }
+    }
+    pub fn finish(&mut self, env: &Env<records::limits::Limits>) {
+        self.terminal = Some(crate::render::vocabulary::Outcome::Done);
+        if self.broken.is_none() {
+            printer::down(&mut self.printer, env, printer::Request::Finish, &mut self.events, &mut self.requests);
         }
     }
     pub fn stop(&mut self) {

@@ -8,7 +8,11 @@ pub use service::{Limits, domain::vocabulary::Call, protocol::Form};
 use skein_io::kernel::{Complete, Exit, Fd, Submit};
 use skein_lib::{Queue, Time, Wall};
 use skein_shell::{Host, OutputKind};
-use std::{io::Write, os::unix::fs::DirBuilderExt, path::PathBuf};
+use std::{
+    io::Write,
+    os::unix::{ffi::OsStrExt, fs::DirBuilderExt},
+    path::PathBuf,
+};
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Invocation {
     pub call: Call,
@@ -49,7 +53,11 @@ impl Client {
         let resolutions = opened.next().expect("resolutions");
         let staging = opened.next().expect("staging");
         let mut service = Service::new(
-            &Configuration { limits: *limits, uid: skein_shell::effective_user() },
+            &Configuration {
+                limits: *limits,
+                uid: skein_shell::effective_user(),
+                store: invocation.store.as_os_str().as_bytes().into(),
+            },
             Roots { store, cache, resolutions, staging },
             invocation.call,
             invocation.form,
@@ -74,6 +82,19 @@ impl Client {
             resolutions: Some(resolutions),
             staging: Some(staging),
         })
+    }
+    pub fn adopt_error(&mut self, fd: Fd) -> Result<(), std::io::Error> {
+        let kind = skein_shell::prepare_output(fd)
+            .map_err(|error| std::io::Error::other(format!("invalid error output: {error:?}")))?;
+        match kind {
+            OutputKind::Pipe => self.service.adopt_error_pipe(fd),
+            OutputKind::Append => self.service.adopt_error_file(fd),
+        }
+        .map_err(|_| std::io::Error::other("no error output slot"))
+    }
+    #[must_use]
+    pub fn take_startup(&mut self) -> Option<Box<[u8]>> {
+        self.service.take_startup()
     }
 }
 impl Host for Client {

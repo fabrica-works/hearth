@@ -18,12 +18,12 @@ impl Harness {
         self.step_at(now, Wall::EPOCH, event)
     }
     pub fn step_at(&mut self, now: Time, wall: Wall, event: Event) -> Box<[Output]> {
-        let mut output = Queue::with_capacity(1);
+        let mut output = Queue::with_capacity(2);
         crate::step(&mut self.store, &Env { now, wall, limits: self.limits }, event, &mut output);
         collect(&mut output)
     }
     pub fn fire(&mut self, now: Time) -> Box<[Output]> {
-        let mut output = Queue::with_capacity(1);
+        let mut output = Queue::with_capacity(2);
         crate::fire(&mut self.store, &Env { now, wall: Wall::EPOCH, limits: self.limits }, &mut output);
         collect(&mut output)
     }
@@ -41,9 +41,11 @@ impl Harness {
     }
 }
 fn collect(output: &mut Queue<Output>) -> Box<[Output]> {
-    let mut list = List::with_capacity(1);
-    if let Some(value) = output.pop() {
-        list.push(value).expect("one output");
+    let mut list = List::with_capacity(2);
+    for _ in 0..output.capacity() {
+        if let Some(value) = output.pop() {
+            list.push(value).expect("two outputs");
+        }
     }
     list.into_boxed()
 }
@@ -148,3 +150,10 @@ pub const EMPTY_CLOSURE: hearth_lib::encode::Digest = hearth_lib::encode::Digest
     193, 88, 154, 151, 28, 76, 229, 4, 43, 122, 140, 15, 92, 154, 246, 155, 61, 70, 254, 100, 184, 171, 76, 218, 172,
     88, 93, 176, 234, 58, 213, 48,
 ]);
+
+pub fn waiting() -> Harness {
+    let mut store = Harness::new(Limits { retry: skein_lib::Duration::from_secs(2), ..crate::limits::SHIPPED }, 1000);
+    drop(store.step(Time::ZERO, Event::Open));
+    drop(store.step(Time::ZERO, Event::Busy));
+    store
+}

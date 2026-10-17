@@ -18,8 +18,9 @@ use skein_io::{
     kernel::{Complete, Fd, Submit},
 };
 use skein_lib::{Env, Queue, Time, Wall};
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Configuration {
+    pub store: Box<[u8]>,
     pub limits: Limits,
     pub uid: u32,
 }
@@ -81,7 +82,7 @@ impl Service {
             io_submissions: Queue::with_capacity(limits.queue),
             file_submissions: Queue::with_capacity(limits.queue),
             io_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.io },
-            protocol: Protocol::new(&limits.protocol, call, form, roots, seed),
+            protocol: Protocol::new(&limits.protocol, call, form, roots, &configuration.store, seed),
             protocol_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.protocol },
             domain: Builder::new(&limits.domain, configuration.uid),
             domain_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.domain },
@@ -107,6 +108,22 @@ impl Service {
         }
         let output = self.io.adopt_append(fd, self.io_env.limits.close_timeout)?;
         self.protocol.bind_output(output);
+        Ok(())
+    }
+    pub fn adopt_error_pipe(&mut self, fd: Fd) -> Result<(), Fd> {
+        if self.protocol.error_bound() {
+            return Err(fd);
+        }
+        let output = self.io.adopt_write_pipe(fd, None)?;
+        self.protocol.bind_error(output);
+        Ok(())
+    }
+    pub fn adopt_error_file(&mut self, fd: Fd) -> Result<(), Fd> {
+        if self.protocol.error_bound() {
+            return Err(fd);
+        }
+        let output = self.io.adopt_append(fd, self.io_env.limits.close_timeout)?;
+        self.protocol.bind_error(output);
         Ok(())
     }
     pub fn completions(&mut self) -> &mut Queue<Complete> {

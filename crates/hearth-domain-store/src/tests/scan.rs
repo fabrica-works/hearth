@@ -264,3 +264,21 @@ fn the_closure_digest_is_h_over_each_packages_four_fields() {
         assert_eq!(crate::resolutions::digest(&closure), digest, "populated {populated}");
     }
 }
+
+#[test]
+fn strays_are_said_once_with_their_count_and_the_first() {
+    let mut store = fixtures::scanning(limits::SHIPPED);
+    let entries = [fixtures::entry(b"a", Shape::Stray), fixtures::entry(b"b", Shape::Stray)];
+    drop(store.page(&entries, true));
+    drop(store.page(&[], true));
+    assert_eq!(
+        &*store.step(Time::ZERO, Event::Done),
+        &[
+            Output::Answer(Answer::Strays {
+                count: 2,
+                first: crate::vocabulary::Stray { directory: Directory::Cache, name: b"a".as_slice().into() }
+            }),
+            Output::Answer(Answer::Ready),
+        ]
+    );
+}

@@ -41,6 +41,7 @@ fn run(args: &[OsString], xdg: Option<&std::ffi::OsStr>, home: Option<&std::ffi:
             .map_err(|error| argv::unopened(Opened::Store, Some(&store), format!("{error:?}")))?;
     let mut client = Client::open(invocation, &limits, Fd::new(1), seed)
         .map_err(|error| argv::unopened(Opened::Store, Some(&store), error))?;
+    client.adopt_error(Fd::new(2)).map_err(|error| argv::unopened(Opened::Store, Some(&store), error))?;
     match skein_shell::drive(&mut kernel, &Clock::new(), &mut client) {
         Exit::Code(code) => Ok(code),
         Exit::Signal(_) => Ok(75),

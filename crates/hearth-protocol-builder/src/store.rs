@@ -250,7 +250,7 @@ impl Store {
         Some(event)
     }
 }
-pub(super) fn startup(why: Why) -> records::startup::Startup {
+pub(super) fn startup(why: Why, store: &[u8]) -> records::startup::Startup {
     let error: Box<[u8]> = match why {
         Why::Lock => bytes::copy_of(b"lock failed"),
         Why::Record => bytes::copy_of(b"store.record failed"),
@@ -270,7 +270,11 @@ pub(super) fn startup(why: Why) -> records::startup::Startup {
             error.finish()
         }
     };
-    records::startup::Startup::Unopened { what: records::startup::Opened::Store, path: None, error }
+    records::startup::Startup::Unopened {
+        what: records::startup::Opened::Store,
+        path: Some(bytes::copy_of(store)),
+        error,
+    }
 }
 
 fn loaded(bytes: &[u8], pending: &Request, limits: &Limits) -> Event {

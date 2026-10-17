@@ -15,7 +15,7 @@ pub const SHIPPED: Limits = Limits {
     retry: Duration::from_millis(200),
     said: Duration::from_secs(1),
 };
-/// The index, one page of names, and the retry deadline.
+/// The index, one page of names, and both lock deadlines.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     use crate::vocabulary::Entry;
@@ -25,5 +25,5 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(skein_lib::Map::<hearth_lib::encode::Digest, ()>::worst_case(limits.resolutions)?)?
         .checked_add(page)?
         .checked_add(255)?
-        .checked_add(skein_lib::Deadlines::<crate::Timer>::worst_case(1)?)
+        .checked_add(skein_lib::Deadlines::<crate::Timer>::worst_case(2)?)
 }

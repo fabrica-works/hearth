@@ -29,8 +29,10 @@ pub enum Request {
     Close,
     Remove { directory: Directory, name: Removal },
 }
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    Waiting,
+    Strays { count: u64, first: Stray },
     Cached { arrival: Token },
     Refused { arrival: Token },
     Ready,

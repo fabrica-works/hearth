@@ -102,13 +102,15 @@ pub struct Protocol {
     rng: skein_lib::Rng,
     call: Option<Call>,
     client: client::Client,
+    progress: client::Client,
+    store_path: Box<[u8]>,
     next: u64,
     child: Option<git::Child>,
     mode: Option<Mode>,
 }
 impl Protocol {
     #[must_use]
-    pub fn new(limits: &Limits, call: Call, form: Form, roots: Roots, seed: u64) -> Self {
+    pub fn new(limits: &Limits, call: Call, form: Form, roots: Roots, store: &[u8], seed: u64) -> Self {
         Self {
             roots,
             store: store::Store::new(),
@@ -117,6 +119,8 @@ impl Protocol {
             rng: skein_lib::Rng::new(seed),
             call: Some(call),
             client: client::Client::new(form, limits.printer),
+            progress: client::Client::new(form, limits.printer),
+            store_path: bytes::copy_of(store),
             next: 100,
             child: None,
             mode: None,
@@ -128,7 +132,11 @@ impl Protocol {
     }
     #[must_use]
     pub fn code(&self) -> Option<u8> {
-        self.client.code()
+        if self.progress.bound() && !self.progress.is_empty() {
+            return None;
+        }
+        let code = self.client.code()?;
+        Some(if self.progress.code() == Some(75) { 75 } else { code })
     }
     #[must_use]
     pub fn output_bound(&self) -> bool {
@@ -137,17 +145,28 @@ impl Protocol {
     pub fn bind_output(&mut self, output: Token) {
         self.client.bind(output);
     }
+    pub fn bind_error(&mut self, output: Token) {
+        self.progress.bind(output);
+    }
+    #[must_use]
+    pub fn error_bound(&self) -> bool {
+        self.progress.bound()
+    }
     #[must_use]
     pub fn takes(&self) -> bool {
-        self.client.takes()
+        self.client.takes() && self.progress.takes()
     }
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.mode.is_none() && self.child.is_none() && self.call.is_none() && self.client.is_empty()
+        self.mode.is_none()
+            && self.child.is_none()
+            && self.call.is_none()
+            && self.client.is_empty()
+            && (!self.progress.bound() || self.progress.is_empty())
     }
     #[must_use]
     pub fn work_pending(&self) -> bool {
-        if self.call.is_some() || self.client.work_pending() {
+        if self.call.is_some() || self.client.work_pending() || self.progress.work_pending() {
             return true;
         }
         let Some(child) = &self.child else {
@@ -207,6 +226,11 @@ pub fn down(
     below: &mut Queue<Asked>,
 ) {
     match rq {
+        Request::Progress(progress) => protocol.progress.down(
+            &Env { now: env.now, wall: env.wall, limits: env.limits.printer },
+            Request::Progress(progress),
+            &protocol.store_path,
+        ),
         Request::Store(request) => {
             protocol.store.down(request, &protocol.roots, &env.limits, read::current(&mut protocol.mode), below);
         }
@@ -215,13 +239,16 @@ pub fn down(
             protocol.startup = Some(
                 records::form::print(
                     protocol.form,
-                    &records::records::Record::Startup(store::startup(why)),
+                    &records::records::Record::Startup(store::startup(why, &protocol.store_path)),
                     None,
                     &env.limits.printer,
                 )
                 .expect("startup fits printer limit"),
             );
             protocol.client.stop();
+            if protocol.progress.bound() {
+                protocol.progress.stop();
+            }
         }
         Request::Render(request) => {
             assert!(protocol.mode.is_none() && protocol.child.is_none(), "one git request at a time");
@@ -276,7 +303,16 @@ pub fn down(
             }
         }
         request @ (Request::Answer(_) | Request::Reply { .. }) => {
-            protocol.client.down(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, request);
+            if let Request::Reply { .. } = request
+                && protocol.progress.bound()
+            {
+                protocol.progress.finish(&Env { now: env.now, wall: env.wall, limits: env.limits.printer });
+            }
+            protocol.client.down(
+                &Env { now: env.now, wall: env.wall, limits: env.limits.printer },
+                request,
+                &protocol.store_path,
+            );
         }
     }
 }
@@ -296,6 +332,10 @@ pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, above: &mut Queu
     io_up(protocol, env, event, below);
 }
 fn io_up(protocol: &mut Protocol, env: &Env<Limits>, event: io::Event, below: &mut Queue<Asked>) {
+    if protocol.progress.owns(&event) {
+        protocol.progress.up(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, event);
+        return;
+    }
     if protocol.client.owns(&event) {
         protocol.client.up(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, event);
         return;
@@ -418,6 +458,10 @@ fn succeeded(mode: &Mode, exit: invocation::Exit) -> bool {
 pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Event>, below: &mut Queue<Asked>) {
     if let Some(call) = protocol.call.take() {
         above.push(Event::Call { reply_to: skein_lib::ReplyTo::new(Token::new(0)), call });
+        return;
+    }
+    if protocol.progress.work_pending() {
+        protocol.progress.resume(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, below);
         return;
     }
     if protocol.client.work_pending() {

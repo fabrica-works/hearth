@@ -2,14 +2,17 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+use alloc::boxed::Box;
 pub use hearth_domain_render as render;
 pub use hearth_domain_store as store;
 pub mod vocabulary;
 use render::vocabulary::{Answer as RenderAnswer, Event as RenderEvent, Output};
 use skein_lib::{Env, Queue, ReplyTo, Time, Token};
 use vocabulary::{Answer, Call, Event, Request};
-pub const MAX_OUT: u32 = 1;
-pub const MAX_OUT_RESUME: u32 = 1;
+/// A notice or store error before render forwards its output.
+pub const MAX_OUT: u32 = 2;
+/// A store error and a render answer may become ready together.
+pub const MAX_OUT_RESUME: u32 = 2;
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
     pub render: render::limits::Limits,
@@ -26,6 +29,7 @@ pub struct Builder {
     arrival: Option<(Token, render::revision::Oid, u64, bool, render::vocabulary::Digest)>,
     refused: Option<Token>,
     remaining: usize,
+    store_error: bool,
 }
 impl Builder {
     #[must_use]
@@ -34,12 +38,13 @@ impl Builder {
             arrival: None,
             refused: None,
             remaining: 0,
+            store_error: false,
             render: render::Render::new(&limits.render),
             store: store::Store::new(&limits.store, uid),
             call: None,
-            store_output: Queue::with_capacity(1),
+            store_output: Queue::with_capacity(2),
             reply: None,
-            output: Queue::with_capacity(1),
+            output: Queue::with_capacity(2),
         }
     }
     #[must_use]
@@ -64,7 +69,11 @@ impl Builder {
                 Output::Answer(RenderAnswer::Change(change)) => Request::Answer(Answer::Change(change)),
                 Output::Answer(RenderAnswer::Rendered { outcome, diff, left_out }) => Request::Reply {
                     to: self.reply.take().expect("active call owns its reply"),
-                    outcome,
+                    outcome: if self.store_error {
+                        outcome.worst(render::vocabulary::Outcome::TryAgain)
+                    } else {
+                        outcome
+                    },
                     diff,
                     left_out,
                 },
@@ -134,10 +143,19 @@ fn store_step(builder: &mut Builder, env: &Env<Limits>, event: store::vocabulary
     store_forward(builder, env, out);
 }
 fn store_forward(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>) {
+    for _ in 0..store::MAX_OUT {
+        store_one(builder, env, out);
+    }
+}
+fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>) {
     use store::vocabulary::{Answer, Output};
     match builder.store_output.pop() {
         Some(Output::Request(request)) => out.push(Request::Store(request)),
-        Some(Output::Answer(Answer::Ready | Answer::Full { .. } | Answer::Unusable { .. })) => {
+        Some(Output::Answer(answer @ (Answer::Ready | Answer::Full { .. } | Answer::Unusable { .. }))) => {
+            store_error(builder, &answer, out);
+            if builder.call.is_none() {
+                return;
+            }
             let event = match builder.call.take().expect("opening call") {
                 Call::Diff { repository, from, to, targets } => RenderEvent::Diff { repository, from, to, targets },
                 Call::Render { repository, revision, targets } => RenderEvent::Render { repository, revision, targets },
@@ -170,6 +188,10 @@ fn store_forward(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Reque
                 step(builder, env, Event::Render(RenderEvent::Cached { request, oid, size, sha256 }), out);
             }
         }
+        Some(Output::Answer(Answer::Waiting)) => out.push(Request::Progress(vocabulary::Progress::Waiting)),
+        Some(Output::Answer(Answer::Strays { count, first })) => {
+            out.push(Request::Progress(vocabulary::Progress::Strays { count, first }));
+        }
         Some(Output::Answer(Answer::Unopened { why })) => {
             builder.call = None;
             out.push(Request::Unopened { to: builder.reply.take().expect("opening call reply"), why });
@@ -188,4 +210,45 @@ pub fn fire(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>) 
 #[must_use]
 pub fn next_deadline(builder: &Builder) -> Option<Time> {
     store::next_deadline(&builder.store)
+}
+
+fn store_error(builder: &mut Builder, answer: &store::vocabulary::Answer, out: &mut Queue<Request>) {
+    use render::errors::{Error, Kind, Step, StoreError, StoreFault, StoreLimit};
+    use store::vocabulary::{Answer, Limit, Step as StoreStep};
+    if builder.store_error {
+        return;
+    }
+    let fault = match answer {
+        Answer::Full { limit, most } => StoreFault::Full {
+            limit: match limit {
+                Limit::CacheFiles => StoreLimit::CacheFiles,
+                Limit::Resolutions => StoreLimit::Resolutions,
+            },
+            most: *most,
+        },
+        Answer::Unusable { step } => StoreFault::Failed {
+            step: match step {
+                StoreStep::List => Step::List,
+                StoreStep::Remove => Step::Remove,
+                StoreStep::Load => Step::Load,
+                StoreStep::Empty => Step::Empty,
+                StoreStep::Keep => Step::Keep,
+            },
+        },
+        Answer::Ready
+        | Answer::Cached { .. }
+        | Answer::Refused { .. }
+        | Answer::Unopened { .. }
+        | Answer::Waiting
+        | Answer::Strays { .. } => return,
+    };
+    builder.store_error = true;
+    out.push(Request::Answer(vocabulary::Answer::Error(Error {
+        kind: Kind::Store(StoreError { store: Box::new([]), fault }),
+        class: render::vocabulary::Class::Operational,
+        at: None,
+        also: None,
+        target: None,
+        task: None,
+    })));
 }

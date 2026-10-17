@@ -10,6 +10,8 @@ use crate::{
 use alloc::boxed::Box;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Record {
+    Waiting(crate::progress::Waiting),
+    Strays(crate::progress::Strays),
     Spec(Box<Spec>),
     Terminal(Terminal),
     Change(Change),
@@ -18,6 +20,8 @@ pub enum Record {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Type {
+    Waiting,
+    Strays,
     Spec,
     Terminal,
     Change,
@@ -28,6 +32,8 @@ impl Record {
     #[must_use]
     pub fn kind(&self) -> Type {
         match self {
+            Self::Waiting(_) => Type::Waiting,
+            Self::Strays(_) => Type::Strays,
             Self::Spec(_) => Type::Spec,
             Self::Terminal(_) => Type::Terminal,
             Self::Change(_) => Type::Change,

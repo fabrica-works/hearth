@@ -5,3 +5,5 @@ mod json;
 mod outcome;
 mod printer;
 mod text;
+
+mod progress;

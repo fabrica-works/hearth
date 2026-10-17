@@ -27,6 +27,7 @@ pub enum Call {
 }
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    Progress(Progress),
     Render(render::vocabulary::Request),
     Store(store::vocabulary::Request),
     Unopened { to: ReplyTo, why: store::vocabulary::Why },
@@ -38,4 +39,11 @@ pub enum Answer {
     Change(render::diff::Change),
     Spec(render::parts::Spec),
     Error(render::errors::Error),
+}
+
+/// Store notices go to standard error (client/README.md, 3.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Progress {
+    Waiting,
+    Strays { count: u64, first: store::vocabulary::Stray },
 }

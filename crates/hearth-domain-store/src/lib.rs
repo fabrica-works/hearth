@@ -12,10 +12,12 @@ pub mod vocabulary;
 use limits::Limits;
 use skein_lib::{Deadlines, Env, Queue, Time};
 use vocabulary::{Event, Output, Request};
-pub const MAX_OUT: u32 = 1;
+/// Strays and readiness, or a failure and its refused arrival.
+pub const MAX_OUT: u32 = 2;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum Timer {
     Retry,
+    Said,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Phase {
@@ -34,6 +36,7 @@ pub struct Store {
     scan: scan::Scan,
     entering: Option<enter::Entering>,
     usable: bool,
+    said: bool,
 }
 impl Store {
     #[must_use]
@@ -41,10 +44,11 @@ impl Store {
         Self {
             phase: Phase::Closed,
             uid,
-            timers: Deadlines::with_capacity(1),
+            timers: Deadlines::with_capacity(2),
             scan: scan::Scan::new(limits),
             entering: None,
             usable: false,
+            said: false,
         }
     }
 }
@@ -60,8 +64,10 @@ pub fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Queue<Out
     }
 }
 pub fn fire(store: &mut Store, env: &Env<Limits>, out: &mut Queue<Output>) {
-    if let Some(Timer::Retry) = store.timers.expire(env.now) {
-        out.push(Output::Request(Request::Lock));
+    match store.timers.expire(env.now) {
+        Some(Timer::Retry) => out.push(Output::Request(Request::Lock)),
+        Some(Timer::Said) => out.push(Output::Answer(vocabulary::Answer::Waiting)),
+        None => {}
     }
 }
 #[must_use]

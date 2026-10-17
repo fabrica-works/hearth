@@ -87,6 +87,8 @@ pub(crate) fn print(record: &Record, after: Option<Type>, most: u32) -> Result<B
 }
 fn render(lines: &mut Lines, record: &Record, after: Option<Type>) {
     match record {
+        Record::Waiting(waiting) => waiting.text(lines),
+        Record::Strays(strays) => strays.text(lines),
         Record::Spec(spec) => {
             if after.is_some() {
                 lines.put(b"\n");

@@ -59,3 +59,30 @@ pub fn closed(closure: &[tree::resolution::Package]) -> Box<[crate::builder::sto
     }
     packages.into_boxed()
 }
+
+#[must_use]
+pub fn progress(progress: crate::builder::vocabulary::Progress, store: &[u8]) -> crate::records::records::Record {
+    use crate::{
+        builder::{store::vocabulary::Directory, vocabulary::Progress},
+        records::{
+            progress::{Strays, Waiting},
+            records::Record,
+        },
+    };
+    let store = skein_lib::bytes::copy_of(store);
+    match progress {
+        Progress::Waiting => Record::Waiting(Waiting { store }),
+        Progress::Strays { count, first } => {
+            let directory: &[u8] = match first.directory {
+                Directory::Top => b".",
+                Directory::Cache => b"cache",
+                Directory::Resolutions => b"resolutions",
+            };
+            let mut path = skein_lib::Writer::new(directory.len().saturating_add(1).saturating_add(first.name.len()));
+            path.put(directory).expect("directory room");
+            path.put(b"/").expect("separator room");
+            path.put(&first.name).expect("name room");
+            Record::Strays(Strays { store, count, first: path.finish() })
+        }
+    }
+}

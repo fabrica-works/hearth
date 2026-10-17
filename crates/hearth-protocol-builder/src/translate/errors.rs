@@ -66,6 +66,7 @@ fn config_field(field: config::Field) -> target::Field {
 pub fn error(error: target::Error) -> records::errors::Error {
     let target::Error { kind, class, at, also, target, task } = error;
     let kind = match kind {
+        target::Kind::Store(fault) => records::errors::Kind::Store(store_error(fault)),
         target::Kind::Schema(fault) => records::errors::Kind::Schema(schema(fault)),
         target::Kind::Decode(fault) => records::errors::Kind::Decode(decode(fault)),
         target::Kind::Repository(why) => records::errors::Kind::Repository(repository(why)),
@@ -397,4 +398,27 @@ pub fn tool(tool: target::Tool) -> records::errors::Tool {
         target::Ended::Stream => out::Ended::Stream,
     };
     out::Tool { command, ended, tail: tool.tail }
+}
+
+fn store_error(error: target::StoreError) -> records::errors::StoreError {
+    use records::errors::{Step, StoreError, StoreFault, StoreLimit};
+    let fault = match error.fault {
+        target::StoreFault::Full { limit, most } => StoreFault::Full {
+            limit: match limit {
+                target::StoreLimit::Resolutions => StoreLimit::Resolutions,
+                target::StoreLimit::CacheFiles => StoreLimit::CacheFiles,
+            },
+            most,
+        },
+        target::StoreFault::Failed { step } => StoreFault::Failed {
+            step: match step {
+                target::Step::List => Step::List,
+                target::Step::Remove => Step::Remove,
+                target::Step::Load => Step::Load,
+                target::Step::Empty => Step::Empty,
+                target::Step::Keep => Step::Keep,
+            },
+        },
+    };
+    StoreError { store: error.store, fault }
 }
