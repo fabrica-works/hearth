@@ -7,3 +7,5 @@ mod printer;
 mod text;
 
 mod progress;
+
+mod secrets;

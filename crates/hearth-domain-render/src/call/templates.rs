@@ -18,6 +18,11 @@ use crate::{
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
 use skein_lib::{List, Map, Queue, Token};
+pub(crate) struct Prepared {
+    pub config: Config,
+    pub expansion: crate::entries::Expansion,
+    pub secrets: parts::secrets::Secrets,
+}
 #[derive(Debug)]
 pub(crate) struct Target {
     meta: Meta,
@@ -25,6 +30,8 @@ pub(crate) struct Target {
     meta_digest: Digest,
     tasks: Box<[schema::Checked]>,
     debian: Value,
+    pub(crate) expansion: crate::entries::Expansion,
+    secrets: parts::secrets::Secrets,
     task: usize,
     rendered: u64,
     entry: usize,
@@ -41,9 +48,10 @@ impl Target {
         meta_digest: Digest,
         checked: schema::Validated,
         debian: Value,
-        config: Config,
+        prepared: Prepared,
         capacity: u32,
     ) -> Self {
+        let Prepared { config, expansion, secrets } = prepared;
         let mut tree = Map::with_capacity(capacity);
         for file in config.tree {
             tree.insert(file.path.clone(), file).expect("tree count");
@@ -54,6 +62,8 @@ impl Target {
             meta_digest,
             tasks: checked.tasks,
             debian,
+            expansion,
+            secrets,
             task: 0,
             rendered: 0,
             entry: 0,
@@ -203,10 +213,14 @@ impl Side {
             files.push(file.clone()).expect("tree count");
         }
         let config = Config { tree: files.into_boxed() };
-        let parts = Box::new([parts::Part {
-            digest: parts::config::digest(&config),
-            record: parts::PartRecord::Config(config),
-        }]);
+        let parts = Box::new([
+            parts::Part { digest: parts::config::digest(&config), record: parts::PartRecord::Config(config) },
+            parts::Part {
+                digest: parts::secrets::digest(&target.secrets),
+                record: parts::PartRecord::Secrets(target.secrets),
+            },
+        ]);
+        drop(target.expansion);
         Some(Answer::Spec(parts::Spec {
             digest: parts::spec_digest(&target.meta_digest, parts.as_ref()),
             meta: target.meta,

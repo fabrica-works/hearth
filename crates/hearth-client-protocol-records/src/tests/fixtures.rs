@@ -359,3 +359,20 @@ pub fn print_error(form: crate::form::Form, error: crate::errors::Error) -> Resu
     };
     crate::form::print(form, &crate::records::Record::Error(error), after, &crate::limits::SHIPPED)
 }
+
+pub fn only_mut<T>(items: &mut [T]) -> &mut T {
+    let [item] = items else { panic!("one item") };
+    item
+}
+pub fn config_mut(spec: &mut Spec) -> &mut Config {
+    for part in &mut spec.parts {
+        match &mut part.record {
+            PartRecord::Config(config) => return config,
+            PartRecord::Secrets(_) => {}
+        }
+    }
+    panic!("config part")
+}
+
+mod secrets;
+pub use secrets::*;

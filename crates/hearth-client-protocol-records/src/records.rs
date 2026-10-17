@@ -59,21 +59,25 @@ pub struct Part {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PartRecord {
     Config(Config),
+    Secrets(crate::parts::secrets::Secrets),
 }
 impl PartRecord {
     pub(crate) fn name(&self) -> &'static [u8] {
         match self {
             Self::Config(_) => b"config",
+            Self::Secrets(_) => b"secrets",
         }
     }
     pub(crate) fn json(&self, json: &mut skein_json::writer::Encoder) {
         match self {
             Self::Config(config) => config.json(json),
+            Self::Secrets(secrets) => secrets.json(json),
         }
     }
     pub(crate) fn text(&self, lines: &mut Lines) {
         match self {
             Self::Config(config) => config.text(lines),
+            Self::Secrets(secrets) => secrets.text(lines),
         }
     }
 }

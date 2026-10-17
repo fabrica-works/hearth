@@ -49,8 +49,8 @@ fn a_task_removed_by_null_in_the_base_env_gives_no_files() {
     let crate::vocabulary::Answer::Spec(spec) = fixtures::answer(&mut call) else {
         panic!("removed task still renders its target")
     };
-    let part = fixtures::only(&spec.parts);
-    let crate::parts::PartRecord::Config(config) = &part.record;
+    let part = fixtures::config_part(&spec.parts);
+    let config = part;
     assert_eq!(config.tree.as_ref(), [], "null removes the task's files");
 }
 

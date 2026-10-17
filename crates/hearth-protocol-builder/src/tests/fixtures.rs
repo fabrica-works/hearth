@@ -760,3 +760,6 @@ pub use keep::*;
 
 mod debian;
 pub use debian::*;
+
+mod secrets;
+pub use secrets::secret_records;

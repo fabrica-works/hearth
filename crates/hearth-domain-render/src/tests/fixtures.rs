@@ -788,3 +788,6 @@ pub use references::*;
 pub mod containers;
 mod debian;
 pub use debian::*;
+
+mod secrets;
+pub use secrets::*;

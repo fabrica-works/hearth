@@ -16,7 +16,7 @@ pub(crate) fn contained(
     checked: &Validated,
     containers: &[crate::compose::Container],
     debian: &Value,
-) -> bool {
+) -> Option<entries::Expansion> {
     let target = context::target(meta, containers);
     let empty = Value::Map(Box::new([]));
     let mut valid = true;
@@ -38,32 +38,39 @@ pub(crate) fn contained(
         }
     }
     if !valid {
-        return false;
+        return None;
     }
+    let mut expanded = skein_lib::List::with_capacity(u32::try_from(checked.tasks.len()).expect("task count"));
     let mut left = limits.expanded;
     for task in &checked.tasks {
         let Some((document, Some(declaration))) = documents.declaration(&task.name) else { continue };
         let context =
             Context { target: &target, debian, settings: &task.settings, tasks: &task.tasks, exports: &empty };
-        if let Err(fault) = entries::expand(declaration, &context, limits, &mut left) {
-            valid = false;
-            let path = documents.path(document);
-            let mut also = None;
-            if let Some(position) = fault.also {
-                also = Some(Place { path: skein_lib::bytes::copy_of(path), position: Some(position) });
+        match entries::expand(declaration, &context, limits, &mut left) {
+            Ok(mut entries) => {
+                entries.task.clone_from(&task.name);
+                expanded.push(entries).expect("task count");
             }
-            errors.push(Error {
-                side: None,
-                kind: fault.kind,
-                class: Class::Configuration,
-                at: Some(Place { path: skein_lib::bytes::copy_of(path), position: Some(fault.at) }),
-                also,
-                target: Some(meta.target.clone()),
-                task: Some(task.name.clone()),
-            });
+            Err(fault) => {
+                valid = false;
+                let path = documents.path(document);
+                let mut also = None;
+                if let Some(position) = fault.also {
+                    also = Some(Place { path: skein_lib::bytes::copy_of(path), position: Some(position) });
+                }
+                errors.push(Error {
+                    side: None,
+                    kind: fault.kind,
+                    class: Class::Configuration,
+                    at: Some(Place { path: skein_lib::bytes::copy_of(path), position: Some(fault.at) }),
+                    also,
+                    target: Some(meta.target.clone()),
+                    task: Some(task.name.clone()),
+                });
+            }
         }
     }
-    valid
+    if valid { Some(entries::Expansion { tasks: expanded.into_boxed() }) } else { None }
 }
 
 #[cfg(test)]
@@ -75,5 +82,5 @@ pub(crate) fn check(
     checked: &Validated,
     debian: &Value,
 ) -> bool {
-    contained(documents, errors, limits, meta, checked, &[], debian)
+    contained(documents, errors, limits, meta, checked, &[], debian).is_some()
 }

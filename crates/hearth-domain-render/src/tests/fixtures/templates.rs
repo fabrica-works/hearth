@@ -67,7 +67,15 @@ pub fn keeping_templates() -> (crate::Render, skein_lib::Env<Limits>, skein_lib:
             }]),
         },
         super::Roots::x1_prod().debian,
-        crate::parts::config::Config { tree: Box::new([]) },
+        crate::call::templates::Prepared {
+            config: crate::parts::config::Config { tree: Box::new([]) },
+            expansion: crate::entries::Expansion { tasks: Box::new([]) },
+            secrets: crate::parts::secrets::Secrets {
+                files: Box::new([]),
+                passwords: Box::new([]),
+                identity: Box::new([]),
+            },
+        },
         5,
     ));
     side.targets = Box::new([]);

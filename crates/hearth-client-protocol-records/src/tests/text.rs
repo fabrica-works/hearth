@@ -24,8 +24,8 @@ fn a_digest_prints_its_first_twelve_lowercase_hex_digits() {
 fn a_mode_prints_as_four_octal_digits() {
     for (mode, expected) in [(0o644, b"0644"), (0o4755, b"4755")] {
         let mut spec = fixtures::x1_prod();
-        let crate::records::PartRecord::Config(config) = &mut spec.parts[0].record;
-        let Node::File { mode: value, .. } = &mut config.tree[0].node;
+        let config = fixtures::config_mut(&mut spec);
+        let Node::File { mode: value, .. } = &mut fixtures::only_mut(&mut config.tree).node;
         *value = mode;
         let printed = form::print(Form::Text, &Record::Spec(spec), None, &limits::SHIPPED).expect("valid spec");
         assert!(skein_lib::bytes::find(&printed, expected).is_some(), "four octal digits for {mode:o}");
@@ -34,8 +34,8 @@ fn a_mode_prints_as_four_octal_digits() {
 #[test]
 fn a_path_past_the_column_widens_it_for_every_entry() {
     let mut spec = fixtures::x1_prod();
-    let crate::records::PartRecord::Config(config) = &mut spec.parts[0].record;
-    let node = config.tree[0].node.clone();
+    let config = fixtures::config_mut(&mut spec);
+    let node = fixtures::only_mut(&mut config.tree).node.clone();
     config.tree = Box::new([
         TreeEntry { path: copy_of(b"/a"), node: node.clone() },
         TreeEntry { path: copy_of(b"/a/very/long/path/past/column"), node },

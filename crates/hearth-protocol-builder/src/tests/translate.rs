@@ -134,7 +134,10 @@ fn spec_back(spec: records::records::Spec) -> Option<render::parts::Spec> {
     let mut translated = skein_lib::List::with_capacity(u32::try_from(parts.len()).expect("bounded parts"));
     for records::records::Part { digest, record } in parts {
         let record = match record {
-            records::records::PartRecord::Config(config) => render::parts::PartRecord::Config(config_back(config)),
+            records::records::PartRecord::Config(config) => {
+                render::parts::PartRecord::Config(config::config_back(config))
+            }
+            records::records::PartRecord::Secrets(value) => render::parts::PartRecord::Secrets(secrets::back(value)),
         };
         translated.push(render::parts::Part { digest: hearth_lib::encode::Digest(digest), record }).expect("part room");
     }
@@ -236,23 +239,6 @@ fn each_client_outcome_translates_and_back() {
     }
 }
 
-fn config_back(config: records::parts::config::Config) -> render::parts::config::Config {
-    let mut tree = skein_lib::List::with_capacity(u32::try_from(config.tree.len()).expect("bounded tree"));
-    for records::parts::config::TreeEntry { path, node } in config.tree {
-        let node = match node {
-            records::parts::config::Node::File { content_digest, mode, owner, group } => {
-                render::parts::config::Node::File {
-                    content_digest: hearth_lib::encode::Digest(content_digest),
-                    mode,
-                    owner,
-                    group,
-                }
-            }
-        };
-        tree.push(render::parts::config::TreeEntry { path, node }).expect("tree room");
-    }
-    render::parts::config::Config { tree: tree.into_boxed() }
-}
 #[test]
 fn a_config_part_translates_to_the_records_and_back() {
     let source = render::parts::Part {
@@ -267,9 +253,9 @@ fn a_config_part_translates_to_the_records_and_back() {
     };
     let records::records::Part { digest, record } = crate::translate::parts::part(source);
     assert_eq!(digest, [7; 32]);
-    let records::records::PartRecord::Config(config) = record;
+    let records::records::PartRecord::Config(config) = record else { panic!("config part") };
     assert_eq!(
-        config_back(config),
+        config::config_back(config),
         render::parts::config::Config {
             tree: Box::new([render::parts::config::TreeEntry {
                 path: skein_lib::bytes::copy_of(b"/etc/motd"),
@@ -798,3 +784,6 @@ mod expansion;
 
 mod debian;
 mod fields;
+
+mod config;
+mod secrets;

@@ -42,8 +42,8 @@ fn the_terminal_record_gives_its_outcome_by_name() {
 #[test]
 fn a_path_that_is_not_utf8_is_refused_as_text() {
     let mut spec = fixtures::x1_prod();
-    let crate::records::PartRecord::Config(config) = &mut spec.parts[0].record;
-    config.tree[0].path = skein_lib::bytes::copy_of(b"/\xff");
+    let config = fixtures::config_mut(&mut spec);
+    fixtures::only_mut(&mut config.tree).path = skein_lib::bytes::copy_of(b"/\xff");
     assert_eq!(
         form::print(Form::JsonLines, &Record::Spec(spec), None, &limits::SHIPPED),
         Err(Refusal::Text),

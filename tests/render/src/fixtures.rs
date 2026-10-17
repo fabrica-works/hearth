@@ -584,3 +584,15 @@ pub fn written_debian() -> hearth_domain_render::revision::Value {
         ),
     }
 }
+
+/// The config part remains identifiable as other parts arrive.
+#[must_use]
+pub fn config_part(parts: &[hearth_domain_render::parts::Part]) -> &hearth_domain_render::parts::config::Config {
+    parts
+        .iter()
+        .find_map(|part| match &part.record {
+            hearth_domain_render::parts::PartRecord::Config(config) => Some(config),
+            hearth_domain_render::parts::PartRecord::Secrets(_) => None,
+        })
+        .expect("config part")
+}

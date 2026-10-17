@@ -2,6 +2,7 @@
 mod debian;
 pub(crate) mod guards;
 mod references;
+mod secrets;
 pub(crate) mod templates;
 mod validation;
 use crate::{
@@ -526,7 +527,7 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
-            if !guards::contained(
+            let Some(expansion) = guards::contained(
                 &self.documents,
                 &mut self.errors,
                 &self.limits,
@@ -534,10 +535,13 @@ impl Side {
                 &checked,
                 &containers,
                 &debian,
-            ) {
+            ) else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
-            }
+            };
+            let Some(secrets) = secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome) else {
+                continue;
+            };
             let Some(config) = self.config(self.settings.get(self.next.saturating_sub(1)).expect("target settings"))
             else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
@@ -549,7 +553,7 @@ impl Side {
                 meta_digest,
                 checked,
                 debian,
-                config,
+                templates::Prepared { config, expansion, secrets },
                 u32::try_from(self.entries.len()).expect("listing count"),
             ));
             return self.template();

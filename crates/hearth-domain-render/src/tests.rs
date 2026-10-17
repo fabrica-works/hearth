@@ -23,3 +23,5 @@ mod entries;
 mod references;
 
 mod debian;
+
+mod secrets;

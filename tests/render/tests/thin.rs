@@ -16,7 +16,7 @@ fn a_targets_meta_is_its_names_and_the_base_envs_placement() {
         assert_eq!(spec.meta, fixtures::x1_prod_meta(), "render.md, 4.4: the target's meta");
         assert_eq!(
             spec.digest,
-            fixtures::digest("e0d142ee5fb0ee79d5e273e4a7839d6201f9134a3abc48206432a3008aa6a009"),
+            fixtures::digest("829eb3fc4903f1afb4bbb31de793bd21f014aabd7dd4d006418879170da9e442"),
             "seed {seed}"
         );
         assert_eq!(run.outcome, Outcome::Done, "seed {seed}");
@@ -192,8 +192,8 @@ fn a_template_and_a_link_are_left_out_of_the_tree() {
     repository.entries.push(link);
     let run = fixtures::render(&repository);
     let Answer::Spec(spec) = only(&run.answers) else { panic!("one target") };
-    let part = only(&spec.parts);
-    let hearth_domain_render::parts::PartRecord::Config(config) = &part.record;
+    let part = hearth_render_world::fixtures::config_part(&spec.parts);
+    let config = part;
     assert_eq!(
         config.tree.as_ref(),
         &[hearth_domain_render::parts::config::TreeEntry {
@@ -217,7 +217,7 @@ fn the_tree_orders_by_installed_path_when_the_suffix_reorders() {
     ]);
     let run = fixtures::render(&repository);
     let Answer::Spec(spec) = only(&run.answers) else { panic!("one spec") };
-    let hearth_domain_render::parts::PartRecord::Config(config) = &only(&spec.parts).record;
+    let config = hearth_render_world::fixtures::config_part(&spec.parts);
     assert_eq!(
         config.tree.iter().map(|entry| entry.path.as_ref()).collect::<Vec<_>>(),
         [b"/etc/a".as_slice(), b"/etc/a-b"]

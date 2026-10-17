@@ -21,7 +21,7 @@ fn json_lines_give_the_version_first_and_the_outcome_last() {
         Some("{\"record\":\"outcome\",\"outcome\":\"done\",\"left_out\":0}"),
         "terminal last"
     );
-    assert_eq!(lines.len(), 5, "version, spec, config, meta and outcome");
+    assert_eq!(lines.len(), 6, "version, spec, config, secrets, meta and outcome");
 }
 #[test]
 fn an_unknown_target_exits_64_after_the_listing() {
@@ -686,5 +686,35 @@ fn a_debian_the_schema_refuses_prints_the_layer_that_set_it() {
 fn a_refused_debian_exits_with_configuration_failure() {
     let repository =
         Repository::make("debian-refused-exit", &fixtures::thin_with(core::slice::from_ref(&fixtures::REFUSED_DEBIAN)));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
+
+#[test]
+fn hearth_render_lists_secrets_passwords_and_identity_by_name_and_place() {
+    let repository = Repository::make("secrets", &fixtures::thin_with(core::slice::from_ref(&fixtures::SECRETS)));
+    let rendered = fixtures::render(&repository, &[], Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["  secret ", "  password ", "  identity "]),
+        concat!(
+            "  secret     mail/dkim/example.org.key /etc/dkimkeys/example.org.key 0640 root:opendkim\n",
+            "  secret     mail/tls/mx1.key /etc/ssl/private/mx1.key 0600 root:root\n",
+            "  password   free users/free.passwd\n",
+            "  identity   ssh-ed25519 ssh-host-key ed25519 /etc/ssh/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key.pub 0600 root:root\n"
+        )
+    );
+}
+#[test]
+fn a_secret_without_a_path_prints_its_fault_at_the_entry() {
+    let repository =
+        Repository::make("secret-no-path", &fixtures::thin_with(core::slice::from_ref(&fixtures::SECRET_NO_PATH)));
+    assert_eq!(
+        fixtures::render(&repository, &[], Form::Text).stdout,
+        b"tasks/motd/task.json:1:14: x1-prod: motd: missing required field path\n"
+    );
+}
+#[test]
+fn a_secret_without_a_path_exits_with_configuration_failure() {
+    let repository =
+        Repository::make("secret-no-path-exit", &fixtures::thin_with(core::slice::from_ref(&fixtures::SECRET_NO_PATH)));
     assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
 }

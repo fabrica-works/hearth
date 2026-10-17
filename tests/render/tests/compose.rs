@@ -1,6 +1,5 @@
 use hearth_domain_render::{
     limits,
-    parts::PartRecord,
     vocabulary::{Answer, Outcome, Request},
 };
 use hearth_render_world::{
@@ -42,7 +41,7 @@ fn fleet_and_environment_keys_never_add_a_task() {
         repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
         let run = parent::run(&repository, &[], seed);
         let Answer::Spec(spec) = only(&run.answers) else { panic!("spec") };
-        let PartRecord::Config(config) = &only(&spec.parts).record;
+        let config = hearth_render_world::fixtures::config_part(&spec.parts);
         assert_eq!(config.tree.as_ref(), [], "seed {seed}");
         assert_eq!(run.requests.len(), 2, "absent tasks are never read, seed {seed}");
     }
