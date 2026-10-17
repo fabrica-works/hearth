@@ -12,9 +12,9 @@ string and typed fields, the kinds' accessors; 16.4: references checked
   3.5, 7.1 to 7.3, 8.3, 8.4.
 - This plan: hearth 04 (Choices, 04.1, 04.2), 36 (36.2), 13 (Choices, 13.2,
   13.4), 14 (Choices), 15 (Choices, 15.1, 15.2), 11, 12 (`Error`), 40 (40.2).
-- skein at `f981746`: `skein-lib`'s `stack.rs` (`with_capacity`:20, `push`:48),
-  `list.rs` (`push`:55, `into_boxed`:104), `map.rs` (`worst_case`:39,
-  `contains_key`:59, `get`:68, `insert`:88), `decimal.rs` (`of`:18,
+- skein at `841f487` (hearth's pin): `skein-lib`'s `stack.rs` (`with_capacity`:22, `push`:50),
+  `list.rs` (`push`:55, `into_boxed`:104), `map.rs` (`worst_case`:41,
+  `contains_key`:61, `get`:70, `insert`:90), `decimal.rs` (`of`:18,
   `as_bytes`:36); `programming-model.md`: 3, 6.3, 8, 10.3.
 
 ## What the design asks
@@ -60,17 +60,20 @@ Scope: format.md 5.9; render.md 3.5's first sentence; `Kind::Guard` (40.2).
 Needs: nothing beyond the session's start (hearth 13, 15).
 Files: render new `src/entries.rs`, `src/revision/declaration.rs`,
 `src/{call, errors, lib}.rs`, new `src/tests/entries.rs`,
-`src/tests/fixtures.rs`; protocol `src/translate/{declarations, errors}.rs`,
-`src/read.rs`, `src/tests/{read, translate, fixtures}.rs`;
+`src/tests/fixtures.rs`; the `Declaration` literals that gain `requires` and
+`entries`: render `src/schema/debian.rs:186`, `src/tests/fixtures/schemas.rs:32`,
+`tests/render/src/schemas.rs:30`; protocol `src/translate/{declarations, errors}.rs`,
+`src/read.rs`, `src/tests/{read, fixtures}.rs`, `src/tests/translate/declarations.rs`
+(the reverse, `schema_back`:70);
 `tests/render/src/{fixtures, parent}.rs`;
 `tests/builder/{src/fixtures.rs, tests/real.rs}`.
 Shape: the sketches. `declaration` compiles each guard's `if` (`Condition`),
 keeps `message` as written, but compiles it too and refuses one that is not
 `Plain`: it holds no `{{`, `{%` or `{#` (format.md, 5.2); a compile error is
 `Refusal { at: the Text, fault: Decode::Syntax }`, which `read.rs` answers as
-13.1's `Refused`. `entries::guards(declaration, roots, limits)` evaluates each guard
+13.1's `Refused`. `entries::guards(declaration, context, limits)` evaluates each guard
 in name order: false (a bare undefined is false, 7.6) is `Kind::Guard` at the
-guard's key; an evaluation fault is `Kind::Evaluation` at the condition. A
+guard's key (`guard.name`'s `at`); an evaluation fault is `Kind::Evaluation` at the condition. A
 target with a schema fault evaluates no guard (13.4 first); one with a fault
 gets no spec, no entries and no template run.
 Test shape: render unit (`src/tests/entries.rs`, under 20 ms, on
@@ -87,7 +90,7 @@ fn a_true_guard_passes_and_a_false_one_errs_at_its_key_with_its_message() {
     ]);
     let guard = Guard { name: Box::from(&b"ssh"[..]), message: Box::from(&b"ssh must listen on 22"[..]) };
     let fault = Fault { kind: Kind::Guard(guard), at: at(3, 5), also: None };
-    assert_eq!(&entries::guards(&declaration, &roots, &limits::SHIPPED)[..], &[fault], "format.md, 5.9: the false one only");
+    assert_eq!(&entries::guards(&declaration, &roots.context(), &limits::SHIPPED)[..], &[fault], "format.md, 5.9: the false one only");
 }
 ```
 Then `every_false_guard_of_every_present_task_errs`,
@@ -121,8 +124,8 @@ for keys alone; `Limits::{expansion, expanded}`; `Kind::Collision`.
 Needs: 16.1; hearth 36.2 (`interpolation::compile`).
 Files: render `src/entries.rs`, `src/revision/declaration.rs`,
 `src/{call, errors, limits}.rs`, `src/tests/{entries, fixtures}.rs`; protocol
-`src/translate/{declarations, errors}.rs`, `src/tests/translate.rs`; records
-`src/errors.rs`, `src/form/{text, json}.rs`, `src/tests/errors.rs`; both
+`src/translate/{declarations, errors}.rs`, `src/tests/translate/{declarations,
+errors}.rs`; records `src/errors.rs`, `src/tests/errors.rs`; both
 fixtures modules; `tests/builder/tests/real.rs`.
 Shape: the sketches. The entry maps translate whole but `fields: _` (16.3).
 `expand` walks each map's entries in key order. Without `for_each`, `if` is
@@ -178,20 +181,24 @@ Needs: nothing beyond 16.2.
 Files: render `src/entries.rs`, new `src/kinds.rs`,
 `src/revision/declaration.rs`, `src/{errors, limits}.rs`,
 `src/tests/{entries, fixtures}.rs`; protocol `src/translate/declarations.rs`,
-`src/tests/translate.rs`; world `tests/render/`: `Cargo.toml`
-(`hearth-protocol-config`), new `src/declarations.rs`,
-`src/{reference, fixtures}.rs`, new `tests/{entries, fuzzy_entries}.rs`,
+`src/tests/translate/declarations.rs`; world `tests/render/`: `Cargo.toml`
+(`hearth-protocol-config`), new `src/declarations.rs`, `src/lib.rs` (`pub mod
+declarations;`), `src/{reference, fixtures}.rs` (`fixtures::limits(rng)`, `:84`,
+varies `made` and `nesting` only: it gains `expansion` and `expanded`), new `tests/{entries, fuzzy_entries}.rs`,
 `tests/memory.rs`; `tests/builder/tests/real.rs`.
 Shape: the sketches. Every field translates (`Text`, `Typed` and `Strings`
 elements through `interpolation::compile`; a `template` field is
 `Literal::Plain`, as written and never interpolated, so that every template
 is used exactly: format.md, 5.5, 2.1; it makes a `Fielded::Text` charged
 as is). `interpolate`: `Plain` as
-written; `Parts` in order, an `Output` a string or an integer (`Decimal`), a
+written; `Parts` in order, each `Output` written by a function of its own
+(`evaluate::output`, `operators.rs:35`, writes a boolean as `true`, which 5.2 refuses), an `Output` a string or an integer (`Decimal`), a
 boolean `Type`, a list or map `Output`, undefined `Undefined` (format.md,
 5.2). A `Text` field of exactly one `Output` that is undefined is absent (a key:
 `Undefined`); a `Typed` field must be exactly one `Output` (else
-`Schema::Wrong` of `name.takes()`) of that type (`Int`, `Bool`, a list of
+`Schema::Wrong { expected }`, `expected` the `TypeName` of `name.takes()`: `Takes`,
+render `errors.rs:269`, maps `Text` to `String`, `Int` to `Int`, `Bool` to `Bool`,
+`Strings` to `List`, `Range` to `Object`) of that type (`Int`, `Bool`, a list of
 strings, a map of integers `base`, `count`), undefined absent. A `Range`'s
 members and a `Strings` element are never absent; `key`, `value` outside a
 `for_each` entry are `Unknown` here too. Each string charges `left`.
@@ -243,15 +250,20 @@ Needs: nothing beyond 16.3.
 Files: render new `src/schema/references.rs`, `src/schema.rs`
 (`declarations` calls it), `src/{call, errors, lib}.rs`,
 `src/tests/{references, fixtures}.rs`; protocol `src/translate/errors.rs`,
-`src/tests/translate.rs`; records `src/errors.rs`, `src/form/{text,
-json}.rs`, `src/tests/errors.rs`; `tests/builder/{src/fixtures.rs,
+`src/tests/translate/errors.rs`, `src/tests/fixtures.rs` (`schema_faults`:460, a
+`[Schema; 19]` at 76c4653: one more per variant); records `src/errors.rs`,
+`src/errors/schema.rs` (the `Schema` printer: `text`:28 and `json`:128 are at
+clippy's 100-line limit, so each new arm is a function of its own),
+`src/tests/errors.rs`, `src/tests/errors/validation.rs`, `src/tests/fixtures.rs`
+(`SchemaInput`:147, `schema_fault`:168); `tests/render/src/schemas.rs` (its
+exhaustive match over `Schema`); `tests/builder/{src/fixtures.rs,
 tests/real.rs}`.
 Shape: `references::check(&Expression, &Declaration)` reads the postfix
 operations once: `settings` then a `Key` (or `String`, `Item`) must be a
 declared setting (`Schema::Undeclared`, 13.4's words); `tasks` then two literal
 names must be a read of that task listing that setting, `exports` then one a
 read with `exports: true` (`Unlisted`); `tasks` then one name straight into
-`is defined` passes for an optional read of that task, else `Unlisted`
+`is defined` or `is not defined` (`Op::NotDefined`) passes for an optional read of that task, else `Unlisted`
 (`setting: None`); `tasks` or `exports` otherwise, or bare, is `Dynamic`;
 `settings[x]` and `settings | tojson` pass, checked at evaluation, and so
 does `exports.<task>` used whole (format.md, 6.4). `Missing` is
@@ -262,10 +274,17 @@ unsound. `references::template` checks every instruction's expression of a
 template (`Output`, `Branch`, `Enter`'s iterable, `Set`), run or not; it runs
 when 15.2 holds the template (the asked targets' tasks only: render.md, 3.3): an
 `Error` at the operation's line and column, `task` set, no `target`. Scripts
-are 18.4's, which calls `template`.
-Test shape: `src/tests/references.rs`, under 20 ms, on a
-`fixtures::declaration` with settings `greeting`, `port` and reads `core`
-(`domain`), `mail` (exports), `wifi` (optional):
+are 18.4's, which calls `template`. Messages (render.md, 7.3's
+`exports.mail is not in mail's reads`): `Unlisted` with a setting prints
+`tasks.<task>.<setting> is not in <reader>'s reads`; with none, root `Exports`,
+`exports.<task> is not in <reader>'s reads`; with none, root `Tasks`,
+`tasks.<task> is not an optional read of <reader>`; `Dynamic` prints `tasks
+takes only literal names` (or `exports …`, format.md, 6.4). JSON as the other
+`Schema` arms, the fields by name.
+Test shape: `src/tests/references.rs`, under 20 ms, on new
+`fixtures::declared_for_references()` (built with `fixtures::declaration`,
+render `src/tests/fixtures.rs:568`), with settings `greeting`, `port` and reads `core`
+(`domain`), `mail` (exports), `wifi` (optional); new `fixtures::expression([..])`:
 ```rust
 // crates/hearth-domain-render/src/tests/references.rs
 #[test]
@@ -282,7 +301,7 @@ Then `tasks_and_exports_references_must_be_in_reads` (a table:
 do not; `exports.mail | tojson` passes; `tasks.core | tojson` and
 `tasks.core[x]` are `Dynamic`), `tasks_and_exports_take_only_literal_names`,
 `a_tasks_name_under_is_defined_passes_for_an_optional_read_only` (`tasks.wifi
-is defined` passes; `tasks.core is defined`, `tasks.nope is defined` are
+is defined` and `tasks.wifi is not defined` pass; `tasks.core is defined`, `tasks.nope is defined` are
 `Unlisted`), `a_reference_under_is_defined_is_checked_too`,
 `a_dynamic_settings_key_is_not_checked`,
 `a_typo_in_an_untaken_branch_of_a_template_is_found_at_its_offset`,
@@ -327,17 +346,18 @@ pub enum Name {
     Home, Kind, Link, Mode, Order, Owner, Param, Password, Path, Paths, PublicPath, Sha256, Shell, Strip, Subordinate,
     Template, Type, Uid, Unit, Unpack, Url, Value,
 }
-impl Name { pub const fn takes(self) -> Takes /* 04.2's table */; pub const fn key(self) -> &'static [u8] /* its JSON key */; }
+impl Name { #[must_use] pub const fn takes(self) -> Takes /* 04.2's table */; #[must_use] pub const fn key(self) -> &'static [u8] /* its JSON key */; }
 
 // crates/hearth-domain-render/src/entries.rs (guards 16.1; expand 16.2; fields, accessors, worst_case 16.3)
 /// Why a task has no concrete entries: the kind, where, and the other place.
 pub struct Fault { pub kind: Kind, pub at: Position, pub also: Option<Position> }
 /// A task's false guards, and those that did not evaluate, in name order.
-pub fn guards(declaration: &Declaration, roots: &Roots, limits: &Limits) -> Box<[Fault]>;
+/// `context` is `evaluate::Context`, as `evaluate::template::run` takes it; a test passes `&roots.context()`.
+#[must_use] pub fn guards(declaration: &Declaration, context: &Context<'_>, limits: &Limits) -> Box<[Fault]>;
 /// A task's entries expanded, charged to `left` (the target's `expanded`); the first fault.
-pub fn expand(declaration: &Declaration, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Expanded, Fault>;
+pub fn expand(declaration: &Declaration, context: &Context<'_>, limits: &Limits, left: &mut u64) -> Result<Expanded, Fault>;
 /// The `key` and `value` of the `index`th element of `entry`'s `for_each`.
-pub fn element<'c>(entry: &Entry, index: u32, roots: &'c Roots, limits: &Limits) -> Result<(Operand<'c>, Operand<'c>), Fault>;
+pub fn element<'c>(entry: &Entry, index: u32, context: &Context<'c>, limits: &Limits) -> Result<(Operand<'c>, Operand<'c>), Fault>;
 /// The most `expand` holds at `limits`; `None` past a u64.
 #[must_use] pub fn worst_case(limits: &Limits) -> Option<u64>;
 /// A target's concrete declarations: its present tasks' (name order), a task's maps' (`Group`: key order).
@@ -362,21 +382,21 @@ pub fn required(entry: &Concrete, name: Name) -> Result<(), Schema>;
 
 // crates/hearth-domain-render/src/schema/references.rs (16.4)
 /// The first reference `expression` makes that `declaration` does not declare, and its operation's `at`.
-pub fn check(expression: &Expression, declaration: &Declaration) -> Option<(Schema, u32)>;
+#[must_use] pub fn check(expression: &Expression, declaration: &Declaration) -> Option<(Schema, u32)>;
 /// Every expression of `declaration`, each at its `Text`: faults for `document` (13.3's `Fault`).
 pub fn declaration(declaration: &Declaration, document: u32, faults: &mut List<Fault>);
 /// The first fault in any instruction's expression of `template` (15.1's), taken or not.
-pub fn template(template: &Template, declaration: &Declaration) -> Option<(Schema, u32)>;
+#[must_use] pub fn template(template: &Template, declaration: &Declaration) -> Option<(Schema, u32)>;
 
 // crates/hearth-domain-render/src/errors.rs: `Kind` gains `Guard(Guard)` (16.1), `Collision(Collision)` (16.2)
 /// format.md 5.9's false guard, as the records' 40.2; and 7.2's `collision` (hearth 22 adds variants).
 pub struct Guard { pub name: Box<[u8]>, pub message: Box<[u8]> }
 pub enum Collision { Key { key: Box<[u8]> } }
-// `Schema` (13) gains, 16.4: `Unlisted { reader: Box<[u8]>, task: Box<[u8]>, setting: Option<Box<[u8]>> }`, `Dynamic { root: Root }`
+// `Schema` (13) gains, 16.4: `Unlisted { reader: Box<[u8]>, root: Root, task: Box<[u8]>, setting: Option<Box<[u8]>> }`, `Dynamic { root: Root }`
 /// The roots that take literal names only (6.4).
 pub enum Root { Tasks, Exports }
 
-// crates/hearth-protocol-builder/src/translate/declarations.rs (13.2's; 16.1 to 16.3); reverses in src/tests/translate.rs
+// crates/hearth-protocol-builder/src/translate/declarations.rs (13.2's; 16.1 to 16.3); reverses in src/tests/translate/{declarations, errors}.rs
 /// A string that does not compile: where (its `Text`), and why.
 pub struct Refusal { pub at: render::revision::Position, pub fault: render::errors::Decode }
 pub fn declaration(declaration: config::declaration::Declaration, limits: &Limits) -> Result<render::revision::declaration::Declaration, Refusal>;
