@@ -1,10 +1,9 @@
 //! Meta's changed fields (render.md, 6.1).
-use crate::diff::{MetaChange, Pair};
+use crate::diff::{MemberPair, MetaChange, NamePair, PlacementPair};
 use crate::{
     form::{json::field, text::Lines},
     parts::meta::Placement,
 };
-use alloc::boxed::Box;
 use skein_json::writer::Encoder;
 enum Value<'a> {
     Bytes(Option<&'a [u8]>),
@@ -12,7 +11,11 @@ enum Value<'a> {
 }
 struct Field<'a> {
     name: &'static [u8],
-    pair: Option<Pair<Value<'a>>>,
+    pair: Option<ValuePair<'a>>,
+}
+struct ValuePair<'a> {
+    before: Value<'a>,
+    after: Value<'a>,
 }
 impl MetaChange {
     fn fields(&self) -> [Field<'_>; 4] {
@@ -25,7 +28,7 @@ impl MetaChange {
     }
     pub(crate) fn text(&self, lines: &mut Lines) {
         for Field { name, pair } in self.fields() {
-            if let Some(Pair { before, after }) = pair {
+            if let Some(ValuePair { before, after }) = pair {
                 lines.put(b"  meta     ~ ");
                 lines.put(name);
                 lines.put(b"  ");
@@ -40,7 +43,7 @@ impl MetaChange {
         json.object_start();
         field(json, b"kind", b"meta");
         for Field { name, pair } in self.fields() {
-            if let Some(Pair { before, after }) = pair {
+            if let Some(ValuePair { before, after }) = pair {
                 json.key(name);
                 json.object_start();
                 json.key(b"before");
@@ -53,9 +56,9 @@ impl MetaChange {
         json.object_end();
     }
 }
-fn bytes(pair: Option<&Pair<Box<[u8]>>>) -> Option<Pair<Value<'_>>> {
+fn bytes(pair: Option<&NamePair>) -> Option<ValuePair<'_>> {
     let pair = pair?;
-    Some(Pair { before: Value::Bytes(Some(&pair.before)), after: Value::Bytes(Some(&pair.after)) })
+    Some(ValuePair { before: Value::Bytes(Some(&pair.before)), after: Value::Bytes(Some(&pair.after)) })
 }
 impl Value<'_> {
     fn text(&self, lines: &mut Lines) {
@@ -74,13 +77,13 @@ impl Value<'_> {
     }
 }
 
-fn member(pair: Option<&Pair<Option<Box<[u8]>>>>) -> Option<Pair<Value<'_>>> {
+fn member(pair: Option<&MemberPair>) -> Option<ValuePair<'_>> {
     let p = pair?;
-    Some(Pair { before: Value::Bytes(p.before.as_deref()), after: Value::Bytes(p.after.as_deref()) })
+    Some(ValuePair { before: Value::Bytes(p.before.as_deref()), after: Value::Bytes(p.after.as_deref()) })
 }
-fn placement(pair: Option<&Pair<Placement>>) -> Option<Pair<Value<'_>>> {
+fn placement(pair: Option<&PlacementPair>) -> Option<ValuePair<'_>> {
     let p = pair?;
-    Some(Pair { before: Value::Placement(&p.before), after: Value::Placement(&p.after) })
+    Some(ValuePair { before: Value::Placement(&p.before), after: Value::Placement(&p.after) })
 }
 
 fn placement_text(p: &Placement, lines: &mut Lines) {

@@ -53,9 +53,9 @@ pub const fn needs(needs: source::Needs) -> target::Needs {
 pub fn part_change(part: source::PartChange) -> target::PartChange {
     match part {
         source::PartChange::Meta(meta) => target::PartChange::Meta(target::MetaChange {
-            base: optional_pair(meta.base),
-            member: optional_pair(meta.member),
-            environment: optional_pair(meta.environment),
+            base: optional_name_pair(meta.base),
+            member: optional_member_pair(meta.member),
+            environment: optional_name_pair(meta.environment),
             placement: optional_placement_pair(meta.placement),
         }),
         source::PartChange::Config(config::Change { tree }) => {
@@ -131,15 +131,17 @@ fn optional_hunks(value: Option<source::Hunks>) -> Option<target::Hunks> {
     Some(hunks(value?))
 }
 
-fn optional_pair<T>(pair: Option<crate::render::parts::meta::Pair<T>>) -> Option<target::Pair<T>> {
+fn optional_name_pair(pair: Option<crate::render::parts::meta::NamePair>) -> Option<target::NamePair> {
     let pair = pair?;
-    Some(target::Pair { before: pair.before, after: pair.after })
+    Some(target::NamePair { before: pair.before, after: pair.after })
 }
-fn optional_placement_pair(
-    pair: Option<crate::render::parts::meta::Pair<crate::render::parts::meta::Placement>>,
-) -> Option<target::Pair<crate::records::parts::meta::Placement>> {
+fn optional_member_pair(pair: Option<crate::render::parts::meta::MemberPair>) -> Option<target::MemberPair> {
     let pair = pair?;
-    Some(target::Pair { before: placement(pair.before), after: placement(pair.after) })
+    Some(target::MemberPair { before: pair.before, after: pair.after })
+}
+fn optional_placement_pair(pair: Option<crate::render::parts::meta::PlacementPair>) -> Option<target::PlacementPair> {
+    let pair = pair?;
+    Some(target::PlacementPair { before: placement(pair.before), after: placement(pair.after) })
 }
 fn optional_firmware(
     firmware: Option<crate::render::revision::Firmware>,

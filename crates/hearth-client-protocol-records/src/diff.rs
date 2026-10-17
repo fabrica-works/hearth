@@ -47,15 +47,25 @@ pub enum PartChange {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct MetaChange {
-    pub base: Option<Pair<Box<[u8]>>>,
-    pub member: Option<Pair<Option<Box<[u8]>>>>,
-    pub environment: Option<Pair<Box<[u8]>>>,
-    pub placement: Option<Pair<crate::parts::meta::Placement>>,
+    pub base: Option<NamePair>,
+    pub member: Option<MemberPair>,
+    pub environment: Option<NamePair>,
+    pub placement: Option<PlacementPair>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Pair<T> {
-    pub before: T,
-    pub after: T,
+pub struct NamePair {
+    pub before: Box<[u8]>,
+    pub after: Box<[u8]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct MemberPair {
+    pub before: Option<Box<[u8]>>,
+    pub after: Option<Box<[u8]>>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct PlacementPair {
+    pub before: crate::parts::meta::Placement,
+    pub after: crate::parts::meta::Placement,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ConfigChange {

@@ -23,23 +23,33 @@ pub struct Placement {
 /// Each changed meta field, before and after (render.md, 6.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Change {
-    pub base: Option<Pair<Box<[u8]>>>,
-    pub member: Option<Pair<Option<Box<[u8]>>>>,
-    pub environment: Option<Pair<Box<[u8]>>>,
-    pub placement: Option<Pair<Placement>>,
+    pub base: Option<NamePair>,
+    pub member: Option<MemberPair>,
+    pub environment: Option<NamePair>,
+    pub placement: Option<PlacementPair>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Pair<T> {
-    pub before: T,
-    pub after: T,
+pub struct NamePair {
+    pub before: Box<[u8]>,
+    pub after: Box<[u8]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct MemberPair {
+    pub before: Option<Box<[u8]>>,
+    pub after: Option<Box<[u8]>>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct PlacementPair {
+    pub before: Placement,
+    pub after: Placement,
 }
 #[must_use]
 pub fn change(before: &Meta, after: &Meta) -> Option<Change> {
     let change = Change {
-        base: pair(&before.base, &after.base),
-        member: pair(&before.member, &after.member),
-        environment: pair(&before.environment, &after.environment),
-        placement: pair(&before.placement, &after.placement),
+        base: name_pair(&before.base, &after.base),
+        member: member_pair(before.member.as_deref(), after.member.as_deref()),
+        environment: name_pair(&before.environment, &after.environment),
+        placement: placement_pair(&before.placement, &after.placement),
     };
     if change.base.is_none() && change.member.is_none() && change.environment.is_none() && change.placement.is_none() {
         None
@@ -47,8 +57,22 @@ pub fn change(before: &Meta, after: &Meta) -> Option<Change> {
         Some(change)
     }
 }
-fn pair<T: Clone + Eq>(before: &T, after: &T) -> Option<Pair<T>> {
-    if before == after { None } else { Some(Pair { before: before.clone(), after: after.clone() }) }
+fn name_pair(before: &[u8], after: &[u8]) -> Option<NamePair> {
+    if before == after { None } else { Some(NamePair { before: before.into(), after: after.into() }) }
+}
+fn member_pair(before: Option<&[u8]>, after: Option<&[u8]>) -> Option<MemberPair> {
+    if before == after {
+        return None;
+    }
+    match (before, after) {
+        (Some(before), Some(after)) => Some(MemberPair { before: Some(before.into()), after: Some(after.into()) }),
+        (Some(before), None) => Some(MemberPair { before: Some(before.into()), after: None }),
+        (None, Some(after)) => Some(MemberPair { before: None, after: Some(after.into()) }),
+        (None, None) => None,
+    }
+}
+fn placement_pair(before: &Placement, after: &Placement) -> Option<PlacementPair> {
+    if before == after { None } else { Some(PlacementPair { before: before.clone(), after: after.clone() }) }
 }
 #[must_use]
 pub fn digest(meta: &Meta) -> Digest {

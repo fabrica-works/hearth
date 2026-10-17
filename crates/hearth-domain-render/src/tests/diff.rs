@@ -239,7 +239,7 @@ fn a_failed_hunks_request_ends_the_call_try_again() {
 
 #[test]
 fn a_meta_change_holds_each_moved_field_before_and_after_and_no_other() {
-    use crate::parts::meta::{self, Pair};
+    use crate::parts::meta::{self, NamePair};
     let before = fixtures::meta();
     let mut after = before.clone();
     after.base = bytes::copy_of(b"x2");
@@ -247,16 +247,16 @@ fn a_meta_change_holds_each_moved_field_before_and_after_and_no_other() {
     assert_eq!(
         meta::change(&before, &after),
         Some(meta::Change {
-            base: Some(Pair { before: bytes::copy_of(b"x1"), after: bytes::copy_of(b"x2") }),
+            base: Some(NamePair { before: bytes::copy_of(b"x1"), after: bytes::copy_of(b"x2") }),
             member: None,
-            environment: Some(Pair { before: bytes::copy_of(b"prod"), after: bytes::copy_of(b"lab") }),
+            environment: Some(NamePair { before: bytes::copy_of(b"prod"), after: bytes::copy_of(b"lab") }),
             placement: None,
         })
     );
 }
 #[test]
 fn a_member_changed_alone_is_a_meta_change_rebuilding_nothing() {
-    use crate::parts::meta::{Change, Pair};
+    use crate::parts::meta::{Change, MemberPair};
     let before = fixtures::spec(b"x1-prod", &[]);
     let mut after = before.clone();
     after.digest = Digest([3; 32]);
@@ -266,7 +266,7 @@ fn a_member_changed_alone_is_a_meta_change_rebuilding_nothing() {
         TargetChange::Changed {
             parts: Box::new([diff::PartChange::Meta(Change {
                 base: None,
-                member: Some(Pair { before: None, after: Some(bytes::copy_of(b"a")) }),
+                member: Some(MemberPair { before: None, after: Some(bytes::copy_of(b"a")) }),
                 environment: None,
                 placement: None,
             })]),

@@ -5,15 +5,19 @@ use crate::{
 };
 pub(super) fn back(change: records::MetaChange) -> meta::Change {
     meta::Change {
-        base: pair_back(change.base),
-        member: pair_back(change.member),
-        environment: pair_back(change.environment),
+        base: name_pair_back(change.base),
+        member: member_pair_back(change.member),
+        environment: name_pair_back(change.environment),
         placement: placement_pair_back(change.placement),
     }
 }
-fn pair_back<T>(pair: Option<records::Pair<T>>) -> Option<meta::Pair<T>> {
+fn name_pair_back(pair: Option<records::NamePair>) -> Option<meta::NamePair> {
     let pair = pair?;
-    Some(meta::Pair { before: pair.before, after: pair.after })
+    Some(meta::NamePair { before: pair.before, after: pair.after })
+}
+fn member_pair_back(pair: Option<records::MemberPair>) -> Option<meta::MemberPair> {
+    let pair = pair?;
+    Some(meta::MemberPair { before: pair.before, after: pair.after })
 }
 fn placement_back(value: crate::records::parts::meta::Placement) -> meta::Placement {
     meta::Placement {
@@ -33,11 +37,9 @@ fn each_meta_change_translates_and_back() {
     }
 }
 
-fn placement_pair_back(
-    pair: Option<records::Pair<crate::records::parts::meta::Placement>>,
-) -> Option<meta::Pair<meta::Placement>> {
+fn placement_pair_back(pair: Option<records::PlacementPair>) -> Option<meta::PlacementPair> {
     let pair = pair?;
-    Some(meta::Pair { before: placement_back(pair.before), after: placement_back(pair.after) })
+    Some(meta::PlacementPair { before: placement_back(pair.before), after: placement_back(pair.after) })
 }
 
 const ERROR_SIDES: &[(Option<diff::Side>, Option<records::Side>)] = &[

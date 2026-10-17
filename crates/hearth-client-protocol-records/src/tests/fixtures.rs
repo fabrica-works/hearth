@@ -252,15 +252,15 @@ pub fn syntax_error(syntax: crate::errors::Syntax) -> crate::errors::Error {
 #[must_use]
 pub fn meta_changes() -> [crate::diff::MetaChange; 2] {
     use crate::{
-        diff::{MetaChange, Pair},
+        diff::{MemberPair, MetaChange, NamePair, PlacementPair},
         parts::meta::{Firmware, Placement, PlacementKind},
     };
     [
         MetaChange {
-            base: Some(Pair { before: b"x1".as_slice().into(), after: b"x2".as_slice().into() }),
-            member: Some(Pair { before: None, after: Some(b"a".as_slice().into()) }),
-            environment: Some(Pair { before: b"prod".as_slice().into(), after: b"lab".as_slice().into() }),
-            placement: Some(Pair {
+            base: Some(NamePair { before: b"x1".as_slice().into(), after: b"x2".as_slice().into() }),
+            member: Some(MemberPair { before: None, after: Some(b"a".as_slice().into()) }),
+            environment: Some(NamePair { before: b"prod".as_slice().into(), after: b"lab".as_slice().into() }),
+            placement: Some(PlacementPair {
                 before: Placement {
                     kind: PlacementKind::Metal,
                     firmware: Some(Firmware::Efi),
@@ -277,7 +277,7 @@ pub fn meta_changes() -> [crate::diff::MetaChange; 2] {
         },
         MetaChange {
             base: None,
-            member: Some(Pair { before: Some(b"a".as_slice().into()), after: None }),
+            member: Some(MemberPair { before: Some(b"a".as_slice().into()), after: None }),
             environment: None,
             placement: None,
         },

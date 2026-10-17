@@ -687,15 +687,15 @@ pub fn every_syntax() -> [hearth_protocol_template::error::ErrorKind; 19] {
 #[must_use]
 pub fn meta_changes() -> [render::parts::meta::Change; 2] {
     use crate::render::{
-        parts::meta::{Change, Pair, Placement},
+        parts::meta::{Change, MemberPair, NamePair, Placement, PlacementPair},
         revision::{Firmware, Runs},
     };
     [
         Change {
-            base: Some(Pair { before: b"x1".as_slice().into(), after: b"x2".as_slice().into() }),
-            member: Some(Pair { before: None, after: Some(b"a".as_slice().into()) }),
-            environment: Some(Pair { before: b"lab".as_slice().into(), after: b"prod".as_slice().into() }),
-            placement: Some(Pair {
+            base: Some(NamePair { before: b"x1".as_slice().into(), after: b"x2".as_slice().into() }),
+            member: Some(MemberPair { before: None, after: Some(b"a".as_slice().into()) }),
+            environment: Some(NamePair { before: b"lab".as_slice().into(), after: b"prod".as_slice().into() }),
+            placement: Some(PlacementPair {
                 before: Placement { kind: Runs::Metal, firmware: Some(Firmware::Efi), hardware: None, on: None },
                 after: Placement {
                     kind: Runs::Container,
@@ -707,7 +707,7 @@ pub fn meta_changes() -> [render::parts::meta::Change; 2] {
         },
         Change {
             base: None,
-            member: Some(Pair { before: Some(b"a".as_slice().into()), after: None }),
+            member: Some(MemberPair { before: Some(b"a".as_slice().into()), after: None }),
             environment: None,
             placement: None,
         },
