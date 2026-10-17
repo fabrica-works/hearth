@@ -341,6 +341,17 @@ the closing repins (Repin). The increments of each session are in its file.
   or asserts the value as a literal, never `values[0]` or `TABLE[2]`. An
   increment that edits a test file first fixes its one-row tables and
   constant-index reads.
+- **A test's call or expected value written once** (ruling 159; the
+  checks of 20:18 and 21:18 saw it twice): a call or an expected block
+  that two tests write is one function in the crate's `src/tests/fixtures`
+  (render `fixtures/entries.rs`: `expanded(declared)`,
+  `expansion_fault(declared)`, `evaluation_fault(kind, at)`), called from
+  each; a limit's neighbours are `LIMIT - 1` and `LIMIT + 1` of its named
+  constant (`THREE_ENTRIES.expansion`), never a bare 3, 4 or 6; an
+  expanded list is asserted whole, or read with the fixtures' `only`,
+  never as `let [a, b] = ..`; a digest written in two tests is a `const`
+  of the crate's fixtures (`ABC_SHA256_HEX`, beside builder's `ABC`). An
+  increment that edits a test file first fixes the repeats in it.
 - **A round trip's expected value is its input** (ruling 144): a test
   named `…_and_back` asserts `assert_eq!(back, input, "row {row}: …")`.
   Its input table holds two or more rows: a `const` slice when its
