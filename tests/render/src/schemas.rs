@@ -32,6 +32,7 @@ pub fn declaration(rng: &mut Rng, shape: Shape) -> Declaration {
         types: types.into_boxed_slice(),
         settings: Box::new([spec]),
         requires: Box::new([]),
+        exports: Box::new([]),
         entries: Box::new([]),
         reads: Box::new([]),
     }
@@ -381,6 +382,7 @@ fn checked(
 #[must_use]
 pub const fn kind(schema: &Schema) -> &'static str {
     match schema {
+        Schema::Export { .. } => "export",
         Schema::Wrong { .. } => "wrong",
         Schema::Enum { .. } => "enum",
         Schema::Below { .. } => "below",

@@ -8,7 +8,7 @@ use crate::{
 use alloc::boxed::Box;
 use skein_json::writer::{Encoder, Limits, Refusal as JsonRefusal};
 use skein_lib::{List, Writer};
-const DEPTH: u32 = 16;
+pub(crate) const DEPTH: u32 = 64;
 pub(crate) fn print(record: &Record, after: Option<Type>, most: u32) -> Result<Box<[u8]>, Refusal> {
     let limits = Limits { depth: DEPTH, length: most };
     let count = match record {

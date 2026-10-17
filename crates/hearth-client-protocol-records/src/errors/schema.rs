@@ -35,6 +35,7 @@ impl Format {
 impl Schema {
     pub(super) fn text(&self, lines: &mut Lines, task: Option<&[u8]>) {
         match self {
+            Self::Export { fault } => export_text(lines, *fault),
             Self::Unlisted { reader, root, task, setting } => {
                 unlisted_text(lines, reader, *root, task, setting.as_deref());
             }
@@ -126,6 +127,7 @@ impl Schema {
     pub(super) fn json(&self, json: &mut Encoder) {
         json.object_start();
         match self {
+            Self::Export { fault } => export_json(json, *fault),
             Self::Unlisted { reader, root, task, setting } => {
                 unlisted_json(json, reader, *root, task, setting.as_deref());
             }
@@ -215,11 +217,7 @@ impl Schema {
             }
             Self::Unread { task, setting, declared } => {
                 json.key(b"declared");
-                json.array_start();
-                for name in declared {
-                    json.string(name);
-                }
-                json.array_end();
+                json_names(json, declared);
                 field(json, b"kind", b"unread");
                 field(json, b"setting", setting);
                 field(json, b"task", task);
@@ -233,6 +231,7 @@ impl super::Root {
     fn name(self) -> &'static [u8] {
         match self {
             Self::Tasks => b"tasks",
+            Self::Debian => b"debian",
             Self::Exports => b"exports",
         }
     }
@@ -277,6 +276,26 @@ fn dynamic_json(json: &mut Encoder, root: super::Root) {
     field(json, b"root", root.name());
 }
 
+fn export_text(lines: &mut Lines, fault: super::ExportFault) {
+    match fault {
+        super::ExportFault::Form => lines.put(b"an export's value must be one {{ }} tag"),
+        super::ExportFault::Root { root } => {
+            lines.put(b"an export reads settings and target alone, not ");
+            lines.put(root.name());
+        }
+    }
+}
+fn export_json(json: &mut Encoder, fault: super::ExportFault) {
+    field(json, b"kind", b"export");
+    match fault {
+        super::ExportFault::Form => field(json, b"fault", b"form"),
+        super::ExportFault::Root { root } => {
+            field(json, b"fault", b"root");
+            field(json, b"root", root.name());
+        }
+    }
+}
+
 fn unread_text(lines: &mut Lines, task: &[u8], setting: &[u8], declared: &[Box<[u8]>]) {
     lines.put(b"reads ");
     lines.put(task);
@@ -290,12 +309,7 @@ fn unread_text(lines: &mut Lines, task: &[u8], setting: &[u8], declared: &[Box<[
         lines.put(b" declares no settings");
     } else {
         lines.put(b" declares ");
-        for (index, name) in declared.iter().enumerate() {
-            if index != 0 {
-                lines.put(b", ");
-            }
-            lines.put(name);
-        }
+        names(lines, declared);
     }
 }
 fn component_text(lines: &mut Lines, package: &[u8], component: &[u8]) {

@@ -175,3 +175,23 @@ pub(super) fn targets(targets: &[Target], environment: &[u8]) -> Box<[Box<[u8]>]
     }
     names.into_boxed()
 }
+
+pub(super) fn checked(
+    settings: &compose::Settings,
+    revision: &crate::schema::Revision<'_>,
+    target: &Target,
+    targets: &[Target],
+    validator: &mut crate::schema::Validator,
+    mut left: u64,
+    errors: &mut errors::Collector,
+) -> Option<crate::schema::Validated> {
+    let names = self::targets(targets, &target.environment);
+    let check = crate::schema::Check::Target { environment: &target.environment, targets: &names };
+    let mut faults = List::with_capacity(16);
+    let checked = crate::schema::validate(settings, revision, &check, validator, &mut left, &mut faults);
+    schema_errors(errors, revision.documents, Some(&target.name), &faults);
+    if validator.limited() {
+        errors::push(errors, limit(&target.name));
+    }
+    checked
+}

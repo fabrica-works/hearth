@@ -188,6 +188,7 @@ fn declaration() -> Declaration {
         types,
         settings: Box::new([]),
         requires: Box::new([]),
+        exports: Box::new([]),
         entries: Box::new([]),
         reads: Box::new([]),
     }

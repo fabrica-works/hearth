@@ -14,7 +14,7 @@ pub fn declaration(
         reads,
         requires,
         scripts: _,
-        exports: _,
+        exports,
         bless: _,
         entries,
     } = declaration;
@@ -36,12 +36,17 @@ pub fn declaration(
     for written in entries {
         maps.push(self::entries(written, &limits.template)?).expect("map count");
     }
+    let mut published = List::with_capacity(u32::try_from(exports.len()).expect("export count"));
+    for written in exports {
+        published.push(export(written, &limits.template)?).expect("export count");
+    }
     Ok(target::Declaration {
         at: position(at),
         types: translated.into_boxed(),
         settings: specs(settings, limits),
         reads: translated_reads.into_boxed(),
         requires: guards.into_boxed(),
+        exports: published.into_boxed(),
         entries: maps.into_boxed(),
     })
 }
@@ -283,4 +288,12 @@ pub fn name(name: config::entries::Name) -> target::Name {
         config::entries::Name::Url => target::Name::Url,
         config::entries::Name::Value => target::Name::Value,
     }
+}
+
+pub fn export(
+    written: config::schema::Export,
+    limits: &hearth_protocol_template::limits::Limits,
+) -> Result<target::Export, Refusal> {
+    let config::schema::Export { name, at, ty, optional, value } = written;
+    Ok(target::Export { name: text(name), at: position(at), ty, optional, value: interpolated(value, limits)? })
 }

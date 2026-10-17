@@ -368,7 +368,11 @@ pub fn config_mut(spec: &mut Spec) -> &mut Config {
     for part in &mut spec.parts {
         match &mut part.record {
             PartRecord::Config(config) => return config,
-            PartRecord::Secrets(_) | PartRecord::Live(_) | PartRecord::Packages(_) | PartRecord::Boot(_) => {}
+            PartRecord::Secrets(_)
+            | PartRecord::Live(_)
+            | PartRecord::Packages(_)
+            | PartRecord::Boot(_)
+            | PartRecord::Exports(_) => {}
         }
     }
     panic!("config part")
@@ -407,3 +411,5 @@ pub fn repository_error(why: crate::errors::Repository) -> crate::errors::Error 
     error.also = None;
     error
 }
+mod exports;
+pub use exports::*;

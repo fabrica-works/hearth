@@ -69,6 +69,9 @@ fn each_form_translates_to_render_and_back() {
 }
 fn schema_back(schema: crate::records::errors::Schema) -> render::errors::Schema {
     match schema {
+        crate::records::errors::Schema::Export { fault } => {
+            render::errors::Schema::Export { fault: super::exports::fault_back(fault) }
+        }
         crate::records::errors::Schema::Unlisted { reader, root, task, setting } => {
             render::errors::Schema::Unlisted { reader, root: reference_root_back(root), task, setting }
         }
@@ -254,6 +257,7 @@ fn a_declarations_requires_cross_to_render_and_back() {
 
 fn reference_root_back(root: crate::records::errors::Root) -> render::errors::Root {
     match root {
+        crate::records::errors::Root::Debian => render::errors::Root::Debian,
         crate::records::errors::Root::Tasks => render::errors::Root::Tasks,
         crate::records::errors::Root::Exports => render::errors::Root::Exports,
     }

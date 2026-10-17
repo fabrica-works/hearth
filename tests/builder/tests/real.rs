@@ -21,7 +21,11 @@ fn json_lines_give_the_version_first_and_the_outcome_last() {
         Some("{\"record\":\"outcome\",\"outcome\":\"done\",\"left_out\":0}"),
         "terminal last"
     );
-    assert_eq!(lines.len(), 9, "version, spec, boot, packages, config, secrets, live, meta and outcome");
+    assert_eq!(
+        lines.len(),
+        fixtures::THIN_RECORDS,
+        "version, spec, boot, packages, config, secrets, live, exports, meta and outcome"
+    );
 }
 #[test]
 fn an_unknown_target_exits_64_after_the_listing() {
@@ -788,3 +792,6 @@ fn hearth_render_lists_each_path_with_its_consumers() {
 }
 #[path = "real/boot.rs"]
 mod boot;
+
+#[path = "real/exports.rs"]
+mod exports;

@@ -94,7 +94,7 @@ pub(super) fn seconds(value: &[u8]) -> Option<i64> {
     }
     number.checked_mul(factor)
 }
-pub(super) fn fault(value: &Composed, form: &Form, check: &Check<'_>, listing: &[Entry], max: u64) -> Option<Schema> {
+pub(crate) fn fault(value: &Composed, form: &Form, check: &Check<'_>, listing: &[Entry], max: u64) -> Option<Schema> {
     let Composite::String(value) = &value.kind else {
         return None;
     };

@@ -26,12 +26,14 @@ pub(crate) struct Prepared {
     pub packages: parts::packages::Packages,
     pub live: parts::live::Live,
     pub boot: parts::boot::Boot,
+    pub exports: parts::exports::Exports,
 }
 #[derive(Debug)]
 pub(crate) struct Target {
     meta: Meta,
     containers: Box<[crate::compose::Container]>,
     meta_digest: Digest,
+    exports: parts::exports::Exports,
     tasks: Box<[schema::Checked]>,
     debian: Value,
     pub(crate) expansion: crate::entries::Expansion,
@@ -59,7 +61,7 @@ impl Target {
         prepared: Prepared,
         capacity: u32,
     ) -> Self {
-        let Prepared { plans, expansion, secrets, packages, live, boot } = prepared;
+        let Prepared { plans, expansion, secrets, packages, live, boot, exports } = prepared;
         let mut tree = Map::with_capacity(capacity);
         for plan in &plans {
             for install in &plan.installs {
@@ -92,6 +94,7 @@ impl Target {
             meta,
             containers,
             meta_digest,
+            exports,
             tasks: checked.tasks,
             debian,
             expansion,
@@ -274,6 +277,10 @@ impl Side {
                 record: parts::PartRecord::Secrets(target.secrets),
             },
             parts::Part { digest: parts::live::digest(&target.live), record: parts::PartRecord::Live(target.live) },
+            parts::Part {
+                digest: parts::exports::digest(&target.exports),
+                record: parts::PartRecord::Exports(target.exports),
+            },
         ]);
         drop(target.expansion);
         Some(Answer::Spec(parts::Spec {

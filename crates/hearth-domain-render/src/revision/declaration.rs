@@ -37,6 +37,7 @@ pub struct Declaration {
     pub settings: Box<[Spec]>,
     pub reads: Box<[Read]>,
     pub requires: Box<[Guard]>,
+    pub exports: Box<[Export]>,
     pub entries: Box<[Entries]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -258,4 +259,14 @@ impl Name {
             Self::Value => b"value",
         }
     }
+}
+
+/// One typed public value (format.md, 8.1).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Export {
+    pub name: Text,
+    pub at: Position,
+    pub ty: u32,
+    pub optional: bool,
+    pub value: Interpolated,
 }

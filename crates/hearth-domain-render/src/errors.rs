@@ -284,6 +284,7 @@ pub enum Takes {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Schema {
     Source { first: revision::declaration::Name, second: revision::declaration::Name },
+    Export { fault: ExportFault },
     Unlisted { reader: Box<[u8]>, root: Root, task: Box<[u8]>, setting: Option<Box<[u8]>> },
     Dynamic { root: Root },
     Task { task: Box<[u8]> },
@@ -458,6 +459,13 @@ pub enum Collision {
 /// Reference roots restricted to literal names (format.md, 6.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Root {
+    Debian,
     Tasks,
     Exports,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ExportFault {
+    Form,
+    Root { root: Root },
 }

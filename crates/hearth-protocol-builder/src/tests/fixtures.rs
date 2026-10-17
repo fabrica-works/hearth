@@ -766,6 +766,8 @@ pub use live::{live_records, live_specs};
 mod secrets;
 pub use secrets::secret_records;
 
+mod exports;
 pub mod files;
 mod packages;
+pub use exports::*;
 pub use packages::*;

@@ -111,5 +111,21 @@ pub fn template_prepared(
         },
         packages: super::thin_packages(),
         live: crate::parts::live::Live { paths: Box::new([]) },
+        exports: crate::parts::exports::build(Box::new([])),
     }
+}
+
+/// Drives internal progress until the next answer.
+pub fn answer(call: &mut crate::call::Side) -> crate::vocabulary::Answer {
+    for _ in 0_u32..100 {
+        if let Some(answer) = call.answer() {
+            return answer;
+        }
+        let mut out = skein_lib::Queue::with_capacity(1);
+        call.template_request(&mut out);
+        if let Some(crate::vocabulary::Output::Request(crate::vocabulary::Request::Keep { sha256, .. })) = out.pop() {
+            call.kept(Some(sha256));
+        }
+    }
+    panic!("fixture answer bound")
 }

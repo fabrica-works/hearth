@@ -143,6 +143,7 @@ pub fn with_task() -> Repository {
             types: Box::new([]),
             settings: Box::new([]),
             requires: Box::new([]),
+            exports: Box::new([]),
             entries: Box::new([]),
             reads: Box::new([]),
         }),
@@ -302,6 +303,7 @@ fn with_default_setting(form: hearth_domain_render::revision::declaration::Form,
             at,
             types: Box::new([Type { at, form }]),
             requires: Box::new([]),
+            exports: Box::new([]),
             entries: Box::new([]),
             reads: Box::new([]),
             settings: Box::new([Spec {
@@ -595,7 +597,8 @@ pub fn config_part(parts: &[hearth_domain_render::parts::Part]) -> &hearth_domai
             hearth_domain_render::parts::PartRecord::Secrets(_)
             | hearth_domain_render::parts::PartRecord::Live(_)
             | hearth_domain_render::parts::PartRecord::Packages(_)
-            | hearth_domain_render::parts::PartRecord::Boot(_) => None,
+            | hearth_domain_render::parts::PartRecord::Boot(_)
+            | hearth_domain_render::parts::PartRecord::Exports(_) => None,
         })
         .expect("config part")
 }

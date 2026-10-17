@@ -22,7 +22,7 @@ fn a_digest_prints_its_first_twelve_lowercase_hex_digits() {
 }
 #[test]
 fn a_mode_prints_as_four_octal_digits() {
-    for (mode, expected) in [(0o644, b"0644"), (0o4755, b"4755")] {
+    for &(mode, expected) in MODES {
         let mut spec = fixtures::x1_prod();
         let config = fixtures::config_mut(&mut spec);
         let Node::File { mode: value, .. } = &mut fixtures::only_mut(&mut config.tree).node else {
@@ -126,3 +126,4 @@ fn a_link_and_a_directory_print_after_the_files_columns() {
         .as_bytes()
     );
 }
+const MODES: &[(u16, &[u8])] = &[(0o644, b"0644"), (0o4755, b"4755")];

@@ -160,7 +160,7 @@ fn run(repository: &Repository, call: Call, form: Form, store: Option<&Path>) ->
     run_holding(repository, call, form, store, &hearth::limits(), Release::After(skein_lib::Duration::ZERO)).rendered
 }
 
-pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         6efeb9c0ea2a\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\n";
+pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         6bc0dd7fe1dd\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n";
 
 mod binary;
 pub use binary::{Ended, binary};
@@ -437,7 +437,7 @@ pub fn broken_task() -> Vec<File> {
     files
 }
 pub const BROKEN_LAB_TEXT: &str = concat!(
-    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         6efeb9c0ea2a\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\n",
+    "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         6bc0dd7fe1dd\nboot         part bc6cab417252\n  mutable    false\npackages     part de38a7ed6276\n  sources    forky amd64 main 20261001T030405Z\n  variant    apt\n  microcode  generic\n  apt        install_recommends false\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\nsecrets      part ac870b5c968e\nlive         part 6f1b7fda0c21\nexports      part 970579fd41be\n",
     "\nenvs/lab.json:1:14: duplicate key \"motd\" (envs/lab.json:1:2)\n"
 );
 pub const D1: hearth::service::domain::render::vocabulary::Digest =
@@ -761,6 +761,11 @@ impl File {
         Self { path, body: target, mode: 0o120_000 }
     }
 }
+mod exports;
 pub mod files;
 mod packages;
+pub use exports::*;
 pub use packages::*;
+
+/// Version, spec, meta, boot, packages, config, secrets, live, exports and outcome.
+pub const THIN_RECORDS: usize = 10;

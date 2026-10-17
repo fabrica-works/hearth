@@ -349,6 +349,12 @@ pub fn schema(schema: target::Schema) -> records::errors::Schema {
             first: skein_lib::bytes::copy_of(first.key()),
             second: skein_lib::bytes::copy_of(second.key()),
         },
+        target::Schema::Export { fault } => records::errors::Schema::Export {
+            fault: match fault {
+                target::ExportFault::Form => records::errors::ExportFault::Form,
+                target::ExportFault::Root { root } => records::errors::ExportFault::Root { root: reference_root(root) },
+            },
+        },
         target::Schema::Dynamic { root } => records::errors::Schema::Dynamic { root: reference_root(root) },
         target::Schema::Malformed { format } => records::errors::Schema::Malformed { format: self::format(format) },
         target::Schema::Target { name, environment } => records::errors::Schema::Target { name, environment },
@@ -626,6 +632,7 @@ pub fn format(format: target::Format) -> records::errors::Format {
 
 fn reference_root(root: target::Root) -> records::errors::Root {
     match root {
+        target::Root::Debian => records::errors::Root::Debian,
         target::Root::Tasks => records::errors::Root::Tasks,
         target::Root::Exports => records::errors::Root::Exports,
     }

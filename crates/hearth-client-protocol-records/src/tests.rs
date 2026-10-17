@@ -6,6 +6,7 @@ mod outcome;
 mod printer;
 mod text;
 
+mod exports;
 mod progress;
 
 mod live;

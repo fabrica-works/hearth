@@ -577,6 +577,7 @@ pub fn declaration(
         settings: settings.into(),
         reads: reads.into(),
         requires: Box::new([]),
+        exports: Box::new([]),
         entries: Box::new([]),
     }
 }
@@ -761,20 +762,6 @@ pub use discovery::{
     container_documents, member_documents, member_layers, members, retain_task, rule_document, with_document,
 };
 
-/// Drives internal progress until the next answer.
-pub fn answer(call: &mut crate::call::Side) -> crate::vocabulary::Answer {
-    for _ in 0_u32..100 {
-        if let Some(answer) = call.answer() {
-            return answer;
-        }
-        let mut out = skein_lib::Queue::with_capacity(1);
-        call.template_request(&mut out);
-        if let Some(crate::vocabulary::Output::Request(crate::vocabulary::Request::Keep { sha256, .. })) = out.pop() {
-            call.kept(Some(sha256));
-        }
-    }
-    panic!("fixture answer bound")
-}
 mod templates;
 pub use templates::*;
 
@@ -797,3 +784,6 @@ pub use secrets::*;
 pub mod kinds;
 mod packages;
 pub use packages::*;
+
+mod exports;
+pub use exports::*;

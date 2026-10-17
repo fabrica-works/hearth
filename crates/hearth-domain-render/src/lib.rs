@@ -125,3 +125,5 @@ mod tests;
 fn failure_place(path: Option<Box<[u8]>>) -> Option<errors::Place> {
     Some(errors::Place { path: path?, position: None })
 }
+
+pub mod exports;

@@ -1,5 +1,6 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
 mod debian;
+mod exports;
 mod files;
 pub(crate) mod guards;
 mod packages;
@@ -17,7 +18,6 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_lib::{List, Map, Queue, Token};
-use validation::schema_errors;
 pub(crate) type Sizes = Map<hearth_lib::encode::Digest, u64>;
 #[derive(Debug)]
 pub(crate) struct Side {
@@ -465,23 +465,15 @@ impl Side {
             let meta = compose::metadata(target, p.clone());
             let meta_digest = meta::digest(&meta);
             let settings = self.settings.get(self.next.saturating_sub(1)).expect("target settings");
-            let names = validation::targets(&self.targets, &target.environment);
-            let check = crate::schema::Check::Target { environment: &target.environment, targets: &names };
-            let mut faults = List::with_capacity(16);
-            let available = self.validated;
-            let checked = crate::schema::validate(
+            let checked = validation::checked(
                 settings,
                 &revision,
-                &check,
+                target,
+                &self.targets,
                 &mut self.validator,
-                &mut self.validated,
-                &mut faults,
+                self.validated,
+                &mut self.errors,
             );
-            self.validated = available;
-            schema_errors(&mut self.errors, &self.documents, Some(&target.name), &faults);
-            if self.validator.limited() {
-                errors::push(&mut self.errors, validation::limit(&target.name));
-            }
             let Some(checked) = checked else {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
@@ -489,15 +481,22 @@ impl Side {
             let Some((debian, set)) = debian::check(&self.documents, &mut self.merge, &mut self.errors, target) else {
                 continue;
             };
-            let Some(expansion) = guards::contained(
-                &self.documents,
-                &mut self.errors,
-                &self.limits,
+            let Some((exports, left)) = exports::prepare(
                 &meta,
                 &checked,
                 &containers,
-                &debian,
+                &revision,
+                &self.targets,
+                &self.limits,
+                &mut self.errors,
             ) else {
+                continue;
+            };
+            let limits = Limits { expanded: left, ..self.limits };
+            let Some(expansion) =
+                guards::contained(&self.documents, &mut self.errors, &limits, &meta, &checked, &containers, &debian)
+            else {
+                self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
             let Some((packages, boot)) =
@@ -522,7 +521,7 @@ impl Side {
                 meta_digest,
                 checked,
                 debian,
-                templates::Prepared { plans, expansion, secrets, packages, live, boot },
+                templates::Prepared { plans, expansion, secrets, packages, live, boot, exports },
                 capacity,
             ));
             return self.template();

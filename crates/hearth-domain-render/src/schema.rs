@@ -110,6 +110,7 @@ pub fn declarations(
         }
         let mut references = List::with_capacity(16);
         references::declaration(declaration, document, &mut references);
+        crate::exports::check(declaration, document, &mut references);
         for fault in &references {
             let mut fault = fault.clone();
             if let Schema::Unlisted { reader, root: _, task: _, setting: _ } = &mut fault.schema {
@@ -497,7 +498,7 @@ fn default_value<'a>(defaults: &'a TaskDefaults, spec: &Spec) -> Option<&'a Defa
     }
     None
 }
-fn fault(faults: &mut List<Fault>, from: Provenance, schema: Schema) {
+pub(crate) fn fault(faults: &mut List<Fault>, from: Provenance, schema: Schema) {
     if faults.room() == 0 {
         let mut larger = List::with_capacity(faults.capacity().max(1).saturating_mul(2));
         for fault in &*faults {
@@ -514,7 +515,7 @@ fn field_names(fields: &[Spec]) -> Box<[Box<[u8]>]> {
     }
     names.into_boxed()
 }
-fn type_fault(kind: &Composite, form: &Form, spec: Option<&Spec>) -> Option<Schema> {
+pub(crate) fn type_fault(kind: &Composite, form: &Form, spec: Option<&Spec>) -> Option<Schema> {
     use crate::errors::TypeName;
     let kind_tag: u8 = match kind {
         Composite::Bool(_) => 0,

@@ -25,8 +25,8 @@ pub fn users() -> Declaration {
     let password = Spec { optional: true, ..schema_spec(b"password", 4) };
     let shell = Spec { default: Some(string(at(1, 30), b"/bin/bash")), ..schema_spec(b"shell", 5) };
     let uid = Spec {
-        min: Some(Number { at: at(1, 40), value: 1000 }),
-        max: Some(Number { at: at(1, 50), value: 59999 }),
+        min: Some(Number { at: at(1, 40), value: super::MIN_UID }),
+        max: Some(Number { at: at(1, 50), value: super::MAX_UID }),
         ..schema_spec(b"uid", 6)
     };
     Declaration {
@@ -42,6 +42,7 @@ pub fn users() -> Declaration {
         ]),
         settings: Box::new([Spec { default: Some(map(at(1, 60), &[])), ..schema_spec(b"accounts", 0) }]),
         requires: Box::new([]),
+        exports: Box::new([]),
         entries: Box::new([]),
         reads: Box::new([]),
     }
@@ -248,7 +249,7 @@ pub fn nulled_accounts() -> (Declaration, Layers) {
     declaration.settings = Box::new([Spec {
         default: Some(map(
             at(1, 20),
-            &[(b"ann", at(1, 21), map(at(1, 28), &[(b"uid", at(1, 29), int(at(1, 35), 1000))]))],
+            &[(b"ann", at(1, 21), map(at(1, 28), &[(b"uid", at(1, 29), int(at(1, 35), super::MIN_UID))]))],
         )),
         ..schema_spec(b"accounts", 0)
     }]);
