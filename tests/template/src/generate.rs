@@ -78,18 +78,31 @@ pub fn mutate(rng: &mut Rng, text: &[u8]) -> Vec<u8> {
 /// Generates nested grammar forms, including filter arguments and lookups.
 #[must_use]
 pub fn text(rng: &mut Rng, shape: Shape) -> Vec<u8> {
-    expression(rng, shape, if shape.width == fixtures::SMALL.width { 3 } else { 6 })
+    expression(rng, shape, if shape.width == fixtures::SMALL.width { 3 } else { 5 })
 }
 fn expression(rng: &mut Rng, shape: Shape, depth: u32) -> Vec<u8> {
     if depth == 0 {
         return literal(rng, shape);
     }
-    let form = rng.below(9);
+    let form = rng.below(12);
     if form >= 4 {
         let a = expression(rng, shape, depth - 1);
         return match form {
             4 => [b"not (".as_slice(), &a, b")"].concat(),
             5 => [b"(".as_slice(), &a, b") is defined"].concat(),
+            9 => {
+                let b = expression(rng, shape, depth - 1);
+                [b"(".as_slice(), &a, b") and (", &b, b")"].concat()
+            }
+            10 => {
+                let b = expression(rng, shape, depth - 1);
+                [b"(".as_slice(), &a, b") or (", &b, b")"].concat()
+            }
+            11 => {
+                let b = expression(rng, shape, depth - 1);
+                let c = expression(rng, shape, depth - 1);
+                [b"(".as_slice(), &a, b") if (", &c, b") else (", &b, b")"].concat()
+            }
             _ => {
                 const OPS: &[&[u8]] =
                     &[b" + ", b" - ", b" ~ ", b" == ", b" != ", b" < ", b" <= ", b" > ", b" >= ", b" in ", b" not in "];

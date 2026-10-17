@@ -1,5 +1,6 @@
 //! One bounded token pass with explicit nesting (format.md, 7.4; render.md, 8.3).
 mod chain;
+mod jumps;
 mod lexer;
 mod pending;
 use crate::{Error, ErrorKind, Expected, Expression, Filter, Missing, Op, Operation, limits::Limits};
@@ -98,7 +99,16 @@ impl Parser {
         if let Some((filter, name_at)) = self.filter.take() {
             match token {
                 Token::Symbol(b'(') => {
-                    self.open(Pending::Arguments { start: self.out.len(), filter, given: 0, at: name_at }, at)?;
+                    self.open(
+                        Pending::Arguments {
+                            start: self.out.len(),
+                            mark: self.out.len(),
+                            filter,
+                            given: 0,
+                            at: name_at,
+                        },
+                        at,
+                    )?;
                     return Ok(false);
                 }
                 Token::Symbol(_) | Token::Value(_) | Token::Word | Token::End => self.apply(filter, name_at, 0)?,
@@ -175,7 +185,11 @@ impl Parser {
                     | Op::Add
                     | Op::Subtract
                     | Op::Defined
-                    | Op::NotDefined => false,
+                    | Op::NotDefined
+                    | Op::JumpIfFalseKeeping { .. }
+                    | Op::JumpIfTrueKeeping { .. }
+                    | Op::JumpIfFalse { .. }
+                    | Op::Jump { .. } => false,
                 };
                 self.emit(at, op, 0);
                 self.phase = Phase::Operator;
@@ -188,7 +202,11 @@ impl Parser {
                         | Pending::Group { .. }
                         | Pending::List { .. }
                         | Pending::Index { .. }
-                        | Pending::Arguments { .. },
+                        | Pending::Arguments { .. }
+                        | Pending::And { .. }
+                        | Pending::Or { .. }
+                        | Pending::If { .. }
+                        | Pending::Else { .. },
                     )
                     | None => {}
                 }
@@ -201,7 +219,7 @@ impl Parser {
             }
             Token::Symbol(b'[') => {
                 self.chain.end();
-                self.open(Pending::List { start: self.out.len(), length: 0, at }, at)?;
+                self.open(Pending::List { start: self.out.len(), mark: self.out.len(), length: 0, at }, at)?;
             }
             Token::Symbol(b']' | b')') => self.close(at, token, true)?,
             Token::Word | Token::Symbol(_) | Token::End => {
@@ -235,7 +253,7 @@ impl Parser {
             Token::Symbol(b']' | b')') => self.close(at, token, false)?,
             Token::Symbol(b',') => self.comma(at)?,
             Token::End => {
-                self.reduce(0, at)?;
+                self.finish(at)?;
                 if let Some(pending) = self.pending.top() {
                     return Err(Error { at, kind: ErrorKind::Expected(closing(pending)) });
                 }
@@ -265,6 +283,10 @@ impl Parser {
     }
     fn word(&mut self, at: u32, word: &[u8]) -> Result<(), Error> {
         match word {
+            b"and" => self.short(false, at),
+            b"or" => self.short(true, at),
+            b"if" => self.conditional(at),
+            b"else" => self.otherwise(at),
             b"in" => self.binary(Op::In, at),
             b"not" => {
                 if self.tested {
@@ -287,6 +309,94 @@ impl Parser {
             _ => Err(Error { at, kind: ErrorKind::Expected(Expected::Operator) }),
         }
     }
+    fn jump(&mut self, at: u32, op: Op) -> u32 {
+        let index = self.out.len();
+        self.out.push(Operation { at, op }).expect("jumps fit token bytes");
+        index
+    }
+    fn short(&mut self, truth: bool, at: u32) -> Result<(), Error> {
+        self.reduce(u8::from(!truth), at)?;
+        self.chain.end();
+        self.tested = false;
+        let op = if truth { Op::JumpIfTrueKeeping { over: 0 } } else { Op::JumpIfFalseKeeping { over: 0 } };
+        let jump = self.jump(at, op);
+        self.pending
+            .push(if truth { Pending::Or { jump } } else { Pending::And { jump } })
+            .expect("operators fit text");
+        self.depth = self.depth.checked_sub(1).expect("left operand");
+        self.phase = Phase::Operand;
+        self.filtered = false;
+        Ok(())
+    }
+    fn conditional(&mut self, at: u32) -> Result<(), Error> {
+        self.reduce(0, at)?;
+        let start = match self.pending.top() {
+            Some(Pending::If { .. }) => return Err(Error { at, kind: ErrorKind::Misplaced }),
+            Some(Pending::Group { start } | Pending::Index { start, .. } | Pending::Else { start, .. }) => *start,
+            Some(Pending::List { mark, .. } | Pending::Arguments { mark, .. }) => *mark,
+            Some(Pending::Not { .. } | Pending::Binary { .. } | Pending::And { .. } | Pending::Or { .. }) => {
+                unreachable!("operators reduced")
+            }
+            None => 0,
+        };
+        self.chain.end();
+        self.depth = self.depth.checked_sub(1).expect("first branch");
+        self.open(Pending::If { start, mid: self.out.len(), at }, at)
+    }
+    fn otherwise(&mut self, at: u32) -> Result<(), Error> {
+        self.reduce(0, at)?;
+        let (start, mid, if_at) = match self.pending.pop() {
+            Some(Pending::If { start, mid, at }) => (start, mid, at),
+            Some(
+                Pending::Group { .. }
+                | Pending::Index { .. }
+                | Pending::List { .. }
+                | Pending::Arguments { .. }
+                | Pending::Not { .. }
+                | Pending::Binary { .. }
+                | Pending::And { .. }
+                | Pending::Or { .. }
+                | Pending::Else { .. },
+            )
+            | None => return Err(Error { at, kind: ErrorKind::Misplaced }),
+        };
+        self.chain.end();
+        self.depth = self.depth.checked_sub(1).expect("condition");
+        let over = mid.checked_sub(start).expect("branch extent").saturating_add(1);
+        self.jump(if_at, Op::JumpIfFalse { over });
+        jumps::rotate(&mut self.out, start, mid);
+        let jump = self.jump(at, Op::Jump { over: 0 });
+        self.pending.push(Pending::Else { jump, start: self.out.len() }).expect("room of replaced If");
+        self.phase = Phase::Operand;
+        self.filtered = false;
+        self.tested = false;
+        Ok(())
+    }
+    fn finish(&mut self, at: u32) -> Result<(), Error> {
+        for _ in 0..=self.pending.len() {
+            self.reduce(0, at)?;
+            match self.pending.top() {
+                Some(Pending::If { .. }) => return Err(Error { at, kind: ErrorKind::Expected(Expected::Else) }),
+                Some(Pending::Else { jump, .. }) => {
+                    jumps::patch(&mut self.out, *jump);
+                    self.pending.pop().expect("else entry");
+                    self.nesting = self.nesting.saturating_sub(1);
+                }
+                Some(
+                    Pending::Group { .. }
+                    | Pending::Index { .. }
+                    | Pending::List { .. }
+                    | Pending::Arguments { .. }
+                    | Pending::Not { .. }
+                    | Pending::Binary { .. }
+                    | Pending::And { .. }
+                    | Pending::Or { .. },
+                )
+                | None => break,
+            }
+        }
+        Ok(())
+    }
     fn binary(&mut self, op: Op, at: u32) -> Result<(), Error> {
         if self.tested {
             return Err(Error { at, kind: ErrorKind::Misplaced });
@@ -301,9 +411,16 @@ impl Parser {
     fn reduce(&mut self, level: u8, at: u32) -> Result<(), Error> {
         for _ in 0..self.pending.len() {
             let rank = match self.pending.top().expect("bounded reductions") {
+                Pending::And { .. } => 1,
+                Pending::Or { .. } => 0,
                 Pending::Not { .. } => 2,
                 Pending::Binary { op, .. } => precedence(op),
-                Pending::Group { .. } | Pending::List { .. } | Pending::Index { .. } | Pending::Arguments { .. } => {
+                Pending::Group { .. }
+                | Pending::List { .. }
+                | Pending::Index { .. }
+                | Pending::Arguments { .. }
+                | Pending::If { .. }
+                | Pending::Else { .. } => {
                     break;
                 }
             };
@@ -314,6 +431,10 @@ impl Parser {
                 return Err(Error { at, kind: ErrorKind::Misplaced });
             }
             match self.pending.pop().expect("reducible entry") {
+                Pending::And { jump } | Pending::Or { jump } => {
+                    self.chain.end();
+                    jumps::patch(&mut self.out, jump);
+                }
                 Pending::Not { at } => {
                     self.nesting = self.nesting.saturating_sub(1);
                     self.emit(at, Op::Not, 1);
@@ -322,7 +443,12 @@ impl Parser {
                     self.chain.end();
                     self.emit(at, op, 2);
                 }
-                Pending::Group { .. } | Pending::List { .. } | Pending::Index { .. } | Pending::Arguments { .. } => {
+                Pending::Group { .. }
+                | Pending::List { .. }
+                | Pending::Index { .. }
+                | Pending::Arguments { .. }
+                | Pending::If { .. }
+                | Pending::Else { .. } => {
                     unreachable!("operator entry")
                 }
             }
@@ -330,13 +456,28 @@ impl Parser {
         Ok(())
     }
     fn comma(&mut self, at: u32) -> Result<(), Error> {
-        self.reduce(0, at)?;
+        self.finish(at)?;
         self.chain.end();
         self.tested = false;
         match self.pending.top_mut() {
-            Some(Pending::List { length, .. }) => *length = length.saturating_add(1),
-            Some(Pending::Arguments { given, .. }) => *given = given.saturating_add(1),
-            Some(Pending::Group { .. } | Pending::Index { .. } | Pending::Not { .. } | Pending::Binary { .. })
+            Some(Pending::List { length, mark, .. }) => {
+                *length = length.saturating_add(1);
+                *mark = self.out.len();
+            }
+            Some(Pending::Arguments { given, mark, .. }) => {
+                *given = given.saturating_add(1);
+                *mark = self.out.len();
+            }
+            Some(
+                Pending::Group { .. }
+                | Pending::Index { .. }
+                | Pending::Not { .. }
+                | Pending::Binary { .. }
+                | Pending::And { .. }
+                | Pending::Or { .. }
+                | Pending::If { .. }
+                | Pending::Else { .. },
+            )
             | None => {
                 return Err(Error { at, kind: ErrorKind::Misplaced });
             }
@@ -347,7 +488,7 @@ impl Parser {
     }
     fn close(&mut self, at: u32, token: Token, empty: bool) -> Result<(), Error> {
         if !empty {
-            self.reduce(0, at)?;
+            self.finish(at)?;
         }
         let pending = self.pending.pop().ok_or(Error { at, kind: ErrorKind::Misplaced })?;
         self.nesting = self.nesting.saturating_sub(1);
@@ -364,7 +505,12 @@ impl Parser {
             | Pending::Index { start, .. }
             | Pending::List { start, .. }
             | Pending::Arguments { start, .. } => *start,
-            Pending::Not { .. } | Pending::Binary { .. } => {
+            Pending::Not { .. }
+            | Pending::Binary { .. }
+            | Pending::And { .. }
+            | Pending::Or { .. }
+            | Pending::If { .. }
+            | Pending::Else { .. } => {
                 return Err(Error { at, kind: ErrorKind::Expected(Expected::Operand) });
             }
         };
@@ -374,7 +520,12 @@ impl Parser {
         }
         self.filtered = false;
         match pending {
-            Pending::Not { .. } | Pending::Binary { .. } => unreachable!("closed nesting entry"),
+            Pending::Not { .. }
+            | Pending::Binary { .. }
+            | Pending::And { .. }
+            | Pending::Or { .. }
+            | Pending::If { .. }
+            | Pending::Else { .. } => unreachable!("closed nesting entry"),
             Pending::Group { .. } => {
                 self.chain.end();
                 if empty {
@@ -407,7 +558,12 @@ fn closing(pending: &Pending) -> Expected {
     match pending {
         Pending::Group { .. } | Pending::Arguments { .. } => Expected::CloseParen,
         Pending::List { .. } | Pending::Index { .. } => Expected::CloseBracket,
-        Pending::Not { .. } | Pending::Binary { .. } => Expected::Operand,
+        Pending::Not { .. }
+        | Pending::Binary { .. }
+        | Pending::And { .. }
+        | Pending::Or { .. }
+        | Pending::If { .. }
+        | Pending::Else { .. } => Expected::Operand,
     }
 }
 
@@ -433,7 +589,11 @@ fn precedence(op: &Op) -> u8 {
         | Op::Filter(_)
         | Op::Not
         | Op::Defined
-        | Op::NotDefined => unreachable!("binary operator"),
+        | Op::NotDefined
+        | Op::JumpIfFalseKeeping { .. }
+        | Op::JumpIfTrueKeeping { .. }
+        | Op::JumpIfFalse { .. }
+        | Op::Jump { .. } => unreachable!("binary operator"),
     }
 }
 

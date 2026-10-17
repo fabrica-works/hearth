@@ -37,6 +37,10 @@ pub enum Op {
     Subtract,
     Defined,
     NotDefined,
+    JumpIfFalseKeeping { over: u32 },
+    JumpIfTrueKeeping { over: u32 },
+    JumpIfFalse { over: u32 },
+    Jump { over: u32 },
 }
 
 /// A missing lookup's result (format.md, 7.6); the root name is no link.

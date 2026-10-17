@@ -29,4 +29,5 @@ pub enum Expected {
     CloseParen,
     CloseBracket,
     In,
+    Else,
 }

@@ -113,7 +113,59 @@ impl Parser<'_> {
         }
     }
     fn expression(&mut self) -> Result<(), u32> {
-        self.negation()
+        let start = self.out.len();
+        let base = self.stack;
+        self.logical_or()?;
+        if self.word(b"if", false)? {
+            let (at, _) = self.take(false)?;
+            self.open(at)?;
+            let a = self.out.split_off(start);
+            self.stack = base;
+            self.logical_or()?;
+            if !self.word(b"else", false)? {
+                return Err(self.peek(false)?.0);
+            }
+            let (else_at, _) = self.take(false)?;
+            self.out.push(Operation {
+                at,
+                op: Op::JumpIfFalse { over: u32::try_from(a.len() + 1).expect("bounded text") },
+            });
+            self.out.extend(a);
+            let jump = self.out.len();
+            self.out.push(Operation { at: else_at, op: Op::Jump { over: 0 } });
+            self.stack = base;
+            self.expression()?;
+            let over = u32::try_from(self.out.len() - jump - 1).expect("bounded text");
+            self.out[jump].op = Op::Jump { over };
+            self.depth -= 1;
+        }
+        Ok(())
+    }
+    fn logical_or(&mut self) -> Result<(), u32> {
+        self.logical_and()?;
+        while self.word(b"or", false)? {
+            let (at, _) = self.take(false)?;
+            let jump = self.out.len();
+            self.out.push(Operation { at, op: Op::JumpIfTrueKeeping { over: 0 } });
+            self.stack -= 1;
+            self.logical_and()?;
+            self.out[jump].op =
+                Op::JumpIfTrueKeeping { over: u32::try_from(self.out.len() - jump - 1).expect("bounded text") };
+        }
+        Ok(())
+    }
+    fn logical_and(&mut self) -> Result<(), u32> {
+        self.negation()?;
+        while self.word(b"and", false)? {
+            let (at, _) = self.take(false)?;
+            let jump = self.out.len();
+            self.out.push(Operation { at, op: Op::JumpIfFalseKeeping { over: 0 } });
+            self.stack -= 1;
+            self.negation()?;
+            self.out[jump].op =
+                Op::JumpIfFalseKeeping { over: u32::try_from(self.out.len() - jump - 1).expect("bounded text") };
+        }
+        Ok(())
     }
     fn word(&mut self, wanted: &[u8], operand: bool) -> Result<bool, u32> {
         let (at, token) = self.peek(operand)?;
@@ -222,7 +274,11 @@ impl Parser<'_> {
                 | Op::Add
                 | Op::Subtract
                 | Op::Defined
-                | Op::NotDefined => unreachable!("postfix links only"),
+                | Op::NotDefined
+                | Op::JumpIfFalseKeeping { .. }
+                | Op::JumpIfTrueKeeping { .. }
+                | Op::JumpIfFalse { .. }
+                | Op::Jump { .. } => unreachable!("postfix links only"),
             }
         }
     }

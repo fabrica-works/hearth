@@ -52,7 +52,11 @@ impl Chain {
                 | Op::Add
                 | Op::Subtract
                 | Op::Defined
-                | Op::NotDefined => unreachable!("only lookup links recorded"),
+                | Op::NotDefined
+                | Op::JumpIfFalseKeeping { .. }
+                | Op::JumpIfTrueKeeping { .. }
+                | Op::JumpIfFalse { .. }
+                | Op::Jump { .. } => unreachable!("only lookup links recorded"),
             }
         }
     }

@@ -5,13 +5,13 @@ use View::{Key as K, Name as N, Other as O};
 
 // Borrow boxed payloads so expected operations remain immutable literal const tables.
 #[derive(Debug, PartialEq, Eq)]
-enum View<'a> {
+pub(super) enum View<'a> {
     Name(&'a [u8], Missing),
     Key(&'a [u8], Missing),
     String(&'a [u8]),
     Other(Op),
 }
-fn observed(operations: &[Operation]) -> Box<[(u32, View<'_>)]> {
+pub(super) fn observed(operations: &[Operation]) -> Box<[(u32, View<'_>)]> {
     let mut out = skein_lib::List::with_capacity(u32::try_from(operations.len()).expect("operations fit text"));
     for operation in operations {
         let view = match &operation.op {
@@ -36,7 +36,11 @@ fn observed(operations: &[Operation]) -> Box<[(u32, View<'_>)]> {
             | Op::Add
             | Op::Subtract
             | Op::Defined
-            | Op::NotDefined => View::Other(operation.op.clone()),
+            | Op::NotDefined
+            | Op::JumpIfFalseKeeping { .. }
+            | Op::JumpIfTrueKeeping { .. }
+            | Op::JumpIfFalse { .. }
+            | Op::Jump { .. } => View::Other(operation.op.clone()),
         };
         out.push((operation.at, view)).expect("one observed view per operation");
     }

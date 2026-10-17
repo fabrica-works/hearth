@@ -1,9 +1,12 @@
 use hearth_protocol_template::{Expression, Op};
 pub fn invariants(expression: &Expression, text: &[u8]) {
-    let mut depth = 0_u32;
+    let mut depths = vec![None; expression.operations.len() + 1];
+    depths[0] = Some(0_u32);
     let mut deepest = 0;
-    for operation in &expression.operations {
-        assert!(usize::try_from(operation.at).expect("bounded by fixture or checked text") < text.len());
+    for (index, operation) in expression.operations.iter().enumerate() {
+        assert!(usize::try_from(operation.at).expect("bounded text") < text.len());
+        let mut depth = depths[index].expect("every emitted operation is reachable");
+        deepest = deepest.max(depth);
         match &operation.op {
             Op::String(_) | Op::Integer(_) | Op::Boolean(_) | Op::Name { .. } => depth += 1,
             Op::Key { .. } | Op::Not | Op::Defined | Op::NotDefined => assert!(depth >= 1),
@@ -30,9 +33,32 @@ pub fn invariants(expression: &Expression, text: &[u8]) {
                 assert!(depth > filter.arity());
                 depth -= filter.arity();
             }
+            Op::JumpIfFalseKeeping { over } | Op::JumpIfTrueKeeping { over } => {
+                assert!(depth >= 1);
+                arrive(&mut depths, index, *over, depth);
+                depth -= 1;
+            }
+            Op::JumpIfFalse { over } => {
+                assert!(depth >= 1);
+                depth -= 1;
+                arrive(&mut depths, index, *over, depth);
+            }
+            Op::Jump { over } => {
+                arrive(&mut depths, index, *over, depth);
+                continue;
+            }
         }
         deepest = deepest.max(depth);
+        arrive(&mut depths, index, 0, depth);
     }
-    assert_eq!(depth, 1);
+    assert_eq!(depths.last(), Some(&Some(1)));
     assert_eq!(expression.values, deepest);
+}
+fn arrive(depths: &mut [Option<u32>], index: usize, over: u32, depth: u32) {
+    let target = index + 1 + usize::try_from(over).expect("jump fits");
+    assert!(target > index && target < depths.len());
+    if let Some(previous) = depths[target] {
+        assert_eq!(previous, depth, "target {target}");
+    }
+    depths[target] = Some(depth);
 }
