@@ -181,8 +181,10 @@ admitted in order to a `tail::Tail` under `limits::SHIPPED` and the
 stderr one taken unless empty (07.3's `failure` rule): its `cause()`,
 `class()` and `lines()`, so that a fake naming another package fails;
 `lists` names and kinds; each `Inst` line's stanza reduced to `KEPT`,
-against the real ones given (cut from the index live; the recording's
-`stanzas` in the gate, none skipping it). `ALLOWED` starts with two
+against the real ones given (cut from the index live, for every case;
+in the gate, the recording's `stanzas` where it has them, test-min's
+alone (41.1), and a recording without them compared on the rest; none
+derived from the universe the fake reads). `ALLOWED` starts with two
 rows, each `case: None` (every case): list sizes (the fake's `InRelease`
 and index are its own), and stanza fields outside `KEPT` (3.6; hearth
 reads six, render.md 5.3). A row is added only for a difference the fake cannot derive from
@@ -209,7 +211,9 @@ s); `no_allowed_difference_touches_test_min_or_test_boot_s_closure`
 (each row's case in `CASES` or every case, none named `test-min` or
 `test-boot`, its reason not empty, at most four rows; under 20 ms). In
 the gate, `tests/recorded_resolve.rs`:
-`the_fake_prints_each_mmdebstrap_recording_as_recorded` (under 0.5 s).
+`the_fake_prints_each_mmdebstrap_recording_as_recorded` (under 0.5 s;
+it counts the recordings whose `stanzas` it compared, and asserts at
+least 1).
 
 ```rust
 #[test] // tests/conformance_resolve.rs

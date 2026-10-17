@@ -546,6 +546,13 @@ None yet.
 
      Nothing is deferred, so `later.md` gains no row.
 
+129. **The gate compares a recording's stanzas where it has them** (plan defect, hearth-46.2's block of 17:52).
+     hearth 46.2's stanzas in the gate (a plan defect). In the gate, `differ` compares each `Inst` line's stanza, reduced to `KEPT`, against a recording's `stanzas` where the recording has them, and compares a recording without them on the rest: the exit, the `Inst` lines, the error lines, the 07.3 failure, `lists`. The plan says so in its own words: 41.1 records "their recordings (4.5), with `lists` and test-min's `stanzas`" (41-resolve-recordings.md, 41.1's Scope); its Done when 2 counts "seven cases, one with stanzas"; and 46.2's sketch passes `real.stanzas.as_deref()`, an `Option`. 46.2's "none skipping it" now reads so (46-fake-mmdebstrap-resolve.md, 46.2's Shape).
+     - The live test, `fake_mmdebstrap_leaves_what_real_mmdebstrap_recorded_for_each_case`, compares every case's stanzas, cut from the index live, as testing.md 5.2 asks of the resolve scenario ("the `Packages` stanzas it left, in the fields the universe keeps (3.6)"). Unchanged.
+     - The gate derives no stanzas from `testing/mirror/universe`: the fake reads that universe, so stanzas derived from it would compare the fake with its own input. No recording is enriched; 46.2's Don't stands ("write a recording; ... run real mmdebstrap again").
+     - `the_fake_prints_each_mmdebstrap_recording_as_recorded` counts the recordings whose `stanzas` it compared, and asserts at least 1 (test-min's, at the pin), so that the gate's stanza comparison runs at every landing. A recording that gains `stanzas` later is compared with no change to the test.
+     - Unchanged: `ALLOWED`'s two rows and its rule, the universe's cut and its test, 46.2's Size.
+
 ## For the user
 
 The long-term choices the user may veto:
