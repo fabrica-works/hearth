@@ -3,7 +3,9 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod limits;
+pub mod lists;
 pub mod output;
+pub mod packages;
 pub mod tail;
 pub mod vector;
 /// Maximum emissions into the caller's reserved queues.

@@ -47,3 +47,28 @@ fn generated_failures_keep_the_reference_s_tail_and_cause() {
         assert_eq!(run.decoded, reference::output(&output, End::Whole, &LIMITS), "seed {seed}");
     }
 }
+#[test]
+fn generated_lists_decode_as_the_reference_whatever_the_cuts() {
+    for seed in 0..32 {
+        let mut rng = Rng::new(0x3801_0000 + seed);
+        let index = generate::index(&mut rng, &LIMITS);
+        assert_eq!(
+            world::read_index(&index, seed, &LIMITS, End::Whole),
+            reference::index(&index, End::Whole, &LIMITS),
+            "seed {seed}"
+        );
+    }
+}
+#[test]
+fn a_list_cut_short_reads_as_the_reference_reads_its_prefix() {
+    for seed in 0..32 {
+        let mut rng = Rng::new(0x3801_1000 + seed);
+        let index = generate::index(&mut rng, &LIMITS);
+        let end = End::Cut(usize::try_from(rng.between(0, u64::try_from(index.len()).unwrap())).unwrap());
+        assert_eq!(
+            world::read_index(&index, seed, &LIMITS, end),
+            reference::index(&index, end, &LIMITS),
+            "seed {seed}"
+        );
+    }
+}

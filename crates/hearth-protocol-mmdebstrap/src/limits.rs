@@ -9,6 +9,9 @@ pub struct Limits {
     pub insts: u32,
     pub tail_lines: u32,
     pub tail_line: u32,
+    pub stanza: u32,
+    pub chunk: u32,
+    pub filename: u32,
     pub idle: skein_lib::Duration,
 }
 /// Design defaults: the shipped profile.
@@ -21,5 +24,8 @@ pub const SHIPPED: Limits = Limits {
     insts: 16_384,
     tail_lines: 20,
     tail_line: 160,
+    stanza: 1_048_576,
+    chunk: 16_384,
+    filename: 4_096,
     idle: skein_lib::Duration::from_secs(60),
 };

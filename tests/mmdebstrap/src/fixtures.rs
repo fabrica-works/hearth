@@ -18,3 +18,21 @@ pub fn at_the_limits(limits: &Limits) -> Vec<u8> {
     bytes.extend_from_slice(format!("E: Unable to locate package {name}\n").as_bytes());
     bytes
 }
+
+/// All selected payloads reach their limits; an ignored field fills the stanza.
+#[must_use]
+pub fn index_at_the_limits(limits: &Limits) -> Vec<u8> {
+    let name = "a".repeat(usize::try_from(limits.name).expect("name fits"));
+    let filename = "f".repeat(usize::try_from(limits.filename).expect("filename fits"));
+    let mut text = format!(
+        "Package: {name}\nVersion: {name}\nArchitecture: {name}\nFilename: {filename}\nSize: 18446744073709551615\nSHA256: {}\nProvides: ",
+        "f".repeat(64)
+    );
+    let ignored = usize::try_from(limits.stanza)
+        .expect("stanza fits")
+        .checked_sub(text.len() + 2)
+        .expect("room for ignored field");
+    text.push_str(&"x".repeat(ignored));
+    text.push_str("\n\n");
+    text.into_bytes()
+}

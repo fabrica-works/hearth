@@ -9,3 +9,9 @@ fn an_output_reader_at_its_limits_holds_no_more_than_its_worst_case() {
     let most = world::read_output_metered(&bytes, &limits::SHIPPED);
     assert!(most <= output::worst_case(&limits::SHIPPED).unwrap());
 }
+#[test]
+fn a_stanza_reader_at_its_limits_holds_no_more_than_its_worst_case() {
+    let bytes = fixtures::index_at_the_limits(&limits::SHIPPED);
+    let most = world::read_index_metered(&bytes, &limits::SHIPPED);
+    assert!(most <= hearth_protocol_mmdebstrap::packages::worst_case(&limits::SHIPPED).unwrap());
+}

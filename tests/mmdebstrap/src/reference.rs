@@ -214,3 +214,168 @@ fn failure_cause(line: &[u8], limits: &Limits) -> Cause {
     }
     Cause::Other
 }
+
+/// A list's stanzas and first terminal fault, independent of scan cuts.
+#[derive(Debug, PartialEq, Eq)]
+pub struct IndexDecoded {
+    pub stanzas: Vec<hearth_protocol_mmdebstrap::packages::Stanza>,
+    pub error: Option<hearth_protocol_mmdebstrap::packages::StanzaError>,
+}
+#[must_use]
+pub fn index(bytes: &[u8], end: End, limits: &Limits) -> IndexDecoded {
+    use hearth_protocol_mmdebstrap::packages::{Field, StanzaError};
+    let (bytes, broken) = match end {
+        End::Whole => (bytes, false),
+        End::Cut(at) => (&bytes[..at.min(bytes.len())], false),
+        End::Break(at) => (&bytes[..at.min(bytes.len())], true),
+    };
+    let mut decoded = IndexDecoded { stanzas: Vec::new(), error: None };
+    let mut fields: [Option<Vec<u8>>; 6] = [None, None, None, None, None, None];
+    let mut preceding = false;
+    let mut selected = None;
+    let mut count = 0_usize;
+    let chunk = usize::try_from(limits.chunk.max(1)).expect("chunk fits");
+    let names = [b"package".as_slice(), b"version", b"architecture", b"filename", b"size", b"sha256"];
+    let kinds = [Field::Package, Field::Version, Field::Architecture, Field::Filename, Field::Size, Field::Sha256];
+    for raw in bytes.split_inclusive(|b| *b == b'\n') {
+        let raw = if raw.ends_with(b"\n") { raw } else { &raw[..raw.len() / chunk * chunk] };
+        if raw.is_empty() {
+            continue;
+        }
+        if count + raw.len() > usize::try_from(limits.stanza).expect("stanza fits") {
+            // An earlier field fault wins over the budget reached later in this delivery.
+            let room = usize::try_from(limits.stanza).expect("stanza fits").saturating_sub(count);
+            if let Err(error) =
+                index_line(&raw[..room], &mut fields, &mut preceding, &mut selected, limits, &names, kinds)
+            {
+                decoded.error = Some(error);
+            } else {
+                decoded.error = Some(StanzaError::TooLong);
+            }
+            return decoded;
+        }
+        count += raw.len();
+        let line = raw.strip_suffix(b"\n").unwrap_or(raw);
+        if line.iter().all(|b| b" \t".contains(b)) {
+            if preceding {
+                match reference_stanza(&mut fields, limits) {
+                    Ok(stanza) => decoded.stanzas.push(stanza),
+                    Err(error) => {
+                        decoded.error = Some(error);
+                        return decoded;
+                    }
+                }
+            }
+            preceding = false;
+            selected = None;
+            count = 0;
+        } else if let Err(error) = index_line(line, &mut fields, &mut preceding, &mut selected, limits, &names, kinds) {
+            decoded.error = Some(error);
+            return decoded;
+        }
+    }
+    if broken {
+        decoded.error = Some(StanzaError::Stream(Fault::Reset));
+    } else if preceding {
+        match reference_stanza(&mut fields, limits) {
+            Ok(stanza) => decoded.stanzas.push(stanza),
+            Err(error) => decoded.error = Some(error),
+        }
+    }
+    decoded
+}
+fn index_line(
+    line: &[u8],
+    fields: &mut [Option<Vec<u8>>; 6],
+    preceding: &mut bool,
+    selected: &mut Option<usize>,
+    limits: &Limits,
+    names: &[&[u8]; 6],
+    kinds: [hearth_protocol_mmdebstrap::packages::Field; 6],
+) -> Result<(), hearth_protocol_mmdebstrap::packages::StanzaError> {
+    use hearth_protocol_mmdebstrap::packages::StanzaError;
+    if line.starts_with(b" ") || line.starts_with(b"\t") {
+        if !*preceding {
+            return Err(StanzaError::Malformed);
+        }
+        if let Some(at) = *selected {
+            return Err(StanzaError::Value(kinds[at]));
+        }
+        return Ok(());
+    }
+    let colon = line.iter().position(|b| *b == b':').filter(|at| *at > 0).ok_or(StanzaError::Malformed)?;
+    *selected = names.iter().position(|name| line[..colon].eq_ignore_ascii_case(name));
+    *preceding = true;
+    if let Some(at) = *selected {
+        if fields[at].is_some() {
+            return Err(StanzaError::Repeated(kinds[at]));
+        }
+        let value = &line[colon + 1..];
+        let first = value.iter().position(|b| !b" \t".contains(b)).unwrap_or(value.len());
+        let last = value.iter().rposition(|b| !b" \t".contains(b)).map_or(first, |at| at + 1);
+        let value = &value[first..last];
+        let max = match at {
+            0..=2 => limits.name,
+            3 => limits.filename,
+            4 => 20,
+            5 => 64,
+            _ => unreachable!(),
+        };
+        let value = if at == 4 {
+            let nonzero = value.iter().position(|b| *b != b'0').unwrap_or(value.len().saturating_sub(1));
+            &value[nonzero..]
+        } else {
+            value
+        };
+        if value.len() > usize::try_from(max).expect("field bound fits") || value.iter().any(|b| b" \t".contains(b)) {
+            return Err(StanzaError::Value(kinds[at]));
+        }
+        fields[at] = Some(value.to_vec());
+    }
+    Ok(())
+}
+fn reference_stanza(
+    fields: &mut [Option<Vec<u8>>; 6],
+    limits: &Limits,
+) -> Result<hearth_protocol_mmdebstrap::packages::Stanza, hearth_protocol_mmdebstrap::packages::StanzaError> {
+    use hearth_protocol_mmdebstrap::packages::{Field, Stanza, StanzaError};
+    const KINDS: [Field; 6] =
+        [Field::Package, Field::Version, Field::Architecture, Field::Filename, Field::Size, Field::Sha256];
+    let mut values = Vec::new();
+    for (value, kind) in fields.iter_mut().zip(KINDS) {
+        values.push(value.take().ok_or(StanzaError::Missing(kind))?);
+    }
+    let package = Name::new(&values[0], limits).ok_or(StanzaError::Value(Field::Package))?;
+    let architecture = Name::new(&values[2], limits).ok_or(StanzaError::Value(Field::Architecture))?;
+    if values[1].is_empty() || !values[1].iter().all(|b| b.is_ascii_alphanumeric() || b".+~:-".contains(b)) {
+        return Err(StanzaError::Value(Field::Version));
+    }
+    let filename = &values[3];
+    if filename.is_empty()
+        || filename.iter().any(|b| !(33..=126).contains(b))
+        || filename.split(|b| *b == b'/').any(|part| part.is_empty() || part == b"." || part == b"..")
+    {
+        return Err(StanzaError::Value(Field::Filename));
+    }
+    let text = std::str::from_utf8(&values[4]).map_err(|_| StanzaError::Value(Field::Size))?;
+    if !text.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(StanzaError::Value(Field::Size));
+    }
+    let size = text.parse::<u64>().map_err(|_| StanzaError::Value(Field::Size))?;
+    if values[5].len() != 64 || !values[5].iter().all(u8::is_ascii_hexdigit) {
+        return Err(StanzaError::Value(Field::Sha256));
+    }
+    let mut sha256 = [0_u8; 32];
+    for (pair, byte) in values[5].chunks_exact(2).zip(&mut sha256) {
+        let text = std::str::from_utf8(pair).map_err(|_| StanzaError::Value(Field::Sha256))?;
+        *byte = u8::from_str_radix(text, 16).map_err(|_| StanzaError::Value(Field::Sha256))?;
+    }
+    Ok(Stanza {
+        package,
+        version: values[1].clone().into(),
+        architecture,
+        filename: filename.clone().into(),
+        size,
+        sha256,
+    })
+}

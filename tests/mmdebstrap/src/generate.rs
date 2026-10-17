@@ -101,3 +101,23 @@ pub fn failures(rng: &mut Rng) -> Vec<u8> {
     }
     text.into_bytes()
 }
+
+/// Valid selected fields around ignored, sometimes multi-chunk fields.
+#[must_use]
+pub fn index(rng: &mut Rng, limits: &Limits) -> Vec<u8> {
+    let mut text = String::new();
+    for at in 0..rng.between(1, 6) {
+        writeln!(text, "Package: pkg{at}\nVersion: 1.{}-2\nArchitecture: amd64", rng.between(0, 99))
+            .expect("String write");
+        writeln!(text, "Filename: pool/main/p/pkg{at}/pkg{at}.deb\nSize: {}", rng.between(0, 1_000_000))
+            .expect("String write");
+        text.push_str("SHA256: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae\nDescription: ignored\n continuation\n");
+        if rng.chance(100) {
+            text.push_str("Provides: ");
+            text.push_str(&"x".repeat(usize::try_from(limits.chunk).expect("chunk fits") + 17));
+            text.push('\n');
+        }
+        text.push_str(if rng.chance(500) { " \t\n\n" } else { "\n" });
+    }
+    text.into_bytes()
+}

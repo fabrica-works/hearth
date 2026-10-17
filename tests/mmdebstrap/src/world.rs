@@ -116,3 +116,85 @@ fn finish(reader: &Reader, decoded: &mut Decoded) {
     decoded.cause = reader.tail().cause().clone();
     decoded.tail = reader.tail().lines().iter().map(|line| line.to_vec()).collect();
 }
+
+/// Read a Packages list through the same seeded lower stream as output.
+#[must_use]
+pub fn read_index(bytes: &[u8], seed: u64, limits: &Limits, end: End) -> crate::reference::IndexDecoded {
+    use hearth_protocol_mmdebstrap::packages::{self, Found, Stanzas};
+    let (bytes, broken) = match end {
+        End::Whole => (bytes, false),
+        End::Cut(at) => (&bytes[..at.min(bytes.len())], false),
+        End::Break(at) => (&bytes[..at.min(bytes.len())], true),
+    };
+    let mut wire = Wire::new(seed);
+    wire.write(bytes);
+    wire.eof = true;
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
+    let mut above = Queue::with_capacity(packages::UP_MAX_OUT.above);
+    let mut below = Queue::with_capacity(packages::UP_MAX_OUT.below);
+    let mut reader = Stanzas::new(limits);
+    packages::open(&mut reader, &env, &mut below);
+    let mut decoded = crate::reference::IndexDecoded { stanzas: Vec::new(), error: None };
+    for _ in 0..bytes.len() * 10 + 100 {
+        if let Some(down) = below.pop() {
+            wire.take(down);
+        }
+        if let Some(mut event) = wire.answer() {
+            if broken && matches!(event, Up::End) {
+                event = Up::Failed(Fault::Reset);
+            }
+            packages::up(&mut reader, &env, event, &mut above, &mut below);
+        }
+        while let Some(found) = above.pop() {
+            match found {
+                Found::Stanza(stanza) => decoded.stanzas.push(stanza),
+                Found::Ended => return decoded,
+                Found::Failed(error) => {
+                    decoded.error = Some(error);
+                    return decoded;
+                }
+            }
+        }
+    }
+    panic!("list reader did not drain seed {seed}");
+}
+/// Meter each list entry point while excluding the world's input and queues.
+#[must_use]
+pub fn read_index_metered(bytes: &[u8], limits: &Limits) -> u64 {
+    use hearth_protocol_mmdebstrap::packages::{self, Stanzas};
+    use skein_lib::{
+        Intake,
+        stream::{Down, Read},
+    };
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
+    let mut above = Queue::with_capacity(packages::UP_MAX_OUT.above);
+    let mut below = Queue::with_capacity(packages::UP_MAX_OUT.below);
+    let mut intake = Intake::with_capacity(u32::try_from(bytes.len()).expect("fixture fits"));
+    intake.append(bytes).expect("fixture fits");
+    let bound = packages::worst_case(limits).expect("bounded limits");
+    let meter = Meter::new();
+    meter.start();
+    let mut reader = Stanzas::new(limits);
+    let mut most = meter.check(meter.end(), bound, &"new");
+    meter.start();
+    packages::open(&mut reader, &env, &mut below);
+    most = most.max(meter.check(meter.end(), bound, &"open"));
+    while let Some(down) = below.pop() {
+        let read = match down {
+            Down::Demand { read: Read::Nothing, .. } => break,
+            Down::Demand { read, .. } => read,
+            other @ (Down::Send(_) | Down::Finish) => panic!("unexpected {other:?}"),
+        };
+        let event = intake.meet(read).map_or(Up::End, Up::Bytes);
+        meter.start();
+        packages::up(&mut reader, &env, event, &mut above, &mut below);
+        let step = meter.end();
+        while let Some(found) = above.pop() {
+            drop(found);
+        }
+        most = most.max(meter.check(step, bound, &"up"));
+    }
+    meter.start();
+    packages::close(&mut reader, &mut below);
+    most.max(meter.check(meter.end(), bound, &"close"))
+}

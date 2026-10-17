@@ -15,3 +15,19 @@ fn generated_and_mutated_output_reads_as_the_reference_reads_it() {
         assert_eq!(run.decoded, reference::output(&output, end, &LIMITS), "seed {seed} end {end:?}");
     }
 }
+#[test]
+fn generated_and_mutated_lists_read_as_the_reference_reads_them() {
+    for seed in PINNED.iter().copied().chain(0..SEEDS) {
+        let mut rng = Rng::new(0x3801_f000 + seed);
+        let mut index = generate::index(&mut rng, &LIMITS);
+        if rng.chance(500) {
+            index = generate::mutate(&mut rng, &index);
+        }
+        let end = world::end(&mut rng, &index);
+        assert_eq!(
+            world::read_index(&index, seed, &LIMITS, end),
+            reference::index(&index, end, &LIMITS),
+            "seed {seed} end {end:?}"
+        );
+    }
+}

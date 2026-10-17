@@ -56,7 +56,7 @@ pub enum Component {
     NonFreeFirmware,
 }
 impl Component {
-    fn bytes(self) -> &'static [u8] {
+    pub(crate) fn bytes(self) -> &'static [u8] {
         match self {
             Self::Main => b"main",
             Self::Contrib => b"contrib",
