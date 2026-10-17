@@ -89,7 +89,7 @@ pub fn class(path: &[u8]) -> Class<'_> {
             && !path.is_empty()
         {
             if path == b".j2" || path.ends_with(b"/.j2") {
-                return Class::Refused { task: Some(task), why: Repository::Static };
+                return Class::Refused { task: Some(task), why: Repository::Name };
             }
             return Class::Tree { task, path };
         }

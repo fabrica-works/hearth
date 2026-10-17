@@ -45,10 +45,12 @@ pub struct Blob {
 pub enum As {
     Document,
     Declaration,
+    Template,
     Cached,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Decoded {
+    Template(crate::evaluate::template::Template),
     Document(Document),
     Declaration(crate::revision::declaration::Declaration),
     Refused { at: Position, fault: crate::errors::Decode, also: Option<Position> },

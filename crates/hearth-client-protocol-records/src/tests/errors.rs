@@ -423,3 +423,42 @@ fn a_tool_error_prints_its_command_end_and_tail_as_json() {
         );
     }
 }
+
+const SYNTAX_MESSAGES: &[&[u8]] = &[
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: a template past its length limit\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: an unexpected character\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: a string with no end\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: an invalid escape\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: an integer outside i64\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: too deep\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: a misplaced expression\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: an unknown filter\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: an unknown test\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: not UTF-8\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: a carriage return\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: a tag with no end\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: an unknown statement\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: a close with no open block\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: a block left open\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: a root of the context bound\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: a statement in an interpolated string\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: expected operand\n",
+    b"tasks/motd/tree/etc/issue.j2:2:1: motd: \"join\" takes 1 argument, given 2\n",
+];
+#[test]
+fn each_syntax_fault_prints_its_message() {
+    for (row, (syntax, expected)) in fixtures::syntax_faults().into_iter().zip(SYNTAX_MESSAGES).enumerate() {
+        assert_eq!(print(&Record::Error(fixtures::syntax_error(syntax))).as_deref(), Ok(*expected), "row {row}");
+    }
+}
+#[test]
+fn a_syntax_error_prints_its_path_task_and_message() {
+    assert_eq!(
+        print(&Record::Error(fixtures::syntax_error(crate::errors::Syntax::Unclosed))).as_deref(),
+        Ok(b"tasks/motd/tree/etc/issue.j2:2:1: motd: a tag with no end\n".as_slice())
+    );
+}
+#[test]
+fn a_syntax_error_prints_its_json_kind_and_fault() {
+    assert_eq!(form::print(Form::JsonLines, &Record::Error(fixtures::syntax_error(crate::errors::Syntax::Unclosed)), Some(Type::Spec), &limits::SHIPPED).as_deref(), Ok(b"{\"record\":\"error\",\"kind\":\"decode\",\"decode\":{\"kind\":\"syntax\",\"fault\":\"unclosed\"},\"class\":\"configuration\",\"at\":{\"column\":1,\"line\":2,\"path\":\"tasks/motd/tree/etc/issue.j2\"},\"task\":\"motd\"}\n".as_slice()));
+}

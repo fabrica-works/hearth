@@ -27,6 +27,7 @@ pub(crate) struct Side {
     pub pending: Box<[Blob]>,
     pub entries: Box<[Entry]>,
     pub invalid: Box<[bool]>,
+    pub refused: Map<Oid, ()>,
     pub cached: Map<Oid, hearth_lib::encode::Digest>,
     pub sizes: Sizes,
     pub files: bool,
@@ -55,6 +56,7 @@ impl Side {
             pending: Box::new([]),
             entries: Box::new([]),
             invalid: Box::new([]),
+            refused: Map::with_capacity(0),
             cached: Map::with_capacity(0),
             sizes: Map::with_capacity(0),
             files: false,
@@ -183,6 +185,7 @@ impl Side {
         let expected = self.pending.get(self.read).expect("one event per requested blob");
         assert_eq!(&expected.oid, oid, "blobs answer in request order");
         match read {
+            Decoded::Template(_) => {}
             Decoded::Document(document) => {
                 self.documents.set(oid, document);
             }
@@ -190,8 +193,29 @@ impl Side {
                 self.documents.set_declaration(oid, declaration);
             }
             Decoded::Refused { at, fault, also } => {
-                let path = self.paths.get(self.read).expect("requested path");
-                errors::push(&mut self.errors, errors::refused(path, Some(at), fault, also));
+                if expected.kind == As::Template {
+                    self.refused.insert(oid.clone(), ()).expect("listing capacity");
+                    for entry in &self.entries {
+                        let asked = match revision::class(&entry.path) {
+                            revision::Class::Tree { task, .. } => self.needs(task),
+                            revision::Class::Fleet
+                            | revision::Class::Environment { .. }
+                            | revision::Class::Host { .. }
+                            | revision::Class::Declaration { .. }
+                            | revision::Class::Template { .. }
+                            | revision::Class::Script { .. }
+                            | revision::Class::Readme { .. }
+                            | revision::Class::Refused { .. }
+                            | revision::Class::Other => false,
+                        };
+                        if asked && &entry.oid == oid && entry.path.ends_with(b".j2") {
+                            errors::push(&mut self.errors, errors::refused(&entry.path, Some(at), fault.clone(), also));
+                        }
+                    }
+                } else {
+                    let path = self.paths.get(self.read).expect("requested path");
+                    errors::push(&mut self.errors, errors::refused(path, Some(at), fault, also));
+                }
                 self.outcome = self.outcome.worst(Outcome::Failed);
             }
         }
@@ -216,11 +240,7 @@ impl Side {
         }
         false
     }
-    pub fn files(&mut self, limits: Limits, out: &mut Queue<Output>) -> bool {
-        if self.files {
-            return false;
-        }
-        self.files = true;
+    fn compose(&mut self, limits: Limits) {
         let mut faults = List::with_capacity(16);
         self.defaults = crate::schema::declarations(
             &self.documents,
@@ -249,8 +269,16 @@ impl Side {
             settings.push(compose::compose(target, &self.documents, &mut self.merge)).expect("target count");
         }
         self.settings = settings.into_boxed();
+    }
+    pub fn files(&mut self, limits: Limits, out: &mut Queue<Output>) -> bool {
+        if self.files {
+            return false;
+        }
+        self.files = true;
+        self.compose(limits);
         let capacity = u32::try_from(self.entries.len()).expect("listing capacity");
         self.cached = Map::with_capacity(capacity);
+        self.refused = Map::with_capacity(capacity);
         self.sizes = Map::with_capacity(capacity);
         let mut blobs = List::with_capacity(capacity);
         let mut paths = List::with_capacity(capacity);
@@ -260,6 +288,15 @@ impl Side {
                     if !path.ends_with(b".j2") && entry.mode != Mode::Link && entry.mode != Mode::Submodule =>
                 {
                     Some((task, As::Cached, limits.static_file))
+                }
+                revision::Class::Tree { task, path }
+                    if path.ends_with(b".j2")
+                        && entry.mode != Mode::Link
+                        && entry.mode != Mode::Submodule
+                        && path != b".j2"
+                        && !path.ends_with(b"/.j2") =>
+                {
+                    Some((task, As::Template, limits.template))
                 }
                 revision::Class::Declaration { .. }
                 | revision::Class::Fleet
@@ -279,13 +316,26 @@ impl Side {
                     let limit = match kind {
                         As::Declaration | As::Document => Limit::Document,
                         As::Cached => Limit::Static,
+                        As::Template => Limit::Template,
                     };
                     errors::push(
                         &mut self.errors,
                         errors::refused(&entry.path, None, Decode::TooLarge { limit, max: u64::from(max) }, None),
                     );
                     self.outcome = self.outcome.worst(Outcome::Failed);
-                } else if !contains(&blobs, &entry.oid, kind) {
+                } else if kind == As::Template && !self.budget.take(entry.size) {
+                    errors::push(
+                        &mut self.errors,
+                        errors::refused(
+                            &entry.path,
+                            None,
+                            Decode::TooLarge { limit: Limit::Decoded, max: limits.decoded },
+                            None,
+                        ),
+                    );
+                    self.fail(Outcome::Failed);
+                    return false;
+                } else if !contains(blobs.as_slice(), &entry.oid, kind) {
                     blobs.push(Blob { oid: entry.oid.clone(), size: entry.size, kind }).expect("listing capacity");
                     paths.push(entry.path.clone()).expect("listing capacity");
                 }
@@ -337,7 +387,10 @@ impl Side {
                         };
                     }
                     revision::Class::Tree { task: name, path } if name == task.as_ref() => {
-                        if entry.mode == Mode::Submodule {
+                        if entry.mode == Mode::Submodule
+                            || self.refused.contains_key(&entry.oid)
+                            || (path.ends_with(b".j2") && !contains(&self.pending, &entry.oid, As::Template))
+                        {
                             valid = false;
                         } else if entry.mode != Mode::Link && !path.ends_with(b".j2") {
                             if let Some(digest) = self.cached.get(&entry.oid) {
@@ -469,7 +522,7 @@ impl Side {
     }
 }
 
-fn contains(blobs: &List<Blob>, oid: &Oid, kind: As) -> bool {
+fn contains(blobs: &[Blob], oid: &Oid, kind: As) -> bool {
     for blob in blobs {
         if &blob.oid == oid && blob.kind == kind {
             return true;

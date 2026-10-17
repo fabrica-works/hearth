@@ -27,6 +27,7 @@ pub enum Kind {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Decode {
+    Syntax(Syntax),
     Declaration(Declared),
     ListNull,
     Unexpected,
@@ -68,6 +69,7 @@ pub enum Field {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Limit {
+    Template,
     Document,
     Decoded,
     Static,
@@ -365,3 +367,6 @@ pub enum Step {
     Empty,
     Keep,
 }
+
+pub mod syntax;
+pub use syntax::Syntax;

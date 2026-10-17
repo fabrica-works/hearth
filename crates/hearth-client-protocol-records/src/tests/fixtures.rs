@@ -201,3 +201,40 @@ pub fn git_failure(command: crate::errors::Command, code: u8) -> crate::errors::
         task: None,
     }
 }
+
+#[must_use]
+pub fn syntax_faults() -> [crate::errors::Syntax; 19] {
+    use crate::errors::{Syntax as S, syntax::Expected};
+    [
+        S::TooLong,
+        S::Character,
+        S::Unterminated,
+        S::Escape,
+        S::Integer,
+        S::TooDeep,
+        S::Misplaced,
+        S::UnknownFilter,
+        S::UnknownTest,
+        S::Utf8,
+        S::Return,
+        S::Unclosed,
+        S::UnknownStatement,
+        S::Unmatched,
+        S::Unended,
+        S::Shadows,
+        S::Interpolation,
+        S::Expected(Expected::Operand),
+        S::Arity { filter: copy_of(b"join"), expected: 1, given: 2 },
+    ]
+}
+pub fn syntax_error(syntax: crate::errors::Syntax) -> crate::errors::Error {
+    let mut error = modules_guard();
+    error.kind = crate::errors::Kind::Decode(crate::errors::Decode::Syntax(syntax));
+    error.target = None;
+    error.task = Some(copy_of(b"motd"));
+    error.at = Some(crate::errors::Place {
+        path: copy_of(b"tasks/motd/tree/etc/issue.j2"),
+        position: Some(crate::errors::Position { line: 2, column: 1 }),
+    });
+    error
+}

@@ -89,6 +89,7 @@ fn position_to_records(position: Option<render::revision::Position>) -> Option<r
 #[must_use]
 pub fn decode(fault: target::Decode) -> records::errors::Decode {
     match fault {
+        target::Decode::Syntax(value) => records::errors::Decode::Syntax(syntax_to_records(value)),
         target::Decode::Declaration(value) => records::errors::Decode::Declaration(declared_to_records(value)),
         target::Decode::Unexpected => records::errors::Decode::Unexpected,
         target::Decode::Trailing => records::errors::Decode::Trailing,
@@ -134,6 +135,7 @@ pub fn field(field: target::Field) -> records::errors::Field {
 #[must_use]
 pub fn limit(limit: target::Limit) -> records::errors::Limit {
     match limit {
+        target::Limit::Template => records::errors::Limit::Template,
         target::Limit::Document => records::errors::Limit::Document,
         target::Limit::Decoded => records::errors::Limit::Decoded,
         target::Limit::Static => records::errors::Limit::Static,
@@ -421,4 +423,111 @@ fn store_error(error: target::StoreError) -> records::errors::StoreError {
         },
     };
     StoreError { store: error.store, fault }
+}
+
+#[must_use]
+pub fn syntax(value: hearth_protocol_template::error::ErrorKind) -> target::Syntax {
+    use hearth_protocol_template::error::ErrorKind as Source;
+    match value {
+        Source::TooLong => target::Syntax::TooLong,
+        Source::Character => target::Syntax::Character,
+        Source::Unterminated => target::Syntax::Unterminated,
+        Source::Escape => target::Syntax::Escape,
+        Source::Integer => target::Syntax::Integer,
+        Source::TooDeep => target::Syntax::TooDeep,
+        Source::Misplaced => target::Syntax::Misplaced,
+        Source::UnknownFilter => target::Syntax::UnknownFilter,
+        Source::UnknownTest => target::Syntax::UnknownTest,
+        Source::Utf8 => target::Syntax::Utf8,
+        Source::Return => target::Syntax::Return,
+        Source::Unclosed => target::Syntax::Unclosed,
+        Source::UnknownStatement => target::Syntax::UnknownStatement,
+        Source::Unmatched => target::Syntax::Unmatched,
+        Source::Unended => target::Syntax::Unended,
+        Source::Shadows => target::Syntax::Shadows,
+        Source::Interpolation => target::Syntax::Interpolation,
+        Source::Expected(value) => target::Syntax::Expected(syntax_expected(value)),
+        Source::Arity { filter, given } => target::Syntax::Arity { filter: super::operations::filter(filter), given },
+    }
+}
+#[must_use]
+pub fn syntax_expected(value: hearth_protocol_template::error::Expected) -> target::syntax::Expected {
+    use hearth_protocol_template::error::Expected as Source;
+    match value {
+        Source::Operand => target::syntax::Expected::Operand,
+        Source::Operator => target::syntax::Expected::Operator,
+        Source::Name => target::syntax::Expected::Name,
+        Source::CloseParen => target::syntax::Expected::CloseParen,
+        Source::CloseBracket => target::syntax::Expected::CloseBracket,
+        Source::In => target::syntax::Expected::In,
+        Source::Else => target::syntax::Expected::Else,
+        Source::Statement => target::syntax::Expected::Statement,
+        Source::Assign => target::syntax::Expected::Assign,
+        Source::TagEnd => target::syntax::Expected::TagEnd,
+    }
+}
+#[must_use]
+pub fn syntax_to_records(value: target::Syntax) -> records::errors::Syntax {
+    match value {
+        target::Syntax::TooLong => records::errors::Syntax::TooLong,
+        target::Syntax::Character => records::errors::Syntax::Character,
+        target::Syntax::Unterminated => records::errors::Syntax::Unterminated,
+        target::Syntax::Escape => records::errors::Syntax::Escape,
+        target::Syntax::Integer => records::errors::Syntax::Integer,
+        target::Syntax::TooDeep => records::errors::Syntax::TooDeep,
+        target::Syntax::Misplaced => records::errors::Syntax::Misplaced,
+        target::Syntax::UnknownFilter => records::errors::Syntax::UnknownFilter,
+        target::Syntax::UnknownTest => records::errors::Syntax::UnknownTest,
+        target::Syntax::Utf8 => records::errors::Syntax::Utf8,
+        target::Syntax::Return => records::errors::Syntax::Return,
+        target::Syntax::Unclosed => records::errors::Syntax::Unclosed,
+        target::Syntax::UnknownStatement => records::errors::Syntax::UnknownStatement,
+        target::Syntax::Unmatched => records::errors::Syntax::Unmatched,
+        target::Syntax::Unended => records::errors::Syntax::Unended,
+        target::Syntax::Shadows => records::errors::Syntax::Shadows,
+        target::Syntax::Interpolation => records::errors::Syntax::Interpolation,
+        target::Syntax::Expected(value) => records::errors::Syntax::Expected(expected_to_syntax_record(value)),
+        target::Syntax::Arity { filter, given } => records::errors::Syntax::Arity {
+            filter: skein_lib::bytes::copy_of(filter_name(filter)),
+            expected: filter.arity(),
+            given,
+        },
+    }
+}
+#[must_use]
+pub fn expected_to_syntax_record(value: target::syntax::Expected) -> records::errors::syntax::Expected {
+    match value {
+        target::syntax::Expected::Operand => records::errors::syntax::Expected::Operand,
+        target::syntax::Expected::Operator => records::errors::syntax::Expected::Operator,
+        target::syntax::Expected::Name => records::errors::syntax::Expected::Name,
+        target::syntax::Expected::CloseParen => records::errors::syntax::Expected::CloseParen,
+        target::syntax::Expected::CloseBracket => records::errors::syntax::Expected::CloseBracket,
+        target::syntax::Expected::In => records::errors::syntax::Expected::In,
+        target::syntax::Expected::Else => records::errors::syntax::Expected::Else,
+        target::syntax::Expected::Statement => records::errors::syntax::Expected::Statement,
+        target::syntax::Expected::Assign => records::errors::syntax::Expected::Assign,
+        target::syntax::Expected::TagEnd => records::errors::syntax::Expected::TagEnd,
+    }
+}
+fn filter_name(value: render::evaluate::Filter) -> &'static [u8] {
+    use render::evaluate::Filter;
+    match value {
+        Filter::Default => b"default",
+        Filter::Join => b"join",
+        Filter::Split => b"split",
+        Filter::First => b"first",
+        Filter::Last => b"last",
+        Filter::Length => b"length",
+        Filter::Replace => b"replace",
+        Filter::Items => b"items",
+        Filter::Keys => b"keys",
+        Filter::Values => b"values",
+        Filter::Sort => b"sort",
+        Filter::Tojson => b"tojson",
+        Filter::ShellQuote => b"shell_quote",
+        Filter::SystemdEscape => b"systemd_escape",
+        Filter::SystemdEscapePath => b"systemd_escape_path",
+        Filter::Basename => b"basename",
+        Filter::Dirname => b"dirname",
+    }
 }

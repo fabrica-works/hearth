@@ -2,6 +2,7 @@
 pub mod context;
 mod escape;
 pub mod filter;
+pub mod template;
 pub use filter::Filter;
 mod lookup;
 mod operators;

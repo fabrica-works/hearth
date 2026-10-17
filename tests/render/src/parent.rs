@@ -116,6 +116,24 @@ fn blob_event(repository: &Repository, blob: &render::vocabulary::Blob, request:
             size: blob.size,
             sha256: hearth_lib::encode::Digest(hash.finish()),
         }
+    } else if blob.kind == render::vocabulary::As::Template {
+        let body = &repository.blobs.iter().find(|(oid, _)| *oid == blob.oid).expect("scripted template").1;
+        let read = match hearth_protocol_template::template::compile(body, &hearth_protocol_template::limits::SHIPPED) {
+            Ok(template) => render::vocabulary::Decoded::Template(
+                hearth_protocol_builder::translate::instructions::template(template),
+            ),
+            Err(error) => {
+                let (line, column) = hearth_protocol_template::template::place(body, error.at);
+                render::vocabulary::Decoded::Refused {
+                    at: render::revision::Position { line, column },
+                    fault: render::errors::Decode::Syntax(hearth_protocol_builder::translate::errors::syntax(
+                        error.kind,
+                    )),
+                    also: None,
+                }
+            }
+        };
+        Event::Read { request, oid: blob.oid.clone(), read }
     } else {
         Event::Read {
             request,

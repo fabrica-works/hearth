@@ -636,3 +636,47 @@ pub fn listing(path: &[u8], count: u32) -> Box<[u8]> {
     }
     listing.finish()
 }
+
+#[must_use]
+pub fn every_does() -> [hearth_protocol_template::instruction::Does; 7] {
+    use hearth_protocol_template::instruction::{Does, Names};
+    let expression = hearth_protocol_template::Expression { operations: Box::new([]), values: 0 };
+    [
+        Does::Text(bytes::copy_of(b"text")),
+        Does::Output(expression.clone()),
+        Does::Branch { condition: expression.clone(), over: 2 },
+        Does::Jump { over: 3 },
+        Does::Enter {
+            names: Names::Pair { first: bytes::copy_of(b"k"), second: bytes::copy_of(b"v") },
+            iterable: expression.clone(),
+            over: 4,
+        },
+        Does::Advance { back: 5 },
+        Does::Set { name: bytes::copy_of(b"x"), value: expression },
+    ]
+}
+#[must_use]
+pub fn every_syntax() -> [hearth_protocol_template::error::ErrorKind; 19] {
+    use hearth_protocol_template::error::{ErrorKind as E, Expected};
+    [
+        E::TooLong,
+        E::Character,
+        E::Unterminated,
+        E::Escape,
+        E::Integer,
+        E::TooDeep,
+        E::Misplaced,
+        E::UnknownFilter,
+        E::UnknownTest,
+        E::Utf8,
+        E::Return,
+        E::Unclosed,
+        E::UnknownStatement,
+        E::Unmatched,
+        E::Unended,
+        E::Shadows,
+        E::Interpolation,
+        E::Expected(Expected::Operand),
+        E::Arity { filter: hearth_protocol_template::Filter::Join, given: 2 },
+    ]
+}

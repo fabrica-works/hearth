@@ -201,6 +201,7 @@ fn a_submodule_under_a_present_tasks_tree_fails_its_target() {
 fn a_template_and_a_link_are_left_out_of_the_tree() {
     let mut repository = fixtures::with_task();
     repository.entries.push(fixtures::entry(b"tasks/motd/tree/etc/template.j2", b'5'));
+    repository.blobs.push((fixtures::oid(b'5'), Box::from(b"ok".as_slice())));
     let mut link = fixtures::entry(b"tasks/motd/tree/etc/link", b'6');
     link.mode = hearth_domain_render::revision::Mode::Link;
     repository.entries.push(link);
@@ -209,5 +210,5 @@ fn a_template_and_a_link_are_left_out_of_the_tree() {
     let part = only(&spec.parts);
     let hearth_domain_render::parts::PartRecord::Config(config) = &part.record;
     assert_eq!(config.tree.as_ref(), []);
-    assert_eq!(run.requests.len(), 2, "the first read includes the declaration; no static files need a second");
+    assert_eq!(run.requests.len(), 3, "the second read includes the template");
 }

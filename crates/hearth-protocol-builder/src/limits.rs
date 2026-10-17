@@ -5,6 +5,7 @@ pub struct Limits {
     pub walk: Walk,
     pub git: git_machine::limits::Limits,
     pub config: config::limits::Limits,
+    pub template: hearth_protocol_template::limits::Limits,
     pub tree: crate::tree::limits::Limits,
     pub printer: records::limits::Limits,
 }
@@ -20,5 +21,6 @@ pub const SHIPPED: Limits = Limits {
     tree: crate::tree::limits::SHIPPED,
     git: git_machine::limits::SHIPPED,
     config: config::limits::SHIPPED,
+    template: hearth_protocol_template::limits::SHIPPED,
     printer: records::limits::SHIPPED,
 };

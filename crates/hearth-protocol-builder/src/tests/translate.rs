@@ -780,3 +780,5 @@ mod declarations;
 mod repository;
 #[path = "translate_store.rs"]
 mod store_arrivals;
+
+mod instructions;

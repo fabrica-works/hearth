@@ -343,3 +343,21 @@ fn a_stray_file_in_a_task_prints_a_repository_error() {
     );
     assert_eq!(rendered.exit, Exit::Code(2));
 }
+
+#[test]
+fn a_template_that_does_not_compile_prints_its_decode_error_at_its_line() {
+    let repository =
+        Repository::make("broken-template", &fixtures::thin_with(core::slice::from_ref(&fixtures::BROKEN_TEMPLATE)));
+    assert_eq!(
+        String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout),
+        "tasks/motd/tree/etc/issue.j2:2:1: motd: a tag with no end\n"
+    );
+}
+#[test]
+fn a_template_that_does_not_compile_leaves_its_target_out() {
+    let repository = Repository::make(
+        "broken-template-exit",
+        &fixtures::thin_with(core::slice::from_ref(&fixtures::BROKEN_TEMPLATE)),
+    );
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}

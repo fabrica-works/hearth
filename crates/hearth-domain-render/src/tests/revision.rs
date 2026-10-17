@@ -119,3 +119,70 @@ fn the_task_past_the_limit_errs_and_fails_the_call() {
         crate::errors::Kind::Decode(crate::errors::Decode::TooLarge { limit: crate::errors::Limit::Tasks, max: 2 })
     );
 }
+
+#[test]
+fn a_tree_file_ending_in_j2_is_asked_as_a_template() {
+    let call = fixtures::template_call(b"tasks/motd/tree/etc/issue.j2", Mode::File, 20, limits::SHIPPED);
+    assert_eq!(
+        call.pending.as_ref(),
+        &[crate::vocabulary::Blob {
+            oid: crate::revision::Oid(skein_lib::bytes::copy_of(b"template")),
+            size: 20,
+            kind: crate::vocabulary::As::Template,
+        }]
+    );
+}
+#[test]
+fn a_template_past_its_limit_fails_its_tasks_targets_unread() {
+    let call = fixtures::template_call(b"tasks/motd/tree/etc/issue.j2", Mode::File, 1_048_577, limits::SHIPPED);
+    assert_eq!(call.pending.as_ref(), []);
+    assert_eq!(
+        call.errors.get(0).expect("limit error").kind,
+        crate::errors::Kind::Decode(crate::errors::Decode::TooLarge {
+            limit: crate::errors::Limit::Template,
+            max: 1_048_576
+        })
+    );
+    assert_eq!(call.errors.get(0).expect("limit error").task.as_deref(), Some(b"motd".as_slice()));
+}
+#[test]
+fn a_j2_symlink_is_refused_as_a_link_unread() {
+    let (_, errors) = fixtures::listing(
+        &[(b"tasks/motd/task.json", Mode::File), (b"tasks/motd/tree/etc/issue.j2", Mode::Link)],
+        &limits::SHIPPED,
+    );
+    assert_eq!(fixtures::only(&errors).kind, crate::errors::Kind::Repository(Repository::Link));
+    assert_eq!(
+        fixtures::template_call(b"tasks/motd/tree/etc/issue.j2", Mode::Link, 2, limits::SHIPPED).pending.as_ref(),
+        []
+    );
+}
+#[test]
+fn a_file_named_dot_j2_is_refused_by_its_name() {
+    let (_, errors) = fixtures::listing(
+        &[(b"tasks/motd/task.json", Mode::File), (b"tasks/motd/tree/etc/.j2", Mode::File)],
+        &limits::SHIPPED,
+    );
+    assert_eq!(fixtures::only(&errors).kind, crate::errors::Kind::Repository(Repository::Name));
+}
+
+const SHARED_TEMPLATE_PATHS: &[&[u8]] = &[b"tasks/motd/tree/etc/issue.j2", b"tasks/motd/tree/etc/motd.j2"];
+#[test]
+fn a_refused_template_blob_gives_each_of_its_paths_an_error() {
+    let mut call = fixtures::shared_template_call();
+    call.decoded(
+        &crate::revision::Oid(skein_lib::bytes::copy_of(b"template")),
+        crate::vocabulary::Decoded::Refused {
+            at: crate::revision::Position { line: 2, column: 1 },
+            fault: crate::errors::Decode::Syntax(crate::errors::Syntax::Unclosed),
+            also: None,
+        },
+    );
+    let (errors, left_out) = call.errors.finish();
+    assert_eq!(errors.len(), 2);
+    assert_eq!(left_out, 0);
+    for (error, path) in errors.iter().zip(SHARED_TEMPLATE_PATHS) {
+        assert_eq!(error.at.as_ref().expect("placed").path.as_ref(), *path);
+        assert_eq!(error.task.as_deref(), Some(b"motd".as_slice()));
+    }
+}

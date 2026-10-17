@@ -3,6 +3,9 @@ use crate::render::errors as render_errors;
 use crate::render::{self, revision as target};
 fn decode_back(fault: record_errors::Decode) -> render_errors::Decode {
     match fault {
+        record_errors::Decode::Syntax(value) => {
+            render_errors::Decode::Syntax(super::instructions::record_syntax_back(value))
+        }
         record_errors::Decode::Declaration(value) => render_errors::Decode::Declaration(declared_back(value)),
         record_errors::Decode::Unexpected => render_errors::Decode::Unexpected,
         record_errors::Decode::Trailing => render_errors::Decode::Trailing,
@@ -50,6 +53,7 @@ fn decode_field_back(field: record_errors::Field) -> render_errors::Field {
 }
 fn decode_limit_back(limit: record_errors::Limit) -> render_errors::Limit {
     match limit {
+        record_errors::Limit::Template => render_errors::Limit::Template,
         record_errors::Limit::Document => render_errors::Limit::Document,
         record_errors::Limit::Decoded => render_errors::Limit::Decoded,
         record_errors::Limit::Static => render_errors::Limit::Static,

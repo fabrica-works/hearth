@@ -58,7 +58,9 @@ impl Decode {
                             Err(error) => Err(error),
                         }
                     }
-                    render::vocabulary::As::Cached => unreachable!("static bytes are never decoded"),
+                    render::vocabulary::As::Template | render::vocabulary::As::Cached => {
+                        unreachable!("static bytes are never decoded")
+                    }
                 },
                 config::json::Event::Failed(error) => Err(error),
                 config::json::Event::Closed => unreachable!("decoder is not closed"),
@@ -141,7 +143,9 @@ impl Read {
         self.arrival = Arrival::Streaming;
         let blob = self.blobs.get(self.index).expect("current blob");
         match blob.kind {
-            render::vocabulary::As::Document | render::vocabulary::As::Declaration => {
+            render::vocabulary::As::Document
+            | render::vocabulary::As::Declaration
+            | render::vocabulary::As::Template => {
                 self.body = Some(Writer::new(usize::try_from(blob.size).expect("render checked document bound")));
             }
             render::vocabulary::As::Cached => self.cache = Some(crate::cache::Cache::new(self.root, &mut self.rng)),
@@ -353,11 +357,17 @@ impl Read {
                     if let Some(cache) = &mut self.cache {
                         cache.finish();
                     } else {
-                        self.decode = Some(Decode::new(
-                            self.body.take().expect("whole blob").finish(),
-                            self.blobs.get(self.index).expect("blob").kind,
-                            env,
-                        ));
+                        let bytes = self.body.take().expect("whole blob").finish();
+                        let kind = self.blobs.get(self.index).expect("blob").kind;
+                        match kind {
+                            render::vocabulary::As::Template => {
+                                self.decoded = Some(compile_template(&bytes, &env.limits));
+                            }
+                            render::vocabulary::As::Document | render::vocabulary::As::Declaration => {
+                                self.decode = Some(Decode::new(bytes, kind, env));
+                            }
+                            render::vocabulary::As::Cached => unreachable!("cached bytes stream"),
+                        }
                     }
                 }
                 batch::Event::Missing { oid } => {
@@ -395,4 +405,19 @@ impl Read {
 
 pub(super) fn current(mode: &mut Option<crate::Mode>) -> Option<&mut Read> {
     if let Some(crate::Mode::Read(read)) = mode { Some(read) } else { None }
+}
+
+fn compile_template(bytes: &[u8], limits: &Limits) -> Decoded {
+    use hearth_protocol_template::template;
+    match template::compile(bytes, &limits.template) {
+        Ok(value) => Decoded::Template(translate::instructions::template(value)),
+        Err(error) => {
+            let (line, column) = template::place(bytes, error.at);
+            Decoded::Refused {
+                at: render::revision::Position { line, column },
+                fault: render::errors::Decode::Syntax(translate::errors::syntax(error.kind)),
+                also: None,
+            }
+        }
+    }
 }

@@ -167,6 +167,7 @@ impl Place {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Decode {
+    Syntax(Syntax),
     Declaration(Declared),
     ListNull,
     Unexpected,
@@ -208,6 +209,7 @@ pub enum Field {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Limit {
+    Template,
     Document,
     Decoded,
     Static,
@@ -220,6 +222,7 @@ pub enum Limit {
 impl Decode {
     fn text(&self, lines: &mut Lines) {
         match self {
+            Self::Syntax(syntax) => syntax.text(lines),
             Self::Declaration(declared) => declared.text(lines),
             Self::Unexpected => lines.put(b"not JSON: unexpected byte"),
             Self::Trailing => lines.put(b"not JSON: trailing bytes"),
@@ -270,6 +273,7 @@ impl Decode {
             }
             Self::TooLarge { limit, max } => {
                 lines.put(match limit {
+                    Limit::Template => b"a template past ",
                     Limit::Document => b"a document past ",
                     Limit::Decoded => b"decoded documents past ",
                     Limit::Static => b"a static file past ",
@@ -285,6 +289,7 @@ impl Decode {
     }
     fn json(&self, json: &mut Encoder) {
         match self {
+            Self::Syntax(syntax) => syntax.json(json),
             Self::Declaration(declared) => {
                 json.object_start();
                 json.key(b"declared");
@@ -357,6 +362,7 @@ impl Decode {
                     json,
                     b"limit",
                     match limit {
+                        Limit::Template => b"template",
                         Limit::Document => b"document",
                         Limit::Decoded => b"decoded",
                         Limit::Static => b"static",
@@ -730,22 +736,14 @@ impl Schema {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub enum TypeName {
-    Bool,
-    Int,
-    String,
-    Enum,
-    List,
-    Map,
-    Object,
-    Path,
-    Mode,
-    Duration,
-    Secret,
-    Target,
-    File,
-}
+mod type_name;
+pub use type_name::TypeName;
+
+mod repository;
+pub use repository::{Command, Ended, Repository, Tool};
+
+pub mod syntax;
+pub use syntax::Syntax;
 
 fn signed(lines: &mut Lines, value: i64) {
     if value < 0 {
@@ -768,40 +766,3 @@ fn json_names(json: &mut Encoder, names: &[Box<[u8]>]) {
     }
     json.array_end();
 }
-impl TypeName {
-    fn article(&self) -> &'static [u8] {
-        match self {
-            Self::Int | Self::Enum | Self::Object => b"an ",
-            Self::Bool
-            | Self::String
-            | Self::List
-            | Self::Map
-            | Self::Path
-            | Self::Mode
-            | Self::Duration
-            | Self::Secret
-            | Self::Target
-            | Self::File => b"a ",
-        }
-    }
-    fn name(&self) -> &'static [u8] {
-        match self {
-            Self::Bool => b"bool",
-            Self::Int => b"int",
-            Self::String => b"string",
-            Self::Enum => b"enum",
-            Self::List => b"list",
-            Self::Map => b"map",
-            Self::Object => b"object",
-            Self::Path => b"path",
-            Self::Mode => b"mode",
-            Self::Duration => b"duration",
-            Self::Secret => b"secret",
-            Self::Target => b"target",
-            Self::File => b"file",
-        }
-    }
-}
-
-mod repository;
-pub use repository::{Command, Ended, Repository, Tool};

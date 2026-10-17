@@ -680,3 +680,48 @@ pub fn hunk_failure() -> crate::vocabulary::Event {
         }),
     }
 }
+
+pub fn template_call(path: &[u8], mode: crate::revision::Mode, size: u64, limits: limits::Limits) -> crate::call::Side {
+    let (mut call, target) = removed_task();
+    let at = composition::at(1, 1);
+    call.documents.set(
+        &crate::revision::Oid(bytes::copy_of(b"host")),
+        crate::revision::Document { at, layer: crate::revision::Layer { tasks: Box::new([]), placement: None } },
+    );
+    call.targets = Box::new([target]);
+    call.commit = Some(crate::revision::Oid(bytes::copy_of(b"commit")));
+    let mut entries = skein_lib::List::with_capacity(3);
+    for entry in call.entries {
+        entries.push(entry).expect("three entries");
+    }
+    entries
+        .push(crate::revision::Entry {
+            path: bytes::copy_of(path),
+            mode,
+            oid: crate::revision::Oid(bytes::copy_of(b"template")),
+            size,
+        })
+        .expect("third entry");
+    call.entries = entries.into_boxed();
+    let mut out = skein_lib::Queue::with_capacity(1);
+    call.files(limits, &mut out);
+    call
+}
+
+pub fn shared_template_call() -> crate::call::Side {
+    let mut call = template_call(b"tasks/motd/tree/etc/issue.j2", crate::revision::Mode::File, 20, limits::SHIPPED);
+    let mut entries = skein_lib::List::with_capacity(4);
+    for entry in call.entries {
+        entries.push(entry).expect("four entries");
+    }
+    entries
+        .push(crate::revision::Entry {
+            path: bytes::copy_of(b"tasks/motd/tree/etc/motd.j2"),
+            mode: crate::revision::Mode::File,
+            oid: crate::revision::Oid(bytes::copy_of(b"template")),
+            size: 20,
+        })
+        .expect("fourth entry");
+    call.entries = entries.into_boxed();
+    call
+}

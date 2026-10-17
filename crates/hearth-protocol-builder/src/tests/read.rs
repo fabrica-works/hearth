@@ -296,3 +296,44 @@ fn a_read_waiting_for_stderr_end_allows_its_completion_through() {
         })
     );
 }
+
+#[test]
+fn a_templates_blob_reaches_render_compiled_with_its_lines() {
+    use crate::render::evaluate::template::{Does, Instruction, Template};
+    let mut layer = Layer::new();
+    layer.read(Box::new([crate::render::vocabulary::Blob {
+        kind: crate::render::vocabulary::As::Template,
+        ..fixtures::blob(b"first\nsecond")
+    }]));
+    assert_eq!(
+        layer.run(&fixtures::batch(b"first\nsecond"), Exit::Code(0)),
+        RootEvent::Render(Event::Read {
+            request: REQUEST,
+            oid: fixtures::oid(),
+            read: Decoded::Template(Template {
+                instructions: Box::new([Instruction { at: 0, does: Does::Text(bytes::copy_of(b"first\nsecond")) }]),
+                lines: Box::new([0, 6]),
+            }),
+        })
+    );
+}
+#[test]
+fn a_template_that_does_not_compile_is_refused_at_its_line_and_column() {
+    let mut layer = Layer::new();
+    layer.read(Box::new([crate::render::vocabulary::Blob {
+        kind: crate::render::vocabulary::As::Template,
+        ..fixtures::blob(b"Host:\n{{ target.name\n")
+    }]));
+    assert_eq!(
+        layer.run(&fixtures::batch(b"Host:\n{{ target.name\n"), Exit::Code(0)),
+        RootEvent::Render(Event::Read {
+            request: REQUEST,
+            oid: fixtures::oid(),
+            read: Decoded::Refused {
+                at: Position { line: 2, column: 1 },
+                fault: crate::render::errors::Decode::Syntax(crate::render::errors::Syntax::Unclosed),
+                also: None,
+            },
+        })
+    );
+}

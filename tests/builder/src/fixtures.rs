@@ -602,3 +602,6 @@ pub fn notice_limits() -> hearth::Limits {
         ..hearth_domain_store::limits::SHIPPED
     })
 }
+
+pub const BROKEN_TEMPLATE: File =
+    File { path: "tasks/motd/tree/etc/issue.j2", body: b"Host:\n{{ target.name\n", mode: 0o644 };
