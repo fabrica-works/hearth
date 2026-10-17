@@ -255,7 +255,7 @@ declared user, group) and `Software` (`root` or package ones), with their
 `groups` entry's `gid`, else by a sysusers user with a `uid` whose own group
 it is, the group named as the user with the user's `uid` as `gid` (format.md
 5.6; a `groups` entry of that name with another `gid` is 22's collision). A
-package user gives both ids or neither: one alone is `Why::OneId`. A fault is
+package user gives both ids or neither: one alone is `Why::OneId`, of `Owns::User`, its entry the user's own name, whether or not it owns anything (ruling 175). A fault is
 `Kind::Ids` at the field, `also` the declaration; it names the entry owned (ruling 174). `Seeds`: every package user
 with both ids, every package group with a `gid` and every owner, by name; a
 package user with neither seeds no line; empty, it is the record's empty
@@ -397,7 +397,7 @@ pub struct SeedIds { pub uid: u32, pub gid: Option<u32> }
 // errors.rs: `Kind` gains `Ids(Ids)`, `Schema` gains `Beneath { allowed: Box<[Box<[u8]>]> }`, `Format` gains `Sha256`
 /// render.md 7.2's `ids`: whose id is missing, of what, and why.
 pub struct Ids { pub owner: Box<[u8]>, pub of: Owns, pub entry: Box<[u8]>, pub why: Why }
-pub enum Owns { Data, Secret, Identity, Download }
+pub enum Owns { Data, Secret, Identity, Download, User }  // `User`: a package user's own entry, for `Why::OneId` alone
 pub enum Why { NoUser, NoGroup, NoUid, NoGid, OneId, NotPackageUser, NotPackageGroup }
 // diff.rs: `PartChange` gains `Secrets`, `Software`, `Live`; parts.rs: `PartRecord` too. Translation, both ways:
 #[must_use] pub fn secrets(secrets: render::parts::secrets::Secrets) -> records::parts::secrets::Secrets; // and `software`, `live`

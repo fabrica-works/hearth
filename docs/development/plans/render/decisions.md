@@ -946,6 +946,17 @@ None yet.
 
      What stays unchanged: the Proof's two exact lines; the error's place (at the owner, `also` the declaration); `Why`'s seven arms; 19.4's Size, at most 260 lines, under the README's four-times rule. No other session file names `Owned` or `Ids` of render's `ids.rs`; a further copy (a fixture, a match on `Ids`) takes the field, and the commit body names its file.
 
+175. **hearth 19.4's one-id fault is of the package user's own entry** (plan defect, hearth-19.4's block of 2026-10-17T23:36:41Z).
+     **hearth 19.4's one-id fault is of the package user's own entry** (plan defect, hearth-19.4's block of 2026-10-17T23:36:41Z).
+
+     Option A. render.md 7.2's `ids` row has three faults: "an owner of a data path, a secret or an identity file without a fixed id; a download owned by anyone but `root` or a package user with a fixed id; a package user with one of `uid` and `gid` alone". The third is of a `users` entry, owned or not, and the sketch's `Owns` had no arm for it. So:
+
+     - `Owns` gains `User`: a package user's own entry, for `Why::OneId` alone.
+     - That fault's `Ids` is `{ owner: <the user's name>, of: Owns::User, entry: <the user's name>, why: Why::OneId }`, at the `uid` or `gid` field given (the Shape's "at the field"), whether or not the user owns anything.
+     - The records' `Owns` mirror and the translation gain the arm, in 19.4's Files already.
+
+     What stays unchanged: ruling 174's `entry` field; the other three `Owns` arms and the six other `Why` arms; the Proof's two lines; 19.4's Size, under the README's four-times rule. A `Why::OneId` of another `Owns`, or `Owns::User` with another `Why`, is no state render makes; the test `a_package_user_with_one_id_alone_is_an_ids_fault` asserts the one above.
+
 ## For the user
 
 The long-term choices the user may veto:
