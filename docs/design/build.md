@@ -532,7 +532,9 @@ H("initramfs",
   systemd-sysusers /etc/sysusers.d/hearth.conf
   ```
 
-  Given a path, it runs that file alone (systemd-sysusers(8)).
+  Given a path, it runs that file alone (systemd-sysusers(8)). A
+  field with a space, a `gecos` most often, is written in double quotes,
+  which format.md, 5.6, keeps out of the fields.
 - **Ids are fixed where format.md requires them:** a user or group that
   owns a data path, a secret or an identity file has its uid and gid in
   its line, the same a package user was seeded with (5.5), so a snapshot
@@ -907,7 +909,9 @@ domain never sees a tool's text.
   (`dpkg: error`, `E: `, `Err:`, `No space left on device`, `Hash Sum
   mismatch`, `Failed to fetch`, `Unable to `, `Could not `) and none of
   mmdebstrap's own framing (`I: PID n exited with exit code`,
-  `E: mmdebstrap failed to run`), each cut at 160 bytes. It is
+  `E: mmdebstrap failed to run`, and 1.5.7's framing of apt's failure,
+  `E: setup failed: `, `E: apt-get update … failed: process exited
+  with` and `W: hooklistener errored out`), each cut at 160 bytes. It is
   classified: a maintainer script failed (and whose), no space, a
   package missing from the repository, other.
 - **Bounds:** a line at most 4096 bytes, the rest cut; the tail 20

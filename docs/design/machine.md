@@ -712,12 +712,16 @@ initrd=\initrd.img.x1-prod.b root=UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90 root
   root; `rootwait` in particular would make a missing root wait for ever
   instead of panicking. Render refuses them (format.md, 5.11), and the
   activator refuses them again.
-- **Tokens** are printable ASCII without spaces or quotes; a value with
-  a space cannot be expressed. Parameters are compared and written as
+- **Tokens** are printable ASCII without spaces, quotes or what GRUB's
+  script reads (`\`, `$`, `;`, `&`, `|`, `<`, `>`, `{`, `}`, `#`;
+  format.md, 5.4); a value with a space cannot be expressed. Parameters are compared and written as
   tokens, never as one string.
 - **Length:** the whole line, the trial's token included, is at most
   2048 bytes with its terminating NUL, x86's `COMMAND_LINE_SIZE`. The
-  `boot` part is refused when the line would be longer.
+  `boot` part is refused when the line would be longer, counted as an
+  EFI entry carries it, its `initrd=` token included, on BIOS too: one
+  rule for every target, and a target that moves to EFI hardware keeps
+  a line that fits.
 - **Nothing in hearth reads `/proc/cmdline`** to learn which slot runs:
   after a soft reboot it still names the slot the kernel was booted for
   (slots.md, section 3).
@@ -751,9 +755,11 @@ INCLUDE_MODULES=btrfs,virtio_pci,virtio_scsi,sd_mod
   microcode; `generic`, every installed microcode package, on bare
   metal. `yes` means the build host's processor.
 - **`INCLUDE_MODULES`** is the packages part's `initramfs` set, which the
-  `boot` task keys by hardware profile (7.2; format.md, 5.4); `mktirfs`
-  resolves their dependencies when it makes the image, and nothing is
-  resolved at boot.
+  `boot` task keys by hardware profile (7.2; format.md, 5.4), in the
+  set's order, bytewise (store.md, 3.1), comma-joined: the file follows
+  the part's digest, whatever order a list in 7.2 or a task gives.
+  `mktirfs` resolves their dependencies when it makes the image, and
+  nothing is resolved at boot.
 - **The image is in the output,** at `boot/initrd.img-<version>`,
   independent of the build host. Its bytes differ between two builds of
   the same inputs, since mktirfs's cpio keeps inode numbers and mtimes

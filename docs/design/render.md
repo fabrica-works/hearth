@@ -47,7 +47,8 @@ questions are in section 10.
 
 - **A repository:** a git directory, of two kinds:
   - **a local one,** which `hearth render` and `hearth diff` name with
-    `--repo` or a path: the client renders it in its own process, with
+    `--repo`, or find around the current directory (client/README.md,
+    3.5): the client renders it in its own process, with
     its own user's access, and never hands the path to a daemon
     (client/README.md, section 3);
   - **the builder's own clone,** `@hearth.store/repo/`, which the
@@ -67,8 +68,8 @@ questions are in section 10.
 git --git-dir=<repository> rev-parse --verify --quiet <revision>^{commit}
 git --git-dir=<repository> ls-tree -r -l -z --full-tree <commit>
 git --git-dir=<repository> cat-file --batch
-git diff --no-index --no-color --no-ext-diff --no-textconv --diff-algorithm=myers --unified=3
-    -- <store>/cache/<before> <store>/cache/<after>                              a changed file's hunks (6.1)
+git --git-dir=/dev/null diff --no-index --no-color --no-ext-diff --no-textconv --diff-algorithm=myers
+    --unified=3 -- <store>/cache/<before> <store>/cache/<after>                  a changed file's hunks (6.1)
 ```
 
 - **git is `/usr/bin/git`,** Debian's, spawned by its path: skein's
@@ -77,26 +78,51 @@ git diff --no-index --no-color --no-ext-diff --no-textconv --diff-algorithm=myer
   (client/README.md, 3.5).
 - **The environment is given whole:** `LC_ALL=C`, `GIT_CONFIG_NOSYSTEM=1`,
   `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_NO_REPLACE_OBJECTS=1`,
-  `GIT_TERMINAL_PROMPT=0`, and `HOME` an empty directory. No user's or
+  `GIT_TERMINAL_PROMPT=0`, and `HOME=/dev/null`. No user's or
   system's configuration changes what git prints, and a replace ref
-  cannot change a blob behind a commit id.
-- **The revision is checked before it reaches git:** a commit id of 40 or
-  64 hex digits, or a ref name of `[A-Za-z0-9._/-]`, at most 255 bytes,
-  never starting with `-`.
-- **`ls-tree` gives the listing:** one record per blob, `<mode> <type>
-  <oid> <size>\t<path>\0`. Modes `100644` and `100755` are files (the
+  cannot change a blob behind a commit id. Every file git looks for
+  under `HOME` (`.gitconfig`, `.config/git/attributes`) lies beneath a
+  file that is not a directory, so git finds none and says nothing, and
+  there is no directory to make or keep empty.
+- **The revision is checked before it reaches git,** as a guard, not a
+  parse: 1 to 255 bytes of `[A-Za-z0-9._/-]`, never starting with `-`.
+  git resolves what passes as it always does: a commit id of 40 or 64
+  hex digits, an abbreviated or uppercase one, a ref name. `rev-parse`
+  exiting 1 means the revision names no commit, whatever it printed
+  (`a..b` prints two lines).
+- **`ls-tree` gives the listing:** one record per entry, `<mode> <type>
+  <oid> <size>\t<path>\0`, the size right-aligned in at least seven
+  columns and `-` for a submodule, whose type is `commit`. Modes `100644`
+  and `100755` are files (the
   second executable), `120000` a symbolic link whose blob is its target,
   `160000` a submodule, which is an error under a path render reads.
-- **`cat-file --batch` gives blobs,** one process per revision read:
-  render writes `<oid>\n` and reads `<oid> <type> <size>\n`, the bytes,
-  and `\n`. The header's size must equal the listing's and fit the
-  blob's kind (2.3) before render demands the body.
+- **`cat-file --batch` gives blobs,** one process per `Read` (8.2):
+  render writes `<oid>\n` for each of the `Read`'s blobs, closing git's
+  input after the last, and reads, for each in turn, `<oid> <type>
+  <size>\n`, the bytes, and `\n`. The header's size must equal the
+  listing's and fit the blob's kind (2.3) before render demands the
+  body. `<oid> missing\n` answers an object the repository lacks: a
+  `tool` error of what needs that blob, and the batch reads on.
 - **`git diff --no-index` gives hunks,** for the diff alone (6.1): it
-  runs outside any repository, on two cache files, and exits 1 when they
-  differ, as they do when their digests do. Its output is unified: the
-  headers before the first `@@`, which are skipped, then hunks; a file
-  git takes for binary prints one `Binary files … differ` line and no
-  hunk. An exit past 1 is a tool error.
+  runs outside any repository, on two cache files. Wherever its working
+  directory lies, in a work tree too, `--git-dir=/dev/null` names no
+  repository, so git discovers none, and no work tree's configuration or
+  attributes (`diff.interHunkContext`, `core.autocrlf`, a `-diff`) change
+  what it prints. It exits 1 when the files differ, as they do when
+  their digests do. Its output is unified: the headers before the first
+  `@@`, which are skipped, then hunks; a file git takes for binary
+  prints one `Binary files … differ` line and no hunk. Anything else
+  fails that file's hunks: an exit of 0, an exit of 1 with neither a
+  hunk nor that line (git's answer when it cannot read a file), an exit
+  past 1 or a signal. The change stands without its hunks, and its
+  target has a `tool` error, so the diff exits 75 (client/README.md,
+  3.3).
+- **A failed git command is a `tool` error** with its exit and the tail
+  of its standard error: the last 20 lines, each cut at 160 bytes with
+  no marker, as mmdebstrap's (5.5). Output git should not give is one
+  too. git runs with no deadline in M1: it reads a local repository,
+  which answers or fails, and the person may interrupt the client; a
+  daemon's render is bounded by its job's deadline (steward.md, 5.2).
 - **`hearth-protocol-git` builds the vectors and parses the outputs** into
   typed records; the domain sees a listing, decoded documents and
   templates, the digests of static files and a diff's hunks as lines,
@@ -110,20 +136,38 @@ defaults alone (client/README.md, 3.5).
 
 | Limit | Default |
 |---|---|
-| entries in a revision's listing | 65,536 |
+| entries in a revision's listing; the bytes of all its paths | 65,536; 16 MiB |
 | a path | 4,096 bytes |
 | a JSON document; its depth; keys in an object | 1 MiB; 32; 4,096 |
-| a template, or a `task.json` string that is an expression | 1 MiB; 4 KiB |
+| a template; an expression, wherever it stands (a `task.json` string, a template's tag or `{{ }}`, an interpolation) | 1 MiB; 4 KiB |
 | a static file, or a `file` setting's target: streamed to the cache, never held | 64 MiB |
 | JSON documents and templates decoded from one revision, held in memory | 64 MiB |
 | targets in a revision; tasks; settings in a task | 1,024; 1,024; 512 |
 | nesting of statements in a template; of an expression | 32; 64 |
-| entries a declaration expands to | 65,536 |
+| entries one `task.json`'s declarations expand to for one target, an `if` that is false making none | 65,536 |
 | loop iterations in one evaluation | 1,048,576 |
+| values one evaluation makes; one target's validated settings; the exports of one environment | 16 MiB; 64 MiB; 64 MiB |
 | a rendered file, held until it is in the cache; bytes rendered for one target | 16 MiB; 256 MiB |
 | errors kept from one render | 256, then a count |
 
-Exceeding a limit is an error of the revision, with the path at fault.
+- **A level of nesting** is, in an expression, each `(`, a list's or an
+  index's `[`, a filter's `(`, a `not`, and an `if` or an `else` still
+  open: each place format.md, 7.4's grammar nests. In a template it is
+  an open `if` or `for`. The level past the limit is refused where it
+  opens.
+- **One evaluation** is one expression's, or one template's run for one
+  target. The values it makes count a string's bytes, and 32 bytes for
+  each element of a list or entry of a map; a list it makes nests at
+  most 64 deep. Validated settings and exports count alike.
+- **What a limit fails** is what holds the excess. The listing's limits,
+  the 64 MiB of decoded documents and templates, and the 1,025th target
+  or task fail the render: no target renders, and the error is the
+  revision's, at the path at fault. A document, a template, an
+  expression or a static file past its limit, or a task past its
+  settings, fails what needs that file (3.1). A limit met while
+  composing, validating, evaluating or rendering a target fails that
+  target. One met while reading the revision is `decode`; any other is
+  `evaluation` (7.2).
 
 ### 2.4 The builder's clone and its fetch
 
@@ -178,7 +222,13 @@ and step 4 reads other targets of the same environment.
   `hosts/<base>/*.json`), a declaration (`tasks/*/task.json`), a template
   (`*.j2`), a static file under `tasks/*/tree/`, or a file outside the
   four roots, read only if a `file` setting names it. A path under the
-  four roots that format.md, section 2 does not allow is an error.
+  four roots that format.md, section 2 does not allow is a `repository`
+  error: in `envs/`, anything but an `<env>.json`; directly in
+  `hosts/<base>/`, a `.json` that is neither of its documents (a file
+  deeper there, or not `.json`, is another file); a file directly in
+  `hosts/` or `tasks/`; a link where a document or a declaration must
+  be; and any submodule. An absent `fleet.json` or `<base>.json` is an
+  empty layer.
 - **The domain asks for blobs by kind,** and the protocol layer decodes
   each before it goes up:
   - JSON through skein's tokenizer into `hearth-protocol-config`, which
@@ -196,7 +246,18 @@ and step 4 reads other targets of the same environment.
     the bytes pass with lib's SHA-256 (asked of skein: README, 8.1), and
     the domain receives its object id, size and digest.
 - **A decode error fails what depends on the file,** not the revision:
-  the targets that have a broken task, or that compose a broken document.
+  the targets that have a broken task, or that compose a broken document;
+  only the limits of the whole revision fail it all (2.3). A repository
+  error fails the targets of its task or base alike; one of neither (a
+  stray file in `envs/`, or directly in `hosts/` or `tasks/`) fails no
+  target, and is the revision's error all the same.
+- **Errors of the revision print whatever targets are asked.** Step 1
+  and discovery read every document and declaration, so their errors
+  print with any command; an error of a target prints only when that
+  target is asked, and a task's templates are read only when an asked
+  target has the task (3.3). While a `hosts/` document is refused, a
+  named target that discovery cannot find is left out under that error,
+  which gives exit 2, not 64's unknown target (client/README.md, 3.3).
 
 ### 3.2 Compose and merge
 
@@ -211,12 +272,15 @@ and step 4 reads other targets of the same environment.
   a container (format.md, 5.12); the composed settings are restricted to
   the present tasks.
 - **Every value keeps its provenance:** the layer, file, line and column
-  that set it, so a later error names the right file.
+  that set it, so a later error names the right file. An object's is the
+  layer that made it (RFC 7386's `result = target`), not a later one that
+  patched its members, and each member keeps its own.
 
 ### 3.3 Validate
 
 - **Once per revision, each declaration is checked against itself:** its
-  schema is well formed and its defaults have their types; every
+  schema is well formed and its defaults have their types. **For each
+  task an asked target has,** every
   `settings.<name>`, `tasks.<task>.<setting>` and `exports.<task>` that its
   templates and expressions name is declared (format.md, 6.4); its
   templates are used and its scripts declared.
@@ -249,7 +313,17 @@ and step 4 reads other targets of the same environment.
 - **No cycle is possible:** exports depend only on their own task's
   settings and on `target` (format.md, 8.1).
 - **An error in another target's exports fails this render too,** naming
-  both targets: a spec never reads a guess.
+  both targets: a spec never reads a guess. A target's exports come from
+  its exporting task's validated settings and `target` alone
+  (format.md, 8.1), so what else fails on it (another task, its own
+  `requires`, its files) leaves them as they are, and its readers
+  render. When they cannot be computed (a document the exporter composes
+  is broken, the task's settings fail validation, an export's expression
+  fails, or a refused `hosts/` document hides which targets have the
+  task, 3.1), each reader fails with an `exported` error (7.2). A
+  container's placement is read alike: each entry of `target.containers`
+  holds the fields of the container's `target.placement`, and a container
+  whose placement cannot be composed fails its host.
 
 ### 3.5 Conditions
 
@@ -277,7 +351,10 @@ and step 4 reads other targets of the same environment.
 - **Render adds what tasks may not write themselves:** `/etc/subuid` and
   `/etc/subgid` from the users' subordinate ranges, a `tmpfiles` line of
   type `d` for each data entry's mode and owners (format.md, 5.6 and
-  5.7), and the initramfs configuration (4.2).
+  5.7), and the initramfs configuration (4.2). `/etc/subuid` and
+  `/etc/subgid` are one text, subuid(5)'s `<user>:<start>:<count>` line
+  for each user with a range, by name: two files `0644 root:root` in
+  the config part's tree, and neither when no user has a range.
 
 ### 3.7 Collisions
 
@@ -289,11 +366,19 @@ Render compares the concrete declarations of all the target's tasks:
 | a data name, within the target and across classes; a data path | one task only |
 | a secret's or identity's path | one task only, and never a path of the tree |
 | a path in the tree under a data path | never: the mount would hide it |
-| a download's path | one task only; never overlapping another's, nor a path of the tree |
-| users, groups, presets, tmpfiles lines, preseeds, boot parameters | several tasks only identically |
+| a download's path | one task only; never equal to, beneath or over another's, a path of the tree, or a secret's or identity's path; never under a data path |
+| users, groups (a sysusers user's own group among them: format.md, 5.6), presets, tmpfiles lines, preseeds, boot parameters | several tasks only identically |
 | a path a `live` entry covers | several entries, of one task or several: their consumers are a union (format.md, 5.14) |
 | a uid or gid; a subordinate range | one user or group; ranges never overlap |
 | packages, initramfs modules | a union |
+
+- **Identically** is field for field, once defaults are filled: a
+  default one task writes out and another leaves out is the same value.
+  Positions and the tasks themselves are not compared.
+- **Paths collide when one is the other or lies beneath it:** a tree
+  file beneath a tar download's path, two data paths nested, a download
+  under a data path, which the mount would hide. Two claims of one task
+  collide as two tasks' do.
 
 A collision is an error that names both tasks and both lines. os
 overwrote silently, in alphabetical order of task.
@@ -375,6 +460,13 @@ overwrote silently, in alphabetical order of task.
 | `exports` | other | what this target publishes to its environment | no key; read by other targets' renders |
 | `meta` | | target, base, member, environment, placement | no key |
 
+- **Every part M1 builds is in every spec,** an empty one too: the keys
+  and the spec digest need each part's digest (4.5). A part with nothing
+  in it is its record with each field empty, a field left out only when
+  it is optional and absent (store.md, 3.1), so no part is ever lacking.
+  A part a later milestone adds is left out until then. Parts are
+  printed in this table's order.
+
 ### 4.2 Output parts
 
 ```
@@ -387,7 +479,7 @@ packages
     updates            bool
     security           timestamp; absent when the pocket is off
   request              set of package names
-  variant              apt for metal and vm; containers' is settled in M5 (format.md, section 13)
+  variant              apt for metal and vm; container for a container, until M5 settles it (format.md, section 13)
   preseeds             map question → { owner, type, value }
   initramfs            { modules: set of names, microcode: none | generic }; absent for a container
   apt                  { install_recommends }
@@ -403,7 +495,7 @@ config
                          file       { content digest, mode, owner, group }
                          link       { target, owner, group }
                          directory  { mode, owner, group }
-  groups               map name → { gid? }
+  groups               map name → { gid? } | package
   users                map name → { uid?, group, gecos, home, shell } | package
   members              set of (user, group)
   presets              map unit → enable | disable
@@ -415,7 +507,10 @@ config
   (format.md, 3.4): os chose it from a `container` task in render and
   from the target's kind in deploy, which disagreed. A container's
   variant changes its resolution key (5.1), so a host and its container
-  never share a packages layer.
+  never share a packages layer. Until M5 settles what mmdebstrap is
+  given, `container` is a placeholder: it enters the key, but render asks
+  no resolution for it, so its packages key stays needed, with
+  `--resolve` too, and that is no error (5.7).
 - **A container's packages part has no initramfs,** and render refuses
   a task's module on it, as it refuses a boot parameter (format.md, 3.4;
   7.2): with no kernel there is nothing to configure.
@@ -426,7 +521,10 @@ config
   derives `microcode` from placement's kind, `none` on a VM and `generic`
   on metal; placement enters no key, so the part must carry the choice
   for the build to know it. Nothing a task writes can set `yes` for
-  either.
+  either. Render writes the text into the cache, as a rendered file
+  (3.6), and the spec names its content digest beside the part, outside
+  the part's digest, which the two fields already make; build copies it
+  from there into its inputs (build.md, 5.4).
 - **`seeds` are the fixed ids build writes into `/etc/passwd` and
   `/etc/group`** in mmdebstrap's extract hook, before any package is
   configured (build.md, 5.5): every package user and group, and every
@@ -451,13 +549,14 @@ config
 - **A download is what it is, not where it comes from.** Its URL stays
   outside the digest, as a fetch hint beside the part (map from SHA-256
   to URL), so moving a release to a mirror rebuilds nothing. Its name
-  stays out too; the path keys it.
+  stays out too; the path keys it. Two downloads of one SHA-256 give the
+  hint the URL of the first by path; a URL is text, kept as written.
 - **Owners are names** in every part; build resolves them in the layer
   (format.md, 5.5). Those of data, secrets, identity and software have
   fixed ids (3.3).
-- **A package user** is a name only (format.md, 5.6): build writes no
-  sysusers line for it, and the activator confirms it in the slot's
-  `/etc/passwd` at prepare (slots.md, 5.7).
+- **A package user or group** is a name only (format.md, 5.6): build
+  writes no sysusers line for it, and the activator confirms it in the
+  slot's `/etc/passwd` or `/etc/group` at prepare (slots.md, 5.7).
 - **Each data entry adds a `tmpfiles` line** of type `d` with its mode
   and owners (format.md, 5.7), so they are applied at boot in the running
   slot (machine.md, 3.4).
@@ -473,9 +572,10 @@ secrets
   files                map secret name → { path, mode, owner, group }
   passwords            map user → secret name
   identity             map item → { kind, algorithm?, path, public_path?, mode, owner, group }
-boot                   list of parameters, in order; for a container [M5], its parameters instead:
-                         { ids, binds: map path → { source, read_only }, capabilities, network, bridge? };
-                         and mutable, from placement (development.md, section 4)
+boot                   { mutable, params }: mutable from placement (development.md, section 4);
+                         params the kernel's command-line parameters, a list in order; for a container,
+                         empty in M1, and from M5 its own parameters instead:
+                         { ids, binds: map path → { source, read_only }, capabilities, network, bridge? }
 ```
 
 - **Slot parts never enter a layer key:** changing one makes a new slot of
@@ -502,11 +602,13 @@ boot                   list of parameters, in order; for a container [M5], its p
 ### 4.4 Other parts and meta
 
 ```
-exports                map task → map name → value; and [M5] the task's probes with `from`, rendered
-live                   map path → list of { task, unit?, action }, in path order; a path ending in `/`
-                       covers its subtree (format.md, 5.14)
 checks                 from M3, the units whose failure does not block a bless (format.md, 5.13);
                        [M5] the target's checks, and the probes it runs for others (3.9; operating.md, section 2)
+live                   map path → list of { task, unit?, action }, in path order, each path's consumers
+                       by task, then unit (none first), then action; a path ending in `/` covers its
+                       subtree (format.md, 5.14)
+exports                map task → map name → value, empty when no task exports, every integer in a value
+                       at any depth as its decimal text (4.6); and [M5] the task's probes with `from`, rendered
 meta                   { target, base, member?, environment, placement { kind, firmware?, hardware?, on?, and a container's parameters [M5] } }
 ```
 
@@ -524,12 +626,12 @@ meta                   { target, base, member?, environment, placement { kind, f
 ```
 part digest        = H("part:<name>", the part's record)
 resolution key     = H("resolution", sources, request, variant, apt)                 5.1
-resolution digest  = H("closure", each package's name, architecture, version, SHA-256) 5.4
+resolution digest  = H("closure", list [ list [ name, architecture, version, sha256 ] … ])  5.4
 packages key       = H("packages", resolution digest, packages part digest)
 software key       = H("software", packages key, software part digest
                          [, M6: the resolved key of each head artifact, by path])
 config key         = H("config", software key, config part digest)                   the output's name
-spec digest        = H("spec", the digests of meta and of every part)
+spec digest        = H("spec", map part name → part digest, meta's among them)
 ```
 
 - **The packages key takes the closure's digest,** not the resolution's
@@ -562,8 +664,13 @@ store.md, section 3 defines the encoding and H. Render relies on it for:
   domain (`no_std`), with a digest a fixed 32 bytes inside other records.
 
 The encoding has no signed integers. An integer setting may be negative,
-so an export's integer value enters as its decimal text; every other
-integer in a part (ids, modes, orders, sizes) is unsigned.
+so every integer in an export's value, at any depth, enters as its
+decimal text; every other integer in a part (ids, modes, orders, sizes)
+is unsigned.
+
+A field's name in the encoding is its JSON name: a two-word field is
+snake case in both (`content_digest`, `install_recommends`,
+`public_path`), where the blocks above may write it as two words.
 
 ## 5. Resolution
 
@@ -584,14 +691,14 @@ resolution key = H("resolution", sources, request, variant, apt)
 
 ```
 mmdebstrap --verbose --simulate --mode=chrootless
-  --variant=<variant>               the part's: apt for metal and vm; a container's (4.2)
-  --architectures=amd64
-  --include=<the request, sorted, comma-joined>
+  --variant=<variant>               the part's: apt for metal and vm; never a container's in M1 (5.7)
+  --architectures=<architecture>    the sources'
+  --include=<names, comma-joined>   the request, sorted; split, and none when it is empty
   --aptopt=Acquire::Check-Valid-Until "false"
-  --aptopt=APT::Install-Recommends "false"
+  --aptopt=APT::Install-Recommends "<true | false>"    the part's install_recommends
   [--aptopt=Acquire::http::Proxy "<the builder's proxy>"]
   --skip=cleanup/apt/lists
-  forky <scratch>/root <scratch>/sources.list
+  <suite> <scratch>/root <scratch>/sources.list
 ```
 
 with `<scratch>/sources.list` encoded from the sources:
@@ -600,8 +707,16 @@ with `<scratch>/sources.list` encoded from the sources:
 deb http://snapshot.debian.org/archive/debian/20261001T030405Z/ forky main contrib non-free-firmware
 ```
 
-and, with both pockets on, `<suite>-updates` from the same archive and
-`<suite>-security` from `http://snapshot.debian.org/archive/debian-security/<security>/`.
+one line for each pocket on, each with the sources' components in their
+fixed order (4.2): the suite's own; then `<suite>-updates` from the same
+archive when `updates` is on; then `<suite>-security` from
+`http://snapshot.debian.org/archive/debian-security/<security>/` when
+`security` is set.
+
+- **The request is split** into `--include` arguments of at most 64 KiB
+  each, as build.md, 5.4 splits the closure: Linux caps one argument at
+  128 KiB, and mmdebstrap joins its `--include`s in order. An empty
+  request passes none.
 
 - **Unprivileged, with no namespace:** chrootless simulate needs no
   subordinate ids, where mmdebstrap's automatic mode would pick unshare
@@ -615,6 +730,11 @@ and, with both pockets on, `<suite>-updates` from the same archive and
   builders out (store.md, 8.2).
 - **mmdebstrap is `/usr/bin/mmdebstrap`,** spawned by its path, as git
   is (2.2).
+- **apt checks each `InRelease` with the host's keys,** those
+  mmdebstrap gives it by default (`/etc/apt/trusted.gpg.d/`, the host's
+  `debian-archive-keyring`), with no `--keyring`: a builder resolves
+  what its host trusts, and the keys are in no key (5.1). A host that
+  lacks them fails the run, an error of kind `tool` (7.2).
 - **The environment is given whole:** `LC_ALL=C`,
   `PATH=/usr/sbin:/usr/bin:/sbin:/bin` for the tools mmdebstrap and apt
   run, and `TMPDIR` the scratch directory.
@@ -628,16 +748,36 @@ and, with both pockets on, `<suite>-updates` from the same archive and
 
 - **`Inst` lines give the closure's names:** `Inst <name> [<old>]
   (<version> <origins> [<architecture>])` gives the name, the version and
-  the architecture of each package apt would install.
+  the architecture of each package apt would install. Under `--verbose`
+  they come on standard error (mmdebstrap 1.5.7, apt 3.0.3), and
+  `hearth-protocol-mmdebstrap` reads both pipes as they fill. A line may
+  go on after `])` with apt's list of broken packages, ` [<names>]` or
+  ` []`; the reader takes the triple and ignores the rest. Each triple
+  comes twice, as mmdebstrap simulates the download and then the
+  install: equal triples are one package. The closure's bound counts
+  packages (store.md, 6.1: 8,192), so the reader takes at most twice as
+  many `Inst` lines.
 - **The `Packages` indices give the rest.** `hearth-protocol-mmdebstrap`
   reads every `*_Packages` file under `<scratch>/root/var/lib/apt/lists/`
-  in bounded chunks, stanza by stanza (at most 64 KiB a stanza), and
-  sends up each stanza's `Package`, `Version`, `Architecture`,
-  `Filename`, `Size` and `SHA256`. The indices are what apt verified
-  against the signed `InRelease`, so their digests can be trusted.
+  in bounded chunks, stanza by stanza (at most 1 MiB a stanza: trixie's
+  `librust-winapi-dev` has 76,338 bytes), and sends up each stanza's
+  `Package`, `Version`, `Architecture`, `Filename`, `Size` and `SHA256`,
+  holding no other field. The indices are what apt verified against the
+  signed `InRelease`, so their digests can be trusted. apt keeps them
+  decompressed (mmdebstrap 1.5.7, apt 3.0.3), each named by its URI
+  without the scheme, `_` for `/`; the reader takes the files ending
+  `_InRelease` and `_Packages` and skips every other name (`lock`,
+  `partial/`).
+- **Output the tool should not give is a fault of the tool:** a malformed
+  `Inst` line, a pipe that breaks, a stanza past its bound, or a
+  `_Packages` or `_InRelease` list that no source line names, that is
+  compressed, or that a source line names and is missing, is a `tool`
+  error, operational (7.2), as git's malformed output is (2.2).
 - **The domain matches them:** each `Inst` triple must match a stanza;
   several stanzas may match (one per index that holds the package) and
-  must agree on size and digest. The package's source is the first
+  must agree on size and digest. A triple with no stanza, or stanzas
+  that disagree, is a `resolution` error, operational: the indices read
+  are not those apt resolved from. The package's source is the first
   matching index's line, in the order of the sources; its URI is that
   line's archive followed by `Filename`.
 - **The indices are kept.** Debian, and so snapshot.debian.org,
@@ -649,17 +789,17 @@ and, with both pockets on, `<suite>-updates` from the same archive and
   SHA-256 (store.md, 6.4): the protocol layer hashes each in the pass
   that reads its stanzas, and the domain then has it synced and renamed
   from the scratch directory to `cache/<sha256>`, with no copy, and
-  recorded (store.md, 6.5 and 6.8). If apt
-  kept them compressed (section 10), each is streamed through the
-  decompressor into the cache instead. The record names them by those
+  recorded (store.md, 6.5 and 6.8). The record names them by those
   digests. build.md's local repository serves them at plain paths
   (build.md, 5.3), so the build reads the indices apt verified, offline.
 - **The closure** is, per package: name, architecture, version, source,
   archive filename, size and SHA-256, sorted by name, then architecture.
   It is what build.md's fetch step needs to fetch each `.deb` by digest
   into its cache.
-- **Every requested package must be in the closure;** one that is not, or
-  an `Inst` triple with no stanza, is an error.
+- **Every requested package must be in the closure;** one that is not
+  (apt installs another that provides it, or replaces it) is a
+  `resolution` error, configuration: the request names a package apt
+  does not install.
 
 ### 5.4 The record
 
@@ -668,11 +808,12 @@ resolution record                                                            sto
   key           the resolution key                                           5.1
   inputs        sources, request, variant, apt: the key's values (5.1), as the packages part holds them
   sources       per source line: uri, suite, components;
-                  InRelease { sha256 }, in the cache;
-                  each Packages index { path in the archive, sha256, size, its InRelease entry }, in the cache
+                  its indices in the cache, each [ path, size, sha256 ]: InRelease first, then each
+                  Packages index, at the path, size and sha256 of its InRelease entry
   closure       per package: name, architecture, version, source, filename, size, sha256
-  digest        H("closure", name, architecture, version, sha256 of each)    the resolution digest, 4.5
-  made          wall time; apt's and mmdebstrap's versions; costs            outside the digest
+  digest        H("closure", list [ list [ name, architecture, version, sha256 ] … ]),
+                  in the closure's order (5.3)                               the resolution digest, 4.5
+  made          { at, apt, mmdebstrap, costs: { fetched, took } }            outside the digest
 ```
 
 - **A record of the store,** found by its key (store.md, 6.4), and
@@ -681,9 +822,20 @@ resolution record                                                            sto
 - **The digest covers what is installed,** not where it came from: a
   package's archive and filename stay outside it.
 - **An index's InRelease entry** is the line that lists its path in the
-  archive (`main/binary-amd64/Packages`) with the size and SHA-256 of
-  the decompressed file, which apt checked and the record repeats; so a
-  cached index is tied to the signed `InRelease` beside it.
+  suite's directory, `dists/<suite>/` (`main/binary-amd64/Packages`),
+  with the size and SHA-256 of the decompressed file, which apt checked
+  and the record repeats; so a cached index is tied to the signed
+  `InRelease` beside it, whose own path there is `InRelease`. render
+  reads no field of `InRelease`: the size and SHA-256 recorded are those
+  of the protocol layer's pass over the file (5.3), which equal the
+  entry's because apt checked the file against it.
+- **`made` is outside the digest** and says how the record came to be:
+  `at`, the wall time when it is recorded; `took`, the run's duration
+  from the spawn to the last index read; `fetched`, the bytes apt
+  reports on its `Fetched <n> <unit> in <time>` line, in its units (`kB`
+  is 1,000 bytes) and as apt rounds them, or 0 when it prints none. A
+  simulate run prints neither tool's version, so `apt` and `mmdebstrap`
+  are empty in M1; M2 records them from each tool's `--version`.
 - **Once recorded, a key's closure does not change** on that builder:
   render reuses it until the record is collected. Re-resolving the same
   key later, with another apt, may give another closure, and so another
@@ -691,22 +843,45 @@ resolution record                                                            sto
 
 ### 5.5 Failures and costs
 
-- **mmdebstrap's output is parsed as os parsed it:** progress markers,
-  and a failure tail of at most 20 lines of 160 bytes, chosen by its
-  allow and deny patterns (`E: `, `Err:`, `Failed to fetch`, `Hash Sum
-  mismatch`, `404  Not Found`, and the rest).
-- **Classified by pattern:** a fetch that failed, a name that did not
-  resolve, a timeout or a spawn failure is operational, and the domain
-  may retry it after a backoff; `Unable to locate package` and
-  unsatisfiable dependencies are configuration errors, naming the
-  package. Anything else defaults to configuration. The patterns are held
-  to recordings of real runs (9.6).
+- **A failed run gives a tail** of at most 20 lines, each cut at 160
+  bytes with no marker, chosen by build.md 10.1's lists, deny before
+  allow, with each indented line that follows a kept line kept with it.
+  Resolution adds to them: the tail keeps apt's verdict on the request
+  whole, `The following packages have unmet dependencies:` and `However
+  the following packages replace it:` with their indented lines, and
+  denies mmdebstrap 1.5.7's own framing of apt's failure, `E: setup
+  failed: `, `E: apt-get update … failed: process exited with` and `W:
+  hooklistener errored out`. apt 3.0.3 under mmdebstrap prints `E:` and
+  `W:`, not `Error:`. These lists are the contract, held to recordings
+  of real runs (9.6).
+- **The tail gives the cause,** taken over every kept line with its
+  indented lines, before the cut to 20:
+
+  | Cause | Lines | Kind, class |
+  |---|---|---|
+  | a package apt does not know | `Unable to locate package <name>`; `Package '<name>' has no installation candidate` | `resolution`, configuration, naming the package |
+  | dependencies apt cannot satisfy | `Unable to correct problems`, or the unmet-dependencies line, named by its first indented line's `<name> :` | `resolution`, configuration, naming the package |
+  | a suite, component or architecture the archive does not have | an `Err:` or `Failed to fetch` the archive answered `404  Not Found` (snapshot.debian.org prints `NOT FOUND`), or apt's `does not have a Release file` | `resolution`, configuration, naming the source line: snapshot.debian.org never changes a timestamp's archive, so the same revision fails again |
+  | a fetch with no answer, or a broken one | any other `Err:` or `Failed to fetch`: `Could not connect`, `Unable to connect`, `Could not resolve`, `Temporary failure resolving`, a timeout, a hash or size mismatch, a 5xx answer | `tool`, operational |
+  | no space | `No space left on device` | `tool`, operational (wire.md, 4.4) |
+  | none of these | | `tool`, configuration |
+
+  An operational cause on any kept line outranks every configuration
+  one: a fetch that failed leaves apt without the lists it would have
+  found the package in. Then the first configuration cause decides.
 - **Timeouts:** 60 s without output ends a run, as in os; the domain
-  sets an overall deadline (10 minutes by default).
+  sets an overall deadline (10 minutes by default). Both, and a spawn
+  that fails, are `tool`, operational.
+- **render never retries.** An operational error tells its caller that
+  the same revision may resolve later: the client exits 75
+  (client/README.md, 3.3) and the steward backs off (wire.md, 4.4).
+- **No marker within a run goes up:** render reports a resolution as it
+  starts and as it ends (client/README.md, 3.2), and none of
+  mmdebstrap's stages.
 - **One resolution at a time per builder:** snapshot.debian.org is fetched
   serially. A run took 9 to 15 s, mostly `apt-get update`.
-- **Its costs are facts:** each run's duration and bytes go up as costs
-  (README, section 5).
+- **Its costs are facts:** each run's `took` and `fetched` (5.4) go up
+  as costs (README, section 5).
 
 ### 5.6 What changes from os
 
@@ -725,14 +900,24 @@ resolution record                                                            sto
   key and asks the store for its record (8.2); a key the store does not
   hold is needed, and the spec says so (3.8, 9.2). No mmdebstrap runs,
   and nothing reaches the network.
+- **A container's packages key stays needed in M1:** its variant is a
+  placeholder until M5 (4.2), so render asks no resolution for it,
+  `--resolve` resolves none, and the spec says needed, with no error.
+  Its other parts render, and its host reads its placement (3.4).
 - **The client resolves on request.** `hearth render --resolve` and
   `hearth diff --resolve` (client/README.md, 3.1) resolve each needed key, one at
   a time (5.5), and record each closure before they print: render's
   targets' keys, and for a diff the keys of the targets whose
   resolution key changed, on both sides, so that its packages change
-  lists what was added, removed and moved (6.1). A resolution that fails
-  is that target's error (7.2): operational or configuration as 5.5
-  classifies it.
+  lists what was added, removed and moved (6.1). A target that one side
+  alone has resolves nothing.
+- **A resolution that fails stops no other.** The keys go in the order of
+  their first holder, the targets in name order, and every key is tried.
+  A key that fails is the error of each target that holds it (7.2), with
+  no place (7.1), operational or configuration as 5.5 classifies it;
+  each keeps its spec, with that key needed. In a diff the target's
+  change stands, its resolution `new key`, and the error prints after
+  the changes (6.1).
 - **A build resolves what its plan needs** (build.md, 4.1) [M2], and the
   daemon's builder resolves for its jobs as they need it (steward.md,
   3.3) [M3].
@@ -748,19 +933,22 @@ diff
 change
   added { spec digest } | removed | same
   | changed { parts: list of part change, rebuild }
-  | failed { side: from | to, errors }
+  | failed { side: from | to | both, errors }
 part change
   packages             request: added, removed; sources, variant, preseeds, initramfs, apt: before, after;
+                       seeds: users and groups added, removed, changed, by name;
                        resolution: same | new key | new key, resolved: added, removed, versions changed
   software             downloads and artifacts added, removed, changed, by path; scripts changed
   config               tree entries added, removed, changed { path, before, after };
                        groups, users, members, presets, tmpfiles: added, removed, changed, by key;
                        scripts changed
-  data, secrets        entries added, removed, changed, by name; secrets by name only
+  data                 entries added, removed, changed, by name
+  secrets              names added, removed, changed; never a value
   boot                 before, after
+  live                 paths added, removed, changed
   exports              task.name: before, after
   checks [M5]
-  meta                 placement: before, after
+  meta                 base, member, environment, placement: each before, after, when it changed
 rebuild
   from packages { resolution: known | needed } | from software | from config | slot only | nothing
 ```
@@ -770,10 +958,23 @@ rebuild
   computes them from the two contents in the store's cache (2.2), with
   three lines of context, and `hearth-protocol-git` hands up at most 200
   lines a file, with the count of those left out, or that the file is
-  binary. Step code computes no text diff. The hunks are part of the
-  typed diff, so its JSON carries them (client/README.md, 3.2), and a client that
+  binary. The lines count from the first `@@`, each `@@` line among them,
+  as 6.3 prints them, and each is one of a hunk's header, context,
+  removed, added, or `\ No newline at end of file`, kept and counted
+  like the others. The domain holds one target's hunks at a time, as it
+  hands its change up. Step code computes no text diff. The hunks are
+  part of the typed diff, so its JSON carries them (client/README.md, 3.2), and a client that
   cannot read the daemon's store [M3] receives them with the rest.
 - **Secrets show names and places,** never values, since render has none.
+- **`failed` is a target whose spec did not render** on a side that has
+  it: `from` or `to`, or `both` when each side has it and neither
+  rendered. Its errors are those sides' (7.1, `side`), and print after
+  the changes. A failed target counts among the diff's targets, neither
+  as changed nor as unchanged. A resolution that fails leaves the spec
+  rendered, so its change stands (5.7).
+- **Every part's change says what moved its digest:** a live-only change
+  rebuilds `nothing` (4.4), as does a change to meta, and no changed
+  target shows an empty list of part changes.
 
 ### 6.2 Targets touched and costs
 
@@ -799,9 +1000,13 @@ A commit changes ion-prod's public endpoint, in `hosts/ion/ion-prod.json`:
 $ hearth diff main HEAD
 carbon-prod                                         rebuild from config
   config   ~ /etc/systemd/network/wg0.netdev        0644 root:root
-               @@ -13 +13 @@
+               @@ -9,5 +9,5 @@ ListenPort=51820
+                [WireGuardPeer]
+                PublicKey=m3NY8…=
+                AllowedIPs=10.0.0.1/32
                -Endpoint=194.164.162.157:51820
                +Endpoint=194.164.162.158:51820
+                PersistentKeepalive=25
 ion-prod                                            nothing to build
   exports  ~ vpn.endpoint   "194.164.162.157" → "194.164.162.158"
 
@@ -813,6 +1018,11 @@ ion-prod                                            nothing to build
 - The coupling is visible: carbon-prod changes because it reads ion-prod's
   exports, and carbon-lab does not, because exports stay in their
   environment.
+- **Hunks print as git gives them,** three lines of context and each
+  `@@` line with git's own context after it (format.md, 8.6's template
+  rendered for carbon-prod). A failed target prints `failed (from)`,
+  `failed (to)` or `failed (both)` where the rebuild goes, and its errors
+  print after the changes.
 
 ### 6.4 Who posts it
 
@@ -830,9 +1040,10 @@ error
   kind        one of 7.2, with its own typed fields
   class       configuration | operational
   at          { path, line, column } in the revision, when there is one
-  also        a second place: the other task of a collision, the layer that set a value
+  also        a second place: a collision's later task in name order, the layer that set a value
   target      the target, when the error is a target's
   task        the task, when it is a task's
+  side        from | to, in a diff: the revision the error is of
 ```
 
 - **Configuration errors** mean the revision is wrong and must change.
@@ -841,24 +1052,44 @@ error
 - **Render collects every independent error:** a broken document fails
   the targets that compose it, a broken task the targets that have it,
   and the rest goes on. Errors are sorted by path, line, column and
-  target, and bounded (2.3).
+  target, then side, those with no place after those with one, by
+  target; and bounded (2.3): one bound over a command's answer, a diff's
+  two sides together. An error past the 256th is counted, not kept, and
+  still decides the exit code (client/README.md, 3.3).
+- **One fault gives one error, where render stops reading:**
+  - a document or a declaration gives its first fault, and the targets
+    it fails print it once, without a target;
+  - each setting is validated on its own: every setting at fault gives
+    its error, and one at fault enters no value;
+  - a schema fault stops the target before its guards: no guard is
+    evaluated, and nothing renders;
+  - every guard of a target is evaluated and each false one prints; a
+    false guard stops its target's entries and files;
+  - every file of a target renders, each giving its first fault.
+- **An error's place is where the fault is read,** and an absent thing's
+  is where its owner is: a missing setting at the key that gives its
+  task to the target, a missing field at its object's `{`, a bad read
+  at the read, a fault inside a JSON string at its opening quote, and a
+  template's fault at its own line and column.
 
 ### 7.2 Kinds
 
 | Kind | Examples |
 |---|---|
-| decode | not JSON, a duplicate key, a fraction, invalid UTF-8, a template's syntax, an unknown filter, a limit exceeded |
-| repository | a document out of place, an environment that does not exist, a submodule, a stray file in a task |
-| composition | two targets of one name, `null` for a task in a default, `placement` in a base, a container's `on` that names a container or a target of another environment; [M5] a container's parameters on another kind, or an id range that overlaps another's (format.md, 3.5) |
-| schema | an undeclared setting, a wrong type, a missing required setting, an undeclared read, a bad default |
-| evaluation | an undefined value used, a type error in an expression, an overflow, a `for_each` that is not a map or list |
+| decode | not JSON, a duplicate key, a fraction, invalid UTF-8, a `null` inside a list, a document or a declaration not of its shape, a template's syntax, an unknown filter; a limit met while reading the revision: its listing's, a file's, the decoded documents' and templates', the 1,025th target or task, a task's 513th setting (2.3) |
+| repository | a document out of place, an environment that does not exist, a directory named out of form, a path that is not UTF-8, a submodule, a stray file in a task, two sources for one destination, a `.j2` link or a bare `.j2` |
+| composition | two targets of one name, a target's name past 63 bytes, a task that does not exist, `null` for a task in a default (the `hearth` task's is `reserved`), `placement` in a base, `null` for `placement` or `members`, `members` in `fleet.json` or `envs/`, a target with no placement, a container's `on` that names a container or a target of another environment; [M5] a container's parameters on another kind, or an id range that overlaps another's (format.md, 3.5) |
+| schema | an undeclared setting, a wrong type, a missing required setting, an undeclared read, a bad default, a key or value of a later milestone (format.md, 2.2) |
+| evaluation | an undefined value used, a type error in an expression, an overflow, a `for_each` that is not a map or list; a limit met while composing, validating, evaluating or rendering a target (2.3) |
+| exported | another target's exports that this one reads cannot be computed (3.4): `target` is the reader, the kind names the exporter and its task, `at` is the cause's place, and the class is the cause's |
 | guard | a false `requires`, with its message |
-| reserved | a command-line key, a path, a unit name, a drop-in that sorts after `zz-hearth-watchdog.conf`, a tmpfiles line, an initramfs setting or a preseed that hearth reserves; a secret or identity file `hearth` could read, or a secret readable by others; [M5] an initramfs module, a boot parameter or the `hearth` task on a container, a host's preset that enables one of its containers' nspawn units (format.md, 3.4, 5.11 and 5.12; build.md, 7.3, 7.4 and 9.2; slots.md, 5.5; machine.md, 6.2) |
-| ids | an owner of a data path, a secret or an identity file without a fixed id; a download owned by anyone but `root` or a package user with a fixed id (3.3; format.md, 5.6 and 10.1) |
+| reserved | a command-line key, a path, a unit name, a drop-in that sorts after `zz-hearth-watchdog.conf`, a tmpfiles line, an initramfs setting or a preseed that hearth reserves; anything but a directory above a reserved path, and a tmpfiles path with a glob or a specifier; a `live` entry render can tell is never live; a secret or identity file `hearth` could read, or one whose `mode` has a bit outside `0770`; `null` for the `hearth` task, in any layer; an initramfs module, a boot parameter or the `hearth` task on a container; [M5] a host's preset that enables one of its containers' nspawn units (format.md, 3.4, 5.11, 5.12, 5.14 and 9.3; build.md, 7.3, 7.4 and 9.2; slots.md, 5.5; machine.md, 6.2) |
+| ids | an owner of a data path, a secret or an identity file without a fixed id; a download owned by anyone but `root` or a package user with a fixed id; a package user with one of `uid` and `gid` alone (3.3; format.md, 5.6 and 10.1) |
 | checks [M5] | a `blessing` check with `from`, a `from` no target has, a command's `user` that is `root`, or neither `nobody`, a sysusers user nor a declared package user (3.9) |
-| collision | one path from two tasks, two users that differ |
-| resolution | a package apt cannot locate, unsatisfiable dependencies, an `Inst` line with no stanza |
-| tool | git or mmdebstrap failed, timed out or could not start: operational |
+| collision | one path from two tasks, two users that differ, a key a declaration makes twice |
+| resolution | configuration: a package apt does not know, dependencies apt cannot satisfy, a suite the archive does not have (5.5), a requested package apt does not install (5.3); a closure past 8,192 packages, or a record past its bounds (store.md, 6.1). Operational: an `Inst` triple with no stanza, stanzas that disagree (5.3) |
+| tool | git or mmdebstrap failed, timed out, could not start or gave output it should not (2.2, 5.3), or a resource failed, as 5.5 says: operational; mmdebstrap's failure of no cause 5.5 knows: configuration |
+| store | a store full at a limit, or whose upkeep failed (store.md, 8.1): operational, the call's, naming the store and the limit and count or the step. A store that cannot be opened, or is another uid's or another range's (store.md, 6.6), is no error of the answer: nothing renders, and the client says so at startup (client/README.md, 3.2) |
 
 ### 7.3 Printed
 
@@ -867,10 +1098,19 @@ hosts/ion/ion-prod.json:4:5: ion-prod: vpn: undeclared setting "adress"; vpn dec
 tasks/mail/tree/etc/postfix/main.cf.j2:60:42: mail: exports.mail is not in mail's reads
 tasks/hardening/task.json:9:7: rhi-prod: /etc/ssh/sshd_config.d/local.conf is given by hardening and by ssh (tasks/ssh/tree/etc/ssh/sshd_config.d/local.conf.j2)
 tasks/boot/task.json:22:7: carbon-lab: boot: requires modules: no initramfs modules for this hardware
+tasks/users/task.json:14:9: rhi-prod: users: the key "ops" is made twice (tasks/users/task.json:9:9)
 ```
 
 - **An undeclared setting lists the declared ones,** so an agent fixes a
-  typo in one step.
+  typo in one step; a task with none says so, `motd declares no
+  settings`.
+- **`also` prints as a place,** in parentheses after the message:
+  `path:line:column`, or the path alone when the place is a whole file,
+  as a file of the tree is.
+- **What an error echoes is quoted:** a key or a value from the revision
+  prints between `"`, with `\"`, `\\` and `\n` for those bytes and
+  `\xNN` for every other control byte, so an error is one line whatever
+  the revision holds.
 - **What would fail later fails here.** Every path, key and line that a
   build's scan, the activator or the boot would refuse, and that render
   can see in the declarations, render refuses first, at its line:
@@ -879,6 +1119,9 @@ tasks/boot/task.json:22:7: carbon-lab: boot: requires modules: no initramfs modu
   tasks/serial/task.json:12:7: rhi-prod: boot: "rootwait" is reserved: tiny-initramfs would wait for ever for a missing root (machine.md, 6.2)
   tasks/web/task.json:30:9: mail-prod: web: /etc/ssl/private/mx1.key is a secret's path; declare it under secrets (format.md, 9.1)
   ```
+- **The errors left out are counted:** the text prints `<n> more errors`
+  (`1 more error`) after the last one kept, and JSON's `outcome` record
+  carries `left_out` (client/README.md, 3.2).
 
 ## 8. Layers and crates
 
@@ -925,11 +1168,11 @@ hearth-protocol-builder          the builder's protocol layer: routes its machin
 ```
 render → protocol                                      protocol → render
 List { repository, revision }                          Listed { commit, entries: path, mode, oid, size }
-Read { commit, blobs: (oid, as) }                      Read { oid, a document | a declaration | a template }
-  as: document | declaration | template | cached       Cached { oid, size, sha256 }: streamed into the cache
+Read { commit, blobs: (oid, as) }                      Read { oid, a document | a declaration | a template | a link's target }
+  as: document | declaration | template | link | cached  Cached { oid, size, sha256 }: streamed into the cache
 Keep { sha256, bytes }: a rendered file                Kept { sha256 }
 Resolve { key, sources, request, variant, apt }        Resolved { key, closure, indices, versions, cost }
-Hunks { before: sha256, after: sha256 }                Hunks { lines: (kind, text), left out, binary }
+Hunks { before: sha256, after: sha256 }                Hunks { lines: (kind, text), left out, binary }: kind is header, context, removed, added or no newline (6.1)
 every request                                          Failed { request, class, at, tail }
 ```
 
@@ -940,7 +1183,8 @@ every request                                          Failed { request, class, 
   alone, over `hearth-protocol-tree`'s frame and its kinds 1, 4 and 5
   (store.md, 2.4 and 6.1); M2 grows both.
 - **Every request gets one terminal event** (`programming-model.md`,
-  5.2), and a resolution's deadline is render's to set.
+  5.2), and a resolution's deadline is render's to set; git's commands
+  have none (2.2).
 
 ### 8.3 Evaluation without recursion
 
@@ -960,9 +1204,17 @@ every request                                          Failed { request, class, 
 ### 8.4 Limits and the worst case
 
 - **Render's limits are 2.3's,** and its worst case
-  (`programming-model.md`, 6.3) is the revision's decoded JSON and
-  templates (64 MiB), an object id, size and digest per static file, the
-  exports of one environment, and one rendered file at a time (16 MiB).
+  (`programming-model.md`, 6.3) is the revision's listing (65,536
+  entries, 16 MiB of paths), its decoded JSON and templates (64 MiB), an
+  object id, size and digest per static file, the exports of one
+  environment (64 MiB), one target's validated settings (64 MiB), one
+  evaluation's values (16 MiB), and one rendered file at a time
+  (16 MiB).
+- **The builder's worst case is 6.3's sum** over its layers at their
+  limits, and the defaults keep it within 1 GiB, which a test holds. In
+  M1 nothing configures the client's memory (client/README.md, 3.5), so
+  its shell checks the sum against none; the daemon's builder checks it
+  against its share of its ceiling (steward.md, 5.3) [M3].
   Static files and rendered files live in the store's cache, never in
   the domain, so a small VM's builder renders what a large one does.
 
@@ -992,7 +1244,10 @@ every request                                          Failed { request, class, 
   (presence, defaults, removal, maps, lists), `templates` (each
   statement, filter and whitespace rule), `exports` (the VPN, the mail
   pair, two environments), `cluster` (stoa's members), `errors` (one case
-  per kind of 7.2), `resolution` (closures from the fake universe).
+  per kind of 7.2 that a repository causes; `tool` and `resolution` are
+  builder-world cases, with git or mmdebstrap's fake failing, 9.6),
+  `resolution` (a target whose resolution the store holds, from a
+  recorded closure, printed with its `keys` line).
 - **The printed spec** is the client's stable text form:
 
   ```
@@ -1007,13 +1262,16 @@ every request                                          Failed { request, class, 
     initramfs  btrfs nvme
   config       part e7c2a0d95b13
     /etc/hostname            file 0644 root:root 3f1c2ab07e44
+    /etc/localtime           link root:root /usr/share/zoneinfo/Europe/Lisbon
     tmpfiles   /var/log/journal d 2755 root systemd-journal
   data         part 51aa0c7d9e41
     journal    /var/log/journal
   ```
 
   Digests and keys are cut to 12 hex digits, as every table of the
-  client's is (client/README.md, 3.2); its JSON gives them whole. With the
+  client's is (client/README.md, 3.2); its JSON gives them whole. A link
+  prints its target, and an empty file the digest of no bytes
+  (`e3b0c44298fc`), as any file prints its own. With the
   resolution in the store, its line reads `resolution 0c7d9e41c0d2
   known`, and a last line gives the layer keys: `keys  packages …
   software … config …`.
@@ -1026,16 +1284,23 @@ every request                                          Failed { request, class, 
 Over generated repositories, valid by construction and then mutated:
 
 - **Determinism:** one revision renders to the same digests in every
-  world, whatever the seed's order of blob arrival and chunking.
+  world, whatever the seed's order of blob arrival and chunking: render's
+  world over seeds, the protocol world's pipes cut at every byte, the
+  simulated client, and real git, each compared by the whole digests
+  the JSON form prints.
 - **Representation:** reordering a JSON object's members, reformatting
   whitespace or editing a `_note` changes no digest.
 - **RFC 7386's laws:** `merge(t, {}) = t`; `merge(merge(t, p), p) =
   merge(t, p)`; a non-object patch replaces; a key the patch lacks keeps
   its value; no result holds `null`.
-- **Locality:** changing a setting no export reads changes that target's
-  spec alone; changing a production file never changes a lab spec.
+- **Locality:** changing a setting in one target's own document that no
+  export reads changes that target's spec alone; one that an export
+  reads changes the exporting target and the targets of its environment
+  that read it, and no other; changing a production file never changes
+  a lab spec.
 - **Order:** the order in which render takes tasks and targets changes
-  nothing; a collision names the same pair whichever task comes first.
+  nothing; a collision names the same pair, the task first in name order
+  at `at` and the other at `also` (7.1), whichever task arrives first.
 - **Digests:** two different records of a part give different digests
   over generated pairs; the encoding's own laws are store.md's
   (section 11).
@@ -1044,7 +1309,9 @@ Over generated repositories, valid by construction and then mutated:
 
 - **Every decoder is fuzzed** on its own (`testing-strategy.md`, 2.4):
   configuration documents and declarations; templates and expressions;
-  `ls-tree` and `cat-file` streams; `Inst` lines and `Packages` stanzas.
+  `ls-tree` and `cat-file` streams; `Inst` lines and `Packages` stanzas;
+  and what render hands the store and its tools, store names and
+  argument vectors, swept in the builder's world.
   Corpora start from the golden repositories and the recordings.
 
 ### 9.5 MiniJinja as an oracle
@@ -1055,7 +1322,11 @@ Over generated repositories, valid by construction and then mutated:
 - **Generated templates of the subset** render byte for byte the same in
   both. Where hearth differs on purpose (undefined, `first` on an empty
   list), the generator avoids it and the difference is listed in the
-  test.
+  test. hearth keeps format.md 7.4's precedence, which binds `~` below
+  `+ -` and `is` below the comparisons, where MiniJinja binds `~` above
+  them and `is` with the filters: both are listed, and the generator
+  parenthesizes a `~` beside `+ -` and an operand of `is` that is not a
+  lookup chain.
 
 ### 9.6 Resolution's fakes and conformance
 
@@ -1078,16 +1349,19 @@ Over generated repositories, valid by construction and then mutated:
 ### 9.8 Budgets
 
 - **Rendering every target of the miniature fleet, and a diff of two
-  revisions,** are domain-world scenarios of milliseconds. The budgets
-  are testing.md's (section 9).
+  revisions,** are domain-world scenarios. Their budgets are counts, the
+  requests a run makes, asserted against 3.10's costs; their time is an
+  aim, 0.5 s a scenario, reported and never failed on (testing.md, 9.3).
+  The suites' budgets are testing.md's (section 9).
 
 ## 10. What is open
 
-- **The indices after a simulate run:** that `--skip=cleanup/apt/lists`
-  leaves `InRelease` and the decompressed `Packages` files in the scratch
-  directory in chrootless simulate mode is to verify; if apt keeps them
-  compressed, the protocol layer must decompress them before they enter
-  the cache. It depends on a recording of each.
+- **A decompressor for the indices:** after a chrootless simulate run,
+  `--skip=cleanup/apt/lists` leaves `InRelease` and the decompressed
+  `Packages` files in the scratch directory, as the recordings show
+  (9.6), and M1 refuses a compressed one (5.3). One is needed only if an
+  apt keeps them compressed (`Acquire::GzipIndexes`), and skein has
+  none; it depends on such an apt.
 - **The `Inst` line with several origins** (`(2.41-12 Debian:13.1/stable,
   Debian-Security:13/stable-security [amd64])`), to verify against
   recordings.
@@ -1102,7 +1376,8 @@ Over generated repositories, valid by construction and then mutated:
   `dpkg --force-depends` from outside and the rest with an outside
   `apt-get install`, while unshare and root skip that last apt step for
   `--variant=custom`, so the two may diverge for containers' variant.
-- **apt's version and solver:** recorded beside the closure, not keyed.
+- **apt's version and solver:** recorded beside the closure from M2
+  (5.4), not keyed.
   Whether a new apt should re-resolve depends on how often closures
   differ in practice, which the costs and conformance will show.
 - **A foreign architecture** with chrootless simulate, to verify; it
@@ -1111,8 +1386,12 @@ Over generated repositories, valid by construction and then mutated:
   targets is shown (README, section 9).
 - **The defaults of 2.3 and the printer's bounds on hunks,** to set from
   the first measurements of the fleet.
-- **Classifying mmdebstrap's failures by pattern,** which recordings of
-  real failures will confirm or correct.
+- **Classifying mmdebstrap's failures:** 5.5's table was checked against
+  runs of mmdebstrap 1.5.7 and apt 3.0.3 for a package apt does not
+  know, one with no installation candidate, dependencies apt cannot
+  satisfy, a snapshot timestamp before the archive and an unreachable
+  proxy. A hash mismatch, a full disk and a 5xx answer have no recording
+  yet; theirs will confirm or correct it.
 - **Keeping decoded documents across revisions** within one builder's
   life, a pass and its linger (steward.md, 4.1): what a pass's later
   renders, a diff's two revisions or the bless's render, would save,

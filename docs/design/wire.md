@@ -316,8 +316,8 @@ be made or run, so its prepare key is refused.
 |---|---|---|
 | `git fetch`: the remote unreachable, a timeout | operational | back off; a new pass |
 | the commit or the branch unknown | configuration | wait until the desired revision changes |
-| render: a decode, schema, evaluation, guard, collision or resolution error, such as a package apt cannot locate (render.md, 7.2) | configuration | wait for another commit: render is deterministic, so retrying cannot help |
-| render: git or the resolution's mmdebstrap failed, timed out or could not start; fetching the indices failed; a name did not resolve (render.md, 5.5 and 7.2's `tool`) | operational | back off |
+| render: a decode, schema, evaluation, guard, collision or resolution error, such as a package apt cannot locate, or a snapshot timestamp whose archive lacks the suite (render.md, 5.5 and 7.2) | configuration | wait for another commit: render is deterministic, so retrying cannot help |
+| render: git or the resolution's mmdebstrap failed, timed out or could not start; fetching the indices failed with no answer or a broken one; a name did not resolve (render.md, 5.5 and 7.2's `tool`) | operational | back off |
 | a build's fetch failed: the network, a 404 from the mirror, a digest mismatch (build.md, 4.3) | operational | back off |
 | a build step failed: a maintainer script, `customize.sh`, a limit, the scan (build.md, 4.3) | refused | refuse the prepare key |
 | out of space | operational | an alarm; collection (store.md, 7.2); back off |

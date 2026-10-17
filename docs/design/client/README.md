@@ -61,7 +61,7 @@ A crate that exists for the client is named
 
 | Command | What it does | Served by | Who may | With an engine |
 |---|---|---|---|---|
-| `hearth render [<target>…] [--at <rev>] [--repo <path>] [--store <path>] [--resolve]` | renders each target named, or every target of the revision, at a revision; prints the spec's parts with their digests (render.md, section 4); with `--resolve`, resolves the keys the store lacks first (render.md, 5.7) | the steward, by a builder's job on the builder's clone (steward.md, 3.3) [M3]; in-process with `--repo` or a local path (3.5) | anyone | yes |
+| `hearth render [<target>…] [--at <rev>] [--repo <path>] [--store <path>] [--resolve]` | renders each target named, or every target of the revision, at a revision; prints the spec's parts with their digests (render.md, section 4); with `--resolve`, resolves the keys the store lacks first (render.md, 5.7) | the steward, by a builder's job on the builder's clone (steward.md, 3.3) [M3]; in-process with `--repo`, or the repository around the current directory (3.5) | anyone | yes |
 | `hearth diff <from> <to> [--target <t>]… [--repo <path>] [--store <path>] [--resolve]` | the rendered diff: per target and part, what changed (render.md, section 6) | as `render` | anyone | yes |
 | `hearth diff --running [--target <t>] [--suggest]` | the running slot against its record: packages, files (with contents on a mutable machine), units, users; `--suggest` drafts task fragments (development.md, section 5) | the steward, from the activator's capture; the drafts in-process | operators | yes |
 | `hearth build <target> [--at <rev>]` | builds the output; prints each layer's key, whether it was found or built, and its costs | the steward, by a builder's job; or in-process with a store of one's own | operators; anyone with their own store | yes |
@@ -93,7 +93,8 @@ A crate that exists for the client is named
 | `hearth dev list`, `hearth dev down <machine>…`, `hearth dev image` [M3b] | the development machines; deleting them; making the base image (development.md, section 3) | as `dev up` | as `dev up` | — |
 
 - **`render` and `diff` in M1** run in-process only (3.5). `render`
-  with no target renders every target of the revision, in name order;
+  with no target renders every target of the revision, in name order,
+  and the targets named in name order too, each once;
   `--at` defaults to `HEAD` of a local repository, and on the daemon's
   clone to the desired revision's commit [M3]. A revision is always a
   commit: what is not committed is not rendered. `diff` takes
@@ -181,18 +182,32 @@ A crate that exists for the client is named
     and its fields under the names render.md gives them (4.2 to 4.4,
     6.1, 7.1), in snake case. Digests and keys are 64 lowercase hex
     digits, modes four octal digits as text, times RFC 3339 in UTC.
+  - **Its layout:** a target's `spec` line, then a `part` line per part,
+    `meta` among them, an empty one too, in render.md, 4.1's order;
+    a part's fields nested under its name (`{"record":"part",
+    "target":…,"name":"packages","digest":…,"packages":{…}}`); a
+    variant as an object with its `kind`, as the canonical encoding has
+    it (store.md, 3.1), a config tree's node as `{"kind":"file",…}`. A
+    diff prints its `change` lines, then one `outcome` line, which
+    carries `from`, `to`, the counts and `left_out`, the errors past the
+    bound (render.md, 7.3): there is no `diff` record.
   - **Within a major version, records and fields are only added.** M3's
     commands add records to version 1 and rename none; a renamed or
     removed field is version 2.
 - **Progress goes to standard error,** as records too: a build's steps
-  as they start and end, a resolution as it starts and ends. Standard
-  output holds only the answer.
+  as they start and end, a resolution as it starts and ends, the store's
+  wait for its lock and its strays (store.md, 8.2). With `--json`,
+  standard error is JSON lines as well, and starts with its own version
+  line. Standard output holds only the answer.
 - **A command's errors are part of its answer.** `render`'s and `diff`'s
   errors (render.md, 7.3), a target's or a revision's, go to standard
   output, as text or as JSON records, after what did render. What keeps
   the client from answering at all (an unknown option, a repository or a
-  store it cannot open) goes to standard error, as a record with
-  `--json`, with 3.3's code.
+  store it cannot open) goes to standard error alone: `hearth:
+  <message>`, or with `--json` one `startup` record after the version
+  line, naming its outcome, `usage` or `try_again`, with 3.3's code. A
+  directory that is no git repository opens, and git's refusal is an
+  error of the answer, of kind `tool` (render.md, 7.2).
 
 ### 3.3 Exit codes
 
@@ -201,9 +216,9 @@ A crate that exists for the client is named
 | 0 | done, or the answer asked for | `status`; `prepare` prepared or found; `diff` with no difference |
 | 1 | a negative answer | `diff` found differences; a conditional order refused because the facts moved; `status --check` found a fall back, drift, a refusal or a hold |
 | 2 | failed | a configuration error in the revision (render.md, 7.1); a build step that failed its key (build.md, 4.3); a prepare the activator refused on verification |
-| 64 | usage | an unknown command, target or option; a malformed revision |
+| 64 | usage | an unknown command, target or option; a malformed revision, or one that names no commit |
 | 69 | unavailable | no daemon answers and the command does not run in-process; the machine follows an engine; the command's job crashed its builder twice (steward.md, 5.1) |
-| 75 | try again | another order holds the target's slots; an operational failure that may pass: git, the resolution's mmdebstrap, a fetch, a timeout (render.md, 7.1) |
+| 75 | try again | another order holds the target's slots; an operational failure that may pass: git, the resolution's mmdebstrap, a fetch, a timeout, a store full or broken (render.md, 7.1); a repository or a store the client cannot open; a standard output that breaks |
 | 77 | not permitted | the peer's credentials do not allow it; a root-only command run by another user |
 
 - **0, 1 and 2 keep os's and the bash fleet's meanings** (os's
@@ -217,9 +232,11 @@ A crate that exists for the client is named
 - **The code comes from the answer's terminal record,** whose outcome
   the protocol layer maps to a code by one total function.
 - **For `render` and `diff`, the worst outcome wins,** over every target
-  of the answer and both sides of a diff: 2 if any error is a
-  configuration error, else 75 if any is operational, else, for `diff`,
-  1 if anything differs, else 0. A diff with a failed target (render.md,
+  of the answer and both sides of a diff: 64 if a target named is not
+  the revision's (not while a refused `hosts/` document hides it:
+  render.md, 3.1), an error of the answer after the targets that did
+  render; else 2 if any error is a configuration error, else 75 if any
+  is operational, else, for `diff`, 1 if anything differs, else 0. A diff with a failed target (render.md,
   6.1, `failed`) is then 2 or 75, never 1: what it answers is
   incomplete.
 
@@ -256,16 +273,24 @@ A crate that exists for the client is named
   `build`. The client hosts `hearth-domain-builder` and its protocol
   layer, and routes the same records to it without bytes.
 - **A local repository is always rendered in-process,** daemon or not:
-  `render` and `diff` with `--repo` or any local path run in the
-  client's loop, as the user who asked. The daemon renders only its own
+  `render` and `diff` with `--repo`, or the repository around the
+  current directory, run in the client's loop, as the user who asked. The daemon renders only its own
   clone of the machine's repository. It cannot read a user's checkout:
   a home is often mode 0700, and git refuses a repository owned by
   another user (its ownership check, `safe.directory`).
-- **Its inputs are named on the command line:** `--repo` (with no
-  daemon, the default is the git repository around the current
-  directory) and `--store`, a directory of the user's own, by default
+- **Its inputs are named on the command line:** `--repo <path>`, the
+  only way to name a repository in M1 (positional words are targets),
+  and `--store`, a directory of the user's own, by default
   `$XDG_CACHE_HOME/hearth/store` (`~/.cache/hearth/store` when it is
-  unset), made 0700 on first use. For `render` and `diff` it may be on
+  unset), made 0700 on first use, with any parent it lacks.
+  - **The repository** is `<path>/.git` where it exists, a directory or
+    a gitfile, else `<path>`, given to git as its `--git-dir` (render.md,
+    2.2). Without `--repo`, `<path>` is the nearest of the current
+    directory and its parents that holds `.git`.
+  - **The store's default:** an empty or relative `XDG_CACHE_HOME` is
+    unset, as the XDG Base Directory specification has it, and so is an
+    empty or relative `HOME`. With neither, and no `--store`, the store
+    cannot be opened (3.2), code 75. For `render` and `diff` it may be on
   any filesystem: it holds the cache and the resolutions (store.md,
   2.4). For `build` it must be a btrfs subvolume [M2] (store.md, 9.1 and
   9.4).

@@ -93,11 +93,13 @@ render.md. Open questions are in section 13.
 
 - **Render reads `fleet.json`, `envs/`, `hosts/` and `tasks/`.** Any other
   file (a `README.md`, `lab-ca/lab.crt`) is read only when a setting of
-  type `file` names it (6.2).
+  type `file` names it (6.2). Every path in the revision is UTF-8; one
+  that is not is a `repository` error (render.md, 7.2).
 - **Under `hosts/<base>/`** the documents are `<base>.json` and
   `<base>-<env>.json` for environments that exist in `envs/`. Any other
-  `.json` there is an error. Other files (a base's own nginx site) may
-  sit beside them, named by `file` settings.
+  `.json` directly in it is an error; deeper, a `.json` is another
+  file. Other files (a base's own nginx site) may sit beside them, named
+  by `file` settings.
 - **A task directory holds `task.json` and only the entries above,** plus
   an optional `README.md`. Anything else is an error, so a misspelt
   `tre/` fails instead of being ignored. Every file under `templates/`
@@ -115,7 +117,14 @@ render.md. Open questions are in section 13.
   `hosts/` are data, taken literally. Only the declarations of a
   `task.json` (5.2) and `*.j2` files are evaluated.
 - **Bounds** are render's limits (render.md, 2.3): 1 MiB a document,
-  depth 32, 4,096 keys an object.
+  depth 32, 4,096 keys an object. They count the document as written: a
+  `_note` is one of its object's keys.
+- **What a later milestone adds is refused before it.** A key or value
+  this document marks [M5] or [M6] is an error at its key until that
+  milestone builds it, as an undeclared field is: a placement's `ids`,
+  `binds`, `capabilities`, `network` and `bridge` (3.4), a download's
+  `artifact` (10.2), a task's `checks` (section 11). So nothing in a
+  repository is silently ignored.
 
 ### 2.3 Templates and static files
 
@@ -140,6 +149,14 @@ render.md. Open questions are in section 13.
     templates in `task.json` drifts from the files.
 - **A destination that itself ends in `.j2`** is written as
   `NAME.j2.j2`: the suffix is stripped once.
+- **One source a destination:** a task that holds both `NAME` and
+  `NAME.j2` (in `tree/`, or `customize.sh` or `software.sh` beside its
+  `.j2`) is a `repository` error at the second in byte order, the first
+  its `also` (render.md, 7.1). Across tasks, one path from two is a
+  collision (5.2).
+- **A template is a file with a name.** A symbolic link whose name ends
+  in `.j2`, and a `.j2` alone, which would install at its directory's
+  path, are `repository` errors.
 - **Templates are UTF-8 with `\n` line ends;** a `\r` in a template is an
   error. Static files are bytes.
 
@@ -149,7 +166,7 @@ render.md. Open questions are in section 13.
 |---|---|---|
 | base, environment, member | `[a-z0-9]`, then `[a-z0-9-]`, not ending in `-` | no dot |
 | target | made from them (3.1), at most 63 bytes | no dot; never `hearth` |
-| task, setting, object field | `[a-z]`, then `[a-z0-9_]` | identifiers in expressions |
+| task, setting, object field, export | `[a-z]`, then `[a-z0-9_]` | identifiers in expressions |
 | data | `[a-z]`, then `[a-z0-9-]`, at most 32 bytes | names a directory in its class (5.7); no dot |
 | secret | segments of `[a-z0-9._-]` joined by `/`, at most 255 bytes | no `.` or `..` segment |
 | key of a map setting | any string of 1 to 255 bytes | |
@@ -226,7 +243,13 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   restricted to those tasks.
 - **Every task named anywhere must exist** under `tasks/`, and its
   settings are validated even where no target has it, so a typo in a
-  default fails.
+  default fails. A layer's value of a task that none of the targets it
+  composes has (`envs/lab.json` setting wifi, which only prod targets
+  have; a base with no target) is checked alone, as a patch: each name
+  declared, and each value but `null` of its type and form. What only a
+  composed value shows is not checked there: a required setting, and
+  whether a `target` names a target of the environment. Such an error
+  names its task and no target (render.md, 7.1).
 - **Reserved keys** of a document name no task: `debian` (5.3),
   `placement` (3.4), `members` (3.6) and `_note`.
 
@@ -255,6 +278,14 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   may appear in `envs/<env>.json` and in a base-env layer or its members,
   never in `fleet.json` or a base: a base describes a system apart from
   where it runs. Every target must have a placement once composed.
+- **A placement is whole where it is written:** `kind` always; `firmware`
+  and `hardware` for metal and a VM, which boot by one and are keyed by
+  the other (5.4; machine.md, 2.7); `on` for a container until M6's
+  build environments. One missing is an error at the placement's `{`,
+  and a field the kind never takes is one at its key.
+- **`placement` and `members` are objects:** `null` for either is an
+  error at the value, never a removal. A placement is replaced, never
+  cleared, and a base-env removes a member by its own key (3.6).
 - **Placement is replaced whole,** the one exception to RFC 7386 (4.1):
   a layer that sets `placement` replaces it entirely, so `envs/lab.json`'s
   `firmware` and `hardware` never leak into a lab target that its own
@@ -342,7 +373,9 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 
 - **A base declares its members** under `members`, a map keyed by member
   name. Each member's value is a layer of its own (3.2): tasks and their
-  settings. `hosts/stoa/stoa.json`:
+  settings, and `debian`; `placement` in a base-env's member alone, since
+  a base's member is the base's (3.4); never `members`.
+  `hosts/stoa/stoa.json`:
 
   ```json
   {
@@ -361,7 +394,13 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   target ends in `-lab`. A base with members has no target `<base>-<env>`.
 - **A base-env file may change the members** in its environment, under
   its own `members`: add one, remove one (`"3": null`), or set one's data
-  there, such as its placement on a lab pool host.
+  there, such as its placement on a lab pool host. `"members": null` is
+  an error (3.4).
+- **A base is a cluster in an environment** when its document or its
+  base-env's has `members`. It then makes one target per member left
+  once the two are merged, and none when none is left. A `null` member
+  in a base removes nothing. `members` in `fleet.json` or `envs/` is a
+  `composition` error at its key, as `placement` in a base is.
 - **Members see each other through exports** (section 8), like any
   targets of the environment: stoa exports its address and index, and
   each member's templates loop over `exports.stoa`. `target.member` holds
@@ -450,6 +489,10 @@ merge(target, patch):
   (3.2), but for `placement`, which a layer replaces whole (3.4). Objects merge key by key; `null` deletes; scalars and lists
   replace. The result never holds `null`, and no setting can: the schema
   has no null type, and an absent optional setting is simply absent.
+- **A `null` a merge would carry is an error where it is written:** one
+  inside a list (`[1, null]`, `[{"a": null}]`), which replaces whole, is
+  a `decode` error in a document (render.md, 7.2) and a bad default in a
+  `task.json` (6.5); one in a placement is a wrong type (3.4).
 - **Lists replace.** os concatenated them, so a variant could add to a
   base's list but never drop or replace an entry, and thin variants grew
   into copies.
@@ -540,6 +583,10 @@ nothing.
 | `bless` | units whose failure does not block a bless | checks | 5.13 |
 | `live` | the units that consume its paths, and what each does when they change with no reboot | live | 5.14 |
 
+- **`doc` is one line,** a string with no line feed, bounded only by its
+  document (2.2). It enters no part, so editing it changes no spec, as
+  editing a `_note` does not.
+
 ### 5.2 Entries
 
 - **Every declaration but `doc`, `settings`, `reads`, `requires`,
@@ -549,12 +596,20 @@ nothing.
   - `for_each`: an expression giving a map or a list. The entry stands
     for one entry per element, with `key` and `value` bound; for a list,
     `key` is the index from 0.
-- **Keys and string fields are interpolated:** each `{{ expr }}` is
-  replaced by its value, a string or an integer. Statements (`{% %}`)
-  are not allowed there.
+- **Keys and string fields are interpolated,** and a list's strings one
+  by one: each `{{ expr }}` is replaced by its value, a string or an
+  integer in decimal. Any other value, a boolean included, is an
+  evaluation error. Statements (`{% %}`), comments (`{# #}`) and the `-`
+  and `+` markers (7.2) are not allowed there: `${{ '{#' }}a[@]}` writes
+  a shell's `${#a[@]}`. Strings outside entries are taken as written (a
+  default, a `doc`, `bless`), but a guard's `message` holds no `{{`, `{%`
+  or `{#`, so that a later milestone may interpolate it.
 - **A field of another type** (an integer, a boolean, a list) may be
-  written as one `{{ expr }}`, whose value must have the field's type. An
-  absent optional setting leaves the field absent.
+  written as one `{{ expr }}`, whose value must have the field's type.
+- **A field that is one `{{ expr }}` alone,** a string field too, is
+  absent when its value is undefined (7.6), so the field's default
+  applies: `shell` below. Beside text, in a key and in a list's string,
+  undefined is an evaluation error.
 - **Keys are unique after expansion:** two elements that make the same
   key are an error.
 - **Across tasks,** a file path, a data name and a secret's or identity's
@@ -610,11 +665,23 @@ nothing.
   every spec. os's rule that `forky` has no updates or security lines
   becomes two booleans. Timestamps should be the snapshot's own, since
   snapshot.debian.org redirects any other to the nearest earlier one.
+- **`debian`'s default is the bottom layer,** as a task's (6.3), so
+  `{"contrib": true}` keeps `main` on; `main` written `false` or `null`
+  is an error. A target whose layers set no `debian` is an error at its
+  base's document. A `snapshot.security` beside a security pocket that
+  is off is dropped, as the pocket's line is.
+- **Names are Debian Policy's (5.6.1):** a package's name, `suite` and
+  `architecture` are lowercase letters, digits, `+`, `-` and `.`, two
+  bytes at least, starting with a letter or a digit, and at most 256
+  bytes. A timestamp is `YYYYMMDDTHHMMSSZ`, its digits checked, not its
+  date. `components`' keys are the four above. Render refuses any other
+  where it is written, so no tool reads one.
 - **`preseeds`** is a map keyed by debconf question, with `type` (enum
-  `select`, `multiselect`, `string`, `boolean`), `value` and `owner`
-  (default: the question's first segment). There is no `password` type:
-  a preseed is in the spec, and a spec holds no secret. They are answered
-  before any package is configured (build.md, section 5). The timezone
+  `select`, `multiselect`, `string`, `boolean`) and `value`, both
+  required, and `owner` (default: the question's first segment). There
+  is no `password` type: a preseed is in the spec, and a spec holds no
+  secret. They are answered before any package is configured (build.md,
+  section 5). The timezone
   and locale, which os and the bash fleet set in code, are the `locale`
   task's:
 
@@ -641,10 +708,19 @@ nothing.
   }
   ```
 
+- **A preseed is one line of `debconf-set-selections`** (build.md, 5.5),
+  so render refuses what would break it: a question is two or more
+  segments joined by `/`, and an owner one, each of letters, digits,
+  `.`, `_`, `+` and `-`; a value holds no control character and does not
+  end in `\`, which joins the next line; a `boolean`'s value is `true`
+  or `false`. Other values are debconf's to read.
+
 ### 5.4 The initramfs and the command line
 
 - **`initramfs`** is a map keyed by kernel module name, with `if` and
-  `for_each`. Their union is the configuration's `INCLUDE_MODULES`. The
+  `for_each`: letters, digits, `_` and `-`, at most 55 bytes, the
+  kernel's `MODULE_NAME_LEN` less its NUL. Their union is the
+  configuration's `INCLUDE_MODULES`. The
   rest of the configuration is no task's: the packages part carries
   `microcode`, `none` on a VM and `generic` on metal, which render
   derives from placement (machine.md, 7.1), and render writes
@@ -652,9 +728,13 @@ nothing.
   `AUTO_MODULES=no` always (render.md, 4.2). So neither `yes`, which
   would read the build host, can reach an output (5.11).
 - **`cmdline`** is a map of entries with `param` (the parameter as the
-  kernel reads it: printable ASCII, no space, no quote) and `order`. The
+  kernel reads it: printable ASCII but a space, `"` and `'`, and `\`,
+  `$`, `;`, `&`, `|`, `<`, `>`, `{`, `}` and `#`, which GRUB's script
+  would read in a BIOS slot's fragment, machine.md, 5.4) and `order`. The
   boot part is the parameters in order (4.3). Ten keys are the
-  activator's or would change how the root is found (5.11). Boot
+  activator's or would change how the root is found (5.11). A line that
+  would pass 2,048 bytes with the activator's tokens is refused at the
+  `param` of the first entry, in order, that takes it past. Boot
   parameters are a slot part, so changing one builds nothing: it is a
   new slot of the same output.
 - **Modules by hardware profile** are data, not branches. The bash
@@ -725,7 +805,9 @@ nothing.
 - **`tree/` mirrors `/`.** A file at `tree/<path>` installs at `/<path>`,
   less a `.j2` suffix. Its mode is 0755 if git records it executable, and
   0644 otherwise; a symbolic link in git is a symbolic link, its target
-  as written. Owner and group are root.
+  as written. Owner and group are root. A link's target, in `tree/` or a
+  `link` entry, is 1 to 4,095 bytes with no NUL: Linux's `PATH_MAX`
+  less its NUL.
 - **`files` is a map keyed by absolute destination path.** An entry is
   one of:
 
@@ -739,9 +821,17 @@ nothing.
 
   with the fields `mode` (an octal string, `"0640"`), `owner` and `group`
   (names, default `root`), `if` and `for_each`.
+- **Forms:** a key ends in `/` exactly when it names a directory of
+  `tree/`, and then takes no source field, `directory` included.
+  `directory` is `true` or absent. A `template` or `copy` entry's mode
+  is 0644 unless it gives one, whatever git records of its source. A
+  `template` is written as is, never interpolated, so that 2.1's check
+  that every template is used stays exact.
 - **A directory's entry governs its subtree:** its `if` covers every file
-  beneath it, its `owner` and `group` apply to entries beneath that have
-  none of their own, and its `mode` is the directory's.
+  beneath it; its `owner` and `group` apply, each alone, to entries
+  beneath that do not give that field; and its `mode` is the
+  directory's. A `tree/` path that an entry names is installed only
+  where the entry is: a false `if` leaves it out, a file or a subtree.
 - **An entry for a path that `tree/` lacks is an error,** as is a path
   that both `tree/` and a `template`, `copy` or `link` entry give.
 - **Owners are names.** Build resolves them in the layer's own
@@ -794,6 +884,7 @@ nothing.
   | Field | Type | Default |
   |---|---|---|
   | `uid` | int | a system id that sysusers picks |
+  | `gid` | int | none; a package user's alone: its primary group's id, in the line build seeds (a sysusers user's group is `group`) |
   | `group` | string | the user's own group, made with the same id |
   | `gecos` | string | empty |
   | `home` | path | `/` |
@@ -812,7 +903,9 @@ nothing.
   collision.
 - **`groups`** is a map keyed by group name, with `gid` and `from`, as
   for users: a group a package creates is declared with
-  `"from": "package"`.
+  `"from": "package"`. Like a package user, build writes no sysusers
+  line for it, and the activator confirms it exists in the slot's
+  `/etc/group` at prepare (slots.md, 5.7).
 - **Persistent owners have fixed ids.** A package's postinst, and
   sysusers for a user with no `uid`, take the next free id when they
   install, and the packages layer is rebuilt from scratch: a snapshot
@@ -839,6 +932,24 @@ nothing.
   and refuses two ranges that overlap; no task ships either file.
 - **Ids are one user's:** two users or two groups with one id are an
   error.
+- **A sysusers user's own group,** what an unset `group` names, has the
+  user's name and the user's `uid` as its id. A `groups` entry of that
+  name is that group, so its `gid` is the user's `uid`, and another is a
+  collision (render.md, 3.7): user `free` with `uid` 1000 and group
+  `free` with `gid` 1001 differ. A user whose primary group has another
+  id names a group of another name in `group`.
+- **A package user gives both `uid` and `gid`, or neither:** build seeds
+  its passwd line from both (build.md, 5.5), and one alone is an `ids`
+  error (render.md, 7.2). With neither, nothing is seeded, and the
+  user may own nothing that needs a fixed id (above).
+- **Ids and strings are bounded:** a `uid` or `gid` is 1 to 65533: 0 is
+  root's, 65534 nobody's and 65535 no id, and the builder's namespace
+  maps no more (store.md, 3.4). A `subordinate` range has a count of 1
+  at least and a base of 65,536 at least, so that no id a target's
+  files own is subordinate, and base plus count is at most
+  4,294,967,295. `gecos`, `home` and `shell` hold no `:`, which splits a
+  passwd line, no `"` or `\`, which sysusers reads as quoting, and no
+  control character. Render refuses any other where it is written.
 - **`presets`** is a map keyed by unit name, with `action`, `enable` or
   `disable`. Build applies them with the target's own systemctl
   (build.md, section 7). A unit is masked by a `link` to `/dev/null` in
@@ -846,6 +957,8 @@ nothing.
 - **`tmpfiles`** is a map keyed by path, with `type` (enum `d`, `D`, `e`,
   `f`, `f+`, `w`, `w+`, `L`, `L+`, `C`, `z`, `Z`, `r`, `R`), `mode`,
   `owner`, `group`, `age` and `argument`, as tmpfiles.d(5) reads them.
+  `v`, `q` and `Q` are reserved, so a line of one is refused as such
+  (5.11), not as an unknown type; any other letter is a schema error.
   Build applies them to the image and writes them for every boot
   (build.md, 7.4), which is what directories inside `/var` and the
   data entries need. Lines that make subvolumes, lines that write over
@@ -883,8 +996,10 @@ nothing.
   | `owner`, `group` | name, with a fixed id (5.6) | `root` |
 
 - **An entry whose path is its class's directory,** `/srv/<class>/<name>`,
-  needs no bind: the class's mount shows it. Any other path beneath
-  `/srv/core`, `/srv/data` or `/srv/cache` is refused.
+  needs no bind: the class's mount shows it. That is its own class and
+  name only: `/srv/core/journal` for an entry `journal` of class `core`.
+  Any other path at or beneath `/srv/core`, `/srv/data` or `/srv/cache`,
+  another entry's directory or a mount itself, is refused.
 - **The activator makes the class subvolume** when the top level lacks
   it, with a root of `0:0 0755`, and **the entry's directory** when the
   class lacks it, seeded once from the output's content at the entry's
@@ -895,9 +1010,11 @@ nothing.
   `tmpfiles` line of type `d` at the entry's path, which systemd applies
   in the running slot, through the bind, where names resolve. So they,
   unlike the path and the class, enter the config key.
-- **Paths** are beneath `/srv`, `/var` or `/home`, never `/var/lib/hearth`
+- **Paths** are beneath `/srv`, `/var` or `/home`, never one of the three
+  itself, whose bind would hide the rest of it, never `/var/lib/hearth`
   or beneath it, and never beneath another entry's path. A target has at
-  most 64 entries (machine.md, 3.4). The rest of `/` stays immutable.
+  most 64 entries (machine.md, 3.4): the 65th, in name order (4.3), is a
+  schema error at its key. The rest of `/` stays immutable.
 - **Names are per target, across classes:** two entries of one target
   with one name are a collision (render.md, 3.7), even in two classes.
   Moving an entry to another class moves no data, so the activator
@@ -979,7 +1096,8 @@ nothing.
   ```
 
   A declared script must exist in the task directory as `NAME` or
-  `NAME.j2`, and a script file that is not declared is an error.
+  `NAME.j2`, and a script file that is not declared is an error. Its
+  keys are those two alone (2.1): any other is a schema error.
 - **`customize.sh`** runs in the config layer, after its files and users
   are in place (build.md, section 7). **`software.sh`** runs in the
   software layer, after every download is placed at its declared path
@@ -1062,28 +1180,58 @@ declares it (render.md, 7.2):
 | task files at `/etc/ssh/ssh_host_*_key` and their `.pub`, `/etc/dropbear/dropbear_*_host_key`, anything under `/etc/ssl/private/`, `/var/lib/systemd/random-seed`, `/var/lib/systemd/credential.secret` | identity and secrets: `identity` and `secrets` entries name these paths, files never do | build.md, 9.2 |
 | anything under `/var/lib/hearth/` | the mount points of hearth's state and store | machine.md, 3.4 |
 | task files, links, downloads and tmpfiles lines under `/usr` but `/usr/local` | the rest of `/usr` is the packages layer's: nothing above it may change what every process maps, and live changes overlay `/usr/local` alone | 5.5; 10.1; build.md, 9.3; slots.md, 6.6 |
-| anything under `/srv/core`, `/srv/data` or `/srv/cache`; a data path beneath them but `/srv/<class>/<name>` | the class subvolumes' mounts hide what the slot holds there | 5.7; machine.md, 3.4 |
-| anything under `/dev`, `/proc`, `/sys`, `/run`, `/tmp`, `/var/tmp`; a file under `/var/log` that is not empty; `/etc/.git`, `/etc/.etckeeper` | runtime, noise, history | build.md, 9.2 |
+| anything under `/srv/core`, `/srv/data` or `/srv/cache` but a data entry at its own `/srv/<class>/<name>` (5.7) | the class subvolumes' mounts hide what the slot holds there | 5.7; machine.md, 3.4 |
+| anything under `/dev`, `/proc`, `/sys`; anything but a tmpfiles line under `/run`, `/tmp`, `/var/tmp`; a file under `/var/log` that is not empty; `/etc/.git`, `/etc/.etckeeper` | runtime, noise, history; a tmpfiles line there waits for boot (build.md, 7.4) | build.md, 9.2 |
 | a task file at `/etc/tiny-initramfs/tiny-initramfs.conf`, so `AUTO_MODULES=yes` and `MICROCODE=yes` cannot reach an output | the packages part's, written before the kernel installs | build.md, 5.5; machine.md, 7.1 |
 | tmpfiles `v`, `q`, `Q`; `w`, `w+`, `f+`, `L+` outside `/var`, `/run` and `/tmp` | a nested subvolume breaks a layer; a write on the read-only root fails at boot | build.md, 7.4 |
 | preseeds of type `password` | they leave the password in `/var/cache/debconf/passwords.dat` | build.md, 9.2 |
-| a secret or identity file owned by user `hearth`, or by a group `hearth` belongs to (`systemd-journal`); a secret's mode readable by others | neither the steward nor its builder may ever read a secret | activator.md, section 2; 9.1 |
+| a secret or identity file owned by user `hearth`, or by a group `hearth` belongs to (`systemd-journal`); a secret's or identity item's `mode` with a bit outside `0770` | neither the steward nor its builder may ever read a secret or a private key | activator.md, section 2; 9.1; 9.3 |
 | an owner of a data path, a secret or an identity file without a fixed id; a download's owner other than `root` or a package user with a fixed id | ids that move between builds; no sysusers user exists when software is placed | 5.6; 10.1 |
-| `live` entries that name a never-live unit or path (5.14); a `unit` with `none`, or none with another action; a path outside `/etc`, `/usr/local` and `/opt` | a never-live unit must not be acted on live, and a change elsewhere is never live | 5.14; slots.md, 6.7 |
+| `live` entries that name a never-live unit or path (5.14); a `unit` with action `none`; a path not beneath `/etc`, `/usr/local` or `/opt` | a never-live unit must not be acted on live, and a change elsewhere is never live | 5.14; slots.md, 6.7 |
 | presets and links that enable `systemd-sysext.service` or `systemd-confext.service`; anything under `/etc/extensions`, `/usr/lib/confexts`, `/usr/local/lib/confexts`, `/var/lib/extensions` or `/var/lib/confexts` | nothing may merge extensions over hearth's live overlays, at boot or after a soft reboot, a container's included, which has no `hearth` task to disable them | 5.12; slots.md, 6.6 |
+
+- **A row's paths hold for whatever is placed at a path:** a `tree/`
+  file, a `files` entry or link, a download, a secret or identity file,
+  a tmpfiles line and a data path, whatever the row's wording, "task
+  files at" or "anything under". "Under" a path is that path and every
+  path beneath it. Two rows leave a kind out: secrets and identity are
+  what the identity and secrets row's paths are for, and a tmpfiles line
+  may stand under `/run`, `/tmp` and `/var/tmp`. So a data path at
+  `/var/lib/dbus/machine-id`, or a tmpfiles `f` line at
+  `/var/lib/systemd/random-seed`, is refused.
+- **Above a reserved path, only a directory may stand:** a `tree/`
+  directory, a `directory` entry, or a tmpfiles line of type `d`, `e` or
+  `z` without an `age`, which act on the directory alone. Anything else
+  at a strict ancestor of a path a row names, or at the directory a
+  row's pattern matches in (`/etc/ssh`, for `ssh_host_*_key`), is
+  refused under that row: a data path, whose bind would hide it; a
+  file, a link, a secret or an identity file, which would put something
+  other than a directory there; a download, whose archive may hold it;
+  and any other
+  tmpfiles line, which may act beneath its path (`D`, `R`, `Z`, `C`, an
+  `age`).
+- **A tmpfiles line names one path:** its key holds no `*`, `?` or `[`,
+  which tmpfiles reads as a glob, and no `%`, which it reads as a
+  specifier, so that each row checks it as written.
 
 ### 5.12 The hearth task
 
 - **Every target has the `hearth` task,** but a container (below),
   without naming it: render adds it, and `"hearth": null` is an error.
+  In any layer, `fleet.json` and an environment's included, it is a
+  `reserved` error at the key (render.md, 7.2), and no other kind
+  reports it.
   Every such output then carries hearth's binary, its activator's unit
   (which starts the steward, which starts builders) and its user, which
   machine.md (8.3) and slots.md assume. Its files are in the repository
   like any task's, `tasks/hearth/`, so the release a fleet runs is
   pinned by a change.
-- **But a container's [M5]:** render adds no `hearth` task to a
-  container's target, and naming it there is an error. No hearth runs in
-  a container (slots.md, 12.5): its host's builder builds its output and
+- **But a container's:** render adds no `hearth` task to a
+  container's target, and naming it there, in its base, member or
+  base-env layer (3.3), is a `reserved` error at the key. The `hearth`
+  settings of `fleet.json` and of an environment reach no container,
+  since it lacks the task (3.3). No hearth runs in
+  a container [M5] (slots.md, 12.5): its host's builder builds its output and
   its host's activator prepares and starts it, so an activator enabled
   inside would only fail, and the tools, the user and the range would
   serve nothing. Should a container run a hearth of its own, this
@@ -1219,6 +1367,10 @@ declares it (render.md, 7.2):
 - **The target's list is the union over its tasks,** in the checks part
   (render.md, 4.4), which holds it from M3. The minimal bless counts only
   the failed units that are not on it (slots.md, 7.1).
+- **Before M3, which brings the bless,** render checks each list and
+  places it in no part. Unlike a check (section 11), the list only
+  relaxes: with no bless, no failure is ignored, so nothing it declares
+  is dropped silently.
 - **A failed unit on the list is still reported** as a fact
   (operating.md, section 4); it only stops counting against a bless.
 - **A container's list holds as a host's [M5]:** its host reads the
@@ -1241,9 +1393,9 @@ an error.
 
   | Field | Type | Default | Meaning |
   |---|---|---|---|
-  | `unit` | unit name | required, but with `none` | the systemd unit that reads the paths |
+  | `unit` | unit name | required, but with action `none`, which names none | the systemd unit that reads the paths |
   | `action` | enum `reload`, `restart`, `reload-or-restart`, `start`, `none` | required | what happens to the unit once the change is mounted |
-  | `paths` | list of absolute paths under `/etc`, `/usr/local` or `/opt` | required | what it consumes; a path ending in `/` covers its subtree |
+  | `paths` | list of paths (6.2) beneath `/etc`, `/usr/local` or `/opt`, never one of the three itself; at least one, each once | required | what it consumes; one trailing `/`, set aside before 6.2's check, makes a path cover its subtree |
 
   | Action | For | Done |
   |---|---|---|
@@ -1338,6 +1490,14 @@ an error.
   | the core services | `dbus.service` and `dbus.socket` (their policy files are allowed, with a reload of dbus); `systemd-logind`, `systemd-journald`, `systemd-udevd`, `systemd-networkd`, `NetworkManager`; `getty@`, `serial-getty@`, `console-getty`; `apparmor.service` and `etc/apparmor.d/` | a restart ends sessions, loses logs, devices or the network; a profile needs `apparmor_parser -r` (slots.md, section 15) |
   | hearth itself, for now | every file of the `hearth` task (5.12) and every path 5.11 reserves | until live changes are proven (slots.md, section 15) |
 
+- **Render refuses what it can tell is never live** (5.11): a `unit`
+  among the core services, or named `systemd-*` or `hearth-*`, and a
+  path that is one of the never-live paths above, a file of the
+  `hearth` task or a path 5.11 reserves, or lies beneath one. A path that covers one, such
+  as `/etc/systemd/`, is accepted, and a change to the never-live path
+  beneath it still takes a trial. Render reads no package, so the
+  builder and the activator find the units the `systemd` packages ship
+  under other names (slots.md, 6.7, rule 8).
 - **What the declarations cost:** nothing in any key. The `live` part
   enters no layer key and no prepare key (render.md, 4.4), so declaring
   consumers builds nothing and prepares nothing.
@@ -1362,10 +1522,16 @@ type  = "bool" | "int" | "string" | "path" | "mode" | "duration" | "secret" | "t
 - **`doc` is required:** one line, at most 200 bytes, for every setting
   and every object field. It is what an agent reads to edit the setting.
 - **`min` and `max`** bound an int; **`max_length`** bounds a string's
-  bytes, a list's elements or a map's entries.
+  bytes, a list's elements or a map's entries. Each is refused on any
+  other type: `min` and `max` on all but `int`, `max_length`, 0 or more,
+  on all but `string`, `list` and `map`, so on a `path`, a `secret` or an
+  `enum` too.
+- **An `enum` lists one value at least,** each once.
 - A schema is checked when its `task.json` is decoded: a default that does
   not have its type, `default` with `optional`, or `min` above `max` is an
-  error in the task, wherever it is used.
+  error in the task, wherever it is used. Whether a `target` in a default
+  exists depends on the environment, so it is checked on each target
+  whose settings hold it (6.3).
 
 ### 6.2 Types
 
@@ -1378,12 +1544,12 @@ type  = "bool" | "int" | "string" | "path" | "mode" | "duration" | "secret" | "t
 | `list` | array | ordered; replaced whole on merge |
 | `map` | object | keyed by name; merged per key; iterated in key order |
 | `object` | object | only its declared fields; merged per field |
-| `path` | string | absolute; no empty, `.` or `..` segment; no trailing `/` |
+| `path` | string | absolute; no empty, `.` or `..` segment; no trailing `/`; `/` alone is one |
 | `mode` | string | three or four octal digits, at most `"7777"` |
-| `duration` | string | a positive integer and one unit, `s`, `m`, `h` or `d`: `5s`, `1m`, `14d`; a number of seconds once decoded |
+| `duration` | string | a positive integer with no leading zero and one unit, `s`, `m`, `h` or `d`: `5s`, `1m`, `14d`; a number of seconds once decoded, which fits an i64 |
 | `secret` | string | a name in the secret store (2.4), never a value |
 | `target` | string | a target of the same environment, which must exist |
-| `file` | string | a path relative to the repository's root, which must exist at the revision |
+| `file` | string | a path relative to the repository's root, with no empty, `.` or `..` segment and no leading or trailing `/`, of a file git records at the revision, mode `100644` or `100755`: never a link, a submodule or a directory |
 
 - **No floats and no null.** Nothing in the fleet needs a fraction, and
   null is RFC 7386's deletion.
@@ -1405,6 +1571,13 @@ type  = "bool" | "int" | "string" | "path" | "mode" | "duration" | "secret" | "t
   `/bin/bash` from the users task's `shell` default.
 - **`optional`:** the setting may be absent, and reads as undefined
   (7.6). A setting with neither `default` nor `optional` is required.
+- **Validation fills what is absent,** after the composition: a setting
+  from its `default`, and an object's field, at any depth, from its
+  field's. So `null` for a setting that has a default restores the
+  default, and `null` for an entry of a default map removes the entry.
+  A default that is a whole value, an object or a map or list of them, has
+  its fields checked and filled like any value, and a `target` in it is
+  checked on each target whose settings hold it.
 
 ### 6.4 Reads
 
@@ -1424,7 +1597,9 @@ type  = "bool" | "int" | "string" | "path" | "mode" | "duration" | "secret" | "t
   other task's.
 - **The other task must be on the target,** unless the read is
   `optional`; then `tasks.wifi` is undefined where wifi is absent, and
-  `tasks.wifi is defined` tells.
+  `tasks.wifi is defined` tells. That is a settings read: a read of
+  `exports` alone needs the task on no target, and `exports.<task>` is
+  an empty map where no target of the environment has it (8.2).
 - **`exports: true`** reads that task's exports from the environment's
   targets (8.2).
 - **References are checked statically:** every `settings.<name>`,
@@ -1432,6 +1607,14 @@ type  = "bool" | "int" | "string" | "path" | "mode" | "duration" | "secret" | "t
   declarations must be declared. `tasks` and `exports` take only literal
   attribute names after them. So the typo `settings.alow` fails at
   render, where os dropped a file.
+- **What may stand alone:** `tasks` is read only as
+  `tasks.<task>.<setting>`, both names literal, so bare `tasks`,
+  `tasks[x]`, `tasks.<task>[x]` and `tasks.<task>` used whole are
+  errors, but `tasks.<task> is defined` for an optional read.
+  `exports.<task>` may be used whole, the map of 8.2. `settings` may be
+  used whole or looked into with `settings[x]`, which is checked when
+  evaluated: a name the task does not declare is an error there, and an
+  absent optional one is undefined (7.6).
 
 ### 6.5 What is an error
 
@@ -1446,7 +1629,8 @@ Each with its file and line (render.md, section 7):
 - a read of a task or setting not declared in `reads`, or of a setting
   the other task does not declare;
 - `null` for a task in `fleet.json` or `envs/`, `placement` in a base or
-  in `fleet.json`, a task name that `tasks/` lacks.
+  in `fleet.json`, `members` in `fleet.json` or `envs/` (3.6), a task
+  name that `tasks/` lacks.
 
 ### 6.6 Example: the users task
 
@@ -1497,14 +1681,19 @@ Each with its file and line (render.md, section 7):
 
 - `{{ … }}` outputs an expression; `{% … %}` is a statement; `{# … #}` is
   a comment.
-- **`trim_blocks` and `lstrip_blocks` are on.** The first newline after a
-  statement tag is removed; spaces and tabs before a statement tag at the
-  start of a line are removed. A statement alone on its line leaves
-  nothing behind.
+- **`trim_blocks` and `lstrip_blocks` are on,** for statement and
+  comment tags alike, never for `{{ … }}`. The first line break after
+  such a tag, one `\n`, `\r\n` or `\r`, is removed; the whitespace
+  before one at the start of a line is removed, which is every Unicode
+  White_Space character but `\r` and `\n`: a space, a tab, U+000B,
+  U+000C and U+00A0 among them. A statement or a comment alone on its
+  line leaves nothing behind.
 - **Markers:** `-` inside a delimiter (`{%-`, `-%}`, `{{-`, `-}}`, `{#-`,
-  `-#}`) strips all whitespace, newlines included, on that side. `+%}`
-  keeps the newline after a tag that `trim_blocks` would remove; `{%+`
-  keeps the indentation that `lstrip_blocks` would remove.
+  `-#}`) strips all Unicode White_Space, newlines included, on that
+  side. `+%}` and `+#}` keep the line break after a tag that
+  `trim_blocks` would remove; `{%+` and `{#+` keep the indentation that
+  `lstrip_blocks` would remove. `{{+` and `+}}` are errors: an output
+  tag has nothing for them to keep.
 - **Trailing newlines are kept as written.** A file that ends in a
   newline renders ending in one (os stripped one, so `/etc/hostname`
   shipped without it).
@@ -1526,12 +1715,23 @@ Each with its file and line (render.md, section 7):
 | loop | `{% for x in e %}` … `{% endfor %}` | over a list, or a map's keys in order |
 | loop with pairs | `{% for k, v in e \| items %}` | two names only |
 | assignment | `{% set x = e %}` | inside a `for`, lasts for one iteration; else to the end of the template |
-| raw | `{% raw %}` … `{% endraw %}` | the text between is output as written |
+| raw | `{% raw %}` … `{% endraw %}` | the text between is output as written, but for its tags' whitespace rules (7.2): the line break after `{% raw %}` goes, and the indentation before an `{% endraw %}` that starts its line |
 
 - **Inside a `for`, `loop`** holds `index` (from 1), `index0`, `first`,
-  `last` and `length`.
+  `last` and `length`. It is read by those five keys alone: another key
+  is an error, and so is `loop` used whole, but in `loop is defined` and
+  as a condition, where it is true. Outside a `for`, `loop` is an
+  unknown name (7.6).
 - **Names may not shadow the context's roots** (7.7): `{% set settings = … %}`
   is an error. os's `for-each` element shadowed any task of the same name.
+  The eight roots, `key`, `value` and `loop` among them, are refused as a
+  `set` or `for` name in every template, bound there or not, when the
+  template is read.
+- **What follows `in`** is an expression without a conditional at its
+  top, as in MiniJinja: `{% for x in (a if c else b) %}` loops over a
+  conditional, and `{% for x in a if c %}` is the refused `for … if`. A
+  pair loop takes any list whose elements are lists of exactly two, as
+  `items` gives; another element is an evaluation error at the `for`.
 - **Nothing else:** no `macro` or `call`, `include`, `import` or `from`,
   `extends` or `block`, `filter`, `with`, `do`, `break` or `continue`,
   block `set`, `for … else`, `for … if`, `recursive`, `autoescape`.
@@ -1556,9 +1756,25 @@ string     = '…' or "…", with the escapes \\ \' \" \n \t
 integer    = [ "-" ] [0-9]+
 ```
 
+- **Between tokens** stand spaces, tabs and line feeds only: any other
+  byte outside a string literal is an error, a `\r` that a declaration's
+  JSON string holds included. A string literal keeps the bytes between
+  its quotes as written, its escapes read.
+
+- **Grammar words are not names:** `and`, `or`, `not`, `if`, `else`,
+  `is`, `in`, `true` and `false`, and `none`, `None`, `True` and
+  `False`, which MiniJinja reads as constants, are refused where a name
+  stands as an operand, and so as a `set` or `for` name. After `.` each
+  is a key like any other: `settings.if`. `defined` is a name but after
+  `is`.
 - **Lookups:** `a.b` and `a['b']` find a map's key; `a[i]` a list's
   element. There are no methods, so `u.keys` is always the key `keys`
   (the trap os's survey found, where Jinja calls a method).
+- **A lookup of the wrong type is an error,** in a chain too (7.6): a
+  key into a list, an integer into a map, anything into a string, an
+  integer or a boolean. A negative index is outside the list, where
+  MiniJinja counts from the end. `in` takes a string to find in a map or
+  a string; another value there is an error.
 - **Values** are strings, integers, booleans, lists and maps, as the
   schema types them.
 - **`and` and `or`** short-circuit and give an operand, as in Jinja.
@@ -1586,13 +1802,16 @@ integer    = [ "-" ] [0-9]+
 | `replace(a, b)` | a string; `a` not empty | every `a` replaced by `b` |
 | `items` | a map | its `[key, value]` pairs, in key order |
 | `keys`, `values` | a map | a list, in key order |
-| `sort` | a list of strings or of integers | ascending |
-| `tojson` | any value | compact JSON: keys in order, `"` `\` and U+0000 to U+001F escaped, the rest as UTF-8 |
+| `sort` | a list of strings or of integers | ascending: strings by bytes, as `<` compares them, integers by value; a list of both is an error |
+| `tojson` | any value | compact JSON: keys in order; `"` and `\` as `\"` and `\\`; U+0008, U+000C, U+000A, U+000D and U+0009 as `\b`, `\f`, `\n`, `\r` and `\t`; the rest of U+0000 to U+001F as `\u00xx`, in lowercase hex; everything else, `/` and U+007F included, as it is, in UTF-8 |
 | `shell_quote` | a string | single-quoted for sh, each `'` written `'\''` |
 | `systemd_escape` | a string | as `systemd-escape`: `/` to `-`, every byte outside `[A-Za-z0-9:_.]` and a leading `.` to `\xNN` |
-| `systemd_escape_path` | an absolute path | as `systemd-escape --path`: slashes collapsed and trimmed, then escaped; `/` alone is `-` |
-| `basename`, `dirname` | a path | its last segment; the rest |
+| `systemd_escape_path` | a path (6.2) | as `systemd-escape --path`: slashes collapsed and trimmed, then escaped; `/` alone is `-` |
+| `basename`, `dirname` | a path (6.2), or a relative path of a `file`'s form | its last segment; the rest. Of `/`, both are `/`; `/a`'s `dirname` is `/`, and a one-segment relative path's is `.`, as coreutils gives them |
 
+- **A value a filter does not take is an evaluation error:** an empty
+  string, `a/` or `/a/../b` to `basename` or `dirname`, a relative path
+  to `systemd_escape_path`.
 - **The only test is `defined`:** `x is defined`, `x is not defined`.
 - `tojson` is for JSON files (the bash fleet escaped its agents'
   `settings.json` with `sed`). `systemd_escape_path` turns
@@ -1608,14 +1827,29 @@ integer    = [ "-" ] [0-9]+
   field that is absent; an optional read's task that is absent; an
   optional export field that is absent; `target.member` outside a
   cluster.
+- **An absent optional value is no key of its map:** only a lookup of it
+  gives undefined. `keys`, `values`, `items`, `length`, `tojson`, `in`,
+  `==` and truthiness see the map without it.
 - **Undefined may be tested, defaulted or used as a condition:** with
   `is defined`, `default(…)`, or as the condition of `if`, `elif`, `not`,
   `and`, `or` and `… if … else …`, where it is false. Printing it,
   looping over it, comparing it, looking into it or filtering it
   otherwise is an error.
+- **Nor does it go further:** undefined as a list's element, as a
+  filter's argument but `default`'s, as a `set` value, or as a branch of
+  `… if … else …` is an error. `and` and `or` give an operand, which may
+  be undefined: `settings.a or settings.b` is undefined where both are.
 - **A lookup chain that goes straight into `is defined` or `default`**
   gives undefined at its first missing link instead of an error:
   `peer.endpoint is defined`.
+- **A chain is a bound name and the `.name` and `[e]` lookups after
+  it,** written straight before `is defined` or `| default`: never in
+  parentheses, `(peer.endpoint) is defined`, and never from a literal,
+  `[1][5] is defined`. The name is no link: an unknown name is refused
+  when the template is read, and a `set` name read where no `set` has
+  bound it is an error, before `is defined` too. A lookup that finds
+  nothing makes the chain undefined; one of the wrong type (7.4) is
+  still an error.
 - So os's two rules (an undefined `a.b` printed empty in a file, and was
   false in a condition, while `a.b` on a missing `a` failed in a file)
   become one, and an agent's typo fails.
@@ -1632,7 +1866,7 @@ integer    = [ "-" ] [0-9]+
 | `settings` | the task's own settings, defaults filled | `settings.port` |
 | `tasks.<task>.<setting>` | declared reads (6.4) | `tasks.core.domain` |
 | `exports.<task>` | declared export reads: target name to exports (8.2) | `exports.vpn` |
-| `key`, `value` | the element of a `for_each` entry, in its fields and its template | |
+| `key`, `value` | the element of a `for_each` entry, in its fields and its template; unknown elsewhere, in a `tree/` template too | |
 | `loop` and assigned names | inside the template | |
 
 - **Nothing else:** no process environment, no clock, no random, no
@@ -1676,9 +1910,16 @@ typed values make unneeded:
 - **`exports` is a map from export name to a spec** like a setting's
   (`type`, `doc`, `optional`) and a `value`, written as one
   `{{ expr }}`.
+- **The value is checked as a setting's is** (6.5), on each target that
+  evaluates it: its type and form, an object's fields declared and its
+  required ones present, a `target` that exists in the environment, a
+  `file` the revision holds.
 - **Computed from settings only:** the task's own settings and `target`.
   Never from another task's reads, never from another target's exports,
-  so exports cannot form a cycle; never of type `secret`.
+  so exports cannot form a cycle; never of type `secret`, at any depth of
+  the type (8.4). `debian`, `tasks` and `exports` are refused in a
+  value, and a `settings.<name>` the task does not declare is an error,
+  as anywhere (6.4).
 - **An optional export** whose expression is undefined is absent.
 - The exports part holds them (render.md, 4.4); a change to an export
   changes exactly the specs that read it.
@@ -1897,6 +2138,13 @@ PersistentKeepalive=25
   }
   ```
 
+- **Never `hearth`'s to read,** as a secret (9.1): an item's `mode`, its
+  private half's, has no bit outside `0770`, so it gives others nothing
+  and has no setuid, setgid or sticky bit.
+- **`wireguard-key` and `backup-key` wait for their milestones:** until
+  then render refuses each as a kind outside the list. So M1 takes
+  `ssh-host-key` alone, which the spec's identity part carries for M3's
+  activator.
 - **The machine-id is every target's,** never declared. The bash fleet
   fixed it in configuration so the journal had a stable path, and lab,
   production and a container shared one; here each target on each
@@ -1930,7 +2178,7 @@ artifacts.md (7.3) cite it.
   | `sha256` | required | required | 64 lowercase hex digits: what it is |
   | `unpack` | `"file"` | `"tar"` | a single file, or an archive the target's `tar` unpacks, detecting its compression |
   | `path` | required | required | the file's path; the directory the archive unpacks into |
-  | `strip` | | default 0 | leading path segments dropped, as `tar --strip-components` |
+  | `strip` | | default 0; 0 to 255 | leading path segments dropped, as `tar --strip-components` |
   | `mode` | default `0755` | | the file's mode, at most `0777` |
   | `owner`, `group` | default `root` | default `root` | the owners of the file, or of every file and directory the archive gives |
 
@@ -1960,10 +2208,11 @@ artifacts.md (7.3) cite it.
 - **No setuid, setgid or file capability:** a `file`'s mode has no such
   bit, and an archive whose members carry setuid or setgid fails the
   build. A program that needs privilege comes from a package.
-- **Paths are under `/opt` or `/usr/local`,** the bash fleet's and
-  os's places for software (5.5), and outside every path of the file
-  tree and every other download's: an overlap is an error. hearth's own
-  binary is `/usr/local/bin/hearth` (5.12; activator.md, 3.1).
+- **Paths are beneath `/opt` or `/usr/local`,** never either itself,
+  the bash fleet's and os's places for software (5.5), and outside every
+  path of the file tree and every other download's: an overlap is an
+  error. hearth's own binary is `/usr/local/bin/hearth` (5.12;
+  activator.md, 3.1).
 - **A version moves with its digest.** A task pins both in `task.json`; a
   bump edits both, in one change whose rendered diff shows it. os's
   `%VERSION%` in a URL goes.

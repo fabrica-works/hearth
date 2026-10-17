@@ -60,11 +60,11 @@ What is open is in section 12.
 ├── store.record                   the store's own record (6.6)
 ├── layers/                        0700
 │   ├── <key>                      a published layer: a read-only subvolume
-│   ├── <key>.record               its record (6.2), 0600
-│   ├── <key>.tree                 its tree file: entries and change set (6.3), 0600
+│   ├── <key>.record               its record (6.2), 0644
+│   ├── <key>.tree                 its tree file: entries and change set (6.3), 0644
 │   ├── <key>.staging              a layer being built: a writable subvolume (4.2)
 │   ├── <key>.trash                a layer being deleted (7.3)
-│   └── <name>.tmp                 a tree file being written (6.8)
+│   └── <key>.tree.tmp             a tree file being written (6.8)
 ├── resolutions/<key>.record       a resolution (6.4)
 ├── cache/<sha256>                 bytes by content: downloads, kept indices, render's blobs; 0644, never modified (2.2)
 ├── cache/<sha256>.record          where they came from (6.5)
@@ -90,9 +90,11 @@ What is open is in section 12.
   `store.record`'s temporary. A name of no known
   shape is not hearth's: the startup scan reports it and leaves it alone
   (8.2).
-- **Directories are 0700, records and tree files 0600,** all the
-  builder's: user `hearth` on a machine, the developer on a developer's
-  machine.
+- **Directories are 0700; records, tree files and cache files 0644,**
+  all the builder's: user `hearth` on a machine, the developer on a
+  developer's machine. The builder runs with the umask 022, and skein's
+  `Store` makes a file `0o666` less it, with no mode of its own: the
+  store's directories keep everyone else out (2.2).
 - **Two writers, apart:** on a machine the steward writes only
   `state/`, and the builder writes the rest and never `state/`
   (steward.md, 2.2). Both run as `hearth`.
@@ -484,12 +486,14 @@ The startup scan (8.2) settles what a crash left:
 | `<key>` with no record | a deletion began (7.3, step 1) | deletes it |
 | a record with no `<key>` | a publish stopped before its rename | deletes the record and tree file |
 | a record whose uuids are not the subvolume's | the subvolume is not the one recorded | deletes both |
-| `*.tmp`; `*.skein-<16 hex>`, skein's `Store`'s temporary (6.8); anything in `staging/` | a write or a step in flight | deletes it |
+| `cache/<64 hex>.tmp`, `layers/<key>.tree.tmp`; a record's name, then `.skein-` and 16 lowercase hex digits, skein's `Store`'s temporary (6.8); anything in `staging/` | a write or a step in flight | deletes it |
 | `cache/<sha256>` with no record | a cut between a cache file's rename and its record, or before the file was durable (6.8) | deletes it |
 | `cache/<sha256>.record` with no file | a deletion stopped (7.5) | deletes the record |
 
 An interrupted build is built again when next asked for, and a cache
-file deleted so is fetched or rendered again.
+file deleted so is fetched or rendered again. A temporary is only one of
+those shapes, in its own directory: any other name, `cache/notes.tmp`
+among them, is a stray, reported and left alone (2.1).
 
 - **A layer that no longer matches its record** is found by a check, not
   by the scan, which reads no file: the activator's verification of what
@@ -729,14 +733,25 @@ configured (`programming-model.md`, section 7), with these defaults:
 | Kind | Body | Within it |
 |---|---|---|
 | 1 store | 4 KiB | — |
-| 4 resolution | 4 MiB | 8,192 packages in a closure, 8 source lines, 16 indices a line; a path or a filename of 4,096 bytes; a name, a version or an architecture of 256 |
-| 5 cache file | 8 KiB | a URI or a path of 4,096 bytes |
+| 4 resolution | 4 MiB | 8,192 packages in a closure, 8 source lines, 16 indices a line; a URI, a path or a filename of 4,096 bytes; a suite, a component, a name, a version or an architecture of 256 |
+| 5 cache file | 8 KiB | a URI or a path of 4,096 bytes; a git object id of 64 |
 
 A body past its bound, or a field past its limit, is a record of a
 version the builder cannot read (6.8). A resolution whose closure would
 pass 8,192 packages is an error of kind resolution (render.md, 7.2),
-never a record. The other kinds' bounds are set with the milestone that
-writes them, M2 for layers, tree files and targets.
+never a record; so is one whose record would pass its bound or a
+field's limit, which the store declines to write: it depends on the
+inputs alone, a configuration error. The other kinds' bounds are set
+with the milestone that writes them, M2 for layers, tree files and
+targets.
+
+- **The decoders' own bounds,** which no valid record reaches, hold
+  for every kind: nesting 8 deep, a field's name of 64 bytes, a list or
+  a map of 8,256 items.
+- **A record that is not its version's** is one the builder cannot read
+  (6.8): a reserved field that is not zero, a field its kind's version
+  does not name, a field it requires missing, a value of another kind.
+  A field a later release adds comes with a new version of its kind.
 
 ### 6.2 A layer's record
 
@@ -804,18 +819,25 @@ key        digest   H("resolution", sources, request, variant, apt), over its in
 inputs     map      { sources, request, variant, apt }: the key's values, as the packages part holds them
                       (render.md, 4.2); the architecture is the sources'
 sources    list     per source line: list [ uri, suite, components,
-                      indices: list [ path, size, sha256 ] ]      kept in cache/: its InRelease first, then each
-                                                                  Packages file, decompressed, at the path and with
-                                                                  the SHA-256 of its InRelease entry
+                      indices: list [ path, size, sha256 ] ]      kept in cache/: its InRelease first, as
+                                                                  [ "InRelease", size, sha256 ], then each Packages
+                                                                  file, decompressed, at the path and with the size
+                                                                  and SHA-256 of its InRelease entry; each path
+                                                                  relative to the suite's directory, dists/<suite>/
 closure    list     per package, by name then architecture:
                       list [ name, architecture, version, source: uint, filename, size, sha256 ]
 digest     digest   H("closure", list [ list [ name, architecture, version, sha256 ] … ])
-made       map      { at, apt, mmdebstrap, costs }
+made       map      { at, apt, mmdebstrap, costs: { fetched, took } }: `at`, wall time in ns when
+                      recorded; apt's and mmdebstrap's versions, empty in M1 (render.md, 5.4);
+                      `fetched`, the bytes apt reports fetching; `took`, the run's duration in ns
 ```
 
 - **The key recomputes from `inputs`,** as a layer's from its record
-  (6.2), and the startup scan checks it: a record whose key does not is
-  deleted.
+  (6.2), **and the digest from `closure`;** the startup scan checks
+  both, since the scan reads each resolution's record whole anyway, and
+  a packages key built on a digest its closure does not give would name
+  bytes it does not install. A record whose key or digest does not
+  recompute is deleted.
 - **Every byte the packages step installs is named by SHA-256 here:**
   each `.deb` by its `Packages` entry, each `Packages` file by its
   `InRelease` entry, each `InRelease` by the digest it had when apt
@@ -842,7 +864,8 @@ size       uint     its length in bytes
 origin     map      where it first came from, one of:
                       { kind: "fetch", uri }                  fetched (build.md, 5.1)
                       { kind: "index", resolution: digest }   an index a resolution kept (6.4), by its key
-                      { kind: "blob", oid: bytes }            a static file render streamed from git, by its object id
+                      { kind: "blob", oid: bytes }            a static file render streamed from git, by its object
+                                                              id as git prints it, lowercase hex
                       { kind: "rendered", path: bytes }       a file render produced, by its template's path in the revision
 at         uint     when it entered the cache: wall time in ns
 took       uint     how long it took to enter, in ns: the fetch, the stream or the write
@@ -860,7 +883,10 @@ record.
   layers (2.4) has no `range`; the builder records it, by rename, before
   its first layer [M2]. Once it is recorded, a builder configured with
   another base refuses to start: every layer on disk is the recorded
-  range's.
+  range's. So does a builder of another uid, which would write files the
+  recorded one cannot replace (`sudo hearth render --store` on a
+  developer's store): the store is not opened, and the client's startup
+  error (8.1) names both uids.
 - **`targets/<H("target", name)>.record`:** the name and the last N
   builds (7.1), newest first, each `[revision, output key, at]`,
   rewritten when a build for the target completes.
@@ -879,7 +905,7 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   `io.md`, sections 5 and 5.2): its temporary, `<name>.skein-<16 hex>`,
   written beside it, synced, renamed over `<name>`, the directory
   synced. A reader sees the old record or the new. A tree file [M2] is
-  written the same way by the builder itself, as `<name>.tmp`.
+  written the same way by the builder itself, as `<key>.tree.tmp`.
 - **Ordered:** the layer's files synced (`syncfs`) and its tree file
   in place before its record, a record before the publishing rename
   (4.2), an unrecording before the subvolume is touched (7.3). The
@@ -906,8 +932,10 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   treated as absent: the layer deleted (7.3), the rest made again, which
   costs time and breaks no slot, since slots are copies. A
   `store.record` it cannot read is written again, and every layer it
-  holds is treated as unrecorded. `state/` records follow 8.3's
-  table.
+  holds is treated as unrecorded; so is one whose `layout` is not 1.
+  A resolution it cannot read stays in place, unindexed, until a
+  resolution of its key is made again over it. `state/` records follow
+  8.3's table.
 
 ## 7. Pins and collection
 
@@ -1016,12 +1044,31 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
 - **A store at a limit is full.** A scan that counts more resolutions or
   cache files than their limits stops there: the builder holds no index,
   and answers every request that reads or adds to the store with an
-  operational error naming the store, the limit and what passed it
-  (render.md, 7.2). A resolution or a cache file that would pass its
-  limit while the builder runs is refused the same way, and its file is
-  removed. Nothing is evicted to make room: collection is M2's (7.5),
-  and from M2 a builder collects before it calls its store full. A store
-  without layers that is full is deleted whole and made again (2.4).
+  operational error of kind `store` naming the store, the limit and what
+  passed it (render.md, 7.2). Only a cache file with its record counts
+  (8.2, step 6). A resolution is not begun without room for one more
+  resolution and for every index its source lines may keep (128 cache
+  files by default, 6.1), so a full store runs no mmdebstrap; a
+  resolution or a cache file that would still pass its limit while the
+  builder runs is refused the same way, and its file is removed. Nothing
+  is evicted to make room: collection is M2's (7.5), and from M2 a
+  builder collects before it calls its store full. A store without
+  layers that is full is deleted whole and made again (2.4).
+- **A store that cannot be opened ends the call.** A lock or a
+  `store.record` that fails, or a `store.record` the builder refuses
+  (6.6), keeps the builder from starting: nothing renders, and the
+  client says so on standard error, with the code 75 (client/README.md,
+  3.2 and 3.3).
+- **A store whose upkeep fails is refused as a full one.** A page of a
+  listing, a removal, a record's load, a `staging/` tree past the walk's
+  bounds (5.6) or an index's keeping (6.8) that fails leaves the builder
+  with no index: it answers every request that reads or adds to the
+  store with an operational error of kind `store`, naming the store and
+  the step that failed, and leaves the store as it is for the next
+  start's scan.
+- **A store's error is the call's,** given once, not each target's: a
+  resolution the store would not find or keep leaves its key needed
+  (render.md, 5.7), and the call's code is 75 (client/README.md, 3.3).
 
 ### 8.2 The startup scan
 
@@ -1040,7 +1087,7 @@ settled before the first job of every pass.
    may interrupt it, and a daemon's job has its steward's deadline
    (steward.md, 5.2). The root, not `store.record`, which 6.8 may write
    again by rename onto another inode.
-2. **The store's record** (6.6): version and range.
+2. **The store's record** (6.6): version, layout, uid and range.
 3. **Every subvolume under the store,** with
    `BTRFS_IOC_GET_SUBVOL_ROOTREF` on its root: the child subvolumes'
    tree ids and the directories holding them, 255 a call, continued from
@@ -1055,12 +1102,21 @@ settled before the first job of every pass.
    layer) is refused, and the layer deleted. A store without layers runs
    this step for its resolutions and its cache alone (2.4). `cache/`,
    `resolutions/` and `layers/` are listed page by page (skein's
-   `io.md`, 5: `ListPage`), 1,024 entries a page, each counted against
-   8.1's limits as it comes, so a directory of any size is scanned in
-   bounded memory.
+   `io.md`, 5: `ListPage`), 1,024 entries a page, so a directory of any
+   size is scanned in bounded memory. Resolutions count against their
+   limit (8.1) as they come. `cache/` is listed twice: its records
+   first, counted against the cache limit as they come, then its files,
+   each paired with its record; a file with none is deleted (4.4) and
+   never counts, so what a crash left cannot fill a store.
 7. **Settled:** deletions done (7.3), strays (any name 2.1 does not
-   list) reported, and the index built. `state/` is the steward's, read
-   at its own start (8.3).
+   list) reported once, by their count and the first found, and the
+   index built. `state/` is the steward's, read at its own start (8.3).
+
+What the store says while it opens, that it waits for the lock and that
+it holds strays, goes to the client's standard error as progress does,
+as text or as records with `--json` (client/README.md, 3.2; as events
+of its job [M3]); its error is part of the answer, unless it kept the
+store from opening (8.1).
 
 The three ioctls have been unprivileged since Linux 4.18, and the
 builder makes them itself (5.8).

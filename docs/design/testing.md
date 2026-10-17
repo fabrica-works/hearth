@@ -257,7 +257,9 @@ hearth-fake-machine
   error, and asserts what its client guarantees: a handle it issued, a
   process it started.
 - **It keeps a ledger:** every operation, who made it (process, ids,
-  view), what it changed and what it refused, in a bounded queue the
+  view; one process until the steward and its builders run apart [M3],
+  since skein's calls name no process), what it changed and what it
+  refused, in a bounded queue the
   referee drains; and counts a world reads at settle: bytes read and
   written per process, inodes changed, subvolumes made, programs run.
   The steward's rule is read from it (steward.md, 2.2): no open beneath
@@ -411,7 +413,7 @@ at M2.
 
 ```
 package    name, version, architecture, priority, Essential, section
-relations  Depends, Pre-Depends, Provides
+relations  Depends, Pre-Depends, Provides, Conflicts, with their version relations
 files      path, kind, mode, owner and group by name, contents by handle; conffiles marked
 scripts    typed effects, never shell: make a system user or group; set a file capability;
            run /etc/kernel/postinst.d; register an alternative; fail (a fault)
@@ -421,8 +423,13 @@ archive    Installed-Size; the .deb's size and SHA-256, as Packages lists them
 - **Snapshots:** the mirror holds the universe at several timestamps,
   and a bump changes some versions. A timestamp between two snapshots
   answers as the earlier one, as snapshot.debian.org redirects.
-- **Variants** as mmdebstrap defines them: essential, then each
-  priority, then apt.
+- **Variants** as mmdebstrap defines them: `essential`, the Essential
+  packages; `apt`, those and apt; `required`, `important` and
+  `standard`, each the packages of its priority and those above it, with
+  apt.
+- **No Breaks, Replaces or Recommends,** until a scenario shows that
+  one changes a closure (5.1). The fake mmdebstrap asserts `APT::Install-Recommends "false"` (render.md, 5.2),
+  naming the option where a world passes another.
 - **base-files and base-passwd:** `/usr/lib/os-release`,
   `/etc/debian_version`, and the static users and groups.
 - **dpkg's database, of the real shape:** `/var/lib/dpkg/status` with
@@ -737,8 +744,10 @@ out   bytes on stdout and stderr, in chunks over the world's time: progress;
   through the argument vector. Only the invocations hearth makes need a
   face.
 - **It checks its client.** It refuses an option the real tool refuses,
-  exits as the real tool does on a usage error, and works only where the
-  real one would: efibootmgr writes variables only as root; mmdebstrap
+  answers each argument vector hearth makes as the real tool does, and
+  asserts that it is given no other, since a real tool's usage errors
+  differ between its commands (`git diff` exits 129, `git rev-parse
+  --verify` 1); and it works only where the real one would: efibootmgr writes variables only as root; mmdebstrap
   in unshare mode makes no user namespace when it runs as root, and as
   anyone else needs `newuidmap`, which `no_new_privs` disables.
 - **Output follows recordings.** Every line it prints has the shape of a
@@ -842,8 +851,15 @@ out   bytes on stdout and stderr, in chunks over the world's time: progress;
 ### 4.5 Recordings
 
 - **Where:** `testing/recordings/<tool>/<version>/`, each with its
-  argument vector, its environment (no terminal), its stdout, its
-  stderr and its exit.
+  argument vector, its environment (no terminal), its working directory,
+  its stdin where the tool reads one (`git cat-file --batch`), its
+  stdout, its stderr and its exit. A tool whose lines another prints is
+  recorded under both versions: mmdebstrap's runs under
+  `mmdebstrap/<its version>-apt<apt's>/`, as a resolution's record
+  keeps both (render.md, 5.4).
+- **From the store's root:** every conformance case runs there, as the
+  builder runs its tools, so a recorded path (`./cache/…`) is the one a
+  run prints.
 - **One recording, two uses:** it is a machine world's transcript, with
   what it must decode to beside it (testing-strategy.md, 4.1), and the
   shape the fake's face prints.
@@ -895,7 +911,7 @@ kernel (testing-strategy.md, section 5).
 
 | Scenario | The real side | What is compared |
 |---|---|---|
-| resolve | `mmdebstrap --simulate --mode=chrootless` through the local mirror, as its proxy (6.2; render.md, 5.2) | the closure: names, architectures, versions; the `Packages` stanzas it left |
+| resolve | `mmdebstrap --simulate --mode=chrootless` through the local mirror, as its proxy (6.2; render.md, 5.2) | the closure: names, architectures, versions; the `Packages` stanzas it left, in the fields the universe keeps (3.6), the others one allowed difference (5.3) |
 | resolve, both modes [M2] | the same requests simulated with `--mode=chrootless` and with `--mode=unshare`, for every variant | the two closures, which must be equal: os and the bash fleet resolved chrootless and built unshare, and a reason once found for preferring unshare was lost (render.md, section 10). With M2's real builds, since unshare needs the subordinate range (6.4) |
 | fetch | `apt-helper download-file` through the local mirror, as its proxy, over loopback | files by digest; a 404's and a mismatch's exit, lines and leftovers |
 | bootstrap | mmdebstrap as build.md (5.4, 8.3) runs it: as the root of a sandbox's user namespace, `--mode=unshare`, chrooted into a staging layer | the installed set; dpkg's status, stanza by stanza; the tree: paths, kinds, modes, owners as the namespace sees them, attributes, link targets, contents by digest |
@@ -967,19 +983,24 @@ real costs of each step.
 - **The pin,** in `testing/mirror`: a snapshot timestamp (the canonical
   one snapshot.debian.org gives), the suite, components and
   architecture, and the requests of the test repository's targets:
-  `test-min` (the essential variant and apt), and `test-boot` for the VM
+  `test-min` (the `apt` variant with no package of its own: the test
+  repository's `tasks/hearth/task.json` declares none, format.md,
+  5.12), and `test-boot` for the VM
   tier (a kernel, tiny-initramfs, systemd, systemd-container,
   openssh-server, incus-agent, and the tools hearth runs: mmdebstrap,
   uidmap, efibootmgr, git). The
-  mirror digest is the digest of the pinned closure's index entries. A
-  bump is a commit, as a snapshot bump in IaC is.
+  mirror digest is the SHA-256 of the pinned `InRelease`, kept in the
+  pin: it names every index the mirror serves. A bump is a commit, as a
+  snapshot bump in IaC is, and carries the keys and closures the tests
+  hold with it.
 - **The extras:** a few test packages built from sources in the
   repository with `dpkg-deb`, as a regular user: a postinst that fails,
   a conffile, a user made by a postinst, a setuid file, a capability.
 - **At M1, indexes only:** a snapshot of forky, `main`, amd64, without
   the updates and security pockets; the suite's `InRelease` and its
   `Packages` index, whole and signed, so apt verifies them as it would
-  snapshot.debian.org's and any request resolves. `test-min` and
+  snapshot.debian.org's, with the host's keys (render.md, 5.2), and any
+  request resolves. `test-min` and
   `test-boot` are targets of the test repository (`testing/repos`) with
   the requests above, and the resolve scenario compares their closures
   (5.2). The pin's first timestamp is the canonical one
@@ -994,8 +1015,9 @@ real costs of each step.
 - **Served on loopback as an HTTP proxy,** by the harness, at a port it
   chooses: it answers each request for
   `http://snapshot.debian.org/archive/…` with the file the mirror holds
-  at that path (`by-hash` paths included), and any other request with
-  404, so no test reaches beyond loopback. The builder under test takes
+  at that path (`by-hash` paths included); a timestamp it does not hold
+  as the latest earlier one it does (3.6), and one before them all, or
+  any other request, with 404, so no test reaches beyond loopback. The builder under test takes
   it as its proxy (render.md, 5.2's `Acquire::http::Proxy`; the fetch's
   apt configuration [M2], build.md, 5.1), as a builder takes an
   apt-cacher-ng: the proxy is the builder's configuration, made by the
@@ -1245,7 +1267,7 @@ standalone worlds [M3], and `hearth-client-dev-world` under `tests/dev`, with
 
 | World | Real | From |
 |---|---|---|
-| `hearth-render-world` | render, on fake git and the universe's index | M1 |
+| `hearth-render-world` | render's domain, under a scripted parent that plays the protocol layer and the store's records (render.md, 9.1) | M1 |
 | `hearth-builder-world` | the builder's root and its children; tree helper and steward scripted | M1 |
 | `hearth-store-world` | the store, on fake btrfs | M2 |
 | `hearth-build-world` | plans and steps, on the fakes of `apt-helper`, mmdebstrap, dpkg-query and the target's tools, in sandboxes | M2 |

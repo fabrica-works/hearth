@@ -606,10 +606,11 @@ RebootWatchdogSec=10min
    `BTRFS_SUBVOL_RDONLY`; left out for a mutable slot, whose fstab
    mounts `/` `rw` (development.md, 4.2). Its manifest is written all
    the same: capture compares against it (development.md, section 5).
-2. **Check the package users:** every user a task declares as made by a
-   package (format.md, 5.6), such as `postfix`, must be in the slot's
-   `/etc/passwd`, read through the same bounded parser as 5.4's; a
-   missing one refuses the slot, naming every one missing.
+2. **Check the package users and groups:** every user and group a task
+   declares as made by a package (format.md, 5.6), such as `postfix`,
+   must be in the slot's `/etc/passwd` or `/etc/group`, read through the
+   same bounded parsers as 5.4's; a missing one refuses the slot, naming
+   every one missing.
 3. **Walk the sealed root's metadata** against the manifest, without
    contents, and record each entry's inode and change time as the seal
    left them. Anything else that differs (nothing should) fails the

@@ -432,6 +432,7 @@ Place {
               policies   per class, core or data: { snapshots? { every, keep } [M5],
                          backup? { every, keep, peer, recipient } [M6] }   operating.md, section 7
   users       [ name ]                                        package users the tasks declare (format.md, 5.6), at most 256
+  groups      [ name ]                                        package groups the tasks declare (format.md, 5.6), at most 256
   secrets     files       [ { name, path, mode, owner, group } ]                     at most 256
               passwords   [ { user, name } ]                                         at most 64
               identity    [ { item, kind, algorithm, path, public path, mode, owner, group } ]   at most 16
