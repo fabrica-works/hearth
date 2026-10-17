@@ -162,3 +162,61 @@ pub fn took(machine: &mut crate::Machine, pid: Pid, pipe: Handle, most: u32) -> 
         | Reply::Exited(_) => panic!("expected Took"),
     }
 }
+
+// Pinned forky index, 20261017T143929Z.
+pub const MAWK: &[u8] = b"Package: mawk\n\
+Version: 1.3.4.20260302-2\n\
+Installed-Size: 299\n\
+Maintainer: Boyuan Yang <byang@debian.org>\n\
+Architecture: amd64\n\
+Provides: awk\n\
+Depends: libc6 (>= 2.38)\n\
+Description: Pattern scanning and text processing language\n\
+Multi-Arch: foreign\n\
+Homepage: https://invisible-island.net/mawk/\n\
+Description-md5: 05965bfcd1a2333e963d9f1945d161fc\n\
+Tag: devel::interpreter, implemented-in::c, interface::commandline,\n\
+ role::program, scope::utility, use::filtering, use::scanning,\n\
+ works-with::text\n\
+Section: interpreters\n\
+Priority: required\n\
+Filename: pool/main/m/mawk/mawk_1.3.4.20260302-2_amd64.deb\n\
+Size: 144700\n\
+MD5sum: 24d7eedf2197e29402ff8c06abd465af\n\
+SHA256: 6fcd463ea272c05627d5159716336b53bfa14b35b1ac7ba29a878f0ee1352419\n\
+\n\
+";
+pub const MAWK_KEPT: &[u8] = b"Package: mawk\n\
+Version: 1.3.4.20260302-2\n\
+Installed-Size: 299\n\
+Architecture: amd64\n\
+Provides: awk\n\
+Depends: libc6 (>= 2.38)\n\
+Section: interpreters\n\
+Priority: required\n\
+Filename: pool/main/m/mawk/mawk_1.3.4.20260302-2_amd64.deb\n\
+Size: 144700\n\
+SHA256: 6fcd463ea272c05627d5159716336b53bfa14b35b1ac7ba29a878f0ee1352419\n\
+\n\
+";
+
+// Pinned forky index, 20261017T143929Z.
+pub const TINY_INITRAMFS: &[u8] = b"Package: tiny-initramfs\n\
+Version: 0.1-8\n\
+Installed-Size: 35\n\
+Maintainer: Debian QA Group <packages@qa.debian.org>\n\
+Architecture: all\n\
+Provides: linux-initramfs-tool\n\
+Depends: tiny-initramfs-core (>= 0.1-8), tiny-initramfs-core (<< 0.1-8+b+~)\n\
+Conflicts: dracut, initramfs-tools, live-tools\n\
+Description: Minimalistic initramfs implementation (automation)\n\
+Homepage: https://github.com/chris-se/tiny-initramfs/\n\
+Description-md5: f21681110ae703bb6849e64e50836f0b\n\
+Section: utils\n\
+Priority: optional\n\
+Filename: pool/main/t/tiny-initramfs/tiny-initramfs_0.1-8_all.deb\n\
+Size: 13420\n\
+MD5sum: d0561fcf207289e483b4f210b502b504\n\
+SHA256: bad1f0b5e68fd252b511a5c02f3d162b04a4cae66a0635581154fb8f5566b9c6\n\
+\n\
+";

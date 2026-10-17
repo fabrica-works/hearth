@@ -1,4 +1,6 @@
 //! The program table above the generic machine (testing.md, 3.5).
+pub mod universe;
+pub mod version;
 use crate::linux::{self, Exit, Item, Node, Op, Pid, Refusal, Reply, Sizes};
 use alloc::collections::BTreeMap;
 #[derive(Debug)]
