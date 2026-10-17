@@ -1,10 +1,12 @@
-//! Revision checks of declared reads (format.md, 6.4 and 6.5).
+//! Declared schemas, defaults and target settings (format.md, 6).
+mod targets;
 use crate::{
     errors::Schema,
     revision::{self, Documents, Position},
 };
 use alloc::boxed::Box;
 use skein_lib::{List, Map, bytes};
+pub use targets::{Checked, Revision, Validated, unclaimed, validate};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Fault {
     pub schema: Schema,
@@ -158,7 +160,7 @@ pub struct Against<'a> {
 enum Wanted {
     Type(u32),
     Spec(Spec),
-    Fields(Box<[Spec]>),
+    Settings(Box<[Spec]>),
 }
 #[derive(Debug)]
 enum Frame {
@@ -168,6 +170,7 @@ enum Frame {
 #[derive(Debug)]
 struct MapFrame {
     from: Provenance,
+    root: bool,
     pairs: Box<[crate::compose::Pair]>,
     next: usize,
     fields: Option<Box<[Spec]>>,
@@ -185,24 +188,37 @@ enum Advance {
 pub struct Validator {
     stack: Stack<Frame>,
     steps: u64,
+    left: u64,
+    limited: bool,
 }
 impl Validator {
     #[must_use]
     pub fn new(limits: &Limits) -> Self {
         Self {
             stack: Stack::with_capacity(limits.depth.saturating_add(1)),
+            left: u64::MAX,
+            limited: false,
             steps: limits.decoded.saturating_mul(u64::from(limits.document)).saturating_mul(4).saturating_add(4),
         }
+    }
+    #[must_use]
+    pub fn limited(&self) -> bool {
+        self.limited
     }
     pub fn settings(
         &mut self,
         settings: &Composed,
         against: &Against<'_>,
         check: &Check<'_>,
-        _left: &mut u64,
+        left: &mut u64,
         faults: &mut List<Fault>,
     ) -> Option<Evaluated> {
-        self.walk(settings.clone(), Wanted::Fields(against.declaration.settings.clone()), against, check, faults)
+        self.left = *left;
+        self.limited = false;
+        let value =
+            self.walk(settings.clone(), Wanted::Settings(against.declaration.settings.clone()), against, check, faults);
+        *left = self.left;
+        value
     }
     fn walk(
         &mut self,
@@ -219,6 +235,12 @@ impl Validator {
         for _ in 0..self.steps {
             if let Some((value, wanted)) = pending.take() {
                 finished = self.enter(value, wanted, against.declaration, faults, &mut valid);
+                if self.limited {
+                    for _ in 0..self.stack.len() {
+                        drop(self.stack.pop());
+                    }
+                    return None;
+                }
             }
             let Some(mut frame) = self.stack.pop() else {
                 return if valid { finished } else { None };
@@ -243,6 +265,10 @@ impl Validator {
         faults: &mut List<Fault>,
         valid: &mut bool,
     ) -> Option<Evaluated> {
+        let root = match &wanted {
+            Wanted::Settings(_) => true,
+            Wanted::Type(_) | Wanted::Spec(_) => false,
+        };
         let (form, spec) = match wanted {
             Wanted::Type(ty) => (
                 declaration.types.get(usize::try_from(ty).expect("type index")).expect("declared type").form.clone(),
@@ -257,12 +283,20 @@ impl Validator {
                     .clone(),
                 Some(spec),
             ),
-            Wanted::Fields(fields) => (Form::Object(fields), None),
+            Wanted::Settings(fields) => (Form::Object(fields), None),
         };
         if let Some(schema) = type_fault(&value.kind, &form, spec.as_ref()) {
             fault(faults, value.from, schema);
             *valid = false;
             return None;
+        }
+        let charge = storage(&value.kind, &form);
+        match self.left.checked_sub(charge) {
+            Some(left) => self.left = left,
+            None => {
+                self.limited = true;
+                return None;
+            }
         }
         match value.kind {
             Composite::Bool(value) => Some(Evaluated::Bool(value)),
@@ -297,6 +331,7 @@ impl Validator {
                 self.stack
                     .push(Frame::Map(MapFrame {
                         from: value.from,
+                        root,
                         pairs,
                         next: 0,
                         fields,
@@ -338,7 +373,7 @@ impl Frame {
     fn finish(self) -> Evaluated {
         match self {
             Self::List { items: _, next: _, ty: _, made } => Evaluated::List(made.into_boxed()),
-            Self::Map(MapFrame { from: _, pairs: _, next: _, fields: _, field: _, ty: _, key: _, made }) => {
+            Self::Map(MapFrame { from: _, root: _, pairs: _, next: _, fields: _, field: _, ty: _, key: _, made }) => {
                 Evaluated::Map(made.into_boxed())
             }
         }
@@ -353,7 +388,7 @@ impl MapFrame {
         faults: &mut List<Fault>,
         valid: &mut bool,
     ) -> Advance {
-        let Self { from, pairs, next, fields, field, ty, key, made } = self;
+        let Self { from, root, pairs, next, fields, field, ty, key, made } = self;
         if let Some(key) = key.take() {
             made.push(EvaluatedEntry { key, value }).expect("field count");
         }
@@ -364,7 +399,7 @@ impl MapFrame {
         };
         match (pair, spec) {
             (Some(pair), Some(spec)) if pair.key.as_ref() < spec.name.text.as_ref() => {
-                unknown(faults, pair, fields.as_deref().expect("object fields"));
+                unknown(faults, pair, fields.as_deref().expect("object fields"), *root);
                 *valid = false;
                 *next = next.saturating_add(1);
             }
@@ -389,7 +424,12 @@ impl MapFrame {
                         },
                         None if spec.optional => {}
                         None => {
-                            fault(faults, *from, Schema::MissingField { field: spec.name.text.clone() });
+                            let schema = if *root {
+                                Schema::Missing { setting: spec.name.text.clone() }
+                            } else {
+                                Schema::MissingField { field: spec.name.text.clone() }
+                            };
+                            fault(faults, *from, schema);
                             *valid = false;
                         }
                     }
@@ -398,7 +438,7 @@ impl MapFrame {
             (Some(pair), None) => {
                 *next = next.saturating_add(1);
                 if let Some(fields) = fields {
-                    unknown(faults, pair, fields);
+                    unknown(faults, pair, fields, *root);
                     *valid = false;
                 } else {
                     *key = Some(pair.key.clone());
@@ -410,8 +450,14 @@ impl MapFrame {
         Advance::More
     }
 }
-fn unknown(faults: &mut List<Fault>, pair: &crate::compose::Pair, fields: &[Spec]) {
-    fault(faults, pair.from, Schema::UndeclaredField { field: pair.key.clone(), declared: field_names(fields) });
+fn unknown(faults: &mut List<Fault>, pair: &crate::compose::Pair, fields: &[Spec], root: bool) {
+    let declared = field_names(fields);
+    let schema = if root {
+        Schema::Undeclared { setting: pair.key.clone(), declared }
+    } else {
+        Schema::UndeclaredField { field: pair.key.clone(), declared }
+    };
+    fault(faults, pair.from, schema);
 }
 fn default_value<'a>(defaults: &'a TaskDefaults, spec: &Spec) -> Option<&'a DefaultValue> {
     for (index, value) in defaults.values.iter().enumerate() {
@@ -509,6 +555,8 @@ fn task_defaults(
     merge: &mut Merge,
     faults: &mut List<Fault>,
 ) -> TaskDefaults {
+    validator.left = u64::MAX;
+    validator.limited = false;
     let mut values = List::with_capacity(u32::try_from(declaration.settings.len()).expect("setting count"));
     for spec in &declaration.settings {
         add_default(&mut values, spec, document, merge, validator.stack.capacity(), faults);
@@ -611,4 +659,31 @@ fn nulls(value: &revision::Value, document: u32, depth: u32, faults: &mut List<F
         }
     }
     unreachable!("decoded document bounds the null scan")
+}
+
+fn entry_size(key: &[u8]) -> u64 {
+    crate::evaluate::ELEMENT.saturating_add(u64::try_from(key.len()).expect("bounded key"))
+}
+fn storage(value: &Composite, form: &Form) -> u64 {
+    match (value, form) {
+        (Composite::String(bytes), _) => u64::try_from(bytes.len()).expect("bounded bytes"),
+        (Composite::List(items), _) => {
+            u64::try_from(items.len()).expect("bounded items").saturating_mul(crate::evaluate::ELEMENT)
+        }
+        (Composite::Map(pairs), Form::Map(_)) => {
+            let mut size = 0_u64;
+            for pair in pairs {
+                size = size.saturating_add(entry_size(&pair.key));
+            }
+            size
+        }
+        (Composite::Map(_), Form::Object(fields)) => {
+            let mut size = 0_u64;
+            for spec in fields {
+                size = size.saturating_add(entry_size(&spec.name.text));
+            }
+            size
+        }
+        (Composite::Bool(_) | Composite::Int(_) | Composite::Map(_), _) => 0,
+    }
 }

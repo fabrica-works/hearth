@@ -349,9 +349,21 @@ pub struct Present {
     pub settings: Composed,
 }
 /// Presence uses host layers alone; settings include fleet and environment.
-pub fn compose(target: &Target, documents: &Documents, merge: &mut Merge) -> Settings {
-    let mut presence = None;
-    let mut settings = None;
+pub fn compose(
+    target: &Target,
+    documents: &Documents,
+    defaults: &crate::schema::Defaults,
+    merge: &mut Merge,
+) -> Settings {
+    let present = presence(target, documents, merge);
+    let origin = Provenance { layer: Layer::Defaults, document: 0, at: Position { line: 1, column: 1 } };
+    let mut bottom = List::with_capacity(u32::try_from(present.len()).expect("task count"));
+    for pair in &present {
+        if let Some(value) = defaults.layer(&pair.key) {
+            bottom.push(Pair { key: pair.key.clone(), from: pair.from, value: value.clone() }).expect("task count");
+        }
+    }
+    let mut settings = Some(Composed { from: origin, kind: Composite::Map(bottom.into_boxed()) });
     for (index, source, layer) in layers(target, documents).into_iter().flatten() {
         let mut pairs = List::with_capacity(u32::try_from(source.tasks.len()).expect("bounded tasks"));
         for task in &source.tasks {
@@ -360,13 +372,9 @@ pub fn compose(target: &Target, documents: &Documents, merge: &mut Merge) -> Set
                 .expect("task count");
         }
         let patch = Value { at: documents.get(index).expect("layer document").at, kind: Kind::Map(pairs.into_boxed()) };
-        if [Layer::Base, Layer::Member, Layer::BaseEnv, Layer::BaseEnvMember].contains(&layer) {
-            presence = merge.merge(presence, &patch, layer, index);
-        }
         settings = merge.merge(settings, &patch, layer, index);
     }
     let origin = Provenance { layer: Layer::Base, document: 0, at: Position { line: 1, column: 1 } };
-    let (_, present) = map_target(presence, origin);
     let (_, settings) = map_target(settings, origin);
     let mut tasks = List::with_capacity(u32::try_from(present.len()).expect("task count"));
     for pair in present {
@@ -543,4 +551,31 @@ pub fn placement(target: &Target, documents: &Documents) -> Option<revision::Pla
         }
     }
     placement
+}
+fn presence(target: &Target, documents: &Documents, merge: &mut Merge) -> Box<[Pair]> {
+    let mut presence = None;
+    for (index, source, layer) in layers(target, documents).into_iter().flatten() {
+        if ![Layer::Base, Layer::Member, Layer::BaseEnv, Layer::BaseEnvMember].contains(&layer) {
+            continue;
+        }
+        let mut pairs = List::with_capacity(u32::try_from(source.tasks.len()).expect("task count"));
+        for task in &source.tasks {
+            pairs
+                .push(revision::Pair { key: task.name.clone(), at: task.at, value: task.value.clone() })
+                .expect("task count");
+        }
+        let at = documents.get(index).expect("layer document").at;
+        presence = merge.merge(presence, &Value { at, kind: Kind::Map(pairs.into_boxed()) }, layer, index);
+    }
+    let origin = Provenance { layer: Layer::Base, document: 0, at: Position { line: 1, column: 1 } };
+    map_target(presence, origin).1
+}
+#[must_use]
+pub fn present(target: &Target, documents: &Documents) -> Box<[Box<[u8]>]> {
+    let pairs = presence(target, documents, &mut Merge::new(&crate::limits::SHIPPED));
+    let mut names = List::with_capacity(u32::try_from(pairs.len()).expect("task count"));
+    for pair in pairs {
+        names.push(pair.key).expect("task count");
+    }
+    names.into_boxed()
 }

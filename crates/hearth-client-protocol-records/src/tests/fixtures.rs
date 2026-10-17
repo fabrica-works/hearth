@@ -145,6 +145,9 @@ pub fn duplicate() -> crate::errors::Error {
 
 #[derive(Clone, Copy, Debug)]
 pub enum SchemaInput {
+    Undeclared { setting: &'static [u8], declared: &'static [&'static [u8]] },
+    Missing(&'static [u8]),
+    Absent(&'static [u8]),
     Task(&'static [u8]),
     Wrong(&'static crate::errors::TypeName),
     Enum { value: &'static [u8], listed: &'static [&'static [u8]] },
@@ -159,6 +162,11 @@ pub enum SchemaInput {
 pub fn schema_fault(input: SchemaInput) -> crate::errors::Schema {
     use crate::errors::Schema;
     match input {
+        SchemaInput::Undeclared { setting, declared } => {
+            Schema::Undeclared { setting: copy_of(setting), declared: schema_names(declared) }
+        }
+        SchemaInput::Missing(setting) => Schema::Missing { setting: copy_of(setting) },
+        SchemaInput::Absent(task) => Schema::Absent { task: copy_of(task) },
         SchemaInput::Wrong(expected) => Schema::Wrong { expected: expected.clone() },
         SchemaInput::Enum { value, listed } => Schema::Enum { value: copy_of(value), listed: schema_names(listed) },
         SchemaInput::Below(min) => Schema::Below { min },

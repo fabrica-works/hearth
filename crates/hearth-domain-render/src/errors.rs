@@ -20,6 +20,7 @@ pub struct Place {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
     Store(StoreError),
+    Evaluation(crate::evaluate::FaultKind),
     Schema(Schema),
     Decode(Decode),
     Repository(Repository),
@@ -285,6 +286,9 @@ pub enum Schema {
     Null,
     UndeclaredField { field: Box<[u8]>, declared: Box<[Box<[u8]>]> },
     MissingField { field: Box<[u8]> },
+    Undeclared { setting: Box<[u8]>, declared: Box<[Box<[u8]>]> },
+    Missing { setting: Box<[u8]> },
+    Absent { task: Box<[u8]> },
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

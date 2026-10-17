@@ -189,13 +189,13 @@ pub fn validate(declaration: &Declaration, settings: &Composed) -> Result<Value,
 /// Returns independently derived schema faults, in field order.
 pub fn reference(declaration: &Declaration, settings: &Composed) -> Result<Value, Box<[Fault]>> {
     let mut faults = Vec::new();
-    let value = object(declaration, settings, &declaration.settings, &mut faults);
+    let value = object(declaration, settings, &declaration.settings, &mut faults, true);
     if faults.is_empty() { Ok(value) } else { Err(faults.into_boxed_slice()) }
 }
 fn issue(faults: &mut Vec<Fault>, value: &Composed, schema: Schema) {
     faults.push(Fault { schema, document: value.from.document, at: value.from.at });
 }
-fn object(declaration: &Declaration, value: &Composed, fields: &[Spec], faults: &mut Vec<Fault>) -> Value {
+fn object(declaration: &Declaration, value: &Composed, fields: &[Spec], faults: &mut Vec<Fault>, root: bool) -> Value {
     let Composite::Map(pairs) = &value.kind else {
         issue(faults, value, Schema::Wrong { expected: TypeName::Object });
         return Value::Bool(false);
@@ -212,7 +212,11 @@ fn object(declaration: &Declaration, value: &Composed, fields: &[Spec], faults: 
                 value: Some(checked(declaration, &pair.value, spec.ty, Some(spec), faults)),
             }),
             (Some(pair), None) => faults.push(Fault {
-                schema: Schema::UndeclaredField { field: Box::from(key), declared: declared.clone() },
+                schema: if root {
+                    Schema::Undeclared { setting: Box::from(key), declared: declared.clone() }
+                } else {
+                    Schema::UndeclaredField { field: Box::from(key), declared: declared.clone() }
+                },
                 document: pair.from.document,
                 at: pair.from.at,
             }),
@@ -221,7 +225,15 @@ fn object(declaration: &Declaration, value: &Composed, fields: &[Spec], faults: 
                     Some(default) => Some(checked(declaration, &written(default), spec.ty, Some(spec), faults)),
                     None if spec.optional => None,
                     None => {
-                        issue(faults, value, Schema::MissingField { field: Box::from(key) });
+                        issue(
+                            faults,
+                            value,
+                            if root {
+                                Schema::Missing { setting: Box::from(key) }
+                            } else {
+                                Schema::MissingField { field: Box::from(key) }
+                            },
+                        );
                         None
                     }
                 };
@@ -351,7 +363,7 @@ fn checked(
                 })
                 .collect(),
         ),
-        (Composite::Map(_), Form::Object(fields)) => object(declaration, value, fields, faults),
+        (Composite::Map(_), Form::Object(fields)) => object(declaration, value, fields, faults, false),
         _ => unreachable!("type checked"),
     }
 }
@@ -363,8 +375,9 @@ pub const fn kind(schema: &Schema) -> &'static str {
         Schema::Below { .. } => "below",
         Schema::Above { .. } => "above",
         Schema::Length { .. } => "length",
-        Schema::UndeclaredField { .. } => "undeclared",
-        Schema::MissingField { .. } => "missing",
+        Schema::UndeclaredField { .. } | Schema::Undeclared { .. } => "undeclared",
+        Schema::MissingField { .. } | Schema::Missing { .. } => "missing",
+        Schema::Absent { .. } => "absent",
         Schema::Null => "null",
         Schema::Task { .. } => "task",
         Schema::Unread { .. } => "unread",

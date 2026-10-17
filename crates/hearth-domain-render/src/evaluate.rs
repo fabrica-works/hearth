@@ -50,7 +50,7 @@ impl Evaluator<'_> {
             // Five roots, each within the 64 MiB validated-input bound (render.md, 2.3).
             walk_steps: limits
                 .made
-                .saturating_add(5 * 67_108_864)
+                .saturating_add(limits.validated.saturating_mul(5))
                 .saturating_mul(2)
                 .saturating_add(u64::from(limits.expression)),
         }

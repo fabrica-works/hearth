@@ -457,9 +457,12 @@ pub fn every_form() -> [crate::config::schema::Form; 13] {
     ]
 }
 #[must_use]
-pub fn schema_faults() -> [render::errors::Schema; 10] {
+pub fn schema_faults() -> [render::errors::Schema; 13] {
     use render::errors::Schema;
     [
+        Schema::Undeclared { setting: bytes::copy_of(b"greting"), declared: Box::new([bytes::copy_of(b"greeting")]) },
+        Schema::Missing { setting: bytes::copy_of(b"greeting") },
+        Schema::Absent { task: bytes::copy_of(b"wifi") },
         Schema::Wrong { expected: render::errors::TypeName::Int },
         Schema::Enum {
             value: bytes::copy_of(b"x"),
@@ -751,5 +754,21 @@ pub fn member_document() -> crate::config::document::Document {
                 Member { name: bytes::copy_of(b"2"), at: Position { offset: 19, line: 1, column: 20 }, layer: None },
             ]),
         }),
+    }
+}
+
+pub fn evaluation_back(kind: crate::records::errors::Evaluation) -> render::evaluate::FaultKind {
+    use crate::records::errors::Evaluation;
+    match kind {
+        Evaluation::Unknown => render::evaluate::FaultKind::Unknown,
+        Evaluation::NoKey => render::evaluate::FaultKind::NoKey,
+        Evaluation::NoIndex => render::evaluate::FaultKind::NoIndex,
+        Evaluation::Undefined => render::evaluate::FaultKind::Undefined,
+        Evaluation::Type => render::evaluate::FaultKind::Type,
+        Evaluation::Overflow => render::evaluate::FaultKind::Overflow,
+        Evaluation::Empty => render::evaluate::FaultKind::Empty,
+        Evaluation::Path => render::evaluate::FaultKind::Path,
+        Evaluation::Output => render::evaluate::FaultKind::Output,
+        Evaluation::Limit => render::evaluate::FaultKind::Limit,
     }
 }

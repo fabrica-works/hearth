@@ -786,5 +786,6 @@ mod repository;
 #[path = "translate_store.rs"]
 mod store_arrivals;
 
+mod evaluation;
 mod instructions;
 mod meta;

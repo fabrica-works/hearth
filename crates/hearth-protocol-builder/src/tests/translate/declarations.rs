@@ -69,6 +69,11 @@ fn each_form_translates_to_render_and_back() {
 }
 fn schema_back(schema: crate::records::errors::Schema) -> render::errors::Schema {
     match schema {
+        crate::records::errors::Schema::Undeclared { setting, declared } => {
+            render::errors::Schema::Undeclared { setting, declared }
+        }
+        crate::records::errors::Schema::Missing { setting } => render::errors::Schema::Missing { setting },
+        crate::records::errors::Schema::Absent { task } => render::errors::Schema::Absent { task },
         crate::records::errors::Schema::Wrong { expected } => {
             render::errors::Schema::Wrong { expected: type_name_back(expected) }
         }

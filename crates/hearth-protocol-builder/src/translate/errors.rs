@@ -67,6 +67,7 @@ pub fn error(error: target::Error) -> records::errors::Error {
     let target::Error { kind, class, at, also, target, task, side } = error;
     let kind = match kind {
         target::Kind::Store(fault) => records::errors::Kind::Store(store_error(fault)),
+        target::Kind::Evaluation(kind) => records::errors::Kind::Evaluation(evaluation(kind)),
         target::Kind::Schema(fault) => records::errors::Kind::Schema(schema(fault)),
         target::Kind::Decode(fault) => records::errors::Kind::Decode(decode(fault)),
         target::Kind::Repository(why) => records::errors::Kind::Repository(repository(why)),
@@ -335,6 +336,9 @@ pub fn declaration_map_to_records(value: render::revision::declaration::Map) -> 
 #[must_use]
 pub fn schema(schema: target::Schema) -> records::errors::Schema {
     match schema {
+        target::Schema::Undeclared { setting, declared } => records::errors::Schema::Undeclared { setting, declared },
+        target::Schema::Missing { setting } => records::errors::Schema::Missing { setting },
+        target::Schema::Absent { task } => records::errors::Schema::Absent { task },
         target::Schema::Wrong { expected } => records::errors::Schema::Wrong { expected: type_name(expected) },
         target::Schema::Enum { value, listed } => records::errors::Schema::Enum { value, listed },
         target::Schema::Below { min } => records::errors::Schema::Below { min },
@@ -543,5 +547,22 @@ pub fn composition(why: target::Composition) -> records::errors::Composition {
     match why {
         target::Composition::Duplicate => records::errors::Composition::Duplicate,
         target::Composition::Long => records::errors::Composition::Long,
+    }
+}
+
+#[must_use]
+pub fn evaluation(kind: render::evaluate::FaultKind) -> records::errors::Evaluation {
+    use crate::render::evaluate::FaultKind;
+    match kind {
+        FaultKind::Unknown => records::errors::Evaluation::Unknown,
+        FaultKind::NoKey => records::errors::Evaluation::NoKey,
+        FaultKind::NoIndex => records::errors::Evaluation::NoIndex,
+        FaultKind::Undefined => records::errors::Evaluation::Undefined,
+        FaultKind::Type => records::errors::Evaluation::Type,
+        FaultKind::Overflow => records::errors::Evaluation::Overflow,
+        FaultKind::Empty => records::errors::Evaluation::Empty,
+        FaultKind::Path => records::errors::Evaluation::Path,
+        FaultKind::Output => records::errors::Evaluation::Output,
+        FaultKind::Limit => records::errors::Evaluation::Limit,
     }
 }

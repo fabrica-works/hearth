@@ -629,3 +629,7 @@ pub fn cluster() -> Vec<File> {
     }
     files
 }
+pub const USERS: &[File] = &[
+    File { path: "tasks/users/task.json", mode: 0o644, body: br#"{"settings":{"accounts":{"type":{"map":{"object":{"uid":{"type":"int","min":1000,"max":59999,"doc":"The account's id."},"shell":{"type":"path","default":"/bin/bash","doc":"The login shell."},"groups":{"type":{"list":"string"},"default":[],"doc":"Supplementary groups."},"password":{"type":"secret","optional":true,"doc":"The password."}}}},"default":{},"doc":"Accounts, by user name."}}}"# },
+    File { path: "hosts/x1/x1.json", mode: 0o644, body: b"{\"motd\": {}, \"users\": {\"accounts\": {\n\"ann\": {\"uid\": \"1000\"},\n\"bob\": {\"uid\": 1001, \"shel\": \"/bin/sh\"},\n\"cy\": {}}}}" },
+];

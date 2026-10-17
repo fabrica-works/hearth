@@ -1,4 +1,5 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
+mod validation;
 use crate::{
     compose::{self, Target},
     errors::{self, Decode, Limit},
@@ -9,6 +10,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_lib::{List, Map, Queue, Token};
+use validation::schema_errors;
 pub(crate) type Sizes = Map<hearth_lib::encode::Digest, u64>;
 #[derive(Debug)]
 pub(crate) struct Side {
@@ -23,6 +25,8 @@ pub(crate) struct Side {
     pub settings: Box<[compose::Settings]>,
     pub merge: compose::Merge,
     pub defaults: crate::schema::Defaults,
+    pub validator: crate::schema::Validator,
+    pub validated: u64,
     pub budget: Budget,
     pub pending: Box<[Blob]>,
     pub entries: Box<[Entry]>,
@@ -52,6 +56,8 @@ impl Side {
             settings: Box::new([]),
             merge: compose::Merge::new(limits),
             defaults: crate::schema::Defaults::new(),
+            validator: crate::schema::Validator::new(limits),
+            validated: limits.validated,
             budget: Budget::new(limits),
             pending: Box::new([]),
             entries: Box::new([]),
@@ -92,6 +98,7 @@ impl Side {
                 return;
             }
         };
+        self.defaults(&discovery.targets);
         let mut selected = List::with_capacity(limits.targets);
         for target in &discovery.targets {
             if self.names.is_empty() || self.names.contains(&target.name) {
@@ -261,34 +268,20 @@ impl Side {
         }
         false
     }
-    fn compose(&mut self, limits: Limits) {
+    fn defaults(&mut self, targets: &[Target]) {
         let mut faults = List::with_capacity(16);
-        self.defaults = crate::schema::declarations(
-            &self.documents,
-            &mut crate::schema::Validator::new(&limits),
-            &mut self.merge,
-            &mut faults,
-        );
-        for (task, fault) in &faults {
-            errors::push(
-                &mut self.errors,
-                errors::Error {
-                    side: None,
-                    kind: errors::Kind::Schema(fault.schema.clone()),
-                    class: crate::vocabulary::Class::Configuration,
-                    at: Some(errors::Place {
-                        path: skein_lib::bytes::copy_of(self.documents.path(fault.document)),
-                        position: Some(fault.at),
-                    }),
-                    also: None,
-                    target: None,
-                    task: Some(task.clone()),
-                },
-            );
-        }
+        self.defaults = crate::schema::declarations(&self.documents, &mut self.validator, &mut self.merge, &mut faults);
+        let revision =
+            crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
+        crate::schema::unclaimed(targets, &revision, &mut self.validator, &mut self.merge, &mut faults);
+        schema_errors(&mut self.errors, &self.documents, None, &faults);
+    }
+    fn compose(&mut self) {
         let mut settings = List::with_capacity(u32::try_from(self.targets.len()).expect("target count"));
         for target in &self.targets {
-            settings.push(compose::compose(target, &self.documents, &mut self.merge)).expect("target count");
+            settings
+                .push(compose::compose(target, &self.documents, &self.defaults, &mut self.merge))
+                .expect("target count");
         }
         self.settings = settings.into_boxed();
     }
@@ -297,7 +290,7 @@ impl Side {
             return false;
         }
         self.files = true;
-        self.compose(limits);
+        self.compose();
         let capacity = u32::try_from(self.entries.len()).expect("listing capacity");
         self.cached = Map::with_capacity(capacity);
         self.refused = Map::with_capacity(capacity);
@@ -510,6 +503,32 @@ impl Side {
                 placement: meta::Placement { kind: p.kind, firmware: p.firmware, hardware: p.hardware, on },
             };
             let meta_digest = meta::digest(&meta);
+            let settings = self.settings.get(self.next.saturating_sub(1)).expect("target settings");
+            let revision = crate::schema::Revision {
+                documents: &self.documents,
+                defaults: &self.defaults,
+                listing: &self.entries,
+            };
+            let check = crate::schema::Check::Target { environment: &target.environment, targets: &[] };
+            let mut faults = List::with_capacity(16);
+            let available = self.validated;
+            let checked = crate::schema::validate(
+                settings,
+                &revision,
+                &check,
+                &mut self.validator,
+                &mut self.validated,
+                &mut faults,
+            );
+            self.validated = available;
+            schema_errors(&mut self.errors, &self.documents, Some(&target.name), &faults);
+            if self.validator.limited() {
+                errors::push(&mut self.errors, validation::limit(&target.name));
+            }
+            if checked.is_none() {
+                self.outcome = self.outcome.worst(Outcome::Failed);
+                continue;
+            }
             let Some(config) = self.config(self.settings.get(self.next.saturating_sub(1)).expect("target settings"))
             else {
                 self.outcome = self.outcome.worst(Outcome::Failed);

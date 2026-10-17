@@ -319,3 +319,93 @@ fn a_bad_field_default_is_reported_once_when_an_object_default_uses_it() {
         &[(copy_of(b"task"), Fault { schema: Schema::Wrong { expected: TypeName::Int }, document: 0, at: at(1, 30) })]
     );
 }
+
+#[test]
+fn an_undeclared_setting_lists_the_declared_ones() {
+    let declaration = typed_declaration(Form::Int);
+    let value =
+        composed(&map(at(2, 1), &[(b"greting", at(2, 7), int(at(2, 17), 5)), (b"x", at(2, 20), int(at(2, 25), 1))]));
+    assert_eq!(
+        validate(&declaration, &value, &Check::Default),
+        Err(Box::from([Fault {
+            schema: Schema::Undeclared { setting: copy_of(b"greting"), declared: Box::new([copy_of(b"x")]) },
+            document: 2,
+            at: at(2, 7)
+        }]))
+    );
+}
+#[test]
+fn a_missing_setting_is_placed_at_the_task_s_key() {
+    let input = schemas::target_schema(&[(b"task", typed_declaration(Form::Int))], &[(b"task", map(at(2, 9), &[]))]);
+    let (_, faults, _) = schemas::target_roots(&input, &crate::limits::SHIPPED);
+    assert_eq!(
+        faults.as_ref(),
+        &[(copy_of(b"task"), Fault { schema: Schema::Missing { setting: copy_of(b"x") }, document: 2, at: at(2, 2) })]
+    );
+}
+#[test]
+fn a_read_gives_the_other_task_s_setting_with_its_default() {
+    let mut core = typed_declaration(Form::Int);
+    core.settings = Box::new([Spec { default: Some(int(at(1, 20), 42)), ..schema_spec(b"x", 0) }]);
+    let reader = fixtures::declaration(&[], &[fixtures::read(b"core", &[Text { at: at(1, 34), text: copy_of(b"x") }])]);
+    let input = schemas::target_schema(
+        &[(b"core", core), (b"reader", reader)],
+        &[(b"core", map(at(2, 9), &[])), (b"reader", map(at(2, 20), &[]))],
+    );
+    let (roots, _, _) = schemas::target_roots(&input, &crate::limits::SHIPPED);
+    let roots = roots.expect("valid reads");
+    let mut reader = None;
+    for task in &roots.tasks {
+        if task.name.as_ref() == b"reader" {
+            reader = Some(task);
+        }
+    }
+    let reader = reader.expect("reader");
+    assert_eq!(
+        reader.tasks,
+        V::Map(Box::new([E {
+            key: copy_of(b"core"),
+            value: Some(V::Map(Box::new([E { key: copy_of(b"x"), value: Some(V::Int(42)) }])))
+        }]))
+    );
+}
+#[test]
+fn an_optional_read_s_absent_task_is_none() {
+    let read = revision::declaration::Read { optional: true, ..fixtures::read(b"core", &[]) };
+    let reader = fixtures::declaration(&[], &[read]);
+    let input = schemas::target_schema(
+        &[(b"core", fixtures::declaration(&[], &[])), (b"reader", reader)],
+        &[(b"reader", map(at(2, 9), &[]))],
+    );
+    let (roots, _, _) = schemas::target_roots(&input, &crate::limits::SHIPPED);
+    assert_eq!(
+        fixtures::only(&roots.expect("optional read").tasks).tasks,
+        V::Map(Box::new([E { key: copy_of(b"core"), value: None }]))
+    );
+}
+#[test]
+fn a_required_read_s_absent_task_is_refused_at_the_read() {
+    let reader = fixtures::declaration(&[], &[fixtures::read(b"core", &[])]);
+    let input = schemas::target_schema(
+        &[(b"core", fixtures::declaration(&[], &[])), (b"reader", reader)],
+        &[(b"reader", map(at(2, 9), &[]))],
+    );
+    let (_, faults, _) = schemas::target_roots(&input, &crate::limits::SHIPPED);
+    assert_eq!(
+        faults.as_ref(),
+        &[(
+            copy_of(b"reader"),
+            Fault { schema: Schema::Absent { task: copy_of(b"core") }, document: 1, at: at(1, 12) }
+        )]
+    );
+}
+#[test]
+fn validated_settings_past_their_budget_fail_the_target() {
+    let input = schemas::target_schema(
+        &[(b"task", typed_declaration(Form::String))],
+        &[(b"task", map(at(2, 9), &[(b"x", at(2, 10), string(at(2, 15), b"abcdefghijklmnopqrstuvwxyz012345"))]))],
+    );
+    let (roots, _, limited) =
+        schemas::target_roots(&input, &crate::limits::Limits { validated: 64, ..crate::limits::SHIPPED });
+    assert_eq!((roots, limited), (None, true));
+}

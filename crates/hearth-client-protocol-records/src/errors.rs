@@ -1,8 +1,11 @@
 //! Errors in the answer (render.md, 7.1 to 7.3).
+mod validation;
 use crate::form::{json::field, text::Lines};
 pub use crate::progress::{Step, StoreError, StoreFault, StoreLimit};
 use alloc::boxed::Box;
 use skein_json::writer::Encoder;
+pub use validation::Evaluation;
+use validation::{json_names, names, signed};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Error {
     pub side: Option<crate::diff::Side>,
@@ -16,6 +19,7 @@ pub struct Error {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
     Store(StoreError),
+    Evaluation(Evaluation),
     Schema(Schema),
     Guard(Guard),
     Decode(Decode),
@@ -64,10 +68,11 @@ impl Error {
         match &self.kind {
             Kind::Store(error) => error.text(lines),
             Kind::Decode(decode) => decode.text(lines),
-            Kind::Schema(schema) => schema.text(lines),
             Kind::Repository(why) => why.text(lines),
             Kind::Tool(tool) => tool.text(lines),
             Kind::Composition(why) => why.text(lines, self.target.as_deref()),
+            Kind::Schema(schema) => schema.text(lines, self.task.as_deref()),
+            Kind::Evaluation(kind) => lines.put(kind.message()),
             Kind::Guard(guard) => {
                 lines.put(b"requires ");
                 lines.put(&guard.name);
@@ -98,6 +103,10 @@ impl Error {
             Kind::Store(error) => {
                 field(json, b"kind", b"store");
                 error.json(json);
+            }
+            Kind::Evaluation(kind) => {
+                field(json, b"kind", b"evaluation");
+                field(json, b"evaluation", kind.name());
             }
             Kind::Schema(schema) => {
                 field(json, b"kind", b"schema");
@@ -603,17 +612,6 @@ impl Takes {
         }
     }
 }
-impl Required {
-    fn name(self) -> &'static [u8] {
-        match self {
-            Self::If => b"if",
-            Self::Message => b"message",
-            Self::Type => b"type",
-            Self::Doc => b"doc",
-            Self::Value => b"value",
-        }
-    }
-}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Schema {
@@ -627,11 +625,26 @@ pub enum Schema {
     Null,
     UndeclaredField { field: Box<[u8]>, declared: Box<[Box<[u8]>]> },
     MissingField { field: Box<[u8]> },
+    Undeclared { setting: Box<[u8]>, declared: Box<[Box<[u8]>]> },
+    Missing { setting: Box<[u8]> },
+    Absent { task: Box<[u8]> },
 }
 
 impl Schema {
-    fn text(&self, lines: &mut Lines) {
+    fn text(&self, lines: &mut Lines, task: Option<&[u8]>) {
         match self {
+            Self::Undeclared { setting, declared } => {
+                validation::undeclared(lines, task.unwrap_or(b"task"), setting, declared);
+            }
+            Self::Missing { setting } => {
+                lines.put(b"missing required setting ");
+                lines.put(setting);
+            }
+            Self::Absent { task } => {
+                lines.put(b"reads ");
+                lines.put(task);
+                lines.put(b", which this target lacks");
+            }
             Self::Wrong { expected } => {
                 lines.put(b"not ");
                 lines.put(expected.article());
@@ -697,6 +710,20 @@ impl Schema {
     fn json(&self, json: &mut Encoder) {
         json.object_start();
         match self {
+            Self::Undeclared { setting, declared } => {
+                json.key(b"declared");
+                json_names(json, declared);
+                field(json, b"kind", b"undeclared");
+                field(json, b"setting", setting);
+            }
+            Self::Missing { setting } => {
+                field(json, b"kind", b"missing");
+                field(json, b"setting", setting);
+            }
+            Self::Absent { task } => {
+                field(json, b"kind", b"absent");
+                field(json, b"task", task);
+            }
             Self::Wrong { expected } => {
                 field(json, b"expected", expected.name());
                 field(json, b"kind", b"wrong");
@@ -762,27 +789,5 @@ pub use repository::{Command, Ended, Repository, Tool};
 
 pub mod syntax;
 pub use syntax::Syntax;
-
-fn signed(lines: &mut Lines, value: i64) {
-    if value < 0 {
-        lines.put(b"-");
-    }
-    lines.decimal(value.unsigned_abs());
-}
-fn names(lines: &mut Lines, names: &[Box<[u8]>]) {
-    for (index, name) in names.iter().enumerate() {
-        if index != 0 {
-            lines.put(b", ");
-        }
-        lines.put(name);
-    }
-}
-fn json_names(json: &mut Encoder, names: &[Box<[u8]>]) {
-    json.array_start();
-    for name in names {
-        json.string(name);
-    }
-    json.array_end();
-}
 mod composition;
 pub use composition::Composition;

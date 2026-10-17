@@ -273,3 +273,82 @@ pub fn cluster() -> Repository {
     set_document(&mut repository, b'2', members(&[(b"1", false), (b"2", false)]));
     repository
 }
+#[must_use]
+pub fn with_int_setting() -> Repository {
+    with_setting(hearth_domain_render::revision::declaration::Form::Int)
+}
+#[must_use]
+pub fn with_setting(form: hearth_domain_render::revision::declaration::Form) -> Repository {
+    use hearth_domain_render::revision::declaration::{Declaration, Spec, Text, Type};
+    let mut repository = with_task();
+    let at = Position { line: 2, column: 7 };
+    set_document(
+        &mut repository,
+        b'4',
+        Decoded::Declaration(Declaration {
+            at,
+            types: Box::new([Type { at, form }]),
+            reads: Box::new([]),
+            settings: Box::new([Spec {
+                name: Text { at, text: Box::from(b"x".as_slice()) },
+                at,
+                ty: 0,
+                default: None,
+                optional: true,
+                min: None,
+                max: None,
+                max_length: None,
+            }]),
+        }),
+    );
+    repository
+}
+#[must_use]
+pub fn task_patch(task: &[u8], setting: &[u8], kind: hearth_domain_render::revision::Kind) -> Decoded {
+    use hearth_domain_render::revision::{Kind, Pair, Task, Value};
+    let at = Position { line: 2, column: 7 };
+    Decoded::Document(Document {
+        members: None,
+        at,
+        layer: Layer {
+            placement: None,
+            tasks: Box::new([Task {
+                name: Box::from(task),
+                at,
+                value: Value {
+                    at,
+                    kind: Kind::Map(Box::new([Pair { key: Box::from(setting), at, value: Value { at, kind } }])),
+                },
+            }]),
+        },
+    })
+}
+#[must_use]
+pub fn unused_object_typo() -> Repository {
+    use hearth_domain_render::revision::{
+        Kind, Pair, Value,
+        declaration::{Form, Type},
+    };
+    let mut repository = with_int_setting();
+    set_document(&mut repository, b'2', document(None));
+    let (_, Decoded::Declaration(declaration)) =
+        repository.documents.iter_mut().find(|(id, _)| *id == oid(b'4')).expect("task")
+    else {
+        panic!("declaration")
+    };
+    let at = declaration.at;
+    let mut field = only(&declaration.settings).clone();
+    field.ty = 1;
+    field.at = Position { line: 2, column: 8 };
+    declaration.types = Box::new([Type { at, form: Form::Object(Box::new([field])) }, Type { at, form: Form::Int }]);
+    let [setting] = declaration.settings.as_mut() else { panic!("one setting") };
+    setting.default = Some(Value {
+        at,
+        kind: Kind::Map(Box::new([Pair {
+            key: Box::from(b"typo".as_slice()),
+            at,
+            value: Value { at, kind: Kind::Int(1) },
+        }])),
+    });
+    repository
+}

@@ -131,8 +131,12 @@ fn a_member_s_layers_follow_its_base_s_and_base_env_s() {
         let documents = fixtures::member_layers(*values);
         let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
         let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
-        let settings =
-            crate::compose::compose(only(&discovered.targets), &documents, &mut Merge::new(&limits::SHIPPED));
+        let settings = crate::compose::compose(
+            only(&discovered.targets),
+            &documents,
+            &crate::schema::Defaults::new(),
+            &mut Merge::new(&limits::SHIPPED),
+        );
         let Composite::Map(pairs) = &only(&settings.tasks).settings.kind else { panic!("task settings") };
         assert_eq!(&only(pairs).value.kind, expected, "row {row}: member layer order");
     }
@@ -192,4 +196,70 @@ fn two_targets_of_one_name_fail_both_with_one_error() {
             task: None,
         }]
     );
+}
+
+#[test]
+fn the_defaults_lie_under_every_document_of_a_target() {
+    use super::fixtures::schemas::{self, Layers};
+    let mut declaration = schemas::typed_declaration(crate::revision::declaration::Form::Int);
+    declaration.settings = Box::new([crate::revision::declaration::Spec {
+        default: Some(int(at(1, 20), 1)),
+        ..schemas::schema_spec(b"x", 0)
+    }]);
+    let (target, documents, defaults) = schemas::layers(
+        &declaration,
+        Layers {
+            fleet: map(at(2, 1), &[(b"x", at(2, 2), int(at(2, 7), 2))]),
+            base: map(at(3, 1), &[]),
+            environment: map(at(4, 1), &[]),
+            overlay: map(at(5, 1), &[]),
+        },
+    );
+    let settings = crate::compose::compose(&target, &documents, &defaults, &mut Merge::new(&limits::SHIPPED));
+    let Composite::Map(entries) = &only(&settings.tasks).settings.kind else { panic!("settings") };
+    assert_eq!(
+        only(entries).value,
+        crate::compose::Composed {
+            from: Provenance {
+                layer: Layer::Fleet,
+                document: documents.find(b"fleet.json").expect("fleet"),
+                at: at(2, 7)
+            },
+            kind: Composite::Int(2)
+        }
+    );
+}
+#[test]
+fn null_removes_a_default_map_s_entry() {
+    use super::fixtures::schemas;
+    let (declaration, layers) = schemas::nulled_accounts();
+    let (target, documents, defaults) = schemas::layers(&declaration, layers);
+    let settings = crate::compose::compose(&target, &documents, &defaults, &mut Merge::new(&limits::SHIPPED));
+    let Composite::Map(settings) = &only(&settings.tasks).settings.kind else { panic!("settings") };
+    let Composite::Map(accounts) = &only(settings).value.kind else { panic!("accounts") };
+    assert_eq!(only(accounts).key.as_ref(), b"bob");
+}
+#[test]
+fn a_nulled_field_gets_its_default_back() {
+    use super::fixtures::schemas;
+    use crate::evaluate::Value as V;
+    let (declaration, layers) = schemas::nulled_accounts();
+    let (target, documents, defaults) = schemas::layers(&declaration, layers);
+    let settings = crate::compose::compose(&target, &documents, &defaults, &mut Merge::new(&limits::SHIPPED));
+    let value = schemas::validate(
+        &declaration,
+        &only(&settings.tasks).settings,
+        &crate::schema::Check::Target { environment: b"prod", targets: &[] },
+    )
+    .expect("valid accounts");
+    let V::Map(settings) = value else { panic!("settings") };
+    let Some(V::Map(accounts)) = &only(&settings).value else { panic!("accounts") };
+    let Some(V::Map(fields)) = &only(accounts).value else { panic!("account") };
+    let mut shell = None;
+    for field in fields {
+        if field.key.as_ref() == b"shell" {
+            shell = field.value.as_ref();
+        }
+    }
+    assert_eq!(shell, Some(&V::String(skein_lib::bytes::copy_of(b"/bin/bash"))));
 }

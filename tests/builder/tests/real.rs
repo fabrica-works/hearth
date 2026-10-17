@@ -396,3 +396,21 @@ fn a_cluster_s_members_render_as_targets_with_their_own_layers() {
     );
     assert_eq!(rendered.exit, Exit::Code(0));
 }
+
+#[test]
+fn an_account_s_faults_print_at_their_lines_in_the_base() {
+    let repository = Repository::make("users-schema", &fixtures::thin_with(fixtures::USERS));
+    assert_eq!(
+        String::from_utf8_lossy(&fixtures::render(&repository, &[], Form::Text).stdout),
+        concat!(
+            "hosts/x1/x1.json:2:16: x1-prod: users: not an int\n",
+            "hosts/x1/x1.json:3:22: x1-prod: users: undeclared field \"shel\"; the object declares groups, password, shell, uid\n",
+            "hosts/x1/x1.json:4:7: x1-prod: users: missing required field uid\n",
+        )
+    );
+}
+#[test]
+fn an_account_s_faults_exit_with_configuration_failure() {
+    let repository = Repository::make("users-schema-exit", &fixtures::thin_with(fixtures::USERS));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
