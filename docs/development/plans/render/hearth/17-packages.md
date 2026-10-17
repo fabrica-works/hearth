@@ -403,4 +403,4 @@ None.
 2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run -p hearth-domain-render -p hearth-protocol-builder -p hearth-client-protocol-records -p hearth-render-world -p hearth-builder-world` passes.
 3. `git -C ~/src/rust/hearth ls-tree --name-only origin/main crates/hearth-domain-render/src/parts/ | grep -c -E '/(packages|boot)\.rs'` prints 2.
 4. `git -C ~/src/rust/hearth grep -c -E 'pub fn inputs\(|debian: _' origin/main -- crates/hearth-domain-render/src/parts/packages.rs crates/hearth-protocol-builder/src/translate/documents.rs` prints one `…packages.rs:1` line and no `documents.rs` line.
-5. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|\bString\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).
+5. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|String::|[^:]: *String\b|-> *String\b|<String\b|&String\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).

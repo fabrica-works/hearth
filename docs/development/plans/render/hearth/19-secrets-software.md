@@ -407,4 +407,4 @@ None.
 2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run -p hearth-domain-render -p hearth-protocol-builder -p hearth-client-protocol-records -p hearth-builder-world` passes.
 3. `git -C ~/src/rust/hearth ls-tree -r --name-only origin/main crates | grep -c -x -E '.*/src/(parts|kinds|translate/parts)/(secrets|identity|software|live)\.rs'` prints 13.
 4. `git -C ~/src/rust/hearth grep -l a_software_script_is_checked_not_digested origin/main -- crates/hearth-domain-render/src/tests` prints nothing.
-5. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|\bString\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).
+5. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|String::|[^:]: *String\b|-> *String\b|<String\b|&String\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).

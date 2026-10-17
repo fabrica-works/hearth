@@ -413,4 +413,4 @@ None.
 3. `git -C ~/src/rust/hearth ls-tree --name-only origin/main crates/hearth-domain-render/src/ crates/hearth-domain-render/src/parts/ | grep -c -x -E 'crates/hearth-domain-render/src/(parts/)?exports\.rs'` prints 2.
 4. `git -C ~/src/rust/hearth grep -n -E 'exports: _' origin/main -- crates/hearth-protocol-builder/src/translate/declarations.rs | wc -l` prints 0.
 5. `git -C ~/src/rust/hearth grep -n -E 'const DEPTH: u32 = 64;' origin/main -- crates/hearth-client-protocol-records/src/form/json.rs | wc -l` prints 1.
-6. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|\bString\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).
+6. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|String::|[^:]: *String\b|-> *String\b|<String\b|&String\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).

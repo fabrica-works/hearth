@@ -18,8 +18,8 @@ proves on the real loop's `hearth render` or `hearth diff` through real git.
   18.5; sketches); `19-secrets-software.md` (Choices 4; 19.1, 19.2);
   `40-client-diff-errors.md` (40.2); `11-thin-story.md` ("Transitional"); `15-files.md`
   (15.3); `24-resolution.md` (24.1); `45-diff-errors-resolve.md` (45.1).
-- skein at `f981746`: `skein-lib`'s `map.rs` (`Map`:24, `insert`:88,
-  `remove`:103, `last`:119).
+- skein at `841f487`, hearth's pin: `skein-lib`'s `map.rs` (`Map`:26,
+  `insert`:90, `remove`:105, `last`:121; its `Hash` by hand, :151).
 
 ## What the design asks
 
@@ -56,6 +56,8 @@ proves on the real loop's `hearth render` or `hearth diff` through real git.
    keys in key order, as 7.3's line (hardening, then ssh). Three claimants
    give two errors, each against the first. A claim by a tree file has the
    file's path and no position; by an entry, `task.json` at the entry's key.
+   `Hidden` is `at` the data entry and `also` the claim beneath it, whatever
+   the tasks' names: its `first` is the data entry's task.
 5. **Kinds:** `Collision` gains `Given` (one name, path or id claimed twice),
    `Differs` (one key, differing rows), `Hidden` (under a data path),
    `Shared` (an id), `Overlap` (a range, a download, a data path); `Subject`
@@ -70,7 +72,12 @@ proves on the real loop's `hearth render` or `hearth diff` through real git.
    tasks' before 22.4 compares them. A data line is its entry's task's.
 8. **Messages** follow render.md 7.3's form: `<name> is given by A and by B`,
    with a subject word unless a tree path; `<subject> <name> differs between A
-   and B`; `uid 1000 is shared by A and B`.
+   and B`; `uid 1000 is shared by A and B`; `<path> is under the data path
+   <data> (a mount would hide it)` (22.3's proof); `<subject> <first>
+   overlaps <second>` for paths (`data path /srv overlaps /srv/www`), and
+   `subordinate ids of alice overlap bob's` for a range (render.md 3.7:
+   "paths collide when one is the other or lies beneath it", "ranges never
+   overlap").
 
 ## Rules that bind it
 
@@ -90,18 +97,35 @@ Scope: render.md 7.1 (last bullet), 2.3 (last row); `Collector`,
 `Limits::errors`, `left_out` through the root to the terminal record.
 Needs: hearth 12 (its held errors; `Answer::Error`).
 Files: render `src/{errors, call, limits, vocabulary, lib}.rs`,
-`src/tests/{errors, fixtures}.rs`; root `src/vocabulary.rs`; protocol
-`src/translate/answers.rs`, `src/tests/translate.rs`; `tests/render/tests/
-errors.rs`; `tests/builder/{src/fixtures.rs, tests/real.rs}`.
+`src/tests/{errors, fixtures}.rs` (`errors.rs:17`, `:40`, `:94` read
+`call.errors.as_slice()`: they read `fixtures::kept(&call)`); root
+`src/vocabulary.rs`, `src/lib.rs` (`:54-55` build and destructure
+`Reply`); protocol `src/client.rs` (`:121`, the Terminal's `left_out:
+0`), `src/tests/client.rs` (`:22`, `:43`, `:53`, `:67`: four `Reply`
+literals), `src/translate/answers.rs`, `src/tests/translate.rs`;
+`tests/render/src/parent.rs` (`:45`, the `Rendered` arm);
+`tests/render/tests/errors.rs`; `tests/builder/{src/fixtures.rs,
+tests/real.rs}`.
 Shape: the sketches. `Call` pushes each error as 12 held it; `resume`
 answers the kept ones in order after the last spec, then `Rendered {
-outcome, left_out }`; the protocol layer sets `Terminal::left_out`, 40.2
+outcome, diff, left_out }` (`diff` is 25's, `vocabulary.rs:31`). Each
+`Side` holds its `Collector` where it holds `errors: List<errors::Error>`
+(`call.rs:20`, made at `:47`), and `errors::push` (`call.rs:110`, `:121`,
+`:164`, `:227`, `:234`) takes it. A diff's `Rendered` (`call.rs:479`,
+`:543`; `:471` destructures it) carries its sides' counts, summed, the
+`from` side's kept when the side is reused for `to` (`:487`): no `left_out:
+0` stays (Done when 4), and 45.1 makes the two sides one collector
+(Choice 1). The protocol layer sets `Terminal::left_out`, 40.2
 prints `<n> more errors` after the last error and puts `left_out` in the
 `outcome` line. A full map hands back the new key: it displaces `last()` when
 smaller (`remove`, `insert`), else is counted; the count saturates.
 Test shape: render unit (`src/tests/errors.rs`, under 20 ms; fixtures gain
 `error_at(path, line, column, target)`, `unplaced(target)`, `collector(n)`,
-`limits_with_errors(n)`, `places(&kept)`):
+`limits_with_errors(n)`, `kept(&call)`, and `places(&kept) ->
+Box<[Spot<'_>]>` with `type Spot<'a> = (&'a [u8], u32, u32, &'a [u8])`:
+render's lints forbid `str::from_utf8`, `Vec`, `collect` and `map`, and
+clippy's `type_complexity` wants the alias; a `None` position, as
+`Place.position` may be, reads `0, 0`):
 ```rust
 #[test]
 fn errors_sort_by_path_then_line_then_column_then_target() {
@@ -109,7 +133,8 @@ fn errors_sort_by_path_then_line_then_column_then_target() {
     for error in [fixtures::error_at(b"b.json", 1, 1, b"t"), fixtures::error_at(b"a.json", 2, 9, b"t"),
         fixtures::error_at(b"a.json", 2, 3, b"u"), fixtures::error_at(b"a.json", 2, 3, b"t")] { collector.push(error); }
     let (kept, left_out) = collector.finish();
-    assert_eq!(fixtures::places(&kept), [("a.json", 2, 3, "t"), ("a.json", 2, 3, "u"), ("a.json", 2, 9, "t"), ("b.json", 1, 1, "t")], "7.1");
+    let expected: [Spot<'_>; 4] = [(b"a.json", 2, 3, b"t"), (b"a.json", 2, 3, b"u"), (b"a.json", 2, 9, b"t"), (b"b.json", 1, 1, b"t")];
+    assert_eq!(*fixtures::places(&kept), expected, "7.1");
     assert_eq!(left_out, 0, "nothing past the bound");
 }
 ```
@@ -117,8 +142,9 @@ Then `an_error_without_a_place_follows_the_placed_by_target`,
 `equal_errors_keep_their_arrival_order`, `errors_past_the_bound_are_counted_
 not_kept` (`errors: 3` beside `SHIPPED`'s 256), `a_smaller_error_displaces_the_
 last_kept_one`, `a_left_out_operational_error_still_makes_the_call_try_again`,
-`the_collector_never_holds_more_than_its_bound`; translate `rendered_left_out_
-reaches_the_terminal_record`; world (`tests/render/tests/errors.rs`, eight
+`the_collector_never_holds_more_than_its_bound`; protocol `src/tests/client.rs`
+(the Terminal is built in `client.rs`, not `translate/answers.rs`)
+`rendered_left_out_reaches_the_terminal_record`; world (`tests/render/tests/errors.rs`, eight
 seeds, under 0.5 s) `three_hundred_broken_documents_answer_256_errors_then_
 the_count`.
 Proof: process, `hearth_render_prints_256_errors_then_the_count`, bound 2 s:
@@ -252,7 +278,8 @@ naming_it_twice`,
 covers_only_itself`; records `a_collision_prints_both_tasks_and_both_places`.
 Proof: process, bound 0.5 s, `TREE_TWICE` (THIN's files;
 `tasks/banner/task.json` `{"files": {"/etc/motd": {"copy": "banner.txt"}}}`
-beside its `banner.txt`; `x1.json` `{"motd": {}, "banner": {}}`):
+and `banner.txt` at the repository's root, where `copy` names its path
+from (format.md, as 18's `lab-ca/lab.crt`); `x1.json` `{"motd": {}, "banner": {}}`):
 `hearth_render_names_both_tasks_of_a_path`,
 `lines_starting(&stdout, &["tasks/banner/"])` is exactly
 ```text
@@ -324,10 +351,13 @@ Removes: the first-wins drops of users, groups, presets, tmpfiles (18 Choices
 ## Interface sketches
 
 Types derive `Clone, PartialEq, Eq, Hash, Debug`; render's mirror the records'.
+`Collector` derives `Debug` alone (`Map` derives only `Debug`, and its `Hash`
+is by hand); `Order` derives `PartialOrd, Ord` too, its first field
+`unplaced: bool`, so that placed errors sort first.
 
 ```rust
 // crates/hearth-domain-render/src/errors.rs (22.1; Collision 22.3, 22.4)
-/// 7.1's order; private fields: placed, path, position, target, side (45.1), arrival.
+/// 7.1's order; private fields, in this order: unplaced, path, position, target, side (45.1), arrival.
 pub struct Order { /* private */ }
 /// The errors of one call: the first `Limits::errors` in order, and a count of the rest.
 pub struct Collector { /* private: Map<Order, Error>, left_out, arrival */ }
@@ -337,6 +367,7 @@ impl Collector {
     pub fn push(&mut self, error: Error);
     /// The kept errors in order, and how many were left out.
     #[must_use] pub fn finish(self) -> (Box<[Error]>, u32);
+    /// `Map::worst_case` counts nodes only: this adds the kept errors' own bytes.
     #[must_use] pub fn worst_case(limits: &Limits) -> Option<u64>;
 }
 /// `limits.rs`: `Limits` gains `errors: u32`, `SHIPPED` 256 (render.md 2.3).
@@ -363,8 +394,10 @@ pub enum Subject { Tree, DataName, DataPath, Secret, Identity, Download, User, G
 // crates/hearth-domain-render/src/additions.rs (22.2)
 /// subuid(5) lines for every user with a range, by name; `None` when no user has one.
 #[must_use] pub fn subordinate(accounts: &Accounts) -> Option<Box<[u8]>>;
-/// A `d` line for each data entry, at its path with its mode, owner and group.
-#[must_use] pub fn data_lines(entries: &[data::Entry]) -> Box<[Tmpfile]>;
+/// A `d` line for each data entry, at its path with its mode, owner and group,
+/// with the entry's task and place (18's `data::Entry` carries them), which 22.4 names.
+pub struct DataLine { pub task: Box<[u8]>, pub at: Position, pub tmpfile: Tmpfile }
+#[must_use] pub fn data_lines(entries: &[data::Entry]) -> Box<[DataLine]>;
 /// `tiny-initramfs.conf` (machine.md, 7.1).
 #[must_use] pub fn initramfs(initramfs: &Initramfs) -> Box<[u8]>;
 // parts/packages.rs, render's and the records': `Packages` gains `initramfs_file: Option<Digest>`, outside `items`
@@ -393,4 +426,4 @@ None.
 3. `git -C ~/src/rust/hearth ls-tree --name-only origin/main crates/hearth-domain-render/src/ | grep -c -x -E 'crates/hearth-domain-render/src/(collisions|additions)\.rs'` prints 2.
 4. `git -C ~/src/rust/hearth grep -n -E 'left_out: 0' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src ':!*/tests/*' ':!*/tests.rs'` prints nothing.
 5. `git -C ~/src/rust/hearth grep -n 'transitional: hearth 22' origin/main -- crates` prints nothing.
-6. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|\bString\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).
+6. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|String::|[^:]: *String\b|-> *String\b|<String\b|&String\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).

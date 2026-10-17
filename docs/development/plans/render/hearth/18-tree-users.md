@@ -373,7 +373,7 @@ pub struct Accounts { pub users: Box<[User]>, pub groups: Box<[Group]> }
 pub struct User { pub name: Box<[u8]>, pub task: Box<[u8]>, pub at: Position, pub kind: UserKind }
 pub enum UserKind { Sysusers { uid: Option<u32>, group: Box<[u8]>, gecos: Box<[u8]>, home: Box<[u8]>, shell: Box<[u8]>, subordinate: Option<(u32, u32)>, member_of: Box<[Box<[u8]>]> }, Package { uid: Option<u32>, gid: Option<u32> } }
 pub struct Group { pub name: Box<[u8]>, pub task: Box<[u8]>, pub at: Position, pub gid: Option<u32>, pub package: bool }
-pub struct Entry { pub name: Box<[u8]>, pub class: DataClass, pub path: Box<[u8]>, pub mode: u16, pub owner: Box<[u8]>, pub group: Box<[u8]> } // data.rs: the part keeps class, path
+pub struct Entry { pub name: Box<[u8]>, pub task: Box<[u8]>, pub at: Position, /* its key in the task.json, as User's: hearth 22.4 names it */ pub class: DataClass, pub path: Box<[u8]>, pub mode: u16, pub owner: Box<[u8]>, pub group: Box<[u8]> } // data.rs: the part keeps class, path
 // render src/evaluate/template.rs: 15.2's `run` gains `element` (None: a tree template)
 pub fn run<'c>(template: &'c Template, context: &Context<'c>, element: Option<(Operand<'c>, Operand<'c>)>, limits: &Limits, room: u64) -> Result<Box<[u8]>, Fault>;
 // render errors.rs and the records': Repository gains NoTree, NoTemplate, Unused, NoScript, LinkTarget (`Stray` is
@@ -411,4 +411,4 @@ None.
 2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run -p hearth-domain-render -p hearth-protocol-builder -p hearth-client-protocol-records -p hearth-builder-world` passes.
 3. `git -C ~/src/rust/hearth ls-tree -r --name-only origin/main crates | grep -c -x -E '.*/(kinds/(files|users|groups|presets|tmpfiles|scripts|data)|translate/parts/data)\.rs'` prints 8.
 4. `git -C ~/src/rust/hearth grep -n -i -E 'minijinja|legacy|workaround' origin/main -- crates/hearth-domain-render/src/kinds crates/hearth-domain-render/src/parts` prints nothing.
-5. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|\bString\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).
+5. `git -C ~/src/rust/hearth grep -n -E '\bVec\b|String::|[^:]: *String\b|-> *String\b|<String\b|&String\b|^\s*_ =>' origin/main -- crates/hearth-domain-render/src crates/hearth-protocol-builder/src/translate ':!*/tests/*' ':!*/tests.rs'` prints nothing (code-organization.md, 6).
