@@ -73,11 +73,27 @@ pub fn template(compiled: &Template, text: &[u8]) {
         )
         .collect();
     assert_eq!(&*compiled.lines, lines);
-    for instruction in &compiled.instructions {
+    for (index, instruction) in compiled.instructions.iter().enumerate() {
         assert!((instruction.at as usize) < text.len());
         match &instruction.does {
             Does::Text(bytes) => assert!(!bytes.is_empty()),
-            Does::Output(e) => invariants(e, text),
+            Does::Output(e) | Does::Set { value: e, .. } => invariants(e, text),
+            Does::Branch { condition, over } => {
+                invariants(condition, text);
+                assert!(index + 1 + *over as usize <= compiled.instructions.len());
+            }
+            Does::Jump { over } => assert!(index + 1 + *over as usize <= compiled.instructions.len()),
+            Does::Enter { iterable, over, .. } => {
+                invariants(iterable, text);
+                assert!(index + 1 + *over as usize <= compiled.instructions.len());
+            }
+            Does::Advance { back } => {
+                let enter = index - *back as usize - 1;
+                let Does::Enter { over, .. } = &compiled.instructions[enter].does else {
+                    panic!("advance has its enter")
+                };
+                assert_eq!(enter + 1 + *over as usize, index + 1);
+            }
         }
     }
 }

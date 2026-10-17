@@ -18,4 +18,16 @@ pub struct Instruction {
 pub enum Does {
     Text(Box<[u8]>),
     Output(Expression),
+    Branch { condition: Expression, over: u32 },
+    Jump { over: u32 },
+    Enter { names: Names, iterable: Expression, over: u32 },
+    Advance { back: u32 },
+    Set { name: Box<[u8]>, value: Expression },
+}
+
+/// Names bound by one loop (format.md, 7.3).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Names {
+    One { name: Box<[u8]> },
+    Pair { first: Box<[u8]>, second: Box<[u8]> },
 }

@@ -3,29 +3,18 @@ use crate::{
     Does, Error, ErrorKind, Expected,
     limits::{Limits, SHIPPED},
 };
-const TEXT: &[(&[u8], u32, &[u8])] = &[(b"plain { }} %} -\n", 0, b"plain { }} %} -\n")];
 #[test]
 fn text_without_tags_compiles_to_one_text_as_written() {
-    for &(input, at, bytes) in TEXT {
-        assert_eq!(*template(input).expect("text").instructions, [text(at, bytes)]);
-    }
+    assert_eq!(*template(b"plain { }} %} -\n").expect("text").instructions, [text(0, b"plain { }} %} -\n")]);
 }
-type OutputCase = (&'static [u8], u32, u32, u32, u32, u32, &'static [u32]);
-const OUTPUT: &[OutputCase] = &[(b"Port {{ settings.port }}\n", 0, 5, 8, 17, 24, &[0, 25])];
 #[test]
 fn an_output_compiles_its_expression_at_offsets_in_the_template() {
-    for &(input, first, tag, root, field, last, lines) in OUTPUT {
-        let compiled = template(input).expect("output");
-        assert_eq!(
-            *compiled.instructions,
-            [
-                text(first, b"Port "),
-                output(tag, expr(1, [name(root, b"settings"), key(field, b"port")])),
-                text(last, b"\n")
-            ]
-        );
-        assert_eq!(&*compiled.lines, lines);
-    }
+    let compiled = template(b"Port {{ settings.port }}\n").expect("output");
+    assert_eq!(
+        *compiled.instructions,
+        [text(0, b"Port "), output(5, expr(1, [name(8, b"settings"), key(17, b"port")])), text(24, b"\n")]
+    );
+    assert_eq!(&*compiled.lines, &[0, 25]);
 }
 const COMMENTS: &[(&[u8], u32, u32)] = &[(b"a{# {{ '\" #}b", 0, 12), (b"a{#-#}b", 0, 6)];
 #[test]
@@ -34,8 +23,7 @@ fn a_comment_leaves_nothing_and_splits_the_text_around_it() {
         assert_eq!(*template(input).expect("comment").instructions, [text(first, b"a"), text(second, b"b")]);
     }
 }
-const QUOTED: &[(&[u8], Result<(), Error>)] =
-    &[(b"{{ '}}' }}", Ok(())), (b"{% if a == '%}' %}", Err(Error { at: 3, kind: ErrorKind::UnknownStatement }))];
+const QUOTED: &[(&[u8], Result<(), Error>)] = &[(b"{{ '}}' }}", Ok(())), (b"{% if a == '%}' %}{% endif %}", Ok(()))];
 #[test]
 fn closing_delimiters_inside_a_string_literal_do_not_end_the_tag() {
     for &(input, ref want) in QUOTED {

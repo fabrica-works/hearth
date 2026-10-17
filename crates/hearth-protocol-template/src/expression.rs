@@ -28,11 +28,18 @@ struct Parser {
     tested: bool,
     nesting: u32,
     limit: u32,
+    conditional: bool,
     depth: u32,
     values: u32,
 }
 /// Compiles one expression, or gives the first refusal with its byte offset.
 pub fn compile(text: &[u8], limits: &Limits) -> Result<Expression, Error> {
+    parse(text, limits, true)
+}
+pub(crate) fn iterable(text: &[u8], limits: &Limits) -> Result<Expression, Error> {
+    parse(text, limits, false)
+}
+fn parse(text: &[u8], limits: &Limits, conditional: bool) -> Result<Expression, Error> {
     if text.len() > usize::try_from(limits.expression).expect("u32 fits usize") {
         return Err(Error { at: limits.expression, kind: ErrorKind::TooLong });
     }
@@ -48,6 +55,7 @@ pub fn compile(text: &[u8], limits: &Limits) -> Result<Expression, Error> {
         tested: false,
         nesting: 0,
         limit: limits.nesting,
+        conditional,
         depth: 0,
         values: 0,
     };
@@ -341,6 +349,9 @@ impl Parser {
     }
     fn conditional(&mut self, at: u32) -> Result<(), Error> {
         self.reduce(0, at)?;
+        if !self.conditional && self.pending.is_empty() {
+            return Err(Error { at, kind: ErrorKind::Misplaced });
+        }
         let start = match self.pending.top() {
             Some(Pending::If { .. }) => return Err(Error { at, kind: ErrorKind::Misplaced }),
             Some(Pending::Group { start } | Pending::Index { start, .. } | Pending::Else { start, .. }) => *start,

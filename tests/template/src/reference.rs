@@ -23,11 +23,21 @@ struct Parser<'a> {
 /// # Errors
 /// Gives the first refused byte offset.
 pub fn compile(text: &[u8], limits: &Limits) -> Result<Expression, u32> {
+    parse(text, limits, true)
+}
+pub(super) fn iterable(text: &[u8], limits: &Limits) -> Result<Expression, u32> {
+    parse(text, limits, false)
+}
+fn parse(text: &[u8], limits: &Limits, conditional: bool) -> Result<Expression, u32> {
     if text.len() > usize::try_from(limits.expression).expect("u32 fits") {
         return Err(limits.expression);
     }
     let mut p = Parser { text, at: 0, limits: *limits, depth: 0, next: None, out: Vec::new(), values: 0, stack: 0 };
-    p.expression()?;
+    if conditional {
+        p.expression()?;
+    } else {
+        p.logical_or()?;
+    }
     let (at, token) = p.peek(false)?;
     match token {
         Token::End => Ok(Expression { operations: p.out.into_boxed_slice(), values: p.values }),

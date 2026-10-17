@@ -1,12 +1,14 @@
 //! Templates compiled left to right to flat instructions (format.md, 7.2; render.md, 8.3).
 mod scan;
-use crate::{Does, Error, ErrorKind, Expression, Instruction, Template, expression, limits::Limits};
+mod statement;
+use crate::{Does, Error, Expression, Instruction, Template, expression, limits::Limits};
 use skein_lib::{List, bytes};
 /// Compiles a whole template, or gives its first refusal at a template offset.
 pub fn compile(text: &[u8], limits: &Limits) -> Result<Template, Error> {
     let (lines, openings) = scan::bytes(text, limits)?;
     let capacity = openings.saturating_mul(3).saturating_add(1);
     let mut out = List::with_capacity(capacity);
+    let mut statements = statement::Statements::new(limits, openings);
     let mut cursor = 0;
     for _ in 0..=text.len() {
         let mut next = None;
@@ -28,6 +30,7 @@ pub fn compile(text: &[u8], limits: &Limits) -> Result<Template, Error> {
                 .expect("counted runs");
         }
         if at == text.len() {
+            statements.finish()?;
             return Ok(Template { instructions: out.into_boxed(), lines });
         }
         let tag = scan::tag(text, at)?;
@@ -37,17 +40,7 @@ pub fn compile(text: &[u8], limits: &Limits) -> Result<Template, Error> {
                 out.push(Instruction { at: scan::offset(at), does: Does::Output(value) }).expect("counted outputs");
             }
             b'#' => {}
-            b'%' => {
-                let body = text.get(tag.start..tag.end).expect("tag range");
-                let mut word = tag.start;
-                for &byte in body {
-                    if ![b' ', b'\t', b'\n'].contains(&byte) {
-                        break;
-                    }
-                    word = word.saturating_add(1);
-                }
-                return Err(Error { at: scan::offset(word), kind: ErrorKind::UnknownStatement });
-            }
+            b'%' => statements.read(text, at, &tag, &mut out, limits)?,
             _ => unreachable!("opening kinds checked"),
         }
         cursor = tag.after;

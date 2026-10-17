@@ -27,6 +27,9 @@ pub const TEMPLATE_KINDS: &[&str] = &[
     "return",
     "unclosed",
     "statement",
+    "unmatched",
+    "unended",
+    "shadows",
 ];
 pub const SMALL: Shape = Shape { width: 16 };
 pub const WIDE: Shape = Shape { width: 260 };
@@ -37,6 +40,7 @@ pub fn limits(rng: &mut Rng) -> Limits {
     } else {
         Limits {
             expression: u32::try_from(rng.between(1, 256)).expect("bounded by fixture or checked text"),
+            statements: u32::try_from(rng.between(1, 4)).expect("tiny statement limit"),
             template: u32::try_from(rng.between(64, 4096)).expect("tiny template limit"),
             nesting: u32::try_from(rng.between(1, 8)).expect("bounded by fixture or checked text"),
         }
@@ -45,6 +49,9 @@ pub fn limits(rng: &mut Rng) -> Limits {
 #[must_use]
 pub fn kind(kind: &ErrorKind) -> &'static str {
     match kind {
+        ErrorKind::Unmatched => "unmatched",
+        ErrorKind::Unended => "unended",
+        ErrorKind::Shadows => "shadows",
         ErrorKind::Utf8 => "utf8",
         ErrorKind::Return => "return",
         ErrorKind::Unclosed => "unclosed",

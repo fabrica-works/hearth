@@ -12,7 +12,7 @@ pub mod template;
 mod utf8;
 pub use error::{Error, ErrorKind, Expected};
 pub use filter::Filter;
-pub use instruction::{Does, Instruction, Template};
+pub use instruction::{Does, Instruction, Names, Template};
 pub use operation::{Expression, Missing, Op, Operation};
 #[cfg(test)]
 mod tests;
