@@ -247,6 +247,20 @@ None yet.
 
      The check's suites at de43be3: clippy clean on the sketches, the workspace's 112 tests and fuzzy's 3 passed, the memory sketch held 12,286 and 8,224 of 266,240, the rotation's two tests passed once 3 was made. A further copy of these names takes the same correction, and the commit body lists it.
 
+107. **hearth 11.1's size, by code-organization.md's count** (size, hearth 11's block of 2026-10-17T16:21:44Z).
+     No defect: 11.1 is within its tolerance. code-organization.md, 7,
+     counts an increment's size with "`git diff -M --numstat
+     origin/main...HEAD -- crates testing ':!*/tests.rs' ':!*/tests/*'
+     ':!testing/recordings/*' ':!testing/repos/*' ':!testing/mirror/*' | awk
+     '{a+=$1} END {print a}'`", and says "Within twice its Size an increment
+     lands without asking". On render/hearth-11-1-skeleton (42aae81) that
+     command prints 584, the nine files of
+     `logs/hearth-11/11.1-size.txt` (13 + 163 + 66 + 80 + 7 + 31 + 69 + 92 +
+     63): within 600, twice 11.1's "at most 300 lines". The report's 684 is
+     not that sum. Land 11.1 as committed, with the gate, and give 584 in
+     the report's `Size:`, by that command. Every later increment counts its
+     size with that command alone, written out as the document gives it.
+
 ## For the user
 
 The long-term choices the user may veto:
