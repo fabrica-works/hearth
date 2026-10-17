@@ -608,6 +608,14 @@ None yet.
      9. `Declared` is `Copy` already (`src/error.rs:24`), as the fuzzy sketch needs.
      A further line number or sketch these corrections move takes the new value, and the commit body lists it.
 
+135. **hearth 35.2's Shapes after 04.2** (re-check of hearth-35.2).
+     hearth 35's re-check after 04.2 landed (b08a390), against hearth 055fba9 and skein 841f487 (every name and line of 35 holds; clippy clean with the interface sketches, the `Limits` users and the 35.1 and 35.2 sketches stubbed; default 82, fuzzy `fuzzy_documents` passing), corrects 35.2 in 35-schema-exports.md (35.1 landed meanwhile, at 992ff01):
+     1. `TASKS` (`tests/config/src/examples.rs:32`) holds 23 rows, 25 with 35.2's: the sweep of task examples decodes the 23 that decode, and asserts `checks-ssh` and `artifact-stoa` refused as `Later`.
+     2. `EVERY_DECLARED` counts `Object::Entry` once for each of its 14 `Map`s, and `Object::Range` (`src/error.rs:48`) is among the objects; a variant no input reaches is named in the report, not in the constant; `Tally::record` matches every variant (`wildcard_enum_match_arm` is denied).
+     3. 35.2 removes `Key::Undecoded` too (`src/declaration.rs:70`, the `exports` row `:81`, the arm `:137`): Done when 3 greps `-w Undecoded`.
+     4. `ROUNDS` is chosen so that `fuzzy_declarations` alone takes about 2 s (`-E 'binary(fuzzy_declarations)'`); `fuzzy_documents` takes 0.5 to 0.8 s of the profile already.
+     A further line number or sketch these corrections move takes the new value, and the commit body lists it.
+
 ## For the user
 
 The long-term choices the user may veto:

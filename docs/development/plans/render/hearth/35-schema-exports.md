@@ -192,11 +192,14 @@ Limits` gives limits that hold a declaration of every key, `world::limits`'
 roomy values (`world.rs:65`) with `settings` drawn below `keys`, so that
 `Settings` falls before the JSON's `keys` (the tiny branch, `world.rs:59`,
 holds none, and its JSON faults come first). `tests/declarations.rs`
-gains `every_task_example_decodes_as_a_declaration_cut_anywhere` (the 23)
+gains `every_task_example_decodes_as_a_declaration_cut_anywhere` (the 23
+that decode of `TASKS`' 25 rows; `checks-ssh` and `artifact-stoa` are refused
+as `Later`, and it asserts so)
 and `generated_declarations_hand_up_each_string_where_it_was_written` (32
 seeds, under 0.5 s); `tests/fuzzy_declarations.rs`, about 2 s: `const ROUNDS:
-u64` is chosen once so that `heavy cargo nextest run -p hearth-config-world
---profile fuzzy` takes about 2 s, and `FIRST_SEED` is `0x0035_F000`:
+u64` is chosen once so that this test alone takes about 2 s (`heavy cargo
+nextest run -p hearth-config-world --profile fuzzy -E
+'binary(fuzzy_declarations)'`; `fuzzy_documents` takes 0.5 to 0.8 s more), and `FIRST_SEED` is `0x0035_F000`:
 ```rust
 #[test]
 fn generated_declarations_broken_once_fail_at_the_break() {
@@ -214,7 +217,10 @@ fn generated_declarations_broken_once_fail_at_the_break() {
 ```
 `EVERY_DECLARED`: each `Declared` variant, with `Unknown` of each
 `Object` but `Type`, whose unknown key is `Wrong { expected: Type }` at its
-`{` (35.1).
+`{` (35.1); `Object::Entry` counts once for each of its 14 `Map`s, and `Range`
+(`error.rs:48`) is among them; a variant no input reaches is named in the
+report, not in the constant, and `Tally::record` matches every variant
+(`wildcard_enum_match_arm`).
 Proof: world,
 `every_task_example_decodes_as_a_declaration_cut_anywhere`: format.md's 23
 task.json blocks, delivered in random pieces, are declarations, vpn's with
@@ -223,7 +229,8 @@ exports `address`, `endpoint`, `hub` and `public_key`. Nothing calls
 Don't: export a `secret`; generate what a reference would judge (the
 generator knows what it broke).
 Size: at most 80 lines.
-Removes: `Declared::Undecoded` and
+Removes: `Declared::Undecoded`, `Key::Undecoded` (`declaration.rs:70`, its
+`exports` row `:81` and arm `:137`, for Done when 3), and
 `the_keys_decoded_later_are_refused_until_their_increment`.
 
 ## Interface sketches
