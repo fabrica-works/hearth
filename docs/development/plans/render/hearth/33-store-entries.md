@@ -100,8 +100,9 @@ Scope: each blob streamed into the cache (32.1) enters by the store: kept
 (indexed already), or refused (full, at the start or now), its read then
 failed; `translate/store.rs`'s cache file.
 Needs: hearth 23 (23.2's index and scan; 23.1's `Rename` form in `cache.rs`).
-Files: `crates/hearth-domain-store/src/{lib, vocabulary, index}.rs`, new
-`src/enter.rs`, `src/tests/{fixtures, enter}.rs`;
+Files: `crates/hearth-domain-store/src/{lib, vocabulary, index, start,
+scan}.rs` (`start.rs:9` and `scan.rs:61` match `Event` whole: each gains
+`Arrived`'s arm), new `src/enter.rs`, `src/tests/{fixtures, enter}.rs`;
 `crates/hearth-domain-builder/src/{lib, vocabulary}.rs`, `src/tests.rs`;
 `crates/hearth-protocol-builder/src/{cache, read, store}.rs`,
 `src/translate/store.rs`, `src/tests/{cache, store, translate}.rs`;
@@ -127,7 +128,9 @@ later answers, and gives `Failed { class: Operational }` at its `last`.
 Test shape: unit as hearth 23's. Reference, in `src/tests/enter.rs`
 (`fixtures::ready(limits, &[digests])` is a store whose index holds them;
 `fixtures::blob(arrival, sha256)` an `Arrived` of `/etc/motd`'s 15-byte blob,
-taking 3 ms; `MOTD` its SHA-256, the literal below):
+taking 3 ms; `ARRIVAL` is `Token::new(1)`; `MOTD` is a `Digest` of the 32 bytes
+of THIN's `775324fc…3123` below, written once in `src/tests/fixtures.rs` as
+bytes; the sketch as rustfmt wraps it at 120 columns, ruling 139):
 
 ```rust
 #[test]
@@ -135,9 +138,18 @@ fn a_new_file_is_kept_with_its_record_and_answered_cached() {
     let mut store = fixtures::ready(limits::SHIPPED, &[]);
     let wall = Wall::from_nanos(1_760_000_000_000_000_000);
     let outputs = store.step_at(Time::ZERO, wall, fixtures::blob(ARRIVAL, MOTD));
-    let record = CacheFile { at: wall, origin: Origin::Blob { oid: Box::from(&b"d23c59a84714a16a9597f6d92ce69390d6d13f9b"[..]) },
-        sha256: MOTD, size: 15, took: Duration::from_millis(3) };
-    assert_eq!(&*outputs, &[Output::Request(Request::Keep { arrival: ARRIVAL, record })], "6.8: renamed, then recorded");
+    let record = CacheFile {
+        at: wall,
+        origin: Origin::Blob { oid: Box::from(&b"d23c59a84714a16a9597f6d92ce69390d6d13f9b"[..]) },
+        sha256: MOTD,
+        size: 15,
+        took: Duration::from_millis(3),
+    };
+    assert_eq!(
+        &*outputs,
+        &[Output::Request(Request::Keep { arrival: ARRIVAL, record })],
+        "6.8: renamed, then recorded"
+    );
     assert_eq!(&*store.step(Time::ZERO, Event::Done), &[Output::Answer(Answer::Cached { arrival: ARRIVAL })]);
     assert!(store.indexed(&MOTD), "8.1: one entry per cache file, by digest");
 }
@@ -184,7 +196,9 @@ Files: `crates/hearth-domain-store/src/{scan, index, vocabulary}.rs`, new
 `src/resolutions.rs`, `src/tests/{fixtures, scan}.rs`;
 `crates/hearth-protocol-builder/src/{lib, limits, store}.rs`,
 `src/store/names.rs`, new `src/walk.rs`, `src/translate/store.rs`,
-`src/tests/{store, translate}.rs`; `crates/hearth-service-builder/src/lib.rs`
+`src/tests/{store, translate, fixtures}.rs` (`fixtures.rs:288` matches
+`Asked::Io(_) | Asked::File(_)`: it gains `Asked::Beneath`'s arm);
+`crates/hearth-service-builder/src/lib.rs`
 (`Asked::Beneath`), `src/tests.rs`; `tests/builder/{src/fixtures.rs,
 tests/store.rs}`.
 Shape: the scan's order is the top, `resolutions/`, `cache/` twice, `Empty`,
@@ -194,7 +208,10 @@ the settlement. In `resolutions/`: `Record(k)` → `Load { key: k }`:
 → indexed (past `resolutions`: `Full { limit: Resolutions }`), else `Remove {
 Record(k) }`; `Unreadable` → nothing; `<64 hex>.record.skein-<16 hex>` a
 `Temporary`. The protocol: `Load { root: resolutions.token, path, max:
-frame::largest(Kind::Resolution) }`, read by `resolution::read` (`Unreadable`
+u32::try_from(tree::frame::largest(tree::frame::Kind::Resolution,
+&limits.tree)) }` (`largest` takes the kind and the tree's limits and returns
+a `u64`, tree `frame.rs:113`; protocol `store.rs:58` converts `Kind::Store`'s
+so), read by `resolution::read` (`Unreadable`
 or `TooLarge` → `Unreadable`), its `inputs` translated. `Empty` → the walk from
 `OpenDirectory { root: staging.fd, name: b"." }`, `staging/` itself kept; past
 `depth` or `entries`, `Failed`.
@@ -217,8 +234,13 @@ the empty closure's `c1589a971c4ce5042b7a8c0f5c9af69b3d46fe64b8ab4cdaac585db0ea3
 `each_inputs_value_translates_and_back`; service:
 `a_beneath_request_reaches_io_with_its_roots_descriptor`. Real loop:
 `the_scan_removes_resolutions_whose_keys_or_digests_do_not_recompute` (laid by
-`resolution::write`, each with `fixtures::closure()` and its digest unless
-said: `<K>.record` with `fixtures::inputs()`, K its key above; `<D2>.record`
+`resolution::write`, which refuses a package whose `source` is not below
+`sources.len()` (tree `resolution.rs:316`), so each record has one tree
+`Line` in `sources` (one that `resolution::write` accepts) and the closure
+of one tree `Package`, new in `tests/builder/src/fixtures.rs`: `apt`,
+`amd64`, `3.0.3`, source 0, any filename and size, sha256 `01…01`, whose four
+fields are `fixtures::closure()`'s, so its digest is `f2fbea8e…7ee3` above;
+each with that closure and its digest unless said: `<K>.record` with `fixtures::inputs()`, K its key above; `<D2>.record`
 (D2 `02…02`) of `variant: "minbase"` and key D2; `<D3>.record` (`03…03`) of
 `inputs()` and key K; `<K2>.record` (K2 `a33fbba1e283ca942abc7b2376b18e4871d28e766ee1a0f1e90470d7b82e21bb`,
 the key of `variant: "minbase"`) with digest `05…05`; `<D4>.record` (`04…04`)
@@ -239,39 +261,61 @@ Removes: nothing.
 ### 33.3 What the store says: its wait, its strays, a full store's error
 Scope: the wait said once, `said` after the first `Busy` (8.2, step 1); the
 strays reported once a scan (8.2, step 7); both on standard error as records
-(client/README.md, 3.2, 3.5); an unopened store's error alone on standard error
-(3.2); a full or unusable store's operational error, once a call, in the
-answer (8.1; render.md, 7.2).
+(client/README.md, 3.2, 3.5); the store's path in an unopened store's error,
+which hearth 23 already prints alone on standard error (3.2); a full or
+unusable store's operational error, once a call, in the answer (8.1;
+render.md, 7.2).
 Needs: hearth 12 (the root's `Answer::Error`, `translate/errors.rs`, and 40.2's
 error records through them).
-Files: `crates/hearth-domain-store/src/{lib, start, scan}.rs`,
-`src/tests/{start, scan}.rs`; `crates/hearth-domain-builder/src/{lib,
+Files: `crates/hearth-domain-store/src/{lib, start, scan, vocabulary,
+limits}.rs` (`vocabulary.rs:25`: `Answer` drops `Copy`, which `Strays {
+first: Stray }` cannot derive; `lib.rs:37`'s `Deadlines::with_capacity(1)`,
+`start.rs:15`'s `.expect("one retry")` and `limits.rs:24`'s `worst_case(1)`
+take two timers, `Retry` and `Said`), `src/tests/{start, scan, fixtures}.rs`;
+`crates/hearth-domain-builder/src/{lib,
 vocabulary}.rs`, `src/tests.rs`; `crates/hearth-domain-render/src/errors.rs`;
 `crates/hearth-client-protocol-records/src/{records, errors}.rs`,
 `src/form/{text, json}.rs` (shared), new `src/progress.rs`, new
-`src/tests/progress.rs`; `crates/hearth-protocol-builder/src/{lib, client}.rs`,
-`src/translate/{store, errors}.rs`, `src/tests/{client, translate}.rs`;
+`src/tests/progress.rs`; `crates/hearth-protocol-builder/src/{lib, client,
+store}.rs` (`store.rs:155`'s `startup` takes the store's path),
+`src/translate/{store, errors}.rs`, `src/tests/{client, translate, store,
+fixtures}.rs` (`store.rs:54-58`'s Startup lines gain the path;
+`fixtures.rs:70`'s `Protocol::new(.., roots(), 7)` gains `store`);
 `crates/hearth-service-builder/src/lib.rs` (`adopt_error_pipe`,
-`adopt_error_file`, `Configuration::store`); `crates/hearth/src/lib.rs`
+`adopt_error_file`, `Configuration::store`; `Configuration` drops `Copy`,
+`lib.rs:21`, which `store: Box<[u8]>` cannot derive), `src/tests/fixtures.rs`
+(`:7`'s `Configuration { limits, uid }` gains `store`); `crates/hearth/src/lib.rs`
 (standard error adopted; the store's path); `tests/builder/{src/fixtures.rs,
 tests/store.rs}` (`Rendered::stderr`, `Release::OnNotice`).
 Shape: the first `Busy` also arms `Timer::Said` at `now + said`, which fires
 `Answer::Waiting` once and is cancelled by `Locked`; the settlement's last step
-answers `Strays { count, first }` before `Ready` when `count > 0`. The root
+answers `Strays { count, first }` before `Ready` when `count > 0`. A step
+may so emit two outputs: the store's `MAX_OUT` (`lib.rs:13`) and the root's
+`MAX_OUT` and `MAX_OUT_RESUME` (builder `lib.rs:11-12`) become 2, their doc
+comments say two, and their queues (builder `lib.rs:34`, `:36`) and the
+store harness's (`tests/fixtures.rs:21`, `:26`) take that capacity, its
+`collect` (`:41`) each output. The root
 sends both as `Request::Progress`; the protocol prints each through a second
 10.2 `Printer` on standard error, in the call's form, `Finish`ed with standard
 output's. The root keeps the store's `Full` or `Unusable` and answers one
 `Answer::Error` of the kind `store` (class operational; render's `errors.rs`
 gains `Kind::Store`, mirrored below) before render's first answer; its arm in
-`translate/errors.rs` names the store's path. On `Unopened`
-the root sends `Request::Unopened { why }` before its `Reply`: the protocol
-prints that error on standard error, nothing on standard output (no version
-line, no terminal record), and its `code()` is 75. Lines (store.md 8.2; client/README.md 3.2: JSON on standard error has its own
-version line; strays one notice, the count and the first):
+`translate/errors.rs` names the store's path. An unopened store stays as
+hearth 23 landed it (ruling 142, point 4): the root's `Request::Unopened { to,
+why }` (builder `vocabulary.rs:20`) and `store::vocabulary::Why`, the
+protocol's `Record::Startup` (protocol `lib.rs:195-206`), which the shell
+writes to standard error (`take_startup`, `crates/hearth/src/lib.rs:115-116`),
+exit 75 (`Outcome::TryAgain`). 33.3 only fills its `path: Some(store)`
+(protocol `store.rs:175`, from `Protocol::new`'s `store`), so the line reads
+`hearth: cannot open the store <store>: <error>` (records `startup.rs:45-50`),
+its errors `lock failed`, `store.record failed` and `store.record is uid
+<recorded>'s, not uid <builder>'s` as landed. Lines (store.md 8.2;
+client/README.md 3.2: JSON on standard error has its own version line; strays
+one notice, the count and the first):
 `waiting for the store's lock: <store>`; `strays in the store <store>: <count>,
 the first <directory>/<name>`; `the store <store> is full: <most> <cache files
-| resolutions>`; `the store <store> is recorded by uid <recorded>, not
-<builder>`; `the store <store>: its <step> failed`; JSON
+| resolutions>`; `the store <store>: its <step> failed` (the steps of
+`Unusable`: `List`, `Remove`, `Load`, `Empty`, `Keep`); JSON
 `{"record":"waiting","store":…}`,
 `{"record":"strays","store":…,"count":…,"first":…}`, and the error's
 `"kind":"store"` with `store`, `limit`, `most`.
@@ -282,9 +326,18 @@ Test shape: unit as before; records', in `src/tests/progress.rs`:
 fn the_waiting_notice_prints_as_text_and_as_json_lines() {
     let record = Record::Waiting(Waiting { store: Box::from(&b"/home/u/.cache/hearth/store"[..]) });
     let text = form::print(Form::Text, &record, None, &limits::SHIPPED);
-    assert_eq!(text.as_deref(), Ok(&b"waiting for the store's lock: /home/u/.cache/hearth/store\n"[..]), "8.2: said once");
+    assert_eq!(
+        text.as_deref(),
+        Ok(&b"waiting for the store's lock: /home/u/.cache/hearth/store\n"[..]),
+        "8.2: said once"
+    );
     let json = form::print(Form::JsonLines, &record, None, &limits::SHIPPED);
-    let expected = concat!(r#"{"record":"version","client":1}"#, "\n", r#"{"record":"waiting","store":"/home/u/.cache/hearth/store"}"#, "\n");
+    let expected = concat!(
+        r#"{"record":"version","client":1}"#,
+        "\n",
+        r#"{"record":"waiting","store":"/home/u/.cache/hearth/store"}"#,
+        "\n"
+    );
     assert_eq!(json.as_deref(), Ok(expected.as_bytes()), "client/README.md, 3.2: progress as records too");
 }
 ```
@@ -295,7 +348,8 @@ Then `the_strays_notice_gives_the_count_and_the_first`,
 `strays_are_said_once_with_their_count_and_the_first`; root:
 `a_full_store_is_answered_once_before_renders_answers`; protocol:
 `progress_prints_on_standard_error_and_answers_on_standard_output`,
-`an_unopened_store_prints_its_error_on_standard_error_alone_and_ends_75`. Real
+`an_unopened_stores_startup_line_names_the_store` (`src/tests/store.rs:54-58`'s
+rows, with the path). Real
 loop (`said` 100 ms, `retry` 20 ms, each named so):
 `a_render_waiting_past_its_notice_says_once_that_it_waits` (`Release::OnNotice`:
 standard error holds the one line, standard output THIN's),
@@ -304,7 +358,8 @@ standard error holds the one line, standard output THIN's),
 `a_full_store_answers_its_error_naming_the_store_and_the_limit`,
 `a_store_recorded_by_another_uid_is_refused_on_standard_error` (its record
 written with the test's uid plus one: standard output empty, standard error the
-one error, exit 75).
+one line `hearth: cannot open the store <store>: store.record is uid <uid+1>'s,
+not uid <uid>'s`, exit 75).
 Proof: process, `heavy cargo nextest run -p hearth-builder-world -E
 'test(=a_render_waiting_past_its_notice_says_once_that_it_waits)'`: a second
 builder over a held store says on standard error, once, that it waits, then
@@ -312,8 +367,8 @@ prints THIN's spec on standard output. Bound: 0.5 s.
 Don't: say the wait twice or before `said`; print a notice on standard output;
 give the store's error per refused request; format in the domain.
 Size: at most 250 lines.
-Removes: hearth 23.2's strays counted and never said; 23.1's terminal record
-printed for an unopened store.
+Removes: hearth 23.2's strays counted and never said; the `path: None` of
+23.1's Startup line for an unopened store (protocol `store.rs:175`).
 
 ## Interface sketches
 
@@ -364,8 +419,7 @@ pub enum Event {
 }
 pub enum Request {
     Progress(Progress),           // what the store says on standard error (33.3)
-    Unopened { why: store::Why }, // the store's error, alone on standard error, before the Reply (33.3)
-}
+}                                 // `Unopened { to, why }` stays as hearth 23 landed it
 /// client/README.md, 3.2's progress (33.3).
 pub enum Progress { Waiting, Strays { count: u64, first: store::Stray } }
 
@@ -390,11 +444,11 @@ pub fn progress(progress: builder::Progress, store: &[u8]) -> records::Record; /
 // crates/hearth-client-protocol-records (33.3): src/progress.rs, `Record::{Waiting, Strays}` and their `Type`s
 pub struct Waiting { pub store: Box<[u8]> }
 pub struct Strays { pub store: Box<[u8]>, pub count: u64, pub first: Box<[u8]> }
-// src/errors.rs: `Kind::Store(StoreError)`, render's the same (33.3); mirrors the store's `Full`, `Unusable` and `Unopened`
+// src/errors.rs: `Kind::Store(StoreError)`, render's the same (33.3); mirrors the store's `Full` and `Unusable`
 pub struct StoreError { pub store: Box<[u8]>, pub fault: StoreFault }
-pub enum StoreFault { Full { limit: StoreLimit, most: u32 }, Failed { step: Step }, Owner { recorded: u32, builder: u32 } }
+pub enum StoreFault { Full { limit: StoreLimit, most: u32 }, Failed { step: Step } } // an unopened store is a Startup record
 pub enum StoreLimit { Resolutions, CacheFiles } // not `Limit`: hearth 12's, 24's and 31's is in this file
-pub enum Step { Lock, Record, List, Remove, Load, Empty, Keep }
+pub enum Step { List, Remove, Load, Empty, Keep } // `Unusable`'s; Lock and Record are `Why`'s, a Startup record
 ```
 
 ## Questions to raise when reached
@@ -410,7 +464,7 @@ None.
    and `vocabulary.rs`.
 3. In a worktree at `origin/main`, once: `heavy cargo nextest run -p
    hearth-domain-store -p hearth-builder-world
-   -E 'package(hearth-domain-store) | binary(=store)'` passes, its `Summary` naming at least 42 tests (hearth
-   23's 17 and these 25); and `heavy cargo nextest run -p
+   -E 'package(hearth-domain-store) | binary(=store)'` passes, its `Summary` naming at least 46 tests (hearth
+   23's 21 under that filter at hearth 3fd9fab, and these 25); and `heavy cargo nextest run -p
    hearth-domain-builder -p hearth-protocol-builder -p
    hearth-client-protocol-records -p hearth-builder-world -p hearth` passes.
