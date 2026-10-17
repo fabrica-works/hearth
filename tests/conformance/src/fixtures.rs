@@ -255,3 +255,28 @@ impl Scenario {
 /// A tiny Packages input for resolve's independent stanza cutter.
 pub const RESOLVE_INDEX: &[u8] =
     b"Package: apt\nVersion: 3.3\nArchitecture: amd64\nOther: kept\n\nPackage: base\nVersion: 1\nArchitecture: all\n\n";
+
+/// Identity of children on the conformance fake machine.
+pub const OWNER: hearth_fake_machine::linux::Ids = hearth_fake_machine::linux::Ids { user: 1000, group: 1000 };
+
+/// Drain the available output while the fake child makes progress.
+pub fn take(
+    machine: &mut hearth_fake_machine::Machine,
+    parent: hearth_fake_machine::linux::Pid,
+    pipe: hearth_fake_machine::linux::Handle,
+    output: &mut Vec<u8>,
+) {
+    use hearth_fake_machine::linux::{Op, Reply};
+    loop {
+        let reply = machine.call(parent, Op::Take { pipe, most: 65_536 }).expect("read pipe");
+        if let Reply::Took(bytes) = reply {
+            output.extend_from_slice(&bytes);
+        } else {
+            assert!(matches!(reply, Reply::Empty | Reply::Ended), "pipe answers bytes or an end");
+            return;
+        }
+    }
+}
+
+/// The committed index cut is anchored beside the mirror pin.
+pub const UNIVERSE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testing/mirror/universe");

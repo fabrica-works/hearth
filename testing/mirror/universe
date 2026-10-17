@@ -1,0 +1,2175 @@
+Origin: Debian
+Label: Debian
+Suite: testing
+Codename: forky
+
+Package: libacl1
+Version: 2.4.0-1
+Installed-Size: 76
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/a/acl/libacl1_2.4.0-1_amd64.deb
+Size: 37132
+SHA256: e9da0e00387e31c1709b70497f1eda91389c962c3940e6d233d4c57f5ea6f635
+
+Package: apt
+Version: 3.3.3
+Installed-Size: 4956
+Architecture: amd64
+Provides: apt-transport-https (= 3.3.3)
+Depends: base-passwd (>= 3.6.1) | adduser, sqv (>= 1.3.0), libapt-pkg7.0 (>= 3.3.3), debian-archive-keyring, libc6 (>= 2.38), libgcc-s1 (>= 3.0), libseccomp2 (>= 2.4.2), libssl3t64 (>= 3.0.0), libstdc++6 (>= 13.1), libsystemd0
+Conflicts: apt-verify, libnettle8 (<< 3.9.1-2.2~)
+Section: admin
+Priority: required
+Filename: pool/main/a/apt/apt_3.3.3_amd64.deb
+Size: 1567912
+SHA256: c9c5697b1bfa54d570637249b78aeed37551014fdfb66dc4334827f7c9b54716
+
+Package: libapt-pkg7.0
+Version: 3.3.3
+Installed-Size: 4389
+Architecture: amd64
+Provides: libapt-pkg (= 3.3.3)
+Depends: libbz2-1.0, libc6 (>= 2.38), libgcc-s1 (>= 3.0), liblz4-1 (>= 0.0~r127), liblzma5 (>= 5.1.1alpha+20120614), libssl3t64 (>= 3.0.0), libstdc++6 (>= 14), libsystemd0 (>= 221), libudev1 (>= 183), libxxhash0 (>= 0.8), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.2.2.3)
+Conflicts: libnettle8 (<< 3.9.1-2.2~)
+Section: libs
+Priority: optional
+Filename: pool/main/a/apt/libapt-pkg7.0_3.3.3_amd64.deb
+Size: 1284224
+SHA256: 7cb0336456c828fcb10ae382f043d9ef4b621cbef0c44d558f8c43c222968ddc
+
+Package: libattr1
+Version: 1:2.6.0-1
+Installed-Size: 62
+Architecture: amd64
+Depends: libc6 (>= 2.4)
+Section: libs
+Priority: optional
+Filename: pool/main/a/attr/libattr1_2.6.0-1_amd64.deb
+Size: 24676
+SHA256: 85bd8c3276826f03541c12474889c504a3cfacc89d414222cd907247c3f536d0
+
+Package: libaudit-common
+Version: 1:4.1.2-1
+Installed-Size: 26
+Architecture: all
+Section: libs
+Priority: optional
+Filename: pool/main/a/audit/libaudit-common_4.1.2-1_all.deb
+Size: 14268
+SHA256: 3d4206918b2c61e7b95bdd2f7e7d927afb1432ecb0deecdd0ade209ed6150c93
+
+Package: libaudit1
+Version: 1:4.1.2-1+b2
+Installed-Size: 210
+Architecture: amd64
+Depends: libaudit-common (>= 1:4.1.2-1), libc6 (>= 2.38), libcap-ng0 (>= 0.7.9)
+Section: libs
+Priority: optional
+Filename: pool/main/a/audit/libaudit1_4.1.2-1+b2_amd64.deb
+Size: 59056
+SHA256: 611fd00539154d6a18cf54249ca1780d82488ba2dbebd761a8b9d357882fc07f
+
+Package: base-files
+Version: 14.2
+Essential: yes
+Installed-Size: 501
+Architecture: amd64
+Provides: base, usr-is-merged
+Pre-Depends: awk
+Section: admin
+Priority: required
+Filename: pool/main/b/base-files/base-files_14.2_amd64.deb
+Size: 87960
+SHA256: 74b9726f2f2eb9be66d886d48bd6841e57f53d1acae1a1acdc29877aa3e29dc6
+
+Package: base-passwd
+Version: 3.6.8
+Essential: yes
+Installed-Size: 285
+Architecture: amd64
+Depends: libc6 (>= 2.34), libdebconfclient0 (>= 0.145), libselinux1 (>= 3.1~)
+Section: admin
+Priority: required
+Filename: pool/main/b/base-passwd/base-passwd_3.6.8_amd64.deb
+Size: 54624
+SHA256: bbebf5418ec31b14825a47c313f969f43714e9e069e5beea8811db2fe946eff3
+
+Package: bash
+Version: 5.3-4
+Essential: yes
+Installed-Size: 7308
+Architecture: amd64
+Depends: base-files (>= 2.1.12), debianutils (>= 5.6-0.1)
+Pre-Depends: libc6 (>= 2.38), libtinfo6 (>= 6)
+Section: shells
+Priority: required
+Filename: pool/main/b/bash/bash_5.3-4_amd64.deb
+Size: 1581708
+SHA256: b13159b47393a3f7be817e2590feefa3678257f919b6271c39710f1d2e2e4d37
+
+Package: libbrotli1
+Version: 1.2.0-4+b1
+Installed-Size: 898
+Architecture: amd64
+Depends: libc6 (>= 2.29)
+Section: libs
+Priority: optional
+Filename: pool/main/b/brotli/libbrotli1_1.2.0-4+b1_amd64.deb
+Size: 311772
+SHA256: 044986c4bf70b62971f888685f11683123a326feb0295bf555e5346ede7f861a
+
+Package: libbz2-1.0
+Version: 1.0.8-6+b2
+Installed-Size: 100
+Architecture: amd64
+Depends: libc6 (>= 2.4)
+Section: libs
+Priority: optional
+Filename: pool/main/b/bzip2/libbz2-1.0_1.0.8-6+b2_amd64.deb
+Size: 39948
+SHA256: 04c7528234a6a4a8a2c2470f1470a7a616d90904fe8cdccf4c2c655540cdc61f
+
+Package: libdebconfclient0
+Version: 0.283
+Installed-Size: 35
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/c/cdebconf/libdebconfclient0_0.283_amd64.deb
+Size: 7572
+SHA256: 9a922bfd8a0bc799f8191dd1b86a5be1be4f4b84567fc6dff2f12cb72327e059
+
+Package: coreutils
+Version: 9.10-1
+Essential: yes
+Installed-Size: 17994
+Architecture: amd64
+Pre-Depends: libacl1 (>= 2.2.23), libattr1 (>= 1:2.4.48), libc6 (>= 2.42), libgmp10 (>= 2:6.3.0+dfsg), libselinux1 (>= 3.1~), libssl3t64 (>= 3.0.0), libsystemd0 (>= 254)
+Section: utils
+Priority: required
+Filename: pool/main/c/coreutils/coreutils_9.10-1_amd64.deb
+Size: 3142356
+SHA256: 6e39a854a50bdfb912f5afc7ffa920d83093b33a2394fa5ece4771adf9b40dbc
+
+Package: courier-mta
+Version: 2.0.6-1
+Installed-Size: 3654
+Architecture: amd64
+Provides: mail-transport-agent
+Depends: courier-base (= 2.0.6-1), debconf, libnet-cidr-perl, wget, debconf (>= 0.5) | debconf-2.0, systemd | systemd-standalone-tmpfiles | systemd-tmpfiles, perl:any, libc6 (>= 2.38), libcourier-authlib0 (>= 0.72.7.20260502), libcourier-unicode12 (>= 2.6.0), libgcc-s1 (>= 3.0), libgdbm6t64 (>= 1.16), libidn2-0 (>= 2.0.0), libperl5.42 (>= 5.42.0), libstdc++6 (>= 13.1)
+Conflicts: mail-transport-agent
+Section: mail
+Priority: optional
+Filename: pool/main/c/courier/courier-mta_2.0.6-1_amd64.deb
+Size: 803720
+SHA256: 3cdb29b6bd19fd7d2074f1cf1786690928dddd9dd076991036401e3fcc11c261
+
+Package: cpio
+Version: 2.15+dfsg-2.1
+Installed-Size: 1201
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Conflicts: cpio-mt, mt-st (<< 0.6)
+Section: utils
+Priority: important
+Filename: pool/main/c/cpio/cpio_2.15+dfsg-2.1_amd64.deb
+Size: 254448
+SHA256: 0ecf4b637b1a56e77d7f440bcadd30eb2e8f038e784258730f602201c951156f
+
+Package: cron
+Version: 3.0pl1-211
+Installed-Size: 248
+Architecture: amd64
+Provides: cron-daemon
+Depends: libc6 (>= 2.38), libpam0g (>= 0.99.7.1), libselinux1 (>= 3.1~), sensible-utils, libpam-runtime
+Pre-Depends: cron-daemon-common
+Conflicts: bcron, cronie, systemd-cron
+Section: admin
+Priority: important
+Filename: pool/main/c/cron/cron_3.0pl1-211_amd64.deb
+Size: 86824
+SHA256: 08385da8b6c491a139a40648f391214bea539e6af542fb5883410410194457ae
+
+Package: cron-daemon-common
+Version: 3.0pl1-211
+Installed-Size: 56
+Architecture: all
+Depends: systemd | systemd-standalone-sysusers | systemd-sysusers
+Conflicts: bcron (<< 0.11-9.1), cron (<< 3.0pl1-140), cronie (<< 1.6.1-5), systemd-cron (<< 1.15.18-1.1)
+Section: admin
+Priority: important
+Filename: pool/main/c/cron/cron-daemon-common_3.0pl1-211_all.deb
+Size: 15884
+SHA256: 6acb53685689dea92641e084f413ed2c02848242ca818fd6a639dac96abb868a
+
+Package: libcurl3t64-gnutls
+Version: 8.22.0-1
+Installed-Size: 37
+Architecture: amd64
+Depends: libcurl4-gnutls (>= 8.22.0-1)
+Section: libs
+Priority: optional
+Filename: pool/main/c/curl/libcurl3t64-gnutls_8.22.0-1_amd64.deb
+Size: 17812
+SHA256: d73e82c8aaa1d930e02b67c17b45a3ee1ca00b418ea2b78e1ca7eb7f63cd8036
+
+Package: libcurl4-gnutls
+Version: 8.22.0-1
+Installed-Size: 1148
+Architecture: amd64
+Depends: libnghttp3-9 (>= 1.11.0~), libngtcp2-16 (>= 1.24.0), libbrotli1 (>= 0.6.0), libc6 (>= 2.43), libgnutls30t64 (>= 3.8.6), libgssapi-krb5-2 (>= 1.17), libidn2-0 (>= 2.0.0), libldap2 (>= 2.6.2), libnettle8t64, libnghttp2-14 (>= 1.50.0), libngtcp2-crypto-gnutls8 (>= 1.22.0), libpsl5t64 (>= 0.16.0), libssh2-1t64 (>= 1.11.1), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.2.3.4)
+Section: libs
+Priority: optional
+Filename: pool/main/c/curl/libcurl4-gnutls_8.22.0-1_amd64.deb
+Size: 457056
+SHA256: b447d589f22edb57af899ea0ebdbd1b6d19fdef1706b604084ad5a7bf0bba887
+
+Package: libsasl2-2
+Version: 2.1.28+dfsg1-11
+Installed-Size: 153
+Architecture: amd64
+Depends: libsasl2-modules-db (>= 2.1.28+dfsg1-11), libc6 (>= 2.38), libssl3t64 (>= 3.0.0)
+Section: libs
+Priority: optional
+Filename: pool/main/c/cyrus-sasl2/libsasl2-2_2.1.28+dfsg1-11_amd64.deb
+Size: 55188
+SHA256: c9e27ccc23841135872b96cb2eff6a1fe64688b26a8c453c1e675e4a68e87bfe
+
+Package: libsasl2-modules-db
+Version: 2.1.28+dfsg1-11
+Installed-Size: 67
+Architecture: amd64
+Depends: libc6 (>= 2.14), libdb5.3t64
+Section: libs
+Priority: optional
+Filename: pool/main/c/cyrus-sasl2/libsasl2-modules-db_2.1.28+dfsg1-11_amd64.deb
+Size: 17204
+SHA256: bfb2b359e04e1f262bac6a28cd9be8d2d63cbb906d632f4c8dfd4f7ca1f6a2d7
+
+Package: dash
+Version: 0.5.12-12
+Essential: yes
+Installed-Size: 207
+Architecture: amd64
+Depends: debianutils (>= 5.6-0.1)
+Pre-Depends: libc6 (>= 2.38)
+Section: shells
+Priority: required
+Filename: pool/main/d/dash/dash_0.5.12-12_amd64.deb
+Size: 98504
+SHA256: a8902cb6d8650134764a25fb80aec8589d858ef71ece1680a62e84816c37bb04
+
+Package: libdb5.3t64
+Version: 5.3.28+dfsg2-11+b1
+Installed-Size: 1859
+Architecture: amd64
+Provides: libdb5.3 (= 5.3.28+dfsg2-11+b1)
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/d/db5.3/libdb5.3t64_5.3.28+dfsg2-11+b1_amd64.deb
+Size: 709352
+SHA256: d263910f67130b11763a0164bac9ee94dafa482cc5ed7301703bbb6520183985
+
+Package: debconf
+Version: 1.5.92
+Installed-Size: 508
+Architecture: all
+Provides: debconf-2.0
+Conflicts: debconf-tiny, whiptail-utf8 (<= 0.50.17-13)
+Section: admin
+Priority: required
+Filename: pool/main/d/debconf/debconf_1.5.92_all.deb
+Size: 122512
+SHA256: cdee7273fe92dad870fa6c7e3a8aa5b4001a8ddeffccb0958e1607bf15879803
+
+Package: debian-archive-keyring
+Version: 2025.1
+Installed-Size: 302
+Architecture: all
+Section: misc
+Priority: important
+Filename: pool/main/d/debian-archive-keyring/debian-archive-keyring_2025.1_all.deb
+Size: 179244
+SHA256: 9ea7778e443144ca490668737a8ab22dd3e748bb99e805e22ec055abeb3c7fac
+
+Package: debianutils
+Version: 5.24
+Essential: yes
+Installed-Size: 228
+Architecture: amd64
+Pre-Depends: libc6 (>= 2.38)
+Section: utils
+Priority: required
+Filename: pool/main/d/debianutils/debianutils_5.24_amd64.deb
+Size: 93316
+SHA256: 3fa7288095ae9ac832442bdaeb560c6961dd6740519cdabcfc66a20a27c23d11
+
+Package: runit-helper
+Version: 2.16.7
+Installed-Size: 18
+Architecture: all
+Section: admin
+Priority: optional
+Filename: pool/main/d/dh-runit/runit-helper_2.16.7_all.deb
+Size: 4932
+SHA256: 7179b63a905793f77d9c250ccd64cd98ea57ca689e93b3fc536136470466af32
+
+Package: diffutils
+Version: 1:3.12-1
+Essential: yes
+Installed-Size: 1768
+Architecture: amd64
+Pre-Depends: libc6 (>= 2.38)
+Section: utils
+Priority: required
+Filename: pool/main/d/diffutils/diffutils_3.12-1_amd64.deb
+Size: 404764
+SHA256: 681796e743a07d6eac76eb05f0862dc2f7bc5061c7cd46c1e2cb595c8d9cf6c2
+
+Package: dma
+Version: 0.14-1
+Installed-Size: 157
+Architecture: amd64
+Provides: mail-transport-agent
+Depends: ucf (>= 0.28), debconf (>= 0.5) | debconf-2.0, libc6 (>= 2.38), libssl3t64 (>= 3.0.0)
+Conflicts: mail-transport-agent
+Section: mail
+Priority: optional
+Filename: pool/main/d/dma/dma_0.14-1_amd64.deb
+Size: 46404
+SHA256: 789812295db363bfd7c7a9c58dd6f808847833677b0af4ff4cb670d264c5ba52
+
+Package: dpkg
+Version: 1.23.11
+Essential: yes
+Installed-Size: 4944
+Architecture: amd64
+Pre-Depends: libbz2-1.0, libc6 (>= 2.38), liblzma5 (>= 5.4.0), libmd0 (>= 0.0.0), libselinux1 (>= 3.1~), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.1.4)
+Section: admin
+Priority: required
+Filename: pool/main/d/dpkg/dpkg_1.23.11_amd64.deb
+Size: 1213824
+SHA256: e8885046ab26534995e970908786b2f2e750fff37a44f0a487a89b449d973826
+
+Package: libcom-err2
+Version: 1.47.4-1+b2
+Installed-Size: 59
+Architecture: amd64
+Provides: libcom-err2t64 (= 1.47.4-1+b2), libcomerr2 (= 1.47.4-1+b2)
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/e/e2fsprogs/libcom-err2_1.47.4-1+b2_amd64.deb
+Size: 19532
+SHA256: e75c8f6b8953ea4d2f452353120f22a3918aa824c3d05a7efe1e7b7a9057706c
+
+Package: efibootmgr
+Version: 18-4.1
+Installed-Size: 94
+Architecture: amd64
+Depends: libc6 (>= 2.38), libefiboot1t64 (>= 39), libefivar1t64 (>= 39), libpopt0 (>= 1.14)
+Section: admin
+Priority: optional
+Filename: pool/main/e/efibootmgr/efibootmgr_18-4.1_amd64.deb
+Size: 30632
+SHA256: 6baa563ca2cc028920a1a427f88245ffbd0ca459c67d5b6fc999920e8bb533a0
+
+Package: libefiboot1t64
+Version: 39-2+b2
+Installed-Size: 137
+Architecture: amd64
+Provides: libefiboot1 (= 39-2+b2)
+Depends: libc6 (>= 2.38), libefivar1t64 (>= 39)
+Section: libs
+Priority: optional
+Filename: pool/main/e/efivar/libefiboot1t64_39-2+b2_amd64.deb
+Size: 44060
+SHA256: 14c944aaf965ae832f8af4fc5ff48fd2f2926e33308a7e964038540024723311
+
+Package: libefivar1t64
+Version: 39-2+b2
+Installed-Size: 230
+Architecture: amd64
+Provides: libefivar1 (= 39-2+b2)
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/e/efivar/libefivar1t64_39-2+b2_amd64.deb
+Size: 60500
+SHA256: 805590194b2c623da20d3225fffc74ffb1808b8a8aef4cf23910127059d1ba32
+
+Package: esmtp-run
+Version: 1.2-19
+Installed-Size: 27
+Architecture: all
+Provides: mail-transport-agent
+Depends: esmtp
+Conflicts: mail-transport-agent
+Section: mail
+Priority: optional
+Filename: pool/main/e/esmtp/esmtp-run_1.2-19_all.deb
+Size: 5256
+SHA256: 5a2e6ec289a20eec7b3e0fc213abdbec4933caa40d8fe28386638e44d160ce7c
+
+Package: exim4-base
+Version: 4.100.1-3
+Installed-Size: 1686
+Architecture: amd64
+Depends: cron | cron-daemon | anacron | systemd-sysv, exim4-config (>= 4.94) | exim4-config-2, libfile-fcntllock-perl, netbase, systemd | systemd-standalone-tmpfiles | systemd-tmpfiles, debconf (>= 0.5) | debconf-2.0, perl:any, libc6 (>= 2.38), libsqlite3-0 (>= 3.5.9)
+Conflicts: exim, exim-tls
+Section: mail
+Priority: optional
+Filename: pool/main/e/exim4/exim4-base_4.100.1-3_amd64.deb
+Size: 1112464
+SHA256: a7545db21c84131ca839ee9f1b3c075a507d69019b18a7d82e6384bb4acf7445
+
+Package: exim4-config
+Version: 4.100.1-3
+Installed-Size: 904
+Architecture: all
+Provides: exim4-config-2
+Depends: debconf (>= 0.5) | debconf-2.0, systemd | systemd-standalone-sysusers | systemd-sysusers
+Conflicts: citadel-server, courier-mta, dma, esmtp-run, exim, exim-tls, exim4-config, exim4-config-2, hula-mta, masqmail, msmtp-mta, mta-dummy, nullmailer, opensmtpd, postfix, qmail-run, sendmail-bin, smail, ssmtp, xmail, zmailer
+Section: mail
+Priority: optional
+Filename: pool/main/e/exim4/exim4-config_4.100.1-3_all.deb
+Size: 239544
+SHA256: 4ea6447c6165b1ee22a06ee93831ce5b2d4accbf95a9770bc070513ea68e873f
+
+Package: exim4-daemon-heavy
+Version: 4.100.1-3
+Installed-Size: 1955
+Architecture: amd64
+Provides: exim4-localscanapi-9.1, mail-transport-agent
+Depends: exim4-base (>= 4.100.1), debconf (>= 0.5) | debconf-2.0, libc6 (>= 2.38), libcrypt1 (>= 1:4.1.0), libgnutls-dane0t64 (>= 3.7.0), libgnutls30t64 (>= 3.8.6), libidn12 (>= 1.13), libidn2-0 (>= 2.0.0), libldap2 (>= 2.6.2), libmariadb3 (>= 3.0.0), libpam0g (>= 0.99.7.1), libpcre2-8-0 (>= 10.47), libperl5.42 (>= 5.42.0), libpq5 (>= 9.1~), libsasl2-2 (>= 2.1.28+dfsg1), libspf2-2t64 (>= 1.2.8~), libsqlite3-0 (>= 3.5.9)
+Conflicts: mail-transport-agent, rmail
+Section: mail
+Priority: optional
+Filename: pool/main/e/exim4/exim4-daemon-heavy_4.100.1-3_amd64.deb
+Size: 759792
+SHA256: 19bf51797818b03ac307f54949228b66880669e2e2b3e9d102019df5b9448303
+
+Package: exim4-daemon-light
+Version: 4.100.1-3
+Installed-Size: 1777
+Architecture: amd64
+Provides: default-mta, exim4-localscanapi-9.1, mail-transport-agent
+Depends: exim4-base (>= 4.100.1), debconf (>= 0.5) | debconf-2.0, libc6 (>= 2.38), libcrypt1 (>= 1:4.1.0), libgnutls-dane0t64 (>= 3.7.0), libgnutls30t64 (>= 3.8.6), libidn12 (>= 1.13), libidn2-0 (>= 2.0.0), libpcre2-8-0 (>= 10.47), libsqlite3-0 (>= 3.5.9)
+Conflicts: mail-transport-agent, rmail
+Section: mail
+Priority: optional
+Filename: pool/main/e/exim4/exim4-daemon-light_4.100.1-3_amd64.deb
+Size: 694760
+SHA256: 175a70e3c0f157b7033bf2349d3c66d26aa6a260e98ed1a39ec276f1b6197bf8
+
+Package: exim4-daemon-mod
+Version: 4.100.1-3
+Installed-Size: 1977
+Architecture: amd64
+Provides: mail-transport-agent
+Depends: exim4-base (>= 4.100.1), debconf (>= 0.5) | debconf-2.0, libc6 (>= 2.38), libcrypt1 (>= 1:4.1.0), libgnutls-dane0t64 (>= 3.7.0), libgnutls30t64 (>= 3.8.6), libidn12 (>= 1.13), libidn2-0 (>= 2.0.0), libpcre2-8-0 (>= 10.47), libsqlite3-0 (>= 3.5.9)
+Conflicts: mail-transport-agent, rmail
+Section: mail
+Priority: optional
+Filename: pool/main/e/exim4/exim4-daemon-mod_4.100.1-3_amd64.deb
+Size: 764564
+SHA256: 7dbce5c181b0bcf309930fbcfea1b7f724414f0fafb09f39a3f8b1303a391fc6
+
+Package: libexpat1
+Version: 2.9.0-1
+Installed-Size: 457
+Architecture: amd64
+Pre-Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/e/expat/libexpat1_2.9.0-1_amd64.deb
+Size: 133152
+SHA256: 190d7f5e45f070c42a12f708fe417d6636cb45fae71175203168bb5c3695081b
+
+Package: findutils
+Version: 4.11.0-3
+Essential: yes
+Installed-Size: 2376
+Architecture: amd64
+Pre-Depends: libc6 (>= 2.38), libselinux1 (>= 3.1~)
+Section: utils
+Priority: required
+Filename: pool/main/f/findutils/findutils_4.11.0-3_amd64.deb
+Size: 788124
+SHA256: 6c7485b63dca915cbe0e89c0b4dd7f5ff47f329c08ce59925b2bba47d6e5968d
+
+Package: gawk
+Version: 1:5.3.2-1
+Installed-Size: 3289
+Architecture: amd64
+Provides: awk
+Pre-Depends: libc6 (>= 2.38), libgmp10 (>= 2:6.3.0+dfsg), libmpfr6 (>= 3.1.3), libreadline8t64 (>= 6.0)
+Section: interpreters
+Priority: optional
+Filename: pool/main/g/gawk/gawk_5.3.2-1_amd64.deb
+Size: 771624
+SHA256: 40f40d768e028b15598b84de036e884cd0b33f83f7658178407c6751eda297f4
+
+Package: gcc-16-base
+Version: 16.2.0-3
+Installed-Size: 106
+Architecture: amd64
+Section: libs
+Priority: optional
+Filename: pool/main/g/gcc-16/gcc-16-base_16.2.0-3_amd64.deb
+Size: 38676
+SHA256: 7dcc6404b44ad8a9d58e83c1e987eecb4d6a24623a92438eeb11829ed1129635
+
+Package: libgcc-s1
+Version: 16.2.0-3
+Installed-Size: 197
+Architecture: amd64
+Provides: libgcc1 (= 1:16.2.0-3)
+Depends: gcc-16-base (= 16.2.0-3), libc6 (>= 2.35)
+Section: libs
+Priority: optional
+Filename: pool/main/g/gcc-16/libgcc-s1_16.2.0-3_amd64.deb
+Size: 74048
+SHA256: e716dc8baad27e884c45ff83a76955047a7a9e33a80e94f9459ee996ebb800b0
+
+Package: libstdc++6
+Version: 16.2.0-3
+Installed-Size: 3320
+Architecture: amd64
+Depends: gcc-16-base (= 16.2.0-3), libc6 (>= 2.38), libgcc-s1 (>= 4.3)
+Conflicts: scim (<< 1.4.2-1)
+Section: libs
+Priority: optional
+Filename: pool/main/g/gcc-16/libstdc++6_16.2.0-3_amd64.deb
+Size: 823236
+SHA256: 7c9e1a89e6c0b9202699957b469c06d0b86f5c97e86c1ff912b6502ddd8793b6
+
+Package: libgdbm-compat4t64
+Version: 1.26-1+b2
+Installed-Size: 77
+Architecture: amd64
+Provides: libgdbm-compat4 (= 1.26-1+b2)
+Depends: libc6 (>= 2.33), libgdbm6t64 (>= 1.16)
+Section: libs
+Priority: optional
+Filename: pool/main/g/gdbm/libgdbm-compat4t64_1.26-1+b2_amd64.deb
+Size: 52016
+SHA256: 2f2909a199edcda9316e1646faf722940c96555b4eb049ce67bbd767035a9b1e
+
+Package: libgdbm6t64
+Version: 1.26-1+b2
+Installed-Size: 140
+Architecture: amd64
+Provides: libgdbm6 (= 1.26-1+b2)
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/g/gdbm/libgdbm6t64_1.26-1+b2_amd64.deb
+Size: 77664
+SHA256: 613613e51bb5bdb5a72e87be5f3a06fdf449b1ff39e205784642ae6ce7a02f13
+
+Package: git
+Version: 1:2.53.0-1
+Installed-Size: 50972
+Architecture: amd64
+Provides: git-completion, git-core
+Depends: libc6 (>= 2.42), libcurl3t64-gnutls (>= 8.3.0), libexpat1 (>= 2.0.1), libpcre2-8-0 (>= 10.34), zlib1g (>= 1:1.2.2), perl, liberror-perl, git-man (>> 1:2.53.0), git-man (<< 1:2.53.0-.)
+Section: vcs
+Priority: optional
+Filename: pool/main/g/git/git_2.53.0-1_amd64.deb
+Size: 9409868
+SHA256: 54828afcd38dd8403b910259d8f47ff7c86908e40a2be8ec3339993dd02926dc
+
+Package: git-man
+Version: 1:2.53.0-1
+Installed-Size: 2369
+Architecture: all
+Section: doc
+Priority: optional
+Filename: pool/main/g/git/git-man_2.53.0-1_all.deb
+Size: 2326272
+SHA256: d43f53335ac640c07e4d79c5fd7d1a0e615987f807e3ff64a346b24aa38100b2
+
+Package: libc-bin
+Version: 2.43-7
+Essential: yes
+Installed-Size: 2118
+Architecture: amd64
+Depends: libc6 (>> 2.43), libc6 (<< 2.44)
+Section: libs
+Priority: required
+Filename: pool/main/g/glibc/libc-bin_2.43-7_amd64.deb
+Size: 620708
+SHA256: 159e07254924fdec81a7677c983a2ace1fb7aa05933abfb9aa6aa037844da18a
+
+Package: libc-gconv-modules-extra
+Version: 2.43-7
+Installed-Size: 7989
+Architecture: amd64
+Section: libs
+Priority: optional
+Filename: pool/main/g/glibc/libc-gconv-modules-extra_2.43-7_amd64.deb
+Size: 1102928
+SHA256: 8abae40b5e2bfca58fbc838329b48f525c98463e930b8d3ed075d0c9e960a57a
+
+Package: libc6
+Version: 2.43-7
+Installed-Size: 5483
+Architecture: amd64
+Depends: libgcc-s1, libc-gconv-modules-extra (= 2.43-7)
+Section: libs
+Priority: optional
+Filename: pool/main/g/glibc/libc6_2.43-7_amd64.deb
+Size: 1866392
+SHA256: 5c71715c51103beb4fbba9fe9f8dff604af6610dfa71c70bff342f54a7860803
+
+Package: libgmp10
+Version: 2:6.3.0+dfsg-5+b2
+Installed-Size: 878
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/g/gmp/libgmp10_6.3.0+dfsg-5+b2_amd64.deb
+Size: 559860
+SHA256: 032743c787f0e1e644e4dcfbdb38f01be8cb150cb9633f8be5e79aba6938f349
+
+Package: libgnutls-dane0t64
+Version: 3.8.13-1
+Installed-Size: 656
+Architecture: amd64
+Provides: libgnutls-dane0 (= 3.8.13-1)
+Depends: libgnutls30t64 (= 3.8.13-1), libc6 (>= 2.34), libunbound8 (>= 1.8.0)
+Section: libs
+Priority: optional
+Filename: pool/main/g/gnutls28/libgnutls-dane0t64_3.8.13-1_amd64.deb
+Size: 495972
+SHA256: b51acb0c9413c904cf80f699feeb5129c9375ee4ca3ffd515efe35febb3161a7
+
+Package: libgnutls30t64
+Version: 3.8.13-1
+Installed-Size: 3711
+Architecture: amd64
+Provides: libgnutls30 (= 3.8.13-1)
+Depends: libc6 (>= 2.38), libgmp10 (>= 2:6.3.0+dfsg), libhogweed6t64 (>= 3.10), libidn2-0 (>= 2.0.0), libnettle8t64 (>= 3.10), libp11-kit0 (>= 0.25.1), libtasn1-6 (>= 4.14), libunistring5 (>= 1.1)
+Section: libs
+Priority: optional
+Filename: pool/main/g/gnutls28/libgnutls30t64_3.8.13-1_amd64.deb
+Size: 1545536
+SHA256: 81f7f28a3968228293cabf6a92f7d6b2a8807f64ccf57469f2ce9a06b7b226af
+
+Package: grep
+Version: 3.12-1
+Essential: yes
+Installed-Size: 1297
+Architecture: amd64
+Provides: rgrep
+Pre-Depends: libc6 (>= 2.38), libpcre2-8-0 (>= 10.32)
+Conflicts: rgrep
+Section: utils
+Priority: required
+Filename: pool/main/g/grep/grep_3.12-1_amd64.deb
+Size: 443080
+SHA256: f118247556ec1e8958c9abf2b9164713201bf74b83787cc23b94b88115dcc7a2
+
+Package: gzip
+Version: 1.14-1
+Essential: yes
+Installed-Size: 262
+Architecture: amd64
+Pre-Depends: libc6 (>= 2.38)
+Conflicts: zutils (<< 1.13-2~)
+Section: utils
+Priority: required
+Filename: pool/main/g/gzip/gzip_1.14-1_amd64.deb
+Size: 148504
+SHA256: 3a58fc548e2ca1a87cdee83ea3fbc77057168908be8c3e1d000563f3b448195a
+
+Package: hostname
+Version: 3.25
+Essential: yes
+Installed-Size: 50
+Architecture: amd64
+Pre-Depends: libc6 (>= 2.34)
+Section: admin
+Priority: required
+Filename: pool/main/h/hostname/hostname_3.25_amd64.deb
+Size: 11024
+SHA256: 9c2a27e5d4d87137211fe46631b05b2ee8892ec76aae926304e4485ba02e1015
+
+Package: libicu78
+Version: 78.3-2
+Installed-Size: 38710
+Architecture: amd64
+Depends: libc6 (>= 2.38), libgcc-s1 (>= 3.0), libstdc++6 (>= 14)
+Section: libs
+Priority: optional
+Filename: pool/main/i/icu/libicu78_78.3-2_amd64.deb
+Size: 10035420
+SHA256: dc918ea6cbe7bb6feea43aac3920a86a29dcc5faf4c56d8f0948408f9076d866
+
+Package: incus-agent
+Version: 7.0.1-5
+Installed-Size: 126679
+Architecture: amd64
+Section: admin
+Priority: optional
+Filename: pool/main/i/incus/incus-agent_7.0.1-5_amd64.deb
+Size: 49995832
+SHA256: f8715fd55f4123605677ae9d4ff48524c83e152fdeba89041c5c049a5ce58759
+
+Package: init-system-helpers
+Version: 1.69+nmu3
+Essential: yes
+Installed-Size: 132
+Architecture: all
+Section: admin
+Priority: required
+Filename: pool/main/i/init-system-helpers/init-system-helpers_1.69+nmu3_all.deb
+Size: 37280
+SHA256: b1a4ebee265c4727cc95cb0555bd8c5af455303b272418bccf5d171913a60ba9
+
+Package: libkeyutils1
+Version: 1.6.3-6+b2
+Installed-Size: 41
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/k/keyutils/libkeyutils1_1.6.3-6+b2_amd64.deb
+Size: 9348
+SHA256: 0a71e3b62a39df17508fad4f6150459fd0f0dc4a0189b9eafbda2a74dcea1853
+
+Package: kmod
+Version: 34.2-2+b2
+Installed-Size: 255
+Architecture: amd64
+Depends: libc6 (>= 2.38), libssl3t64 (>= 3.0.0), libkmod2 (= 34.2-2+b2)
+Section: admin
+Priority: important
+Filename: pool/main/k/kmod/kmod_34.2-2+b2_amd64.deb
+Size: 95676
+SHA256: 3f9b20cfc650affceff67cdf6f627ac65a45ad1ca18ec553bc47ce4c13ee1196
+
+Package: libkmod2
+Version: 34.2-2+b2
+Installed-Size: 144
+Architecture: amd64
+Depends: libc6 (>= 2.38), libssl3t64 (>= 3.0.0)
+Section: libs
+Priority: optional
+Filename: pool/main/k/kmod/libkmod2_34.2-2+b2_amd64.deb
+Size: 62480
+SHA256: 2a2a1da5c39c769fe7185a463404dabd979a7026c92eef0b553c2cd2100ed588
+
+Package: libgssapi-krb5-2
+Version: 1.22.1-3
+Installed-Size: 432
+Architecture: amd64
+Depends: libkrb5-3 (= 1.22.1-3), libc6 (>= 2.38), libcom-err2 (>= 1.43.9), libk5crypto3 (>= 1.20), libkrb5support0 (= 1.22.1-3)
+Section: libs
+Priority: optional
+Filename: pool/main/k/krb5/libgssapi-krb5-2_1.22.1-3_amd64.deb
+Size: 137244
+SHA256: 8849ff8bdfabbc1e8d1664eb209852023b1eaba1889ffd821459b7c57604c777
+
+Package: libk5crypto3
+Version: 1.22.1-3
+Installed-Size: 260
+Architecture: amd64
+Depends: libc6 (>= 2.38), libkrb5support0 (= 1.22.1-3)
+Section: libs
+Priority: optional
+Filename: pool/main/k/krb5/libk5crypto3_1.22.1-3_amd64.deb
+Size: 78952
+SHA256: 6567c39be649ff018ccb356174886c7358e1a6888e6d13e8a7e001c76c78a20c
+
+Package: libkrb5-3
+Version: 1.22.1-3
+Installed-Size: 1100
+Architecture: amd64
+Depends: libkrb5support0 (= 1.22.1-3), libc6 (>= 2.38), libcom-err2 (>= 1.43.9), libk5crypto3 (>= 1.20), libkeyutils1 (>= 1.5.9), libssl3t64 (>= 3.0.0)
+Section: libs
+Priority: optional
+Filename: pool/main/k/krb5/libkrb5-3_1.22.1-3_amd64.deb
+Size: 335308
+SHA256: 945966e0aeae286e8d79ab85e425340348024970587027acad3d3582471f1eef
+
+Package: libkrb5support0
+Version: 1.22.1-3
+Installed-Size: 135
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/k/krb5/libkrb5support0_1.22.1-3_amd64.deb
+Size: 31052
+SHA256: e7e2d65fa4f016fdf7d982ddd5b9c2e5ecdf2c33f41f1e4ab20de7e59aaaaacf
+
+Package: libarchive13t64
+Version: 3.8.9-1
+Installed-Size: 926
+Architecture: amd64
+Provides: libarchive13 (= 3.8.9-1)
+Depends: libacl1 (>= 2.2.23), libbz2-1.0, libc6 (>= 2.38), liblz4-1 (>= 1.8.0), liblzma5 (>= 5.2.2), libnettle8t64, libxml2-16 (>= 2.14.1), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.1.4)
+Section: libs
+Priority: optional
+Filename: pool/main/liba/libarchive/libarchive13t64_3.8.9-1_amd64.deb
+Size: 364316
+SHA256: 1683fc17173f2f82f2840344fae8a553d033788101e571ffecf3dd2c93cda33d
+
+Package: libbsd0
+Version: 0.12.2-3
+Installed-Size: 215
+Architecture: amd64
+Depends: libc6 (>= 2.38), libmd0 (>= 1.0.3-2)
+Section: libs
+Priority: optional
+Filename: pool/main/libb/libbsd/libbsd0_0.12.2-3_amd64.deb
+Size: 131912
+SHA256: 0383e47d704a5e58080606cbcafd2f2aa725702767ccf8b877fb224d04ff38c5
+
+Package: libcap-ng0
+Version: 0.9.6-1
+Installed-Size: 69
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/libc/libcap-ng/libcap-ng0_0.9.6-1_amd64.deb
+Size: 18956
+SHA256: eb2bf5de7323241b985b07b3352d319d033133e4168590c9d48b80db2491a762
+
+Package: libcbor0.10
+Version: 0.10.2-2.2
+Installed-Size: 94
+Architecture: amd64
+Depends: libc6 (>= 2.14)
+Section: libs
+Priority: optional
+Filename: pool/main/libc/libcbor/libcbor0.10_0.10.2-2.2_amd64.deb
+Size: 28964
+SHA256: 3ab6113310ba2cb1eedc69f0ca82d42c07e46fa769f982ad091a92cf36b0f2f8
+
+Package: liberror-perl
+Version: 0.17030-1
+Installed-Size: 71
+Architecture: all
+Depends: perl:any
+Section: perl
+Priority: optional
+Filename: pool/main/libe/liberror-perl/liberror-perl_0.17030-1_all.deb
+Size: 26872
+SHA256: 06110a972bdc52f6c6d6615dddbe97f836c61d0e36c685ef4107c2eaa81f871f
+
+Package: libevent-2.1-7t64
+Version: 2.1.13-stable-1
+Installed-Size: 442
+Architecture: amd64
+Provides: libevent-2.1-7 (= 2.1.13-stable-1)
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/libe/libevent/libevent-2.1-7t64_2.1.13-stable-1_amd64.deb
+Size: 183200
+SHA256: 9b440b77447e53fea74c9931158494f2dd4467307c795d6d201a00c4566b09cb
+
+Package: libffi8
+Version: 3.8.0-2
+Installed-Size: 101
+Architecture: amd64
+Provides: libffi8ubuntu1 (= 3.8.0-2)
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/libf/libffi/libffi8_3.8.0-2_amd64.deb
+Size: 32472
+SHA256: 8f52979b2f3831088c419aae858f10fd3ad7e42cc6c1d28967bae996a98223a4
+
+Package: libfido2-1
+Version: 1.17.0-2
+Installed-Size: 257
+Architecture: amd64
+Depends: libc6 (>= 2.38), libcbor0.10 (>= 0.10.2), libssl3t64 (>= 3.0.0), libudev1 (>= 183), zlib1g (>= 1:1.1.4)
+Section: libs
+Priority: optional
+Filename: pool/main/libf/libfido2/libfido2-1_1.17.0-2_amd64.deb
+Size: 80492
+SHA256: a3db14aaa05b4856019ff0ad41e77f07a5153e89535eb94024d2668ffcd4b5a8
+
+Package: libfile-fcntllock-perl
+Version: 0.22-4+b5
+Installed-Size: 130
+Architecture: amd64
+Depends: perl (>= 5.42.2-3), perlapi-5.42.2, libc6 (>= 2.28)
+Section: perl
+Priority: optional
+Filename: pool/main/libf/libfile-fcntllock-perl/libfile-fcntllock-perl_0.22-4+b5_amd64.deb
+Size: 31476
+SHA256: 04afe8358c60457acccc106cde8d6b370c5769f7561321fea4401d967dace139
+
+Package: libidn12
+Version: 1.44-1
+Installed-Size: 236
+Architecture: amd64
+Depends: libc6 (>= 2.14)
+Section: libs
+Priority: optional
+Filename: pool/main/libi/libidn/libidn12_1.44-1_amd64.deb
+Size: 47476
+SHA256: 5c28ee08d68e11a7d370c0d8decf952f59df75f69fc4b70943ba923ebf970b6a
+
+Package: libidn2-0
+Version: 2.3.8-5
+Installed-Size: 447
+Architecture: amd64
+Depends: libc6 (>= 2.14), libunistring5 (>= 1.1)
+Section: libs
+Priority: optional
+Filename: pool/main/libi/libidn2/libidn2-0_2.3.8-5_amd64.deb
+Size: 108596
+SHA256: 25a38f7d9ba5bb3daf47a21ad5d348303e602f3c9037a48d621683fe87e7ce28
+
+Package: libmd0
+Version: 1.3.0-1
+Installed-Size: 115
+Architecture: amd64
+Depends: libc6 (>= 2.33)
+Section: libs
+Priority: optional
+Filename: pool/main/libm/libmd/libmd0_1.3.0-1_amd64.deb
+Size: 45420
+SHA256: b93615e08319799bedd98a68643d607b06a7713365f829fb3cae131f8a3b81b1
+
+Package: libnsl3
+Version: 2.0.1-2
+Installed-Size: 58
+Architecture: amd64
+Depends: libc6 (>= 2.14), libtirpc3t64 (>= 1.0.2)
+Section: libs
+Priority: optional
+Filename: pool/main/libn/libnsl/libnsl3_2.0.1-2_amd64.deb
+Size: 15668
+SHA256: 8bad39924c34339ffe72706217cead3b83e78575b0b826614936b909cdbd2519
+
+Package: libpsl5t64
+Version: 0.23.3-1
+Installed-Size: 104
+Architecture: amd64
+Provides: libpsl5 (= 0.23.3-1)
+Depends: libidn2-0 (>= 0.16), libc6 (>= 2.38), libunistring5 (>= 1.1)
+Section: libs
+Priority: optional
+Filename: pool/main/libp/libpsl/libpsl5t64_0.23.3-1_amd64.deb
+Size: 61660
+SHA256: 610ce84d46ad555c604431bd659a2d3475dd4cbc6d112de7c405f0b1a74c088f
+
+Package: libseccomp2
+Version: 2.6.1-1+b1
+Installed-Size: 202
+Architecture: amd64
+Depends: libc6 (>= 2.14)
+Section: libs
+Priority: optional
+Filename: pool/main/libs/libseccomp/libseccomp2_2.6.1-1+b1_amd64.deb
+Size: 51668
+SHA256: 6cfbb195275e4d514ad9f5597bcdcbed7bd1c094d32e1d9bee4cbc6e13a1a550
+
+Package: libselinux1
+Version: 3.11-2.1
+Installed-Size: 236
+Architecture: amd64
+Depends: libc6 (>= 2.38), libpcre2-8-0 (>= 10.47)
+Section: libs
+Priority: optional
+Filename: pool/main/libs/libselinux/libselinux1_3.11-2.1_amd64.deb
+Size: 92160
+SHA256: e060712ee0dae5f61e1fb4f978edc8a2b083299384caaf9fc05cefbd8972b826
+
+Package: libsemanage-common
+Version: 3.11-1
+Installed-Size: 21
+Architecture: all
+Section: libs
+Priority: optional
+Filename: pool/main/libs/libsemanage/libsemanage-common_3.11-1_all.deb
+Size: 7148
+SHA256: c322450a9ed61de368442c5a5a916aeee5f0783ef2d81fbd4f555c6a1c4fcbcb
+
+Package: libsemanage2
+Version: 3.11-1+b1
+Installed-Size: 310
+Architecture: amd64
+Depends: libsemanage-common (>= 3.11-1), libaudit1 (>= 1:2.2.1), libbz2-1.0, libc6 (>= 2.38), libselinux1 (>= 3.11), libsepol2 (>= 3.11)
+Section: libs
+Priority: optional
+Filename: pool/main/libs/libsemanage/libsemanage2_3.11-1+b1_amd64.deb
+Size: 97000
+SHA256: 24a03d5ee5ac6270193c25ead855f152399c7e691175ac26d1a41c4cfbdb9682
+
+Package: libsepol2
+Version: 3.11-1
+Installed-Size: 819
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/libs/libsepol/libsepol2_3.11-1_amd64.deb
+Size: 307312
+SHA256: 4dcfd54ba3aac14c29be93c6007726c9139f000b52b964510bfb48a28834cbf7
+
+Package: libssh2-1t64
+Version: 1.11.1-6
+Installed-Size: 453
+Architecture: amd64
+Provides: libssh2-1 (= 1.11.1-6)
+Depends: libc6 (>= 2.38), libssl3t64 (>= 3.0.0), zlib1g (>= 1:1.1.4)
+Section: libs
+Priority: optional
+Filename: pool/main/libs/libssh2/libssh2-1t64_1.11.1-6_amd64.deb
+Size: 253392
+SHA256: 6c31e52c70e7e8a7897762fe9200259c88d0861939cce07aaa8f094c85372920
+
+Package: libtasn1-6
+Version: 4.21.0-2+b1
+Installed-Size: 121
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/libt/libtasn1-6/libtasn1-6_4.21.0-2+b1_amd64.deb
+Size: 49292
+SHA256: 097059368c29f6bac5253cc9a4ee3b8c2f449326de016feddf5a00b896fabe49
+
+Package: libtext-charwidth-perl
+Version: 0.04-12+b1
+Installed-Size: 42
+Architecture: amd64
+Depends: perl-base (>= 5.42.2-3), perlapi-5.42.2, libc6 (>= 2.4)
+Section: perl
+Priority: optional
+Filename: pool/main/libt/libtext-charwidth-perl/libtext-charwidth-perl_0.04-12+b1_amd64.deb
+Size: 9344
+SHA256: 2d63cee7fdc39836f37a87846f1998be615fdc8de6db4c892aec427b32c1907a
+
+Package: libtext-wrapi18n-perl
+Version: 0.06-11
+Installed-Size: 26
+Architecture: all
+Depends: libtext-charwidth-perl
+Section: perl
+Priority: optional
+Filename: pool/main/libt/libtext-wrapi18n-perl/libtext-wrapi18n-perl_0.06-11_all.deb
+Size: 7788
+SHA256: 78f3e536289c5f07351b1251980d42ec8706a4638de160dbe184a479d7e5bc14
+
+Package: libtirpc-common
+Version: 1.3.7+ds-1
+Installed-Size: 30
+Architecture: all
+Section: libs
+Priority: optional
+Filename: pool/main/libt/libtirpc/libtirpc-common_1.3.7+ds-1_all.deb
+Size: 10040
+SHA256: 5b59ea5cc2fbbaccd9bc4e286a545d0cc8ea14d52b9ca0cd73b3b1fb78b1d385
+
+Package: libtirpc3t64
+Version: 1.3.7+ds-1
+Installed-Size: 230
+Architecture: amd64
+Provides: libtirpc3 (= 1.3.7+ds-1)
+Depends: libc6 (>= 2.38), libgssapi-krb5-2 (>= 1.17), libtirpc-common (>= 1.3.7+ds-1)
+Section: libs
+Priority: optional
+Filename: pool/main/libt/libtirpc/libtirpc3t64_1.3.7+ds-1_amd64.deb
+Size: 82880
+SHA256: a6d18d608b5a0fe40de49b0672aae558814c04e9203c8aa14b8293da3ec2ba4a
+
+Package: libtlsrpt0
+Version: 0.5.1-1
+Installed-Size: 48
+Architecture: amd64
+Depends: libc6 (>= 2.4)
+Section: libs
+Priority: optional
+Filename: pool/main/libt/libtlsrpt/libtlsrpt0_0.5.1-1_amd64.deb
+Size: 10912
+SHA256: 006e497bfa64554e33e165e5eabdf850ef194127da755c9fc5786103b26dfa75
+
+Package: libunistring5
+Version: 1.4.2-1
+Installed-Size: 2102
+Architecture: amd64
+Depends: libc6 (>= 2.34)
+Section: libs
+Priority: optional
+Filename: pool/main/libu/libunistring/libunistring5_1.4.2-1_amd64.deb
+Size: 479564
+SHA256: 509fb596f6b4de34f1d9cb5a0001abc3c6c51f4800e908ef888262ebdaaefa3b
+
+Package: libcrypt1
+Version: 1:4.5.2+20251210-1
+Installed-Size: 265
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Conflicts: libpam0g (<< 1.4.0-10)
+Section: libs
+Priority: optional
+Filename: pool/main/libx/libxcrypt/libcrypt1_4.5.2+20251210-1_amd64.deb
+Size: 100216
+SHA256: 3ed2cd1666bb12315542f03c892e98d83efb382b7de1747d60d9960899857ed5
+
+Package: libxml2-16
+Version: 2.15.4+dfsg-1
+Installed-Size: 1682
+Architecture: amd64
+Depends: libc6 (>= 2.38), zlib1g (>= 1:1.2.2.3)
+Conflicts: w3c-dtd-xhtml
+Section: libs
+Priority: optional
+Filename: pool/main/libx/libxml2/libxml2-16_2.15.4+dfsg-1_amd64.deb
+Size: 682688
+SHA256: 36f043b5014adf26ff722f693361d1d677088d1eb384fe4522ad514b52053c88
+
+Package: libzstd1
+Version: 1.5.7+dfsg-4
+Installed-Size: 839
+Architecture: amd64
+Depends: libc6 (>= 2.34)
+Section: libs
+Priority: optional
+Filename: pool/main/libz/libzstd/libzstd1_1.5.7+dfsg-4_amd64.deb
+Size: 304040
+SHA256: 93e7930e4c25b918f1dd980cc1c6d4487654a248f5fa71eacb976ed7bbe954bd
+
+Package: linux-base-7.2.11+deb14-amd64
+Version: 7.2.11-1
+Installed-Size: 958
+Architecture: amd64
+Section: kernel
+Priority: optional
+Filename: pool/main/l/linux/linux-base-7.2.11+deb14-amd64_7.2.11-1_amd64.deb
+Size: 463756
+SHA256: a16696106fbd13d02e0b5747fc2850a5d9fc9b20b1bc8275328ccb7e42f9754b
+
+Package: linux-modules-7.2.11+deb14-amd64
+Version: 7.2.11-1
+Installed-Size: 109553
+Architecture: amd64
+Depends: kmod, linux-base-7.2.11+deb14-amd64 (= 7.2.11-1)
+Section: kernel
+Priority: optional
+Filename: pool/main/l/linux/linux-modules-7.2.11+deb14-amd64_7.2.11-1_amd64.deb
+Size: 110072220
+SHA256: 293423f4e28fc96a9c6088650602bac105d4eea7f11f27499a484228f0223fd9
+
+Package: linux-base
+Version: 4.17
+Installed-Size: 82
+Architecture: all
+Depends: debconf (>= 0.5) | debconf-2.0
+Section: kernel
+Priority: optional
+Filename: pool/main/l/linux-base/linux-base_4.17_all.deb
+Size: 26028
+SHA256: 22142de0000ed7f5a8b748198b5b2656a02a3467433f3cae141e09c7b02ba803
+
+Package: linux-base-amd64
+Version: 7.2.11-1
+Installed-Size: 9
+Architecture: amd64
+Depends: linux-base-7.2.11+deb14-amd64 (= 7.2.11-1)
+Section: kernel
+Priority: optional
+Filename: pool/main/l/linux-signed-amd64/linux-base-amd64_7.2.11-1_amd64.deb
+Size: 1208
+SHA256: 6d362a5a85d67d6e9d7d16678c902c2305f5b566c78f0551b3e70bde6cdc176a
+
+Package: linux-binary-7.2.11+deb14-amd64
+Version: 7.2.11-1
+Installed-Size: 14220
+Architecture: amd64
+Depends: linux-base-7.2.11+deb14-amd64 (= 7.2.11-1)
+Section: kernel
+Priority: optional
+Filename: pool/main/l/linux-signed-amd64/linux-binary-7.2.11+deb14-amd64_7.2.11-1_amd64.deb
+Size: 14250060
+SHA256: 2d2abdffc6bdea862eb7a76f9eb50983905bb2143859b0ee1fd243b542f90cfc
+
+Package: linux-image-7.2.11+deb14-amd64
+Version: 7.2.11-1
+Installed-Size: 15
+Architecture: amd64
+Depends: dracut | initramfs-tools (>= 0.120+deb8u2) | linux-initramfs-tool, linux-base-7.2.11+deb14-amd64 (= 7.2.11-1), linux-binary-7.2.11+deb14-amd64 (= 7.2.11-1), linux-modules-7.2.11+deb14-amd64 (= 7.2.11-1)
+Pre-Depends: linux-base (>= 4.17~)
+Section: kernel
+Priority: optional
+Filename: pool/main/l/linux-signed-amd64/linux-image-7.2.11+deb14-amd64_7.2.11-1_amd64.deb
+Size: 1892
+SHA256: 1986ff769b59d4d3ff382c25fc158b1a2bca3aaf831a86ba56e4811453c9ef13
+
+Package: linux-image-amd64
+Version: 7.2.11-1
+Installed-Size: 16
+Architecture: amd64
+Provides: linux-image-generic, linux-latest-modules-7.2.11+deb14-amd64, virtualbox-guest-modules, wireguard-modules (= 1.0.0)
+Depends: linux-base-amd64 (= 7.2.11-1), linux-image-7.2.11+deb14-amd64 (= 7.2.11-1)
+Section: kernel
+Priority: optional
+Filename: pool/main/l/linux-signed-amd64/linux-image-amd64_7.2.11-1_amd64.deb
+Size: 1692
+SHA256: ed490a3f77e968252226baefd99b54cabed87e365228df8338e976ac8b56f694
+
+Package: liblmdb0
+Version: 0.9.35-1
+Installed-Size: 107
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/l/lmdb/liblmdb0_0.9.35-1_amd64.deb
+Size: 45764
+SHA256: 730d832294705c3b8086fb8b126a0ea1ac0bd56c60b855de4c4d1b5ab93f4d9e
+
+Package: liblz4-1
+Version: 1.10.0-10
+Installed-Size: 193
+Architecture: amd64
+Depends: libc6 (>= 2.14), libxxhash0 (>= 0.6.5)
+Section: libs
+Priority: optional
+Filename: pool/main/l/lz4/liblz4-1_1.10.0-10_amd64.deb
+Size: 70284
+SHA256: 069d0349906af0335de6cb6a4132f0ac45c1e1db0dffffdcb5b1d291f8f6a66f
+
+Package: mawk
+Version: 1.3.4.20260302-2
+Installed-Size: 299
+Architecture: amd64
+Provides: awk
+Depends: libc6 (>= 2.38)
+Section: interpreters
+Priority: required
+Filename: pool/main/m/mawk/mawk_1.3.4.20260302-2_amd64.deb
+Size: 144700
+SHA256: 6fcd463ea272c05627d5159716336b53bfa14b35b1ac7ba29a878f0ee1352419
+
+Package: media-types
+Version: 14.0.0
+Installed-Size: 99
+Architecture: all
+Section: net
+Priority: standard
+Filename: pool/main/m/media-types/media-types_14.0.0_all.deb
+Size: 30760
+SHA256: c835983e7cfeac12fc5db143d5de009444e800ddc40eeb439fb556a6b9e99243
+
+Package: mmdebstrap
+Version: 1.5.7-3
+Installed-Size: 574
+Architecture: all
+Depends: apt (>= 2.3.14), python3 (>= 3.10), perl:any
+Section: admin
+Priority: optional
+Filename: pool/main/m/mmdebstrap/mmdebstrap_1.5.7-3_all.deb
+Size: 133964
+SHA256: 640e83218e7a38aab9cfd9ce23853d2b5133a380979d1b3d0b9668aa582680c8
+
+Package: msmtp-mta
+Version: 1.8.33-1
+Installed-Size: 139
+Architecture: amd64
+Provides: mail-transport-agent
+Depends: libc6 (>= 2.38), libsecret-1-0 (>= 0.7), systemd | systemd-standalone-sysusers | systemd-sysusers, msmtp (= 1.8.33-1)
+Conflicts: mail-transport-agent
+Section: mail
+Priority: optional
+Filename: pool/main/m/msmtp/msmtp-mta_1.8.33-1_amd64.deb
+Size: 80552
+SHA256: 686e1bde118e0d4a1297a4b70e932345a5893343e1ea2a898c9fb96167cc44a6
+
+Package: libncursesw6
+Version: 6.6+20260608-2
+Installed-Size: 424
+Architecture: amd64
+Depends: libtinfo6 (= 6.6+20260608-2), libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/n/ncurses/libncursesw6_6.6+20260608-2_amd64.deb
+Size: 137064
+SHA256: 91dbb5e4ebe44a010703f916b4c4675aa3f54516601bbffe6612bd07e92d2071
+
+Package: libtinfo6
+Version: 6.6+20260608-2
+Installed-Size: 572
+Architecture: amd64
+Depends: libc6 (>= 2.42)
+Section: libs
+Priority: optional
+Filename: pool/main/n/ncurses/libtinfo6_6.6+20260608-2_amd64.deb
+Size: 352696
+SHA256: 14682d1f6e35df22df0fe1eb2c09418aff0e29e2ea5a7bc0aa1bcd37192ba5a7
+
+Package: ncurses-base
+Version: 6.6+20260608-2
+Essential: yes
+Installed-Size: 393
+Architecture: all
+Provides: ncurses-runtime
+Section: misc
+Priority: required
+Filename: pool/main/n/ncurses/ncurses-base_6.6+20260608-2_all.deb
+Size: 276104
+SHA256: a0b409c94a8e3d0dd86c252b4c5ef243443745ec1d528e3fe0aa194ff29297b7
+
+Package: ncurses-bin
+Version: 6.6+20260608-2
+Essential: yes
+Installed-Size: 670
+Architecture: amd64
+Pre-Depends: libc6 (>= 2.42), libtinfo6 (>= 6.6)
+Section: utils
+Priority: required
+Filename: pool/main/n/ncurses/ncurses-bin_6.6+20260608-2_amd64.deb
+Size: 444712
+SHA256: bb592ded1895e53eee937be0b6433690529a6655845877332a9965ffe7002aaf
+
+Package: netbase
+Version: 6.6
+Installed-Size: 32
+Architecture: all
+Section: admin
+Priority: important
+Filename: pool/main/n/netbase/netbase_6.6_all.deb
+Size: 10344
+SHA256: 7bc354cb841d2e35cd8b581cfdf7383fbe6cfec95c54a619f756499ee3e10a4b
+
+Package: libhogweed6t64
+Version: 3.10.2-1+b1
+Installed-Size: 483
+Architecture: amd64
+Provides: libhogweed6 (= 3.10.2-1+b1)
+Depends: libc6 (>= 2.14), libgmp10 (>= 2:6.3.0+dfsg), libnettle8t64
+Section: libs
+Priority: optional
+Filename: pool/main/n/nettle/libhogweed6t64_3.10.2-1+b1_amd64.deb
+Size: 334792
+SHA256: d5872392a9d3b9b6e06f3dbd07a3f954346226d9fa2f318c4a3b5732b060fc44
+
+Package: libnettle8t64
+Version: 3.10.2-1+b1
+Installed-Size: 564
+Architecture: amd64
+Provides: libnettle8 (= 3.10.2-1+b1)
+Depends: libc6 (>= 2.17)
+Section: libs
+Priority: optional
+Filename: pool/main/n/nettle/libnettle8t64_3.10.2-1+b1_amd64.deb
+Size: 305348
+SHA256: 213f9f0119cd63efc2529401547bad5f6d2cea4cae5d05cffdef22f19aabb30e
+
+Package: libnghttp2-14
+Version: 1.70.0-1
+Installed-Size: 240
+Architecture: amd64
+Depends: libc6 (>= 2.17)
+Section: libs
+Priority: optional
+Filename: pool/main/n/nghttp2/libnghttp2-14_1.70.0-1_amd64.deb
+Size: 92720
+SHA256: cf76b0aaa71afafd1b3cd9e4d23dde13fc436d6b7e6a6a1d95d8fc6c735efad2
+
+Package: libnghttp3-9
+Version: 1.17.0-1
+Installed-Size: 206
+Architecture: amd64
+Depends: libc6 (>= 2.14)
+Section: libs
+Priority: optional
+Filename: pool/main/n/nghttp3/libnghttp3-9_1.17.0-1_amd64.deb
+Size: 68104
+SHA256: 56b36ea1945fd79e3dd4186fbfb6aff6d047c43fe67b9b28403a24365e5e8f57
+
+Package: libngtcp2-16
+Version: 1.24.0-1
+Installed-Size: 389
+Architecture: amd64
+Depends: libc6 (>= 2.25)
+Section: libs
+Priority: optional
+Filename: pool/main/n/ngtcp2/libngtcp2-16_1.24.0-1_amd64.deb
+Size: 144968
+SHA256: c7cc3ddab5bfa468597e857c2c5c89a442263c9155576e9e4a629660c0ca19c5
+
+Package: libngtcp2-crypto-gnutls8
+Version: 1.24.0-1
+Installed-Size: 76
+Architecture: amd64
+Depends: libc6 (>= 2.14), libgnutls30t64 (>= 3.8.2), libngtcp2-16 (>= 1.24.0)
+Section: libs
+Priority: optional
+Filename: pool/main/n/ngtcp2/libngtcp2-crypto-gnutls8_1.24.0-1_amd64.deb
+Size: 23880
+SHA256: 318e930e203fc34b65a65b12673d7cfdfd101d32553b96581eef2fee81f42948
+
+Package: nullmailer
+Version: 1:2.2+10~g7ed88a0-6.1
+Installed-Size: 483
+Architecture: amd64
+Provides: mail-transport-agent
+Depends: debconf (>= 0.5) | debconf-2.0, libc6 (>= 2.38), libgnutls30t64 (>= 3.8.1), libstdc++6 (>= 5)
+Conflicts: mail-transport-agent
+Section: mail
+Priority: optional
+Filename: pool/main/n/nullmailer/nullmailer_2.2+10~g7ed88a0-6.1_amd64.deb
+Size: 102272
+SHA256: 6455d057fd3f490b6a0980455d2a6d289d7d2276e76f69a510bc7bb4598b7278
+
+Package: libldap2
+Version: 2.6.14+dfsg-2
+Installed-Size: 590
+Architecture: amd64
+Depends: libc6 (>= 2.38), libsasl2-2 (>= 2.1.28+dfsg1), libssl3t64 (>= 3.0.0)
+Section: libs
+Priority: optional
+Filename: pool/main/o/openldap/libldap2_2.6.14+dfsg-2_amd64.deb
+Size: 200220
+SHA256: fa3426dfd34e6672e4fd9800114c588f157e5c4a5cf9b8a7fc118adcb23e022f
+
+Package: opensmtpd
+Version: 7.9.0p0-1
+Installed-Size: 1511
+Architecture: amd64
+Provides: mail-transport-agent
+Depends: adduser, ed, debconf (>= 0.5) | debconf-2.0, libc6 (>= 2.38), libcrypt1 (>= 1:4.1.0), libevent-2.1-7t64 (>= 2.1.8-stable), libpam0g (>= 0.99.7.1), libssl3t64 (>= 3.0.0), zlib1g (>= 1:1.1.4)
+Conflicts: mail-transport-agent, sendmail-base
+Section: mail
+Priority: optional
+Filename: pool/main/o/opensmtpd/opensmtpd_7.9.0p0-1_amd64.deb
+Size: 403084
+SHA256: 3addef224554f87cf8a15523be2e4cb61a53746f4281050d1809e854cb8d83b7
+
+Package: openssh-common
+Version: 1:10.6p1-1
+Installed-Size: 1623
+Architecture: amd64
+Depends: libc6 (>= 2.38), libfido2-1 (>= 1.8.0), libselinux1 (>= 3.1~), libssl3t64 (>= 3.0.0)
+Section: net
+Priority: standard
+Filename: pool/main/o/openssh/openssh-common_10.6p1-1_amd64.deb
+Size: 505020
+SHA256: b0d984dc3721a6d52219c86b8c9833cc958ffa4b8cf1c596d9433b93852f729a
+
+Package: openssh-server
+Version: 1:10.6p1-1
+Installed-Size: 3615
+Architecture: amd64
+Provides: ssh-server
+Depends: libpam-modules, libpam-runtime, openssh-common (= 1:10.6p1-1), openssh-sftp-server, procps, ucf, debconf (>= 0.5) | debconf-2.0, runit-helper (>= 2.14.0~), systemd | systemd-standalone-sysusers | systemd-sysusers, libaudit1 (>= 1:2.2.1), libc6 (>= 2.42), libcrypt1 (>= 1:4.1.0), libpam0g (>= 0.99.7.1), libselinux1 (>= 3.1~), libssl3t64 (>= 3.0.0), libwrap0 (>= 7.6-4~), libwtmpdb0 (>= 0.13.0), zlib1g (>= 1:1.1.4)
+Section: net
+Priority: optional
+Filename: pool/main/o/openssh/openssh-server_10.6p1-1_amd64.deb
+Size: 641792
+SHA256: 0e58eee4dd7e0c2b6ac753506e9f315e9213eee9c40a835730adb7106cd03811
+
+Package: openssh-sftp-server
+Version: 1:10.6p1-1
+Installed-Size: 189
+Architecture: amd64
+Depends: openssh-common (= 1:10.6p1-1), libc6 (>= 2.38)
+Section: net
+Priority: optional
+Filename: pool/main/o/openssh/openssh-sftp-server_10.6p1-1_amd64.deb
+Size: 71240
+SHA256: c440d44516c36cdb2ae485d4dd7440a302ae38a5de0c4944e163620854e5ff6c
+
+Package: libssl3t64
+Version: 3.6.5-1
+Installed-Size: 8349
+Architecture: amd64
+Provides: libssl3 (= 3.6.5-1)
+Depends: libc6 (>= 2.38), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.1.4), openssl-provider-legacy
+Section: libs
+Priority: optional
+Filename: pool/main/o/openssl/libssl3t64_3.6.5-1_amd64.deb
+Size: 2620984
+SHA256: 0a0ec84fe860c5c93c74d53cbb071aea0793327a3761b483080e9d7b73c21b37
+
+Package: openssl-provider-legacy
+Version: 3.6.5-1
+Installed-Size: 442
+Architecture: amd64
+Depends: libc6 (>= 2.14), libssl3t64 (>= 3.6.0)
+Section: utils
+Priority: optional
+Filename: pool/main/o/openssl/openssl-provider-legacy_3.6.5-1_amd64.deb
+Size: 329396
+SHA256: 82b7c056f7dfd91e4eedb1a0738d655867b6e13bd25ce03406e9cf464e9345ad
+
+Package: original-awk
+Version: 2025-12-25-1
+Installed-Size: 184
+Architecture: amd64
+Provides: awk
+Pre-Depends: libc6 (>= 2.38)
+Section: interpreters
+Priority: optional
+Filename: pool/main/o/original-awk/original-awk_2025-12-25-1_amd64.deb
+Size: 76632
+SHA256: 5e06610a2a34ac3b88105b30d358e6db636fcfea261f568dbea45aed25fc84c0
+
+Package: libp11-kit0
+Version: 0.26.5-1
+Installed-Size: 2147
+Architecture: amd64
+Depends: libc6 (>= 2.38), libffi8 (>= 3.4)
+Section: libs
+Priority: optional
+Filename: pool/main/p/p11-kit/libp11-kit0_0.26.5-1_amd64.deb
+Size: 482444
+SHA256: 7f6187247766dca57582c4fa327928fb612de3cd17a13786c1762c57357b4930
+
+Package: libpam-modules
+Version: 1.7.0-8
+Installed-Size: 892
+Architecture: amd64
+Provides: libpam-mkhomedir, libpam-motd, libpam-umask
+Pre-Depends: libaudit1 (>= 1:2.2.1), libc6 (>= 2.38), libcrypt1 (>= 1:4.3.0), libdb5.3t64, libpam0g (>= 1.4.1), libselinux1 (>= 3.1~), libsystemd0 (>= 254), debconf (>= 0.5) | debconf-2.0, libpam-modules-bin (= 1.7.0-8)
+Conflicts: libpam-mkhomedir, libpam-motd, libpam-umask
+Section: admin
+Priority: required
+Filename: pool/main/p/pam/libpam-modules_1.7.0-8_amd64.deb
+Size: 168008
+SHA256: 18dee1d65efb25e7d8b0beb14077b08c2a41fab8f6910a844c40b690ffcb33df
+
+Package: libpam-modules-bin
+Version: 1.7.0-8
+Installed-Size: 203
+Architecture: amd64
+Depends: libaudit1 (>= 1:2.2.1), libc6 (>= 2.38), libcrypt1 (>= 1:4.3.0), libpam0g (>= 0.99.7.1), libselinux1 (>= 3.1~), libsystemd0 (>= 254)
+Section: admin
+Priority: required
+Filename: pool/main/p/pam/libpam-modules-bin_1.7.0-8_amd64.deb
+Size: 46320
+SHA256: 6e11f923ab8189838263b24aa3c8f3c83e20a036527b03fea7850c7a08b046c1
+
+Package: libpam-runtime
+Version: 1.7.0-8
+Installed-Size: 1026
+Architecture: all
+Depends: debconf (>= 0.5) | debconf-2.0, libpam-modules
+Section: admin
+Priority: required
+Filename: pool/main/p/pam/libpam-runtime_1.7.0-8_all.deb
+Size: 245528
+SHA256: a428e8faf8fa126da17b3619e041603677da613bda804f881b86d2e4db0e3a7b
+
+Package: libpam0g
+Version: 1.7.0-8
+Installed-Size: 191
+Architecture: amd64
+Depends: libaudit1 (>= 1:2.2.1), libc6 (>= 2.34), debconf (>= 0.5) | debconf-2.0
+Section: libs
+Priority: optional
+Filename: pool/main/p/pam/libpam0g_1.7.0-8_amd64.deb
+Size: 66864
+SHA256: ace6c4fc0a62bf09d837bfeb5f43a1069797fcb89938b6dc13ba1bdfd2bfbfa8
+
+Package: libpcre2-8-0
+Version: 10.48-3.1
+Installed-Size: 794
+Architecture: amd64
+Depends: libc6 (>= 2.34)
+Section: libs
+Priority: optional
+Filename: pool/main/p/pcre2/libpcre2-8-0_10.48-3.1_amd64.deb
+Size: 312316
+SHA256: 4f717024358d04c0b9ad7583f470fc639b1c4fd92d34b5ec4355c307cd5b37de
+
+Package: libperl5.42
+Version: 5.42.3-1
+Installed-Size: 25223
+Architecture: amd64
+Depends: libbz2-1.0, libc6 (>= 2.43), libcrypt1 (>= 1:4.1.0), libdb5.3t64, libgdbm-compat4t64 (>= 1.18-3), libgdbm6t64 (>= 1.21), zlib1g (>= 1:1.2.3.4), perl-modules-5.42 (>= 5.42.3-1)
+Section: libs
+Priority: optional
+Filename: pool/main/p/perl/libperl5.42_5.42.3-1_amd64.deb
+Size: 4272212
+SHA256: f16e5e3de1aefc52cdc95c2132c5939e8af620a0418a01774914d290d813fe7f
+
+Package: perl
+Version: 5.42.3-1
+Installed-Size: 840
+Architecture: amd64
+Provides: libansicolor-perl (= 5.01), libarchive-tar-perl (= 3.12), libattribute-handlers-perl (= 1.03), libautodie-perl (= 2.37), libcompress-raw-bzip2-perl (= 2.218), libcompress-raw-zlib-perl (= 2.222), libcompress-zlib-perl (= 2.223), libcpan-meta-perl (= 2.150010), libcpan-meta-requirements-perl (= 2.143), libcpan-meta-yaml-perl (= 0.020), libdigest-md5-perl (= 2.59), libdigest-perl (= 1.20), libdigest-sha-perl (= 6.04), libencode-perl (= 3.21), libexperimental-perl (= 0.035), libextutils-cbuilder-perl (= 0.280242), libextutils-command-perl (= 7.76), libextutils-install-perl (= 2.22), libextutils-parsexs-perl (= 3.570000), libfile-spec-perl (= 3.9400), libhttp-tiny-perl (= 0.096), libi18n-langtags-perl (= 0.45), libio-compress-base-perl (= 2.223), libio-compress-bzip2-perl (= 2.223), libio-compress-perl (= 2.223), libio-compress-zlib-perl (= 2.223), libio-zlib-perl (= 1.15), libjson-pp-perl (= 4.16000), liblocale-maketext-perl (= 1.33), liblocale-maketext-simple-perl (= 0.21.01), libmath-bigint-perl (= 2.005002), libmath-complex-perl (= 1.6300), libmime-base64-perl (= 3.16.01), libmodule-corelist-perl (= 5.20260802.42), libmodule-load-conditional-perl (= 0.74), libmodule-load-perl (= 0.36), libmodule-metadata-perl (= 1.000038), libnet-perl (= 1:3.15), libnet-ping-perl (= 2.76), libparams-check-perl (= 0.38), libparent-perl (= 0.244), libparse-cpan-meta-perl (= 2.150010), libperl-ostype-perl (= 1.010), libpod-escapes-perl (= 1.07), libpod-simple-perl (= 3.45), libstorable-perl (= 3.37.01), libsys-syslog-perl (= 0.36), libterm-table-perl (= 0.024), libtest-harness-perl (= 3.50), libtest-simple-perl (= 1.302210), libtest-tester-perl (= 1.302210), libtest-use-ok-perl (= 1.302210), libtest2-suite-perl (= 1.302210), libtext-balanced-perl (= 2.06), libthread-queue-perl (= 3.14), libthreads-perl (= 2.43), libthreads-shared-perl (= 1.70), libtime-hires-perl (= 1.9778), libtime-local-perl (= 1.3500), libtime-piece-perl (= 1.3600), libunicode-collate-perl (= 1.31), libversion-perl (= 1:0.9933), libversion-requirements-perl, podlators-perl (= 6.0.2)
+Depends: perl-base (= 5.42.3-1), perl-modules-5.42 (>= 5.42.3-1), libperl5.42 (= 5.42.3-1)
+Conflicts: libjson-pp-perl (<< 2.27200-2)
+Section: perl
+Priority: standard
+Filename: pool/main/p/perl/perl_5.42.3-1_amd64.deb
+Size: 266028
+SHA256: b2f0e4386c89108f4238b1d089e66c9119909ad8f026f815719b9bc9c5984cd3
+
+Package: perl-base
+Version: 5.42.3-1
+Essential: yes
+Installed-Size: 9553
+Architecture: amd64
+Provides: libfile-path-perl (= 2.18), libfile-temp-perl (= 0.2311), libio-socket-ip-perl (= 0.43), libscalar-list-utils-perl (= 1:1.68.01), libsocket-perl (= 2.041), libxsloader-perl (= 0.32), perlapi-5.42.2, perlapi-5.42.3
+Pre-Depends: libc6 (>= 2.43), libcrypt1 (>= 1:4.1.0)
+Conflicts: defoma (<< 0.11.12), doc-base (<< 0.10.3), mono-gac (<< 2.10.8.1-3), safe-rm (<< 0.8), update-inetd (<< 4.41)
+Section: perl
+Priority: required
+Filename: pool/main/p/perl/perl-base_5.42.3-1_amd64.deb
+Size: 1877832
+SHA256: a1284d4067274e2e94b99f9646244be0c425b485d389312603afe197657cbb9d
+
+Package: perl-modules-5.42
+Version: 5.42.3-1
+Installed-Size: 22000
+Architecture: all
+Provides: perl-modules
+Depends: perl-base (>= 5.42.3-1)
+Conflicts: perl-modules (<< 5.22.0~)
+Section: libs
+Priority: optional
+Filename: pool/main/p/perl/perl-modules-5.42_5.42.3-1_all.deb
+Size: 3212612
+SHA256: 8e9d6e4efe5efe86c29efbdd5d0e2f47d7f639757d454c068940a11cb4a532a9
+
+Package: libpopt0
+Version: 1.19+dfsg-2+b2
+Installed-Size: 245
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/p/popt/libpopt0_1.19+dfsg-2+b2_amd64.deb
+Size: 43816
+SHA256: 52a8b72fc1deded2615fd8a0f2b170d3e7bd2b1aa577f92d5b1b9b09357c0e2c
+
+Package: postfix
+Version: 3.11.7-1
+Installed-Size: 4274
+Architecture: amd64
+Provides: mail-transport-agent
+Depends: netbase, debconf (>= 0.5) | debconf-2.0, systemd | systemd-standalone-sysusers | systemd-sysusers, systemd | systemd-standalone-tmpfiles | systemd-tmpfiles, libc6 (>= 2.38), libcdb1 (>= 0.76), libdb5.3t64, libicu78 (>= 78.1-1~), liblmdb0 (>= 0.9.11), libnsl3 (>= 2.0), libsasl2-2 (>= 2.1.28+dfsg1), libssl3t64 (>= 3.2.0), libtlsrpt0 (>= 0.5.0rc1)
+Pre-Depends: init-system-helpers (>= 1.54~)
+Conflicts: mail-transport-agent, smail
+Section: mail
+Priority: optional
+Filename: pool/main/p/postfix/postfix_3.11.7-1_amd64.deb
+Size: 1711104
+SHA256: 7f3f508044a4116d59866654cd825762f0783ab7e4ae4bec806554c949098ac9
+
+Package: libproc2-1
+Version: 2:4.0.7-1
+Installed-Size: 252
+Architecture: amd64
+Depends: libc6 (>= 2.38), libsystemd0
+Section: libs
+Priority: optional
+Filename: pool/main/p/procps/libproc2-1_4.0.7-1_amd64.deb
+Size: 72980
+SHA256: 66dac4932b752f770a27f8240f114d20bbf7f5d04b80f30f1f048f1ec148bd19
+
+Package: procps
+Version: 2:4.0.7-1
+Installed-Size: 2691
+Architecture: amd64
+Provides: watch
+Depends: libc6 (>= 2.38), libncursesw6 (>= 6.1), libproc2-1 (>= 2:4.0.7), libsystemd0 (>= 254), libtinfo6 (>= 6)
+Section: admin
+Priority: important
+Filename: pool/main/p/procps/procps_4.0.7-1_amd64.deb
+Size: 988820
+SHA256: 4fabff7d0755d698a93d4d006864853ab4622f2a8766d275e3cbf6bf13686ba2
+
+Package: libpython3-stdlib
+Version: 3.14.7-3
+Installed-Size: 26
+Architecture: amd64
+Depends: libpython3.14-stdlib (>= 3.14.7)
+Section: python
+Priority: optional
+Filename: pool/main/p/python3-defaults/libpython3-stdlib_3.14.7-3_amd64.deb
+Size: 8252
+SHA256: ebd261012bb7edfd4d0a6be183d12c0bb79f3b3da9c733dc023c6f26a902d63d
+
+Package: python3
+Version: 3.14.7-3
+Installed-Size: 81
+Architecture: amd64
+Provides: python3-profiler, python3-supported-max (= 3.14), python3-supported-min (= 3.14)
+Depends: python3.14 (>= 3.14.7), libpython3-stdlib (= 3.14.7-3)
+Pre-Depends: python3-minimal (= 3.14.7-3)
+Conflicts: python3-distutils
+Section: python
+Priority: optional
+Filename: pool/main/p/python3-defaults/python3_3.14.7-3_amd64.deb
+Size: 26016
+SHA256: 7a4b84ade717f6038ba089baff035f4353dc5a0375f65f98ee67a25ff72fa7b9
+
+Package: python3-minimal
+Version: 3.14.7-3
+Installed-Size: 111
+Architecture: amd64
+Pre-Depends: python3.14-minimal (>= 3.14.7)
+Section: python
+Priority: optional
+Filename: pool/main/p/python3-defaults/python3-minimal_3.14.7-3_amd64.deb
+Size: 25272
+SHA256: 0f7001b63a3dd44d65e57c49ebd6edae16d3026fb3689e3e65fb45af0adf1f05
+
+Package: libpython3.14-minimal
+Version: 3.14.8-1
+Installed-Size: 5674
+Architecture: amd64
+Depends: libc6 (>= 2.14), libssl3t64 (>= 3.4.0)
+Conflicts: binfmt-support (<< 1.1.2)
+Section: python
+Priority: optional
+Filename: pool/main/p/python3.14/libpython3.14-minimal_3.14.8-1_amd64.deb
+Size: 902020
+SHA256: 149d1ff143259f6a5a405522d40143595fdedbf6d8e01123ea798603f895c93d
+
+Package: libpython3.14-stdlib
+Version: 3.14.8-1
+Installed-Size: 10331
+Architecture: amd64
+Depends: libpython3.14-minimal (= 3.14.8-1), media-types | mime-support, netbase, tzdata, libbz2-1.0, libc6 (>= 2.42), libdb5.3t64, libffi8 (>= 3.4), liblzma5 (>= 5.1.1alpha+20120614), libncursesw6 (>= 6.1), libreadline8t64 (>= 7.0~beta), libsqlite3-0 (>= 3.36.0), libtinfo6 (>= 6), libuuid1 (>= 2.20.1), libzstd1 (>= 1.5.5)
+Section: python
+Priority: optional
+Filename: pool/main/p/python3.14/libpython3.14-stdlib_3.14.8-1_amd64.deb
+Size: 2366832
+SHA256: abfa1b45e311461a4f8ee110d203efbc18808fada340af7036235b0d0c4cfd9a
+
+Package: python3.14
+Version: 3.14.8-1
+Installed-Size: 947
+Architecture: amd64
+Depends: python3.14-minimal (= 3.14.8-1), libpython3.14-stdlib (= 3.14.8-1), media-types | mime-support, tzdata
+Section: python
+Priority: optional
+Filename: pool/main/p/python3.14/python3.14_3.14.8-1_amd64.deb
+Size: 873608
+SHA256: e5854629b8555d123537ca313d9d9ab4f40fe427e91406b38ef1c2c323581aaa
+
+Package: python3.14-minimal
+Version: 3.14.8-1
+Installed-Size: 8164
+Architecture: amd64
+Depends: libpython3.14-minimal (= 3.14.8-1), libexpat1 (>= 2.8.0), zlib1g (>= 1:1.2.0)
+Pre-Depends: libc6 (>= 2.38)
+Conflicts: binfmt-support (<< 1.1.2)
+Section: python
+Priority: optional
+Filename: pool/main/p/python3.14/python3.14-minimal_3.14.8-1_amd64.deb
+Size: 2715148
+SHA256: 06e82c1b5c9d6f3ff6a25e0eb4c136fb10cedd93d51ec378ff163c9bee584270
+
+Package: libreadline8t64
+Version: 8.3-4
+Installed-Size: 508
+Architecture: amd64
+Provides: libreadline8 (= 8.3-4)
+Depends: readline-common, libc6 (>= 2.38), libtinfo6 (>= 6)
+Section: libs
+Priority: optional
+Filename: pool/main/r/readline/libreadline8t64_8.3-4_amd64.deb
+Size: 180660
+SHA256: 1b65e285f312f9073dc4f0dafe44143d986bd8914e4a03af3ca59d68f238d02c
+
+Package: readline-common
+Version: 8.3-4
+Installed-Size: 94
+Architecture: all
+Conflicts: libreadline-common, libreadline5 (<< 5.0-11)
+Section: utils
+Priority: important
+Filename: pool/main/r/readline/readline-common_8.3-4_all.deb
+Size: 74828
+SHA256: 0fbae1769293deda3cf2a349c472bc50302225812d8900def5c9dfa02404ad6d
+
+Package: sqv
+Version: 1.5.0-1
+Installed-Size: 1919
+Architecture: amd64
+Depends: libc6 (>= 2.34), libgcc-s1 (>= 4.2), libgmp10 (>= 2:6.3.0+dfsg), libhogweed6t64, libnettle8t64 (>= 3.9~)
+Section: utils
+Priority: optional
+Filename: pool/main/r/rust-sequoia-sqv/sqv_1.5.0-1_amd64.deb
+Size: 703756
+SHA256: 41553e3ca006ed490692872a3e0009247bcfcee92f180f611559f6e8cd152210
+
+Package: sed
+Version: 4.9-3
+Essential: yes
+Installed-Size: 987
+Architecture: amd64
+Pre-Depends: libacl1 (>= 2.2.23), libc6 (>= 2.38), libselinux1 (>= 3.1~)
+Section: utils
+Priority: required
+Filename: pool/main/s/sed/sed_4.9-3_amd64.deb
+Size: 330844
+SHA256: 04998e405e5967c4ac599c5e1cce1a31b5441097b478143823ea87a01e879d89
+
+Package: sendmail-bin
+Version: 8.18.2-2
+Installed-Size: 1954
+Architecture: amd64
+Provides: mail-transport-agent
+Depends: sendmail-base (= 8.18.2-2), sendmail-cf (= 8.18.2-2), procps, libc6 (>= 2.38), libdb5.3t64, libldap2 (>= 2.6.2), liblockfile1 (>= 1.0), libnsl3 (>= 2.0), libsasl2-2 (>= 2.1.28+dfsg1), libssl3t64 (>= 3.0.0), libwrap0 (>= 7.6-4~)
+Pre-Depends: debconf
+Conflicts: mail-transport-agent
+Section: mail
+Priority: optional
+Filename: pool/main/s/sendmail/sendmail-bin_8.18.2-2_amd64.deb
+Size: 735176
+SHA256: d69506b413bb372171bcde43a367b1173f134a8687e1545d21ca43eba0fac175
+
+Package: sensible-utils
+Version: 0.0.26
+Installed-Size: 66
+Architecture: all
+Section: utils
+Priority: important
+Filename: pool/main/s/sensible-utils/sensible-utils_0.0.26_all.deb
+Size: 27000
+SHA256: 26a99bab6fb8488d385402a6fae2af8edb83fe9379ee4cbb2811bbdc40771683
+
+Package: libsubid6
+Version: 1:4.20.3-1
+Installed-Size: 344
+Architecture: amd64
+Depends: libacl1 (>= 2.2.23), libaudit1 (>= 1:2.2.1), libbsd0 (>= 0.11.0), libc6 (>= 2.43), libcrypt1 (>= 1:4.1.0), libpam0g (>= 0.99.7.1), libselinux1 (>= 3.1~), libsemanage2 (>= 2.0.32), libsystemd0
+Section: libs
+Priority: optional
+Filename: pool/main/s/shadow/libsubid6_4.20.3-1_amd64.deb
+Size: 221124
+SHA256: 071637c5c05d6431827b45f00ec1de298f469a1e10cb6207fc015b07be018a98
+
+Package: uidmap
+Version: 1:4.20.3-1
+Installed-Size: 337
+Architecture: amd64
+Depends: libaudit1 (>= 1:2.2.1), libbsd0 (>= 0.7.0), libc6 (>= 2.43), libselinux1 (>= 3.1~), libsubid6 (= 1:4.20.3-1)
+Section: admin
+Priority: optional
+Filename: pool/main/s/shadow/uidmap_4.20.3-1_amd64.deb
+Size: 194836
+SHA256: 37d776e856326ca872ce7c600133e98323ae15812c5f88782e817fc57302938a
+
+Package: libsqlite3-0
+Version: 3.53.4-2
+Installed-Size: 1927
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/s/sqlite3/libsqlite3-0_3.53.4-2_amd64.deb
+Size: 974044
+SHA256: bbf13c9326764d05e37e6590debdaa6f33af6bd822e3ca1204789d9d1dc23b11
+
+Package: ssmtp
+Version: 2.66-1
+Installed-Size: 134
+Architecture: amd64
+Provides: mail-transport-agent
+Depends: libc6 (>= 2.38), libssl3t64 (>= 3.0.0), debconf (>= 0.5) | debconf-2.0
+Conflicts: mail-transport-agent
+Section: mail
+Priority: optional
+Filename: pool/main/s/ssmtp/ssmtp_2.66-1_amd64.deb
+Size: 45420
+SHA256: e59bbbbf0bade4e1a9126309a113792133c40d454eebe78106bc282fd48330b9
+
+Package: libsystemd-shared
+Version: 262-1
+Installed-Size: 9076
+Architecture: amd64
+Depends: libc6 (>= 2.34)
+Section: libs
+Priority: optional
+Filename: pool/main/s/systemd/libsystemd-shared_262-1_amd64.deb
+Size: 2788776
+SHA256: 66978b0102d1da834afa5ec670f8f6a1ded893be9fbe08fa2a5c95c152f90b51
+
+Package: libsystemd0
+Version: 262-1
+Installed-Size: 1381
+Architecture: amd64
+Depends: libc6 (>= 2.34)
+Section: libs
+Priority: optional
+Filename: pool/main/s/systemd/libsystemd0_262-1_amd64.deb
+Size: 511728
+SHA256: 4d28018b91c1f7e605c0e35a2f5be0cb00dd7d8afaea93d15a9bc554343bb7ac
+
+Package: libudev1
+Version: 262-1
+Installed-Size: 377
+Architecture: amd64
+Depends: libc6 (>= 2.34)
+Section: libs
+Priority: optional
+Filename: pool/main/s/systemd/libudev1_262-1_amd64.deb
+Size: 148216
+SHA256: c34216896e550fb8691e65103ac3854455d4ae047b15ed797998edbc3d9230ff
+
+Package: systemd
+Version: 262-1
+Installed-Size: 11386
+Architecture: amd64
+Provides: systemd-sysusers (= 262-1), systemd-tmpfiles (= 262-1)
+Depends: libblkid1, libmount1, libsystemd0 (= 262-1)
+Pre-Depends: libc6 (>= 2.34), libsystemd-shared (= 262-1)
+Conflicts: consolekit, elogind, libpam-ck-connector, opensysusers (<< 0.7.3-4.1~), systemctl, systemd-shim
+Section: admin
+Priority: important
+Filename: pool/main/s/systemd/systemd_262-1_amd64.deb
+Size: 3476836
+SHA256: 6de3a3df3fb9d264b48c6306b55fb4d83f6114a25ad6299b3bd83e5bc28436d2
+
+Package: systemd-container
+Version: 262-1
+Installed-Size: 2906
+Architecture: amd64
+Depends: libc6 (>= 2.34), libsystemd-shared (= 262-1), libmount1, libarchive13t64 | libarchive13, systemd
+Conflicts: systemd (<< 256-2~)
+Section: admin
+Priority: optional
+Filename: pool/main/s/systemd/systemd-container_262-1_amd64.deb
+Size: 910904
+SHA256: 6b09555464fe97486b6b2e3c9a2a52e8eb81708ca0fff8712d6a2542da86299b
+
+Package: sysvinit-utils
+Version: 3.18-1
+Essential: yes
+Installed-Size: 100
+Architecture: amd64
+Provides: lsb-base (= 11.1.0)
+Depends: libc6 (>= 2.38)
+Conflicts: lsb-base (<< 11.3~)
+Section: admin
+Priority: required
+Filename: pool/main/s/sysvinit/sysvinit-utils_3.18-1_amd64.deb
+Size: 29708
+SHA256: a0c2a66f3a825dd417e998276268ef74dbff3796525bbb708566cdb0114174f9
+
+Package: tar
+Version: 1.35+dfsg-6
+Essential: yes
+Installed-Size: 3101
+Architecture: amd64
+Pre-Depends: libacl1 (>= 2.2.23), libc6 (>= 2.38), libselinux1 (>= 3.1~)
+Conflicts: cpio (<= 2.4.2-38)
+Section: utils
+Priority: required
+Filename: pool/main/t/tar/tar_1.35+dfsg-6_amd64.deb
+Size: 825300
+SHA256: e1019bbb6e60aefa0927ffd6b2b8ecdee3943ee72efd1a1ffb5e4528874437b8
+
+Package: libwrap0
+Version: 7.6.q-37
+Installed-Size: 110
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/t/tcp-wrappers/libwrap0_7.6.q-37_amd64.deb
+Size: 55296
+SHA256: 94541fed2d2ecc4654d5cf446c25153ec3908c8f3138c6155717dad69f6528f2
+
+Package: tiny-initramfs
+Version: 0.1-8
+Installed-Size: 35
+Architecture: all
+Provides: linux-initramfs-tool
+Depends: tiny-initramfs-core (>= 0.1-8), tiny-initramfs-core (<< 0.1-8+b+~)
+Conflicts: dracut, initramfs-tools, live-tools
+Section: utils
+Priority: optional
+Filename: pool/main/t/tiny-initramfs/tiny-initramfs_0.1-8_all.deb
+Size: 13420
+SHA256: bad1f0b5e68fd252b511a5c02f3d162b04a4cae66a0635581154fb8f5566b9c6
+
+Package: tiny-initramfs-core
+Version: 0.1-8
+Installed-Size: 140
+Architecture: amd64
+Depends: cpio, xz-utils
+Section: utils
+Priority: optional
+Filename: pool/main/t/tiny-initramfs/tiny-initramfs-core_0.1-8_amd64.deb
+Size: 40140
+SHA256: b93f7c0c9d9d379d1c92d85a56537fcdafafb5879c41fcaff79b2ec2a2e71250
+
+Package: libcdb1
+Version: 0.81-2+b2
+Installed-Size: 43
+Architecture: amd64
+Depends: libc6 (>= 2.33)
+Section: libs
+Priority: optional
+Filename: pool/main/t/tinycdb/libcdb1_0.81-2+b2_amd64.deb
+Size: 14100
+SHA256: 7f61a6810fe3a0e28969caee4f2b10f6a4d3e694eba13d87adb068898c27fdc4
+
+Package: tzdata
+Version: 2026e-1
+Installed-Size: 1353
+Architecture: all
+Provides: tzdata-forky
+Depends: debconf (>= 0.5) | debconf-2.0
+Section: localization
+Priority: required
+Filename: pool/main/t/tzdata/tzdata_2026e-1_all.deb
+Size: 262368
+SHA256: e04d96b6fd39854cba37dfbf35e28b375bace5eca688332540f41ab89602b568
+
+Package: ucf
+Version: 3.0056
+Installed-Size: 162
+Architecture: all
+Depends: debconf (>= 0.5) | debconf-2.0, libtext-wrapi18n-perl, procps, sensible-utils
+Section: utils
+Priority: standard
+Filename: pool/main/u/ucf/ucf_3.0056_all.deb
+Size: 47144
+SHA256: d96c7609eea296fd04fd8d47ea7c42800d6520b342851c00ce289acacd9aa685
+
+Package: libunbound8
+Version: 1.26.1-1
+Installed-Size: 1462
+Architecture: amd64
+Depends: libc6 (>= 2.38), libevent-2.1-7t64 (>= 2.1.8-stable), libssl3t64 (>= 3.4.0)
+Section: libs
+Priority: optional
+Filename: pool/main/u/unbound/libunbound8_1.26.1-1_amd64.deb
+Size: 664284
+SHA256: e42e79c6efc94f47b4667799cf4f31ec53c83d65a7145e668b4a7efff79b1951
+
+Package: libblkid1
+Version: 2.42.4-1
+Installed-Size: 469
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/u/util-linux/libblkid1_2.42.4-1_amd64.deb
+Size: 185476
+SHA256: 4b2bb042aec4edb75afd462c6e1b946a85fded738df063650394a4c0f9ede0ba
+
+Package: libmount1
+Version: 2.42.4-1
+Installed-Size: 606
+Architecture: amd64
+Depends: libblkid1 (= 2.42.4-1), libc6 (>= 2.38), libselinux1 (>= 3.1~), libsystemd0 (>= 251)
+Section: libs
+Priority: optional
+Filename: pool/main/u/util-linux/libmount1_2.42.4-1_amd64.deb
+Size: 231804
+SHA256: 2a5636da5631f655ed927f941698a9a0c0644a978c9a14ea3e2795cfe70b8a71
+
+Package: libsmartcols1
+Version: 2.42.4-1
+Installed-Size: 397
+Architecture: amd64
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/u/util-linux/libsmartcols1_2.42.4-1_amd64.deb
+Size: 153076
+SHA256: dcf7292c258277a2ce0ee018b3912e38cb07ec448ebed0afb508c851a2cf63be
+
+Package: libuuid1
+Version: 2.42.4-1
+Installed-Size: 94
+Architecture: amd64
+Provides: libuuid1t64 (= 2.42.4-1)
+Depends: libc6 (>= 2.38)
+Section: libs
+Priority: optional
+Filename: pool/main/u/util-linux/libuuid1_2.42.4-1_amd64.deb
+Size: 34456
+SHA256: bdef15911ca5748219f5257bf4f1e81444fb40966499c02b1176bfbbcd9a2d08
+
+Package: util-linux
+Version: 2.42.4-1
+Essential: yes
+Installed-Size: 4826
+Architecture: amd64
+Provides: hardlink
+Pre-Depends: libpam-modules, libpam-runtime, libblkid1 (= 2.42.4-1), libc6 (>= 2.42), libcap-ng0 (>= 0.7.9), libcrypt1 (>= 1:4.1.0), libmount1 (= 2.42.4-1), libpam0g (>= 0.99.7.1), libselinux1 (>= 3.1~), libsmartcols1 (= 2.42.4-1), libsystemd0 (>= 251), libtinfo6 (>= 6), libudev1 (>= 183), libuuid1 (= 2.42.4-1)
+Conflicts: hardlink
+Section: utils
+Priority: required
+Filename: pool/main/u/util-linux/util-linux_2.42.4-1_amd64.deb
+Size: 1254484
+SHA256: eb0692f9ea11a123181d198ac9276f7bdf42a64dab1985136157f6ddac1cd432
+
+Package: libwtmpdb0
+Version: 0.75.0-6
+Installed-Size: 50
+Architecture: amd64
+Depends: libc6 (>= 2.38), libsqlite3-0 (>= 3.7.15)
+Section: libs
+Priority: optional
+Filename: pool/main/w/wtmpdb/libwtmpdb0_0.75.0-6_amd64.deb
+Size: 13588
+SHA256: 9ce6a1303eb4e8b221a06af158538a46b2aa6fab7182e78863896b872b933af7
+
+Package: libxxhash0
+Version: 0.8.3-2+b2
+Installed-Size: 96
+Architecture: amd64
+Depends: libc6 (>= 2.14)
+Section: libs
+Priority: optional
+Filename: pool/main/x/xxhash/libxxhash0_0.8.3-2+b2_amd64.deb
+Size: 27140
+SHA256: 3dc2a55daf655f3c07df99b2be4cb7eea6b79089e66407f6739fe40c267907c4
+
+Package: liblzma5
+Version: 5.8.4-1
+Installed-Size: 482
+Architecture: amd64
+Depends: libc6 (>= 2.34)
+Section: libs
+Priority: optional
+Filename: pool/main/x/xz-utils/liblzma5_5.8.4-1_amd64.deb
+Size: 354284
+SHA256: 2dd166f61cb2a32c50f1a4dd3cd34f5f18a4ff97a6ff23665b9a57537fd60625
+
+Package: xz-utils
+Version: 5.8.4-1
+Installed-Size: 1551
+Architecture: amd64
+Provides: lzma
+Depends: libc6 (>= 2.34), liblzma5 (>= 5.6.2)
+Conflicts: lzma (<< 9.22-1), xz-lzma
+Section: utils
+Priority: standard
+Filename: pool/main/x/xz-utils/xz-utils_5.8.4-1_amd64.deb
+Size: 760856
+SHA256: 641c17b9ec4becb5d294cdb80398b25f993f42d6b2b6ee4c02bbfc466c406804
+
+Package: zlib1g
+Version: 1:1.3.dfsg+really1.3.2-3
+Installed-Size: 169
+Architecture: amd64
+Provides: libz1
+Depends: libc6 (>= 2.14)
+Conflicts: zlib1 (<= 1:1.0.4-7)
+Section: libs
+Priority: optional
+Filename: pool/main/z/zlib/zlib1g_1.3.dfsg+really1.3.2-3_amd64.deb
+Size: 90912
+SHA256: 52c585b07bea72ef36df9ddd5d1937f4739d3caec057d827954baec256292651
+

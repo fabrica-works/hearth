@@ -87,27 +87,11 @@ impl Resolve {
     }
     #[must_use]
     pub fn simulate(&self, case: &Case) -> Simulate {
-        let target = self.pin.target(case.target).expect("pinned target");
-        let name = |text: &str| Name::new(text.as_bytes(), &limits::SHIPPED).expect("pinned name");
-        let request = case.request.map_or_else(
-            || target.request.iter().map(|text| name(text)).collect(),
-            |request| request.iter().map(|text| name(text)).collect(),
-        );
-        assert_eq!(&*target.variant, "apt", "M1's pinned variant");
-        Simulate {
-            sources: Sources {
-                suite: name(&self.pin.suite),
-                architecture: name(&self.pin.architecture),
-                components: Box::new([Component::Main]),
-                archive: Timestamp::new(case.archive.unwrap_or(&self.pin.archive).as_bytes())
-                    .expect("pinned timestamp"),
-                updates: false,
-                security: None,
-            },
-            request,
-            variant: Variant::Apt,
-            apt: Apt { install_recommends: false },
-        }
+        inputs(&self.pin, case)
+    }
+    #[must_use]
+    pub fn version(&self) -> &str {
+        &self.version
     }
     #[must_use]
     pub fn run(&self, case: &Case) -> Resolved {
@@ -168,6 +152,31 @@ impl Resolve {
         }
     }
 }
+/// A case's pinned inputs, shared by the real and fake vectors.
+#[must_use]
+pub fn inputs(pin: &Pin, case: &Case) -> Simulate {
+    let target = pin.target(case.target).expect("pinned target");
+    let name = |text: &str| Name::new(text.as_bytes(), &limits::SHIPPED).expect("pinned name");
+    let request = case.request.map_or_else(
+        || target.request.iter().map(|text| name(text)).collect(),
+        |request| request.iter().map(|text| name(text)).collect(),
+    );
+    assert_eq!(&*target.variant, "apt", "M1's pinned variant");
+    Simulate {
+        sources: Sources {
+            suite: name(&pin.suite),
+            architecture: name(&pin.architecture),
+            components: Box::new([Component::Main]),
+            archive: Timestamp::new(case.archive.unwrap_or(&pin.archive).as_bytes()).expect("pinned timestamp"),
+            updates: false,
+            security: None,
+        },
+        request,
+        variant: Variant::Apt,
+        apt: Apt { install_recommends: false },
+    }
+}
+
 fn version(tool: &str, prefix: &str, strip: &str) -> String {
     let output = Command::new(tool)
         .arg("--version")

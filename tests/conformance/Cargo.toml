@@ -9,11 +9,13 @@ publish.workspace = true
 hearth-protocol-mmdebstrap.workspace = true
 hearth-test-mirror.workspace = true
 hearth-fake-git.workspace = true
+hearth-fake-mmdebstrap.workspace = true
 hearth-fake-machine.workspace = true
 hearth-protocol-git.workspace = true
 hearth-recordings.workspace = true
 hearth-git-world.workspace = true
 skein-scratch.workspace = true
+skein-lib.workspace = true
 
 # Ordinary Rust (programming-model.md, 10.2), so not the step crates' lints.
 # tests/clippy.toml bans what would make a run unrepeatable.

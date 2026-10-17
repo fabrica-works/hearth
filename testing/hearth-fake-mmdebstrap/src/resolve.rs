@@ -1,6 +1,10 @@
 //! Mark requests before dependencies, using the model of apt in decisions.md, 14.
-use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
-use core::cmp::Ordering;
+use alloc::{
+    boxed::Box,
+    collections::{BTreeMap, BTreeSet},
+    vec::Vec,
+};
+use core::{cell::RefCell, cmp::Ordering};
 use hearth_fake_machine::hearth::{
     universe::{Alternative, Package, Priority, Universe, alternative_text},
     version,
@@ -48,6 +52,7 @@ struct Resolver<'a> {
     packages: Vec<(Selected, &'a Package)>,
     candidates: BTreeMap<&'a [u8], usize>,
     marked: Vec<usize>,
+    read: Option<RefCell<BTreeSet<usize>>>,
 }
 impl<'a> Resolver<'a> {
     fn new(universes: &[&'a Universe]) -> Self {
@@ -67,9 +72,18 @@ impl<'a> Resolver<'a> {
                 }
             }
         }
-        Self { packages, candidates, marked: Vec::new() }
+        Self { packages, candidates, marked: Vec::new(), read: None }
+    }
+    fn read_name(&self, name: &[u8]) {
+        let Some(read) = &self.read else {
+            return;
+        };
+        read.borrow_mut().extend(
+            self.packages.iter().enumerate().filter(|(_, (_, package))| package.name.as_ref() == name).map(|(i, _)| i),
+        );
     }
     fn mark(&mut self, place: usize) {
+        self.read_name(&self.packages[place].1.name);
         if !self.marked.contains(&place) {
             self.marked.push(place);
         }
@@ -82,6 +96,9 @@ impl<'a> Resolver<'a> {
             .filter(|(i, (_, p))| self.candidates.get(p.name.as_ref()) == Some(i) && provides(p, alternative))
             .map(|(i, _)| i)
             .collect();
+        for place in &found {
+            self.read_name(&self.packages[*place].1.name);
+        }
         found.sort_by_key(|i| (!self.packages[*i].1.essential, self.packages[*i].1.priority, *i));
         found
     }
@@ -117,6 +134,7 @@ impl<'a> Resolver<'a> {
         }
         let mut fallback = None;
         for alternative in group {
+            self.read_name(&alternative.name);
             let direct = self
                 .candidates
                 .get(alternative.name.as_ref())
@@ -171,7 +189,17 @@ fn broken(package: &Package, field: Field, group: &[Alternative], against: Optio
 }
 /// Resolve a variant and its explicit requests, returning the closure in marking order.
 pub fn closure(request: &Request<'_>) -> Result<Box<[Selected]>, Failure> {
+    resolve(&mut Resolver::new(request.universes), request)
+}
+/// Packages marked, candidates weighed and providers ranked, in universe order.
+#[must_use]
+pub fn read_by(request: &Request<'_>) -> Box<[Selected]> {
     let mut resolver = Resolver::new(request.universes);
+    resolver.read = Some(RefCell::new(BTreeSet::new()));
+    let _ = resolve(&mut resolver, request);
+    resolver.read.as_ref().expect("read collection enabled").borrow().iter().map(|i| resolver.packages[*i].0).collect()
+}
+fn resolve(resolver: &mut Resolver<'_>, request: &Request<'_>) -> Result<Box<[Selected]>, Failure> {
     for i in 0..resolver.packages.len() {
         let package = resolver.packages[i].1;
         if package.essential {

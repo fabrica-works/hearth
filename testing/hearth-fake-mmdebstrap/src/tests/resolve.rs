@@ -171,3 +171,21 @@ fn a_higher_version_from_a_later_source_is_the_candidate() {
         ]
     );
 }
+
+#[test]
+fn the_read_set_keeps_ranked_providers_in_universe_order() {
+    let universe = fixtures::debian();
+    let read = resolve::read_by(&Request { universes: &[&universe], variant: Variant::Essential, include: &[] });
+    assert_eq!(
+        read.as_ref(),
+        &[
+            resolve::Selected { universe: 0, package: 0 },
+            resolve::Selected { universe: 0, package: 1 },
+            resolve::Selected { universe: 0, package: 2 },
+            resolve::Selected { universe: 0, package: 3 },
+            resolve::Selected { universe: 0, package: 4 },
+            resolve::Selected { universe: 0, package: 5 },
+        ],
+        "gawk was ranked against mawk even though it was not marked"
+    );
+}

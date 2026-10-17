@@ -189,7 +189,10 @@ pub fn print(simulate: &Simulate, sources: &[Source], outcome: &Outcome) -> Prin
             update_failed(&mut out);
         }
         Outcome::Failed { essential, providers, failure } => {
+            let simulation = "NOTE: This is only a simulation!\n      apt-get needs root privileges for real execution.\n      Keep also in mind that locking is deactivated,\n      so don't depend on the relevance to the real current situation!\n";
+            out.push_str(simulation);
             insts(&mut out, essential);
+            out.push_str(simulation);
             match failure {
                 Failure::Unknown(name) => {
                     writeln!(out, "E: Unable to locate package {}", text(name)).expect("string write");

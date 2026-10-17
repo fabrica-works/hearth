@@ -12,7 +12,7 @@ use hearth_fake_git::{
 use hearth_fake_machine::{
     Machine,
     hearth::Tool,
-    linux::{self, At, Exit, Handle, How, Ids, Item, Op, Pid, Pipe, Reply, Sizes, Spawn, Way},
+    linux::{self, At, Exit, How, Item, Op, Pipe, Reply, Sizes, Spawn, Way},
 };
 use hearth_recordings::Recording;
 use std::sync::OnceLock;
@@ -34,7 +34,7 @@ pub const ALLOWED: &[Allowed] = &[
         reason: "M1's fake stores SHA-1 objects only (decisions.md, 13)",
     },
 ];
-const OWNER: Ids = Ids { user: 1000, group: 1000 };
+use crate::fixtures::{OWNER, take};
 fn signature(role: &str) -> Signature {
     let value = |field: &str| {
         git::IDENTITY.iter().find(|(key, _)| *key == format!("GIT_{role}_{field}")).expect("scenario identity field").1
@@ -130,17 +130,6 @@ fn machine(case: &Case, recording: &Recording) -> Machine {
         }
     }
     machine
-}
-fn take(machine: &mut Machine, parent: Pid, pipe: Handle, out: &mut Vec<u8>) {
-    loop {
-        let reply = machine.call(parent, Op::Take { pipe, most: 4096 }).expect("parent pipe");
-        if let Reply::Took(bytes) = reply {
-            out.extend_from_slice(&bytes);
-        } else {
-            assert!(matches!(reply, Reply::Empty | Reply::Ended), "pipe answers bytes or an end");
-            return;
-        }
-    }
 }
 #[must_use]
 pub fn run(name: &str, recording: &Recording) -> Run {
