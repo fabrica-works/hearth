@@ -10,6 +10,7 @@ hearth-lib.workspace = true
 hearth-protocol-tree.workspace = true
 hearth-domain-store.workspace = true
 hearth-test-mirror.workspace = true
+hearth-recordings.workspace = true
 skein-shell.workspace = true
 skein-scratch.workspace = true
 skein-io.workspace = true

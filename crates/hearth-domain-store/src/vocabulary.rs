@@ -4,6 +4,9 @@ use hearth_lib::encode::{Digest, Item};
 use skein_lib::{Duration, Token, Wall};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    Record { resolution: Resolution },
+    Room,
+    Unwritable { max: u64 },
     Find { key: Digest },
     Resolution { record: Resolution },
     Unreadable,
@@ -18,6 +21,7 @@ pub enum Event {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    Write { resolution: Resolution },
     Load { key: Digest },
     Empty,
     Keep { arrival: Token, record: CacheFile },
@@ -32,6 +36,8 @@ pub enum Request {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    Recorded,
+    HasRoom,
     Found { resolution: Resolution },
     Absent,
     Declined { why: Decline },
@@ -81,6 +87,7 @@ pub enum Limit {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Step {
+    Write,
     Load,
     Empty,
     Keep,
@@ -186,6 +193,7 @@ pub struct Costs {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Decline {
+    Bound { max: u64 },
     Full { limit: Limit, most: u32 },
     Unusable { step: Step },
 }

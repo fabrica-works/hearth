@@ -2,6 +2,7 @@
 use super::{Box, Encoder, Lines, field};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Resolution {
+    TooLarge { max: u64 },
     Unknown { package: Box<[u8]> },
     Unsatisfiable { package: Option<Box<[u8]>> },
     Absent { uri: Box<[u8]>, suite: Box<[u8]> },
@@ -43,6 +44,11 @@ impl Resolution {
                 lines.put(b"the Packages indices disagree on ");
                 triple(lines, name, version, architecture);
             }
+            Self::TooLarge { max } => {
+                lines.put(b"a resolution record past ");
+                lines.decimal(*max);
+                lines.put(b" bytes");
+            }
             Self::TooMany { max } => {
                 lines.put(b"a closure past ");
                 lines.decimal(u64::from(*max));
@@ -79,6 +85,11 @@ impl Resolution {
             Self::Disagree { name, version, architecture } => {
                 field(json, b"kind", b"disagree");
                 json_triple(json, name, version, architecture);
+            }
+            Self::TooLarge { max } => {
+                field(json, b"kind", b"too_large");
+                json.key(b"max");
+                json.unsigned(*max);
             }
             Self::TooMany { max } => {
                 field(json, b"kind", b"too_many");

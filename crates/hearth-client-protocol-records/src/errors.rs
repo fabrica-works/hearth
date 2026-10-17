@@ -264,6 +264,7 @@ pub enum Field {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Limit {
+    Record,
     Closure,
     Template,
     Document,
@@ -330,6 +331,7 @@ impl Decode {
             }
             Self::TooLarge { limit, max } => {
                 lines.put(match limit {
+                    Limit::Record => b"a record past ",
                     Limit::Closure => b"a closure past ",
                     Limit::Template => b"a template past ",
                     Limit::Document => b"a document past ",
@@ -421,6 +423,7 @@ impl Decode {
                     json,
                     b"limit",
                     match limit {
+                        Limit::Record => b"record",
                         Limit::Closure => b"closure",
                         Limit::Template => b"template",
                         Limit::Document => b"document",

@@ -21,11 +21,21 @@ pub(super) struct Store {
     max: u32,
     closing: Option<Event>,
     keeping: u8,
+    deferred: Option<Event>,
     walk: Option<crate::walk::Walker>,
 }
 impl Store {
     pub fn new() -> Self {
-        Self { pending: None, cursor: None, directory: Directory::Top, max: 0, closing: None, keeping: 0, walk: None }
+        Self {
+            pending: None,
+            cursor: None,
+            directory: Directory::Top,
+            max: 0,
+            closing: None,
+            keeping: 0,
+            deferred: None,
+            walk: None,
+        }
     }
     pub fn down(
         &mut self,
@@ -37,11 +47,30 @@ impl Store {
     ) {
         assert!(self.pending.is_none(), "one store request");
         self.pending = Some(request.clone());
+        if let Request::Write { resolution } = &request {
+            match tree::resolution::write(&translate::store::tree_resolution(resolution.clone()), &limits.tree) {
+                Ok(bytes) => below.push(Asked::File(file::Request::Store {
+                    owner: OWNER,
+                    root: roots.resolutions.token,
+                    path: names::removal(builder::store::vocabulary::Removal::Record(resolution.key)),
+                    bytes,
+                    expected: file::Expect::Any,
+                    no_follow: true,
+                })),
+                Err(_) => {
+                    self.pending = None;
+                    self.deferred =
+                        Some(Event::Unwritable { max: u64::from(tree::frame::Kind::Resolution.bound(&limits.tree)) });
+                }
+            }
+            return;
+        }
         if request == Request::Empty {
             self.walk = Some(crate::walk::Walker::new(limits.walk, roots.staging.fd, below));
             return;
         }
         below.push(Asked::File(match request {
+            Request::Write { .. } => unreachable!("write handled"),
             Request::Empty => unreachable!("walk started"),
             Request::Load { key } => file::Request::Load {
                 owner: OWNER,
@@ -115,6 +144,17 @@ impl Store {
                 no_follow: true,
             },
         }));
+    }
+    pub fn ready(&self) -> bool {
+        self.deferred.is_some()
+    }
+    pub fn resume(&mut self, above: &mut Queue<builder::vocabulary::Event>) -> bool {
+        if let Some(event) = self.deferred.take() {
+            above.push(builder::vocabulary::Event::Store(event));
+            true
+        } else {
+            false
+        }
     }
     fn list(&self) -> file::Request {
         file::Request::ListPage { owner: OWNER, directory: self.cursor.expect("scan cursor"), max: self.max }

@@ -8,6 +8,7 @@ pub enum ResolutionInput {
     Unmatched,
     Disagree,
     TooMany,
+    TooLarge,
 }
 pub fn resolution_error(input: ResolutionInput) -> Error {
     let resolution = match input {
@@ -27,6 +28,7 @@ pub fn resolution_error(input: ResolutionInput) -> Error {
             version: b"3.3.3".as_slice().into(),
             architecture: b"amd64".as_slice().into(),
         },
+        ResolutionInput::TooLarge => Resolution::TooLarge { max: RECORD_BOUND },
         ResolutionInput::TooMany => Resolution::TooMany { max: CLOSURE_LIMIT },
     };
     Error {
@@ -38,6 +40,7 @@ pub fn resolution_error(input: ResolutionInput) -> Error {
             | ResolutionInput::Unsatisfiable
             | ResolutionInput::Absent
             | ResolutionInput::Missing
+            | ResolutionInput::TooLarge
             | ResolutionInput::TooMany => Class::Configuration,
         },
         at: None,
@@ -54,3 +57,5 @@ pub fn mmdebstrap_error(ended: Ended) -> Error {
     error
 }
 pub const CLOSURE_LIMIT: u32 = 8_192;
+
+pub const RECORD_BOUND: u64 = 4 * 1024 * 1024;

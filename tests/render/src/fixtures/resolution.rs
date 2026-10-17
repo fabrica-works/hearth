@@ -4,7 +4,7 @@ pub fn configuration_requests(requests: &[Request]) -> Vec<Request> {
     requests
         .iter()
         .filter(|request| match request {
-            Request::Find { .. } | Request::Resolve { .. } => false,
+            Request::Find { .. } | Request::Resolve { .. } | Request::Record { .. } => false,
             Request::List { .. } | Request::Read { .. } | Request::Keep { .. } | Request::Hunks { .. } => true,
         })
         .cloned()

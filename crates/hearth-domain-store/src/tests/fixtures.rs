@@ -50,7 +50,7 @@ fn collect(output: &mut Queue<Output>) -> Box<[Output]> {
     list.into_boxed()
 }
 pub fn recording() -> Harness {
-    let mut store = Harness::new(crate::limits::SHIPPED, 1000);
+    let mut store = Harness::new(crate::limits::SHIPPED, MIN_UID);
     drop(store.step(Time::ZERO, Event::Open));
     drop(store.step(Time::ZERO, Event::Locked));
     store
@@ -63,12 +63,12 @@ pub fn entry(name: &[u8], shape: crate::vocabulary::Shape) -> Entry {
     Entry { name: name.into(), shape }
 }
 pub fn scanning(limits: Limits) -> Harness {
-    let mut store = Harness::new(limits, 1000);
+    let mut store = Harness::new(limits, MIN_UID);
     drop(store.step(Time::ZERO, Event::Open));
     drop(store.step(Time::ZERO, Event::Locked));
     drop(store.step(
         Time::ZERO,
-        Event::Loaded { record: Some(StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: 1000 }) },
+        Event::Loaded { record: Some(StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: MIN_UID }) },
     ));
     drop(store.page(&[], true));
     drop(store.page(&[], true));
@@ -106,12 +106,12 @@ pub fn full() -> Harness {
 }
 
 pub fn resolving(limits: Limits, key: hearth_lib::encode::Digest) -> Harness {
-    let mut store = Harness::new(limits, 1000);
+    let mut store = Harness::new(limits, MIN_UID);
     drop(store.step(Time::ZERO, Event::Open));
     drop(store.step(Time::ZERO, Event::Locked));
     drop(store.step(
         Time::ZERO,
-        Event::Loaded { record: Some(StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: 1000 }) },
+        Event::Loaded { record: Some(StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: MIN_UID }) },
     ));
     drop(store.page(&[], true));
     let entry = entry(b"record", crate::vocabulary::Shape::Record(key));
@@ -155,7 +155,8 @@ pub const EMPTY_CLOSURE: hearth_lib::encode::Digest = hearth_lib::encode::Digest
 ]);
 
 pub fn waiting() -> Harness {
-    let mut store = Harness::new(Limits { retry: skein_lib::Duration::from_secs(2), ..crate::limits::SHIPPED }, 1000);
+    let mut store =
+        Harness::new(Limits { retry: skein_lib::Duration::from_secs(2), ..crate::limits::SHIPPED }, MIN_UID);
     drop(store.step(Time::ZERO, Event::Open));
     drop(store.step(Time::ZERO, Event::Busy));
     store
@@ -188,3 +189,20 @@ pub fn resolved_ready() -> Harness {
     store.store.scan.resolutions.insert(KEY, ()).expect("fixture resolution");
     store
 }
+
+pub const ONE_RESOLUTION: Limits = Limits { resolutions: 1, ..crate::limits::SHIPPED };
+pub const RECORD_BOUND: u64 = 4 * 1024 * 1024;
+pub fn recorded_ready() -> Harness {
+    let mut store = ready(ONE_RESOLUTION, &[]);
+    drop(store.step(Time::ZERO, Event::Record { resolution: resolution_record() }));
+    drop(store.step(Time::ZERO, Event::Done));
+    store
+}
+
+pub fn room_store(usable: bool, recorded: bool) -> Harness {
+    let mut store = if recorded { recorded_ready() } else { ready(ONE_RESOLUTION, &[]) };
+    store.store.usable = usable;
+    store
+}
+
+pub const MIN_UID: u32 = 1000;

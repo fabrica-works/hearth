@@ -582,6 +582,7 @@ mod templates;
 mod exported;
 
 const RESOLUTION_MESSAGES: &[(fixtures::ResolutionInput, &str)] = &[
+    (fixtures::ResolutionInput::TooLarge, "a resolution record past 4194304 bytes\n"),
     (fixtures::ResolutionInput::Unknown, "apt cannot locate package \"apt\"\n"),
     (fixtures::ResolutionInput::Unsatisfiable, "unsatisfiable dependencies of \"apt\"\n"),
     (fixtures::ResolutionInput::Absent, "the archive http://one/ does not have forky\n"),

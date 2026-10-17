@@ -59,6 +59,7 @@ pub enum StoreLimit {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Step {
+    Write,
     List,
     Remove,
     Load,
@@ -73,6 +74,7 @@ impl Step {
             Self::Load => b"load",
             Self::Empty => b"empty",
             Self::Keep => b"keep",
+            Self::Write => b"write",
         }
     }
 }

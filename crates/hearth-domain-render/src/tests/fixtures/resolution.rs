@@ -55,8 +55,10 @@ fn packages_side(variant: crate::parts::packages::Variant) -> crate::call::Side 
         let mut spec = spec.as_ref().clone();
         let mut packages = super::thin_packages();
         packages.variant = variant;
-        spec.parts =
-            Box::new([crate::parts::Part { digest: KEY_A, record: crate::parts::PartRecord::Packages(packages) }]);
+        spec.parts = Box::new([
+            crate::parts::Part { digest: KEY_A, record: crate::parts::PartRecord::Packages(packages) },
+            crate::parts::Part { digest: KEY_A, record: crate::parts::PartRecord::Config(super::config()) },
+        ]);
         made.insert(name.clone(), crate::diff::Made::Spec(Box::new(spec))).expect("fixture targets");
     }
     side.made = made;
@@ -194,3 +196,24 @@ pub fn matched_apt_closure() -> crate::resolution::Closure {
     closure.stanza(0, resolution_stanza(b"apt", b"amd64")).expect("matching apt");
     closure
 }
+
+pub fn first_resolving_side() -> crate::call::Side {
+    let mut side = resolving_side();
+    drop(next_resolution(&mut side));
+    side
+}
+pub fn record_side(side: &mut crate::call::Side) -> Option<crate::vocabulary::Request> {
+    let mut out = skein_lib::Queue::with_capacity(1);
+    side.record(
+        Box::new([]),
+        crate::resolution::Tools { apt: Box::new([]), mmdebstrap: Box::new([]) },
+        crate::resolution::Costs { fetched: 0, took: skein_lib::Duration::ZERO },
+        skein_lib::Wall::EPOCH,
+        &mut out,
+    );
+    match out.pop() {
+        Some(crate::vocabulary::Output::Request(request)) => Some(request),
+        Some(crate::vocabulary::Output::Answer(_)) | None => None,
+    }
+}
+pub const FAILED_HOLDERS: &[(&[u8], u32, u32, &[u8])] = &[(b"", 0, 0, b"a"), (b"", 0, 0, b"c")];

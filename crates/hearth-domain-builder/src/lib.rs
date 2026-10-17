@@ -33,6 +33,7 @@ pub struct Builder {
     remaining: usize,
     store_error: bool,
     finding: Option<Token>,
+    resolving: Option<render::vocabulary::Request>,
 }
 impl Builder {
     #[must_use]
@@ -44,6 +45,7 @@ impl Builder {
             remaining: 0,
             store_error: false,
             finding: None,
+            resolving: None,
             render: render::Render::new(&limits.render),
             store: store::Store::new(&limits.store, uid),
             call: None,
@@ -65,6 +67,21 @@ impl Builder {
             if let Output::Request(render::vocabulary::Request::Find { request, key }) = output {
                 self.finding = Some(request);
                 store_step(self, env, store::vocabulary::Event::Find { key }, out);
+                return;
+            }
+            if let Output::Request(render::vocabulary::Request::Record { request, resolution }) = output {
+                self.finding = Some(request);
+                store_step(
+                    self,
+                    env,
+                    store::vocabulary::Event::Record { resolution: resolution::stored(resolution) },
+                    out,
+                );
+                return;
+            }
+            if let Output::Request(request @ render::vocabulary::Request::Resolve { .. }) = output {
+                self.resolving = Some(request);
+                store_step(self, env, store::vocabulary::Event::Room, out);
                 return;
             }
             out.push(match output {
@@ -201,7 +218,9 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
                         at: None,
                         failure: render::vocabulary::Failure::Store,
                     },
-                    Answer::Found { .. }
+                    Answer::Recorded
+                    | Answer::HasRoom
+                    | Answer::Found { .. }
                     | Answer::Absent
                     | Answer::Declined { .. }
                     | Answer::Ready
@@ -237,10 +256,13 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
                 step(builder, env, Event::Render(RenderEvent::Cached { request, oid, size, sha256 }), out);
             }
         }
-        Some(Output::Answer(answer @ (Answer::Found { .. } | Answer::Absent | Answer::Declined { .. }))) => {
-            let request = builder.finding.take().expect("find answer");
-            let event = resolution::answer(request, answer);
-            step(builder, env, Event::Render(event), out);
+        Some(Output::Answer(
+            answer @ (Answer::Found { .. } | Answer::Absent | Answer::Recorded | Answer::Declined { .. }),
+        )) => {
+            resolution::terminal(builder, env, answer, out);
+        }
+        Some(Output::Answer(Answer::HasRoom)) => {
+            out.push(Request::Render(builder.resolving.take().expect("room before resolve")));
         }
         Some(Output::Answer(Answer::Waiting)) => out.push(Request::Progress(vocabulary::Progress::Waiting)),
         Some(Output::Answer(Answer::Strays { count, first })) => {
@@ -287,9 +309,12 @@ fn store_error(builder: &mut Builder, answer: &store::vocabulary::Answer, out: &
                 StoreStep::Load => Step::Load,
                 StoreStep::Empty => Step::Empty,
                 StoreStep::Keep => Step::Keep,
+                StoreStep::Write => Step::Write,
             },
         },
-        Answer::Found { .. }
+        Answer::Recorded
+        | Answer::HasRoom
+        | Answer::Found { .. }
         | Answer::Absent
         | Answer::Declined { .. }
         | Answer::Ready

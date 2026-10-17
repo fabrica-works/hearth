@@ -77,6 +77,7 @@ pub enum Field {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Limit {
+    Record,
     Closure,
     Template,
     Document,
@@ -422,6 +423,7 @@ pub enum StoreLimit {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Step {
+    Write,
     List,
     Remove,
     Load,
@@ -496,6 +498,7 @@ pub enum Cause {
 /// Apt's configuration verdict and the bounded closure (render.md, 5.5, 7.2).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Resolution {
+    TooLarge { max: u64 },
     Unknown { package: Box<[u8]> },
     Unsatisfiable { package: Option<Box<[u8]>> },
     Absent { uri: Box<[u8]>, suite: Box<[u8]> },

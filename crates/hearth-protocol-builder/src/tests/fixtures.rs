@@ -566,12 +566,7 @@ pub fn walking(walk: limits::Walk) -> Layer {
 pub fn every_inputs() -> [crate::tree::resolution::Inputs; 2] {
     use hearth_lib::encode::Item;
     [
-        crate::tree::resolution::Inputs {
-            sources: Box::new([Item::Map(0)]),
-            request: Box::new([Item::List(1), Item::Bytes(b"hello".as_slice().into())]),
-            variant: Box::new([Item::Bytes(b"apt".as_slice().into())]),
-            apt: Box::new([Item::Map(0)]),
-        },
+        resolution_inputs(),
         crate::tree::resolution::Inputs {
             sources: Box::new([Item::List(4), Item::None, Item::True, Item::False, Item::Uint(7)]),
             request: Box::new([Item::List(2), Item::Digest(ABC), Item::Bytes(b"x".as_slice().into())]),

@@ -9,7 +9,7 @@ use skein_lib::{Queue, ReplyTo, Token, bytes};
 
 #[test]
 fn a_render_call_reaches_render() {
-    let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+    let mut builder = Builder::new(&fixtures::LIMITS, fixtures::MIN_UID);
     let mut out = Queue::with_capacity(1);
     step(
         &mut builder,
@@ -25,7 +25,7 @@ fn a_render_call_reaches_render() {
 }
 #[test]
 fn renders_spec_reaches_the_client() {
-    let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+    let mut builder = Builder::new(&fixtures::LIMITS, fixtures::MIN_UID);
     let mut out = Queue::with_capacity(1);
     builder.output.push(Output::Answer(RenderAnswer::Spec(fixtures::spec())));
     builder.forward(&fixtures::env(), &mut out);
@@ -38,7 +38,7 @@ fn renders_spec_reaches_the_client() {
 #[test]
 #[should_panic(expected = "one builder call at a time")]
 fn a_second_call_while_one_is_held_panics() {
-    let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+    let mut builder = Builder::new(&fixtures::LIMITS, fixtures::MIN_UID);
     let mut out = Queue::with_capacity(1);
     step(
         &mut builder,
@@ -58,7 +58,7 @@ fn a_second_call_while_one_is_held_panics() {
 #[test]
 fn the_call_reaches_render_only_once_the_store_is_open() {
     use crate::store::vocabulary::Event as StoreEvent;
-    let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+    let mut builder = Builder::new(&fixtures::LIMITS, fixtures::MIN_UID);
     let mut out = Queue::with_capacity(1);
     step(
         &mut builder,
@@ -94,12 +94,12 @@ fn the_call_reaches_render_only_once_the_store_is_open() {
 const UNOPENED: &[crate::store::vocabulary::Why] = &[
     crate::store::vocabulary::Why::Lock,
     crate::store::vocabulary::Why::Record,
-    crate::store::vocabulary::Why::Owner { recorded: 1001, builder: 1000 },
+    crate::store::vocabulary::Why::Owner { recorded: fixtures::MIN_UID + 1, builder: fixtures::MIN_UID },
 ];
 #[test]
 fn an_unopened_store_ends_the_call_before_render() {
     for &why in UNOPENED {
-        let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+        let mut builder = Builder::new(&fixtures::LIMITS, fixtures::MIN_UID);
         let mut out = Queue::with_capacity(1);
         step(
             &mut builder,
@@ -124,7 +124,7 @@ fn a_refused_blob_fails_its_read_at_its_last_blob() {
         render::vocabulary::{Event as RenderEvent, Outcome},
         store::vocabulary as store,
     };
-    let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+    let mut builder = Builder::new(&fixtures::LIMITS, fixtures::MIN_UID);
     builder.reply = Some(ReplyTo::new(Token::new(1)));
     let mut out = Queue::with_capacity(1);
     step(
@@ -159,7 +159,7 @@ fn a_full_store_is_answered_once_before_renders_answers() {
         render::errors::{Error, Kind, StoreError, StoreFault, StoreLimit},
         store::vocabulary::{Answer as StoreAnswer, Limit, Output as StoreOutput},
     };
-    let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+    let mut builder = Builder::new(&fixtures::LIMITS, fixtures::MIN_UID);
     builder.call = Some(fixtures::call());
     let mut out = Queue::with_capacity(2);
     builder.store_output.push(StoreOutput::Answer(StoreAnswer::Full { limit: Limit::CacheFiles, most: 2 }));
@@ -194,7 +194,7 @@ fn a_full_store_is_answered_once_before_renders_answers() {
 
 #[test]
 fn a_store_error_makes_the_call_operational_even_without_an_arrival() {
-    let mut builder = Builder::new(&fixtures::LIMITS, 1000);
+    let mut builder = Builder::new(&fixtures::LIMITS, fixtures::MIN_UID);
     builder.store_error = true;
     builder.reply = Some(ReplyTo::new(Token::new(0)));
     builder.output.push(Output::Answer(RenderAnswer::Rendered {
@@ -265,17 +265,52 @@ fn a_find_reaches_the_store_and_its_answer_render() {
 }
 #[test]
 fn a_found_resolution_answers_render_with_the_stored_digest() {
-    assert_eq!(
-        crate::resolution::answer(
-            Token::new(5),
-            crate::store::vocabulary::Answer::Found { resolution: fixtures::store_resolution() }
-        ),
-        crate::render::vocabulary::Event::Found {
-            request: Token::new(5),
-            digest: hearth_lib::encode::Digest([
-                193, 88, 154, 151, 28, 76, 229, 4, 43, 122, 140, 15, 92, 154, 246, 155, 61, 70, 254, 100, 184, 171, 76,
-                218, 172, 88, 93, 176, 234, 58, 213, 48
-            ])
+    let crate::render::vocabulary::Event::Found { resolution, .. } = crate::resolution::answer(
+        Token::new(5),
+        crate::store::vocabulary::Answer::Found { resolution: fixtures::store_resolution() },
+    ) else {
+        panic!("found record")
+    };
+    assert_eq!(resolution.digest, fixtures::EMPTY_CLOSURE);
+}
+
+#[test]
+fn a_declined_record_answers_the_stores_error_once_and_leaves_the_key_needed() {
+    let (mut builder, mut out) = fixtures::record_builder();
+    drop(out.pop());
+    step(&mut builder, &fixtures::env(), Event::Store(crate::store::vocabulary::Event::Failed), &mut out);
+    let requests = fixtures::finish(&mut builder, &mut out);
+    assert_eq!(fixtures::error_count(&requests), 1);
+    let mut needed = 0_u32;
+    for request in requests {
+        if let Request::Answer(Answer::Spec(spec)) = request {
+            let Some(crate::render::keys::Resolution::Needed { .. }) = spec.resolution.as_deref() else {
+                panic!("needed key")
+            };
+            needed = needed.saturating_add(1);
         }
-    );
+    }
+    assert_eq!(needed, 1);
+}
+#[test]
+fn a_resolve_goes_down_only_when_the_store_has_room() {
+    let env = skein_lib::Env { limits: fixtures::NO_RESOLUTION_ROOM, ..fixtures::env() };
+    let (mut builder, mut out) = fixtures::resolving_builder(&env);
+    let requests = fixtures::finish(&mut builder, &mut out);
+    assert_eq!(fixtures::error_count(&requests), 1);
+    let mut resolves = 0_u32;
+    for request in requests {
+        if let Request::Render(crate::render::vocabulary::Request::Resolve { .. }) = request {
+            resolves = resolves.saturating_add(1);
+        }
+    }
+    assert_eq!(resolves, 0);
+}
+
+#[test]
+fn each_resolution_field_translates_and_back() {
+    for (row, input) in fixtures::resolutions().into_iter().enumerate() {
+        let back = crate::resolution::stored(crate::resolution::found(input.clone()));
+        assert_eq!(back, input, "row {row}: resolution record");
+    }
 }

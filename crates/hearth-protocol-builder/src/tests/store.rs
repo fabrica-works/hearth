@@ -300,3 +300,25 @@ fn a_staging_directory_is_opened_by_token_without_following_links() {
         }))
     );
 }
+
+#[test]
+fn a_written_resolution_reads_back_as_the_stores() {
+    for (row, input) in fixtures::writable_resolutions().into_iter().enumerate() {
+        let mut layer = Layer::new();
+        layer.client(BuilderRequest::Store(Request::Write {
+            resolution: crate::translate::store::resolution(input.clone()),
+        }));
+        let Some(Asked::File(file::Request::Store { bytes, root, path, expected, .. })) = layer.asked() else {
+            panic!("resolution write")
+        };
+        assert_eq!(root, fixtures::roots().resolutions.token, "row {row}");
+        assert_eq!(
+            path.as_ref(),
+            b"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad.record",
+            "row {row}"
+        );
+        assert_eq!(expected, file::Expect::Any, "row {row}");
+        let back = tree::resolution::read(&bytes, &tree::limits::SHIPPED).expect("kind 4");
+        assert_eq!(back, input, "row {row}: written record");
+    }
+}

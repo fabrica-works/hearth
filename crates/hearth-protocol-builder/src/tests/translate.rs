@@ -768,3 +768,4 @@ mod export_changes;
 mod resolve;
 
 mod directives;
+mod record_store;

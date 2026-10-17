@@ -53,6 +53,7 @@ fn decode_field_back(field: record_errors::Field) -> render_errors::Field {
 }
 fn decode_limit_back(limit: record_errors::Limit) -> render_errors::Limit {
     match limit {
+        record_errors::Limit::Record => render_errors::Limit::Record,
         record_errors::Limit::Closure => render_errors::Limit::Closure,
         record_errors::Limit::Template => render_errors::Limit::Template,
         record_errors::Limit::Document => render_errors::Limit::Document,
@@ -239,6 +240,7 @@ fn each_shape_field_fault_translates_its_kind_and_back() {
     }
 }
 const DECODE_LIMITS: &[(render_errors::Limit, record_errors::Limit)] = &[
+    (render_errors::Limit::Record, record_errors::Limit::Record),
     (render_errors::Limit::Closure, record_errors::Limit::Closure),
     (render_errors::Limit::Document, record_errors::Limit::Document),
     (render_errors::Limit::Decoded, record_errors::Limit::Decoded),
@@ -551,6 +553,7 @@ fn each_declared_fault_translates_to_render_and_back() {
 
 fn resolution_back(fault: record_errors::Resolution) -> render_errors::Resolution {
     match fault {
+        record_errors::Resolution::TooLarge { max } => render_errors::Resolution::TooLarge { max },
         record_errors::Resolution::Unknown { package } => render_errors::Resolution::Unknown { package },
         record_errors::Resolution::Unsatisfiable { package } => render_errors::Resolution::Unsatisfiable { package },
         record_errors::Resolution::Absent { uri, suite } => render_errors::Resolution::Absent { uri, suite },

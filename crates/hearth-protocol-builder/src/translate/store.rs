@@ -107,3 +107,49 @@ pub fn progress(progress: crate::builder::vocabulary::Progress, store: &[u8]) ->
         }
     }
 }
+#[must_use]
+pub fn tree_resolution(record: crate::builder::store::vocabulary::Resolution) -> tree::resolution::Resolution {
+    use tree::resolution::{Costs, Index, Inputs, Line, Made, Package, Resolution};
+    let mut closure = skein_lib::List::with_capacity(u32::try_from(record.closure.len()).expect("closure bound"));
+    for package in record.closure {
+        closure
+            .push(Package {
+                name: package.name,
+                architecture: package.architecture,
+                version: package.version,
+                source: package.source,
+                filename: package.filename,
+                size: package.size,
+                sha256: package.sha256,
+            })
+            .expect("closure bound");
+    }
+    let mut sources = skein_lib::List::with_capacity(u32::try_from(record.sources.len()).expect("sources bound"));
+    for line in record.sources {
+        let mut indices = skein_lib::List::with_capacity(u32::try_from(line.indices.len()).expect("indices bound"));
+        for index in line.indices {
+            indices.push(Index { path: index.path, size: index.size, sha256: index.sha256 }).expect("indices bound");
+        }
+        sources
+            .push(Line { uri: line.uri, suite: line.suite, components: line.components, indices: indices.into_boxed() })
+            .expect("sources bound");
+    }
+    Resolution {
+        key: record.key,
+        digest: record.digest,
+        inputs: Inputs {
+            apt: record.inputs.apt,
+            request: record.inputs.request,
+            sources: record.inputs.sources,
+            variant: record.inputs.variant,
+        },
+        closure: closure.into_boxed(),
+        sources: sources.into_boxed(),
+        made: Made {
+            at: record.made.at,
+            apt: record.made.apt,
+            mmdebstrap: record.made.mmdebstrap,
+            costs: Costs { fetched: record.made.costs.fetched, took: record.made.costs.took },
+        },
+    }
+}

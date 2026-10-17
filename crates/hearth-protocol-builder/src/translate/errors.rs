@@ -145,6 +145,7 @@ pub fn field(field: target::Field) -> records::errors::Field {
 #[must_use]
 pub fn limit(limit: target::Limit) -> records::errors::Limit {
     match limit {
+        target::Limit::Record => records::errors::Limit::Record,
         target::Limit::Closure => records::errors::Limit::Closure,
         target::Limit::Template => records::errors::Limit::Template,
         target::Limit::Document => records::errors::Limit::Document,
@@ -463,6 +464,7 @@ fn store_error(error: target::StoreError) -> records::errors::StoreError {
                 target::Step::Load => Step::Load,
                 target::Step::Empty => Step::Empty,
                 target::Step::Keep => Step::Keep,
+                target::Step::Write => Step::Write,
             },
         },
     };
@@ -670,6 +672,7 @@ pub fn resolution(fault: target::Resolution) -> records::errors::Resolution {
         target::Resolution::Disagree { name, version, architecture } => {
             Resolution::Disagree { name, version, architecture }
         }
+        target::Resolution::TooLarge { max } => Resolution::TooLarge { max },
         target::Resolution::TooMany { max } => Resolution::TooMany { max },
     }
 }

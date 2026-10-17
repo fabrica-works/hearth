@@ -85,6 +85,7 @@ dependencies = [
  "hearth-domain-store",
  "hearth-lib",
  "hearth-protocol-tree",
+ "hearth-recordings",
  "hearth-test-mirror",
  "skein-io",
  "skein-lib",

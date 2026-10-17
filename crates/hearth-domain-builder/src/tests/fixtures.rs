@@ -36,7 +36,7 @@ pub fn spec() -> render::parts::Spec {
 }
 
 pub fn store_record() -> crate::store::vocabulary::StoreRecord {
-    crate::store::vocabulary::StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: 1000 }
+    crate::store::vocabulary::StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: MIN_UID }
 }
 pub fn arrival_answer(builder: &mut crate::Builder, last: bool, answer: crate::store::vocabulary::Answer) {
     builder.arrival = Some((
@@ -78,10 +78,7 @@ pub fn store_resolution() -> crate::store::vocabulary::Resolution {
     use hearth_lib::encode::Item;
     Resolution {
         key: FIND_KEY,
-        digest: hearth_lib::encode::Digest([
-            193, 88, 154, 151, 28, 76, 229, 4, 43, 122, 140, 15, 92, 154, 246, 155, 61, 70, 254, 100, 184, 171, 76,
-            218, 172, 88, 93, 176, 234, 58, 213, 48,
-        ]),
+        digest: EMPTY_CLOSURE,
         inputs: Inputs {
             sources: Box::new([Item::Map(0)]),
             request: Box::new([Item::List(1), Item::Bytes(b"hello".as_slice().into())]),
@@ -132,3 +129,11 @@ fn store_event(builder: &mut crate::Builder, event: crate::store::vocabulary::Ev
         drop(builder.store_output.pop());
     }
 }
+
+pub const EMPTY_CLOSURE: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
+    193, 88, 154, 151, 28, 76, 229, 4, 43, 122, 140, 15, 92, 154, 246, 155, 61, 70, 254, 100, 184, 171, 76, 218, 172,
+    88, 93, 176, 234, 58, 213, 48,
+]);
+
+mod resolve;
+pub use resolve::*;

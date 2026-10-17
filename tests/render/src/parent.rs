@@ -52,6 +52,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                 Output::Request(request) => {
                     let mut at = env.now;
                     let events = match &request {
+                        Request::Record { request, .. } => vec![Event::Recorded { request: *request }],
                         Request::Resolve { .. } => unreachable!("resolve disabled"),
                         Request::Find { request, .. } => vec![Event::Absent { request: *request }],
                         Request::Keep { request, sha256, .. } => {
@@ -69,6 +70,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                     };
                     let token = match &request {
                         Request::Resolve { request, .. }
+                        | Request::Record { request, .. }
                         | Request::Find { request, .. }
                         | Request::Keep { request, .. }
                         | Request::List { request, .. }
@@ -89,21 +91,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
         } else if let Some(at) = schedule.next_time() {
             env.now = at;
             let event = schedule.next(at).expect("scheduled event");
-            let token = match &event {
-                Event::Stanza { request, .. }
-                | Event::Inst { request, .. }
-                | Event::Resolved { request, .. }
-                | Event::Found { request, .. }
-                | Event::Absent { request }
-                | Event::Kept { request, .. }
-                | Event::Listed { request, .. }
-                | Event::Hunks { request, .. }
-                | Event::Read { request, .. }
-                | Event::Cached { request, .. }
-                | Event::Unresolved { request }
-                | Event::Failed { request, .. } => *request,
-                Event::Render { .. } | Event::Diff { .. } => unreachable!("only answers scheduled"),
-            };
+            let token = event_token(&event);
             let left = ledger.get_mut(token).expect("request in flight");
             *left -= 1;
             if *left == 0 {
@@ -158,5 +146,24 @@ fn blob_event(repository: &Repository, blob: &render::vocabulary::Blob, request:
             oid: blob.oid.clone(),
             read: repository.documents.iter().find(|(oid, _)| *oid == blob.oid).expect("scripted document").1.clone(),
         }
+    }
+}
+
+fn event_token(event: &Event) -> skein_lib::Token {
+    match event {
+        Event::Recorded { request }
+        | Event::Stanza { request, .. }
+        | Event::Inst { request, .. }
+        | Event::Resolved { request, .. }
+        | Event::Found { request, .. }
+        | Event::Absent { request }
+        | Event::Kept { request, .. }
+        | Event::Listed { request, .. }
+        | Event::Hunks { request, .. }
+        | Event::Read { request, .. }
+        | Event::Cached { request, .. }
+        | Event::Unresolved { request }
+        | Event::Failed { request, .. } => *request,
+        Event::Render { .. } | Event::Diff { .. } => unreachable!("only answers scheduled"),
     }
 }

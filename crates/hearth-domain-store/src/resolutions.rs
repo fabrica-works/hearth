@@ -46,7 +46,10 @@ pub(super) fn find(
         }
         Event::Resolution { record } => Answer::Found { resolution: record },
         Event::Unreadable | Event::Failed => Answer::Absent,
-        Event::Open
+        Event::Record { .. }
+        | Event::Room
+        | Event::Unwritable { .. }
+        | Event::Open
         | Event::Locked
         | Event::Busy
         | Event::Loaded { .. }
@@ -55,5 +58,67 @@ pub(super) fn find(
         | Event::Arrived { .. } => unreachable!("find terminal"),
     };
     store.finding = false;
+    out.push(Output::Answer(answer));
+}
+
+/// Admission is checked before starting a run and again before writing it.
+const RESOLUTION_INDICES: u32 = 8 * 16;
+
+pub(super) fn record(
+    store: &mut crate::Store,
+    env: &skein_lib::Env<crate::limits::Limits>,
+    event: crate::vocabulary::Event,
+    out: &mut skein_lib::Queue<crate::vocabulary::Output>,
+) {
+    use crate::vocabulary::{Answer, Decline, Event, Limit, Output, Request, Step};
+    let answer = match event {
+        Event::Room | Event::Record { .. } => {
+            let decline = if !store.usable {
+                Some(store.decline)
+            } else if store.scan.resolutions.len() >= env.limits.resolutions {
+                Some(Decline::Full { limit: Limit::Resolutions, most: env.limits.resolutions })
+            } else if event == Event::Room
+                && store.scan.index.len().saturating_add(RESOLUTION_INDICES) > env.limits.cache_files
+            {
+                // store.md, 6.1: eight source lines, sixteen indices each.
+                Some(Decline::Full { limit: Limit::CacheFiles, most: env.limits.cache_files })
+            } else {
+                None
+            };
+            if let Some(why) = decline {
+                Answer::Declined { why }
+            } else if let Event::Record { resolution } = event {
+                store.writing = Some(resolution.key);
+                out.push(Output::Request(Request::Write { resolution }));
+                return;
+            } else {
+                Answer::HasRoom
+            }
+        }
+        Event::Done => {
+            let key = store.writing.take().expect("record write");
+            store.scan.resolutions.insert(key, ()).expect("admitted resolution");
+            Answer::Recorded
+        }
+        Event::Unwritable { max } => {
+            store.writing = None;
+            Answer::Declined { why: Decline::Bound { max } }
+        }
+        Event::Failed => {
+            store.writing = None;
+            store.usable = false;
+            store.decline = Decline::Unusable { step: Step::Write };
+            Answer::Declined { why: store.decline }
+        }
+        Event::Find { .. }
+        | Event::Resolution { .. }
+        | Event::Unreadable
+        | Event::Open
+        | Event::Locked
+        | Event::Busy
+        | Event::Loaded { .. }
+        | Event::Page { .. }
+        | Event::Arrived { .. } => unreachable!("record terminal"),
+    };
     out.push(Output::Answer(answer));
 }

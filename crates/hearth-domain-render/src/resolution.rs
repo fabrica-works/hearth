@@ -144,3 +144,20 @@ impl Closure {
         Ok(closure.into_boxed())
     }
 }
+
+/// The closure recorded whole by key (store.md, 6.4).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Record {
+    pub key: hearth_lib::encode::Digest,
+    pub inputs: crate::parts::packages::Inputs,
+    pub sources: Box<[Line]>,
+    pub closure: Box<[Package]>,
+    pub digest: hearth_lib::encode::Digest,
+    pub made: Made,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Made {
+    pub at: skein_lib::Wall,
+    pub tools: Tools,
+    pub costs: Costs,
+}

@@ -10,28 +10,28 @@ fn needed_keys_are_resolved_one_at_a_time_in_target_order() {
     let mut side = fixtures::resolving_side();
     let Some(Request::Resolve { key, .. }) = fixtures::next_resolution(&mut side) else { panic!("first resolve") };
     assert_eq!(key, KEY_A);
-    side.resolved(None);
+    drop(fixtures::record_side(&mut side));
+    side.recorded(None);
     let Some(Request::Resolve { key, .. }) = fixtures::next_resolution(&mut side) else { panic!("second resolve") };
     assert_eq!(key, KEY_B);
-    side.resolved(None);
+    drop(fixtures::record_side(&mut side));
+    side.recorded(None);
     assert_eq!(fixtures::next_resolution(&mut side), None);
 }
 #[test]
 fn a_failed_key_leaves_the_later_keys_resolved() {
-    let mut side = fixtures::resolving_side();
-    drop(fixtures::next_resolution(&mut side));
-    side.resolved(Some(fixtures::run_failure(RunCause::Fetch)));
+    let mut side = fixtures::first_resolving_side();
+    side.resolve_failed(fixtures::run_failure(RunCause::Fetch));
     let Some(Request::Resolve { key, .. }) = fixtures::next_resolution(&mut side) else { panic!("later key") };
     assert_eq!(key, KEY_B);
-    side.resolved(None);
+    drop(fixtures::record_side(&mut side));
+    side.recorded(None);
     let mut out = Queue::with_capacity(1);
     drop(side.resolved_answer(&mut out));
     let Some(Answer::Spec(spec)) = side.resolved_answer(&mut out) else { panic!("b's spec") };
-    assert_eq!(spec.resolution.as_deref(), Some(&keys::Resolution::Needed { key: KEY_B }));
-    assert_eq!(
-        fixtures::places(&side.errors.errors()).as_ref(),
-        [(b"".as_slice(), 0, 0, b"a".as_slice()), (b"", 0, 0, b"c")]
-    );
+    let Some(keys::Resolution::Known { key, .. }) = spec.resolution.as_deref() else { panic!("recorded B") };
+    assert_eq!(*key, KEY_B);
+    assert_eq!(fixtures::places(&side.errors.errors()).as_ref(), fixtures::FAILED_HOLDERS);
 }
 #[test]
 fn without_resolve_no_key_is_resolved() {
@@ -41,25 +41,20 @@ fn without_resolve_no_key_is_resolved() {
 }
 #[test]
 fn a_failed_run_is_an_error_of_each_target_holding_its_key() {
-    let mut side = fixtures::resolving_side();
-    drop(fixtures::next_resolution(&mut side));
-    side.resolved(Some(fixtures::run_failure(RunCause::Fetch)));
+    let mut side = fixtures::first_resolving_side();
+    side.resolve_failed(fixtures::run_failure(RunCause::Fetch));
     for error in side.errors.errors() {
         assert_eq!(error.at, None);
     }
-    assert_eq!(
-        fixtures::places(&side.errors.errors()).as_ref(),
-        [(b"".as_slice(), 0, 0, b"a".as_slice()), (b"", 0, 0, b"c")]
-    );
+    assert_eq!(fixtures::places(&side.errors.errors()).as_ref(), fixtures::FAILED_HOLDERS);
 }
 #[test]
 fn a_run_too_large_is_the_resolution_error_too_many() {
-    let mut side = fixtures::resolving_side();
-    drop(fixtures::next_resolution(&mut side));
-    side.resolved(Some((
+    let mut side = fixtures::first_resolving_side();
+    side.resolve_failed((
         Class::Configuration,
         Failure::TooLarge { limit: crate::errors::Limit::Closure, max: u64::from(limits::SHIPPED.closure) },
-    )));
+    ));
     for error in side.errors.errors() {
         assert_eq!(error.kind, Kind::Resolution(Resolution::TooMany { max: fixtures::CLOSURE_LIMIT }));
     }
@@ -80,7 +75,7 @@ fn each_cause_takes_its_kind_and_class() {
     for (row, &(cause, class, kind)) in CAUSES.iter().enumerate() {
         let mut side = fixtures::resolving_side();
         drop(fixtures::next_resolution(&mut side));
-        side.resolved(Some(fixtures::run_failure(cause)));
+        side.resolve_failed(fixtures::run_failure(cause));
         for error in side.errors.errors() {
             let name = match error.kind {
                 Kind::Resolution(_) => "resolution",
@@ -123,7 +118,7 @@ fn an_error_with_no_place_sorts_after_placed_errors_by_target() {
     let mut side = fixtures::resolving_side();
     side.errors.push(fixtures::error_at(b"z.json", 1, 1, b"z"));
     drop(fixtures::next_resolution(&mut side));
-    side.resolved(Some(fixtures::run_failure(RunCause::Fetch)));
+    side.resolve_failed(fixtures::run_failure(RunCause::Fetch));
     assert_eq!(
         fixtures::places(&side.errors.errors()).as_ref(),
         [(b"z.json".as_slice(), 1, 1, b"z".as_slice()), (b"", 0, 0, b"a"), (b"", 0, 0, b"c")]
@@ -239,12 +234,54 @@ fn a_repeated_inst_line_is_one_package() {
 }
 #[test]
 fn an_unmatched_closure_is_an_operational_error_of_each_holder() {
-    let mut side = fixtures::resolving_side();
-    drop(fixtures::next_resolution(&mut side));
+    let mut side = fixtures::first_resolving_side();
     side.finding.inst(fixtures::resolution_inst(b"apt", b"amd64"));
-    side.resolved(None);
+    drop(fixtures::record_side(&mut side));
     for error in side.errors.errors() {
         assert_eq!(error.class, Class::Operational);
     }
     assert_eq!(side.errors.errors().len(), 2);
+}
+
+#[test]
+fn a_closed_closure_is_asked_recorded_with_its_digest_and_inputs() {
+    let mut side = fixtures::first_resolving_side();
+    side.finding.inst(fixtures::resolution_inst(b"apt", b"amd64"));
+    side.finding.stanza(0, fixtures::resolution_stanza(b"apt", b"amd64"));
+    let Some(Request::Record { request, resolution }) = fixtures::record_side(&mut side) else { panic!("record") };
+    assert_eq!(request, Token::new(7));
+    assert_eq!((resolution.key, resolution.digest), (KEY_A, fixtures::APT_CLOSURE));
+    assert_eq!(resolution.inputs.request.as_ref(), [hearth_lib::encode::Item::List(0)]);
+    assert_eq!(resolution.inputs.variant.as_ref(), [hearth_lib::encode::Item::Bytes(b"apt".as_slice().into())]);
+}
+#[test]
+fn once_recorded_every_target_holding_the_key_is_known() {
+    let mut side = fixtures::first_resolving_side();
+    drop(fixtures::record_side(&mut side));
+    side.recorded(None);
+    drop(fixtures::next_resolution(&mut side));
+    side.resolve_failed(fixtures::run_failure(RunCause::Fetch));
+    let mut names = List::with_capacity(3);
+    let mut out = Queue::with_capacity(1);
+    for _ in 0_u32..3 {
+        if let Some(Answer::Spec(spec)) = side.resolved_answer(&mut out)
+            && let Some(keys::Resolution::Known { key, .. }) = spec.resolution.as_deref()
+        {
+            names.push((spec.meta.target.clone(), *key)).expect("fixture targets");
+        }
+    }
+    assert_eq!(names.as_slice(), [(b"a".as_slice().into(), KEY_A), (b"c".as_slice().into(), KEY_A)]);
+}
+#[test]
+fn a_closure_past_its_limit_is_never_recorded() {
+    let mut side = fixtures::resolving_side();
+    side.limits = fixtures::SMALL_CLOSURE;
+    drop(fixtures::next_resolution(&mut side));
+    for name in [b"apt".as_slice(), b"curl", b"dpkg"] {
+        side.finding.inst(fixtures::resolution_inst(name, b"amd64"));
+    }
+    assert_eq!(fixtures::record_side(&mut side), None);
+    for error in side.errors.errors() {
+        assert_eq!(error.kind, Kind::Resolution(Resolution::TooMany { max: fixtures::SMALL_CLOSURE.closure }));
+    }
 }

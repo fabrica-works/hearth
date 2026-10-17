@@ -47,7 +47,10 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Qu
             crate::scan::begin(store, env.limits, out);
             return;
         }
-        Event::Find { .. }
+        Event::Record { .. }
+        | Event::Room
+        | Event::Unwritable { .. }
+        | Event::Find { .. }
         | Event::Resolution { .. }
         | Event::Unreadable
         | Event::Arrived { .. }

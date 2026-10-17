@@ -52,7 +52,7 @@ fn boxed_resolution(value: Option<render::keys::Resolution>) -> Option<Box<rende
 }
 
 #[must_use]
-pub fn resolution_faults() -> [render::errors::Resolution; 8] {
+pub fn resolution_faults() -> [render::errors::Resolution; 9] {
     use render::errors::Resolution;
     [
         Resolution::Unknown { package: b"apt".as_slice().into() },
@@ -70,6 +70,26 @@ pub fn resolution_faults() -> [render::errors::Resolution; 8] {
             version: b"3.3.3".as_slice().into(),
             architecture: b"amd64".as_slice().into(),
         },
+        Resolution::TooLarge { max: u64::from(tree::limits::SHIPPED.resolution.body) },
         Resolution::TooMany { max: super::CLOSURE_LIMIT },
     ]
+}
+
+#[must_use]
+pub fn resolution_inputs() -> tree::resolution::Inputs {
+    use hearth_lib::encode::Item;
+    tree::resolution::Inputs {
+        sources: Box::new([Item::Map(0)]),
+        request: Box::new([Item::List(1), Item::Bytes(b"hello".as_slice().into())]),
+        variant: Box::new([Item::Bytes(b"apt".as_slice().into())]),
+        apt: Box::new([Item::Map(0)]),
+    }
+}
+#[must_use]
+pub fn writable_resolutions() -> [tree::resolution::Resolution; 2] {
+    let first = resolution_record(resolution_inputs());
+    let mut second = first.clone();
+    second.made.at = Wall::from_nanos(77);
+    second.made.costs.fetched = 9;
+    [first, second]
 }

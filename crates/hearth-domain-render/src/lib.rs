@@ -87,13 +87,17 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             assert_eq!(request, Token::new(6), "resolve token");
             render.call.as_mut().expect("active call").side.finding.stanza(line, stanza);
         }
-        Event::Resolved { request, lines: _, tools: _, costs: _ } => {
+        Event::Resolved { request, lines, tools, costs } => {
             assert_eq!(request, Token::new(6), "resolve token");
-            render.call.as_mut().expect("active call").side.resolved(None);
+            render.call.as_mut().expect("active call").side.record(lines, tools, costs, env.wall, out);
         }
-        Event::Found { request, digest } => {
+        Event::Recorded { request } => {
+            assert_eq!(request, Token::new(7), "record token");
+            render.call.as_mut().expect("active call").side.recorded(None);
+        }
+        Event::Found { request, resolution } => {
             assert_eq!(request, Token::new(5), "find token");
-            render.call.as_mut().expect("active call").side.found(Some(digest), false);
+            render.call.as_mut().expect("active call").side.found(Some(resolution.digest), false);
         }
         Event::Absent { request } => {
             assert_eq!(request, Token::new(5), "find token");
@@ -103,46 +107,7 @@ pub fn step(render: &mut Render, env: &Env<Limits>, ev: Event, out: &mut Queue<O
             assert_eq!(request, Token::new(3), "hunks token");
             render.call.as_mut().expect("active call").hunks(Some(hunks));
         }
-        Event::Failed { request, class, at, failure } => {
-            if request == Token::new(3) {
-                render.call.as_mut().expect("active call").hunk_failure(class, failure);
-                return;
-            }
-            let side = &mut render.call.as_mut().expect("active call").side;
-            if request == Token::new(6) {
-                side.resolved(Some((class, failure)));
-                return;
-            }
-            if request == Token::new(5) {
-                side.found(None, true);
-                return;
-            }
-            if request == Token::new(4) {
-                side.kept(None);
-                return;
-            }
-            let kind = match failure {
-                vocabulary::Failure::Run { tool, .. } | vocabulary::Failure::Tool(tool) => {
-                    Some(errors::Kind::Tool(tool))
-                }
-                vocabulary::Failure::TooLarge { limit, max } => {
-                    Some(errors::Kind::Decode(errors::Decode::TooLarge { limit, max }))
-                }
-                vocabulary::Failure::Store => None,
-            };
-            if let Some(kind) = kind {
-                let at = failure_place(at);
-                errors::push(
-                    &mut side.errors,
-                    errors::Error { side: None, kind, class, at, also: None, target: None, task: None },
-                );
-            }
-            let outcome = match class {
-                Class::Configuration => Outcome::Failed,
-                Class::Operational => Outcome::TryAgain,
-            };
-            render.call.as_mut().expect("active call").side.fail(outcome);
-        }
+        Event::Failed { request, class, at, failure } => failed(render, request, class, at, failure),
     }
 }
 pub fn resume(render: &mut Render, env: &Env<Limits>, out: &mut Queue<Output>) {
@@ -161,3 +126,46 @@ fn failure_place(path: Option<Box<[u8]>>) -> Option<errors::Place> {
 }
 
 pub mod exports;
+
+fn failed(render: &mut Render, request: Token, class: Class, at: Option<Box<[u8]>>, failure: vocabulary::Failure) {
+    if request == Token::new(3) {
+        render.call.as_mut().expect("active call").hunk_failure(class, failure);
+        return;
+    }
+    let side = &mut render.call.as_mut().expect("active call").side;
+    if request == Token::new(7) {
+        side.recorded(Some((class, failure)));
+        return;
+    }
+    if request == Token::new(6) {
+        side.resolve_failed((class, failure));
+        return;
+    }
+    if request == Token::new(5) {
+        side.found(None, true);
+        return;
+    }
+    if request == Token::new(4) {
+        side.kept(None);
+        return;
+    }
+    let kind = match failure {
+        vocabulary::Failure::Run { tool, .. } | vocabulary::Failure::Tool(tool) => Some(errors::Kind::Tool(tool)),
+        vocabulary::Failure::TooLarge { limit, max } => {
+            Some(errors::Kind::Decode(errors::Decode::TooLarge { limit, max }))
+        }
+        vocabulary::Failure::Store => None,
+    };
+    if let Some(kind) = kind {
+        let at = failure_place(at);
+        errors::push(
+            &mut side.errors,
+            errors::Error { side: None, kind, class, at, also: None, target: None, task: None },
+        );
+    }
+    let outcome = match class {
+        Class::Configuration => Outcome::Failed,
+        Class::Operational => Outcome::TryAgain,
+    };
+    render.call.as_mut().expect("active call").side.fail(outcome);
+}

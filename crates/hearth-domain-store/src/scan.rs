@@ -128,7 +128,10 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
         Event::Unreadable => {
             scan.loading = None;
         }
-        Event::Find { .. }
+        Event::Record { .. }
+        | Event::Room
+        | Event::Unwritable { .. }
+        | Event::Find { .. }
         | Event::Arrived { .. }
         | Event::Open
         | Event::Locked
@@ -242,7 +245,9 @@ fn finish(store: &mut Store, answer: Answer, out: &mut Queue<Output>) {
     match &answer {
         Answer::Full { limit, most } => store.decline = crate::vocabulary::Decline::Full { limit: *limit, most: *most },
         Answer::Unusable { step } => store.decline = crate::vocabulary::Decline::Unusable { step: *step },
-        Answer::Found { .. }
+        Answer::Recorded
+        | Answer::HasRoom
+        | Answer::Found { .. }
         | Answer::Absent
         | Answer::Declined { .. }
         | Answer::Waiting

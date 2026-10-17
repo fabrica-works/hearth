@@ -8,6 +8,9 @@ pub use hearth_lib::encode::Digest;
 use skein_lib::Token;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
+    Recorded {
+        request: Token,
+    },
     Inst {
         request: Token,
         inst: crate::resolution::Inst,
@@ -25,7 +28,7 @@ pub enum Event {
     },
     Found {
         request: Token,
-        digest: Digest,
+        resolution: crate::resolution::Record,
     },
     Absent {
         request: Token,
@@ -78,6 +81,10 @@ pub enum Event {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    Record {
+        request: Token,
+        resolution: crate::resolution::Record,
+    },
     Resolve {
         request: Token,
         key: Digest,

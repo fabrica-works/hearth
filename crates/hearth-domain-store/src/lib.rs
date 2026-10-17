@@ -38,6 +38,7 @@ pub struct Store {
     usable: bool,
     said: bool,
     finding: bool,
+    writing: Option<hearth_lib::encode::Digest>,
     decline: vocabulary::Decline,
 }
 impl Store {
@@ -52,12 +53,17 @@ impl Store {
             usable: false,
             said: false,
             finding: false,
+            writing: None,
             decline: vocabulary::Decline::Unusable { step: vocabulary::Step::List },
         }
     }
 }
 pub fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Queue<Output>) {
-    if let Event::Find { .. } = ev {
+    if store.writing.is_some() {
+        resolutions::record(store, env, ev, out);
+    } else if let Event::Record { .. } | Event::Room = ev {
+        resolutions::record(store, env, ev, out);
+    } else if let Event::Find { .. } = ev {
         resolutions::find(store, ev, out);
     } else if store.finding {
         resolutions::find(store, ev, out);

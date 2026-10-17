@@ -157,3 +157,52 @@ pub fn unknown_package_repository() -> Repository {
     ));
     repository
 }
+
+#[must_use]
+pub fn mirror() -> hearth_test_mirror::Mirror {
+    hearth_test_mirror::Mirror::find(&hearth_test_mirror::Pin::committed()).expect("fetched pinned mirror")
+}
+#[must_use]
+pub fn resolved_test_min(label: &str) -> (Repository, Rendered) {
+    let repository = Repository::make(label, TEST_REPOSITORY);
+    let proxy = hearth_test_mirror::Proxy::serve(&mirror()).expect("loopback proxy");
+    let rendered = resolve(&repository, &[b"test-min"], Form::Text, proxy.url().as_bytes());
+    (repository, rendered)
+}
+#[must_use]
+pub fn read_test_min(repository: &Repository) -> Resolution {
+    let bytes =
+        std::fs::read(repository.scratch().path().join("store/resolutions").join(format!("{TEST_MIN_KEY}.record")))
+            .expect("recorded resolution");
+    hearth_protocol_tree::resolution::read(&bytes, &hearth_protocol_tree::limits::SHIPPED).expect("resolution record")
+}
+#[must_use]
+pub fn recorded_closure() -> Box<[Package]> {
+    let recording = hearth_recordings::all("mmdebstrap")
+        .into_iter()
+        .find(|(name, _)| name.as_ref() == "test-min")
+        .expect("test-min recording")
+        .1;
+    let bytes = recording.stanzas.expect("recorded installed stanzas");
+    let stanzas = std::str::from_utf8(&bytes).expect("stanza UTF-8");
+    let mut packages = Vec::new();
+    for stanza in stanzas.split("\n\n").filter(|stanza| !stanza.is_empty()) {
+        let field =
+            |name: &str| stanza.lines().find_map(|line| line.strip_prefix(name)).expect("recorded package field");
+        let mut sha256 = [0; 32];
+        for (byte, pair) in sha256.iter_mut().zip(field("SHA256: ").as_bytes().chunks_exact(2)) {
+            *byte = u8::from_str_radix(std::str::from_utf8(pair).expect("hex"), 16).expect("digest byte");
+        }
+        packages.push(Package {
+            name: field("Package: ").as_bytes().into(),
+            architecture: field("Architecture: ").as_bytes().into(),
+            version: field("Version: ").as_bytes().into(),
+            filename: field("Filename: ").as_bytes().into(),
+            size: field("Size: ").parse().expect("package size"),
+            sha256: hearth_lib::encode::Digest(sha256),
+            source: 0,
+        });
+    }
+    packages.sort_by(|left, right| (&left.name, &left.architecture).cmp(&(&right.name, &right.architecture)));
+    packages.into_boxed_slice()
+}

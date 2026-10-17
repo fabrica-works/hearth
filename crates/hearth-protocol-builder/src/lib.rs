@@ -195,7 +195,7 @@ impl Protocol {
     }
     #[must_use]
     pub fn work_pending(&self) -> bool {
-        if self.call.is_some() || self.client.work_pending() || self.progress.work_pending() {
+        if self.store.ready() || self.call.is_some() || self.client.work_pending() || self.progress.work_pending() {
             return true;
         }
         if let Some(resolve) = &self.resolving {
@@ -291,7 +291,9 @@ pub fn down(
             assert!(protocol.keeping.is_none(), "one cache request at a time");
             match request {
                 request @ render::vocabulary::Request::Resolve { .. } => protocol.resolve(request, env, below),
-                render::vocabulary::Request::Find { .. } => unreachable!("root routes finds to store"),
+                render::vocabulary::Request::Record { .. } | render::vocabulary::Request::Find { .. } => {
+                    unreachable!("root routes finds to store")
+                }
                 request @ render::vocabulary::Request::Keep { .. } => protocol.keep(request, env),
                 render::vocabulary::Request::List { request, repository, revision } => {
                     let Ok(revision) = invocation::revision(&revision) else {
@@ -525,7 +527,7 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
         protocol.client.resume(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, below);
         return;
     }
-    if protocol.resume_resolve(env, above, below) {
+    if protocol.store.resume(above) || protocol.resume_resolve(env, above, below) {
         return;
     }
     if let Some(keep) = &mut protocol.keeping {

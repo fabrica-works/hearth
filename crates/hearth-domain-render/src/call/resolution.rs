@@ -18,6 +18,7 @@ pub(crate) struct Finding {
     attempted: Map<Digest, ()>,
     closure: Option<crate::resolution::Closure>,
     fault: Option<crate::errors::Resolution>,
+    recording: Option<Digest>,
 }
 impl Finding {
     pub fn resolve(&mut self, deadline: Option<skein_lib::Time>) {
@@ -43,6 +44,7 @@ impl Finding {
             attempted: Map::with_capacity(capacity),
             closure: None,
             fault: None,
+            recording: None,
         }
     }
 }
@@ -136,18 +138,65 @@ impl Side {
         }
         Some(self.finished())
     }
-    pub(crate) fn resolved(&mut self, failure: Option<(crate::vocabulary::Class, crate::vocabulary::Failure)>) {
-        let key = self.finding.pending.take().expect("one resolve in flight");
+    pub(crate) fn record(
+        &mut self,
+        lines: Box<[crate::resolution::Line]>,
+        tools: crate::resolution::Tools,
+        costs: crate::resolution::Costs,
+        at: skein_lib::Wall,
+        out: &mut Queue<Output>,
+    ) {
+        let key = self.finding.pending.expect("active resolve");
         let closure = self.finding.closure.take().expect("active closure");
-        let fault = if failure.is_none() {
-            let names = requested_names(&self.made, &key);
-            match self.finding.fault.take() {
-                Some(fault) => Some(fault),
-                None => closure.close(names).err(),
-            }
-        } else {
-            None
+        let closed = match self.finding.fault.take() {
+            Some(fault) => Err(fault),
+            None => closure.close(requested_names(&self.made, &key)),
         };
+        match closed {
+            Ok(closure) => {
+                let digest = keys::closure(&closure);
+                self.finding.recording = Some(digest);
+                out.push(Output::Request(Request::Record {
+                    request: Token::new(7),
+                    resolution: crate::resolution::Record {
+                        key,
+                        inputs: inputs(&self.made, &key),
+                        sources: lines,
+                        closure,
+                        digest,
+                        made: crate::resolution::Made { at, tools, costs },
+                    },
+                }));
+            }
+            Err(fault) => self.resolution_fault(key, Some(fault), None),
+        }
+    }
+    pub(crate) fn recorded(&mut self, failure: Option<(crate::vocabulary::Class, crate::vocabulary::Failure)>) {
+        let key = self.finding.pending.take().expect("record in flight");
+        let digest = self.finding.recording.take().expect("record digest");
+        if failure.is_none() {
+            *self.finding.asked.get_mut(&key).expect("asked key") = Some(digest);
+            self.ready = true;
+        } else {
+            self.resolution_fault(key, None, failure);
+        }
+    }
+    pub(crate) fn resolve_failed(&mut self, failure: (crate::vocabulary::Class, crate::vocabulary::Failure)) {
+        let key = self.finding.pending.take().expect("resolve in flight");
+        self.finding.closure = None;
+        self.finding.fault = None;
+        self.resolution_fault(key, None, Some(failure));
+    }
+    fn resolution_fault(
+        &mut self,
+        key: Digest,
+        fault: Option<crate::errors::Resolution>,
+        failure: Option<(crate::vocabulary::Class, crate::vocabulary::Failure)>,
+    ) {
+        self.finding.pending = None;
+        if let Some((_, crate::vocabulary::Failure::Store)) = &failure {
+            self.outcome = self.outcome.worst(Outcome::TryAgain);
+        }
         let fault = match fault {
             Some(fault) => {
                 let class = match &fault {
@@ -158,6 +207,7 @@ impl Side {
                     | crate::errors::Resolution::Unsatisfiable { .. }
                     | crate::errors::Resolution::Absent { .. }
                     | crate::errors::Resolution::Missing { .. }
+                    | crate::errors::Resolution::TooLarge { .. }
                     | crate::errors::Resolution::TooMany { .. } => crate::vocabulary::Class::Configuration,
                 };
                 Some((class, crate::errors::Kind::Resolution(fault)))
@@ -224,6 +274,7 @@ fn failure_kind(failure: crate::vocabulary::Failure) -> Option<crate::errors::Ki
         Failure::TooLarge { limit: Limit::Closure, max } => {
             Kind::Resolution(Resolution::TooMany { max: u32::try_from(max).expect("closure limit is u32") })
         }
+        Failure::TooLarge { limit: Limit::Record, max } => Kind::Resolution(Resolution::TooLarge { max }),
         Failure::TooLarge { limit, max } => Kind::Decode(Decode::TooLarge { limit, max }),
         Failure::Store => return None,
     })
@@ -246,4 +297,17 @@ fn classified_failure(
 ) -> Option<(crate::vocabulary::Class, crate::errors::Kind)> {
     let (class, failure) = failure?;
     Some((class, failure_kind(failure)?))
+}
+
+fn inputs(made: &Map<Box<[u8]>, Made>, key: &Digest) -> parts::packages::Inputs {
+    for (_, made) in made {
+        if let Made::Spec(spec) = made
+            && let Some(resolution) = &spec.resolution
+            && resolution.key() == *key
+            && let Some(packages) = packages(spec)
+        {
+            return parts::packages::inputs(packages);
+        }
+    }
+    unreachable!("key has a holder")
 }
