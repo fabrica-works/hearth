@@ -95,6 +95,9 @@ it. Each proves on the real loop's `hearth render`, by the error it prints.
 - **No recursion, no `Vec`, `String` or `_` arm** (render.md, 8.3): every walk a
   `for`, rows in `skein_lib::List`, no new limit. Positions in proofs are
   counted by hand (`python3 -I`, once); no expected value is computed.
+- **`clippy.toml`'s list binds every crate:** no `mem::take` (`mem::replace`),
+  no `sort_by` closure, `is_some_and`, `Iterator::filter` or `Iterator::find`
+  (`:114`, `:132`, `:147`, `:165`, `:207`): a `for`, or a `match`.
 - **Shared files:** render's `errors.rs`, `entries.rs`, `compose.rs`, `call.rs`;
   the records' `errors.rs`; `translate/errors.rs`; both fixtures modules.
 
@@ -106,9 +109,15 @@ Scope: 5.11's rows for `cmdline`, `preseeds`, `presets`, `tmpfiles`; machine.md
 Needs: the session's start (hearth 17, 18, 19).
 Files: render new `src/reserved.rs`, `src/reserved/words.rs`, `src/{entries,
 call, errors, lib}.rs`, new `src/tests/reserved.rs`, `src/tests/fixtures.rs`;
-protocol `src/translate/errors.rs`, `src/tests/translate.rs`; records
-`src/errors.rs`, `src/form/{text, json}.rs`, `src/tests/errors.rs`;
-`tests/builder/{src/fixtures.rs, tests/real.rs}`.
+protocol `src/translate/errors.rs`, new `src/tests/translate/reserved.rs` (a
+rules fixture beside `composition_kinds`, `src/tests/fixtures.rs:740`);
+records `src/errors.rs` (`Kind::Reserved`, its text and json arms beside
+`Composition`'s, `:81` and `:137`, its `mod` and `pub use` beside
+`composition`'s, `:657` to `:669`), new `src/errors/reserved.rs` (no_std: a
+length prints with `lines.decimal(u64::from(*bytes))`), `src/tests/errors.rs`;
+`tests/render/src/declarations.rs` (its exhaustive `Kind` match, `:223` to
+`:232`, gains `| Kind::Reserved(_)`); `tests/builder/{src/fixtures.rs,
+tests/real.rs}`.
 Shape: the sketches. On a container (`entries`' `container`, from its
 placement) an entry of `Map::Initramfs` is `ContainerModule` and one of
 `Map::Cmdline` `ContainerParam`, at the entry's key (render.md 4.2, 7.2). A
@@ -126,7 +135,9 @@ the hearth task's own). Tmpfiles `type` `v`, `q`, `Q`: `TmpfilesSubvolume`,
 `w`, `w+`, `f+`, `L+` at a path not beneath `/var`, `/run`, `/tmp`:
 `TmpfilesWrite`; both at `type`.
 Test shape: `src/tests/reserved.rs`, under 20 ms, on 17.4's `fixtures::cmdline`
-and new `fixtures::{preseeds, presets, tmpfiles, refused}`. Reference:
+and new `fixtures::{preseeds, presets, tmpfiles, refused, reserved}`
+(`reserved(&[Refused]) -> Box<[Reserved]>`, each row's `reserved` in order).
+Reference:
 ```rust
 // crates/hearth-domain-render/src/tests/reserved.rs
 #[test]
@@ -134,7 +145,7 @@ fn a_reserved_key_is_refused_at_its_param_and_leaves_the_kinds_nothing() {
     let mut expansion = fixtures::cmdline([("base", "wait", "rootwait", 500), ("base", "quiet", "quiet", 100)]);
     let refused = reserved::entries(&mut expansion, b"x1-prod", false);
     let want = Reserved { rule: Rule::RootWait, what: Box::from(&b"rootwait"[..]) };
-    assert_eq!(fixtures::reserved(&refused), [want], "format.md, 5.11: rootwait waits for ever");
+    assert_eq!(*fixtures::reserved(&refused), [want], "format.md, 5.11: rootwait waits for ever");
     assert_eq!(expansion.of(Map::Cmdline).len(), 1, "the refused entry is hidden: no kind reports it twice");
 }
 ```
@@ -295,12 +306,26 @@ Removes: nothing.
 Scope: format.md 5.12; render.md 3.2; hearth 12's presence; log 68.
 Needs: nothing beyond 21.3; hearth 42.3 (`Composition::Task`, `CONTAINERS`).
 Files: render `src/{compose, call, errors}.rs`, `src/tests/{compose,
-fixtures}.rs`;
+fixtures, errors}.rs`, `src/tests/fixtures/schemas.rs`;
 protocol, records and `tests/builder` as 21.1's; both fixtures modules: `THIN`
 and the scripted `x1_prod` gain `tasks/hearth/task.json` `{}` (a ripple past
 README's 20 lines, as 17.1's: a planner's ruling), and each repository that
-is not built on them: `LAYERS` (12.1), `MOTD` (25.1), `CLUSTER`, `CONTAINERS`
-(42.2, 42.3), `CONTAINED`, `VPN` (20.1, 20.3).
+is not built on them: `MOTD` and `CONTAINERS` (`tests/builder/src/fixtures.rs`,
+`:237`, `:646`). `LAYERS` and `CLUSTER` need nothing, and `CONTAINED`
+(`thin_with`) has THIN's; `VPN`, if hearth 20 lands it without `thin_with`.
+The ripple, at hearth c8f830d:
+- render's unit fixtures: `schemas.rs:176`'s `Present` gains `implicit:
+  false`; `removed_task` (`fixtures.rs:203`) gains a `tasks/hearth/task.json`
+  entry, its declaration (`declaration(&[], &[])`) and `call.defaults =
+  schema::declarations(..)`; the list capacities at `fixtures.rs:692` and
+  `:712` grow by one (4 to 5, 5 to 6), as `tests/errors.rs:116`'s count (4 to
+  5). `tests/compose.rs:140`, `:219`, `:238` and `:251` read
+  `only(&settings.tasks)`, which now holds two: they read a new
+  `fixtures::task_of(&Settings) -> &Present`, the task not `implicit`;
+- the render world: the scripted `x1_prod` (`tests/render/src/fixtures.rs:38`)
+  gains the entry (oid `h`) and an empty `Declaration`;
+  `tests/render/tests/compose.rs:21`'s reads gain its oid, `thin.rs:121`'s
+  count goes from 4 to 5, and `thin.rs:142`'s reads gain `oid(b'h')`.
 Shape: `compose::compose` adds `hearth` to the present tasks of a target whose
 placement is not a container, in name order, `implicit`. Naming `hearth` in a
 presence layer (base, member, base-env) of a container, with any value, is
@@ -309,7 +334,8 @@ environment's included, `HearthNull` (42.3's `Null` skips `hearth`: no other
 kind reports it), both `reserved`, at the key, `task` `hearth`, `target` named
 (`fleet.json`'s and an environment's once, without a target). A present
 `hearth` with no `tasks/hearth/task.json` is 42.3's `Composition::Task` at that
-path, no position, for each such target. A non-null `hearth` in a base or member of
+path, no position, for each such target: 42.3 added the variant, and 21.4
+emits it for the implicit task (nothing on main does). A non-null `hearth` in a base or member of
 any other target is accepted: one `Present` (not two), `implicit` false.
 `fleet.json` and `envs/` keys for `hearth` are settings, as for any task; a
 container has none: a key for it on a container is dropped, with no error. Nothing else:
@@ -342,14 +368,19 @@ askpass` (100755), `tree/etc/hearth/alarms.json.j2`): exit 0, and
   download   /usr/local/bin/hearth file 0755 root:root ca2dff161724
   fetch      ca2dff161724 https://git.ekanayaka.io/ai/hearth/releases/download/v0.1.0/hearth-x86_64-linux
 ```
-`a_target_whose_hearth_task_declares_nothing_requests_no_package` (log 68, as
-08.2's `testing/repos/test`: `tasks/hearth/task.json` `{"doc": "hearth
-itself."}`, a target with no other task): `lines_starting` over `  request`
-is empty, exit 0. `a_container_renders_without_a_hearth_declaration_and_a_host_
-does_not` on `NO_HEARTH` (42.3's `CONTAINERS`, `chat-prod` on `rhi-prod`, no
-`tasks/hearth`): asked `chat-prod`, exit 0; asked `rhi-prod`, stdout is
-`tasks/hearth/task.json: rhi-prod: hearth: no task hearth under tasks/` and
-exit 2. `a_container_naming_hearth_is_refused_at_the_key` (`chat-prod.json`
+`a_target_whose_hearth_task_declares_nothing_requests_no_package` (log 68, on
+08.2's `testing/repos/test` as main has it: its `tasks/hearth/task.json`
+holds a `doc` alone, and 21.4 leaves it so; a target with no other task):
+`lines_starting` over `  request` is empty, exit 0.
+`a_container_renders_without_a_hearth_declaration_and_a_host_does_not` waits
+for the designer's answer to whether a container renders when its host
+fails (ruling 162): main leaves such a container
+out (42-listing-members-rules.md, Rules; `call/validation.rs:129`). Its host
+half holds either way: on `NO_HEARTH` (42.3's `CONTAINERS` with
+`chat-prod.json` overridden to `"on": "rhi-prod"`, as `CONTAINERS` places it
+on `rhi-lab`; no `tasks/hearth`), asked `rhi-prod`, stdout is
+`tasks/hearth/task.json: rhi-prod: no task hearth under tasks/` (the records
+print no task for `Composition::Task`, `errors.rs:66`) and exit 2. `a_container_naming_hearth_is_refused_at_the_key` (`chat-prod.json`
 `{"placement": {"kind": "container", "on": "rhi-prod"}, "hearth": {}}`): the
 `hosts/` line begins `hosts/chat/chat-prod.json:1:56: chat-prod: hearth: `.
 Don't: write the data part's `snapshots` and `backups` policies (M5, M6);
