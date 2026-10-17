@@ -1,5 +1,6 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
 pub(crate) mod guards;
+mod references;
 pub(crate) mod templates;
 mod validation;
 use crate::{
@@ -216,6 +217,7 @@ impl Side {
         assert_eq!(&expected.oid, oid, "blobs answer in request order");
         match read {
             Decoded::Template(template) => {
+                self.check_template(oid, &template);
                 self.templates.insert(oid.clone(), template).expect("listing capacity");
             }
             Decoded::Document(document) => {

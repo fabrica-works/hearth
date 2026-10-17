@@ -342,6 +342,10 @@ pub fn declaration_map_to_records(value: render::revision::declaration::Map) -> 
 #[must_use]
 pub fn schema(schema: target::Schema) -> records::errors::Schema {
     match schema {
+        target::Schema::Unlisted { reader, root, task, setting } => {
+            records::errors::Schema::Unlisted { reader, root: reference_root(root), task, setting }
+        }
+        target::Schema::Dynamic { root } => records::errors::Schema::Dynamic { root: reference_root(root) },
         target::Schema::Malformed { format } => records::errors::Schema::Malformed { format: self::format(format) },
         target::Schema::Target { name, environment } => records::errors::Schema::Target { name, environment },
         target::Schema::File { path } => records::errors::Schema::File { path },
@@ -603,5 +607,12 @@ pub fn format(format: target::Format) -> records::errors::Format {
         target::Format::Key => records::errors::Format::Key,
         target::Format::Timestamp => records::errors::Format::Timestamp,
         target::Format::Debian => records::errors::Format::Debian,
+    }
+}
+
+fn reference_root(root: target::Root) -> records::errors::Root {
+    match root {
+        target::Root::Tasks => records::errors::Root::Tasks,
+        target::Root::Exports => records::errors::Root::Exports,
     }
 }

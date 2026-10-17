@@ -69,6 +69,12 @@ fn each_form_translates_to_render_and_back() {
 }
 fn schema_back(schema: crate::records::errors::Schema) -> render::errors::Schema {
     match schema {
+        crate::records::errors::Schema::Unlisted { reader, root, task, setting } => {
+            render::errors::Schema::Unlisted { reader, root: reference_root_back(root), task, setting }
+        }
+        crate::records::errors::Schema::Dynamic { root } => {
+            render::errors::Schema::Dynamic { root: reference_root_back(root) }
+        }
         crate::records::errors::Schema::Malformed { format } => {
             render::errors::Schema::Malformed { format: super::forms::format_back(format) }
         }
@@ -233,5 +239,12 @@ fn a_declarations_requires_cross_to_render_and_back() {
         let guard = declarations::guard(guard, &crate::limits::SHIPPED.template).expect("guard compiles");
         let back = super::back::expression(guard.when.expression);
         assert_eq!(back, input, "row {row}: guard condition");
+    }
+}
+
+fn reference_root_back(root: crate::records::errors::Root) -> render::errors::Root {
+    match root {
+        crate::records::errors::Root::Tasks => render::errors::Root::Tasks,
+        crate::records::errors::Root::Exports => render::errors::Root::Exports,
     }
 }

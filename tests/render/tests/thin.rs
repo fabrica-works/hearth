@@ -254,8 +254,12 @@ fn the_tree_orders_by_installed_path_when_the_suffix_reorders() {
 }
 
 const FAULTING_TEMPLATES: &[(&[u8], hearth_domain_render::revision::Mode, &[u8])] = &[
-    (b"tasks/motd/tree/etc/a.j2", hearth_domain_render::revision::Mode::File, b"{{ target.nam }}{{ settings.no }}"),
-    (b"tasks/motd/tree/etc/b.j2", hearth_domain_render::revision::Mode::File, b"header\n{{ target.zz }}{{ tasks.no }}"),
+    (b"tasks/motd/tree/etc/a.j2", hearth_domain_render::revision::Mode::File, b"{{ target.nam }}{{ target.no }}"),
+    (
+        b"tasks/motd/tree/etc/b.j2",
+        hearth_domain_render::revision::Mode::File,
+        b"header\n{{ target.zz }}{{ target.no }}",
+    ),
 ];
 const FIRST_FAULTS: &[(&[u8], Position, hearth_domain_render::errors::Kind)] = &[
     (

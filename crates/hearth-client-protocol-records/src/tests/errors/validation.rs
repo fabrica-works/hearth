@@ -170,3 +170,86 @@ fn an_evaluation_error_prints_its_target_task_and_message() {
         Ok(b"tasks/motd/tree/etc/issue.j2:1:11: x1-prod: motd: a missing key\n".as_slice())
     );
 }
+const REFERENCES: &[(SchemaInput, &str)] = &[
+    (
+        SchemaInput::Unlisted {
+            reader: b"vpn",
+            root: crate::errors::Root::Tasks,
+            task: b"core",
+            setting: Some(b"domain"),
+        },
+        "tasks.core.domain is not in vpn's reads\n",
+    ),
+    (
+        SchemaInput::Unlisted { reader: b"mail", root: crate::errors::Root::Exports, task: b"mail", setting: None },
+        "exports.mail is not in mail's reads\n",
+    ),
+    (
+        SchemaInput::Unlisted { reader: b"vpn", root: crate::errors::Root::Tasks, task: b"wifi", setting: None },
+        "tasks.wifi is not an optional read of vpn\n",
+    ),
+    (SchemaInput::Dynamic(crate::errors::Root::Tasks), "tasks takes only literal names\n"),
+    (SchemaInput::Dynamic(crate::errors::Root::Exports), "exports takes only literal names\n"),
+];
+#[test]
+fn an_unlisted_read_prints_the_reader_and_the_reference() {
+    for (row, &(input, expected)) in REFERENCES.iter().enumerate() {
+        assert_eq!(
+            form::print(Form::Text, &Record::Error(fixtures::reference_error(input)), None, &limits::SHIPPED)
+                .as_deref(),
+            Ok(expected.as_bytes()),
+            "row {row}"
+        );
+    }
+}
+const REFERENCES_JSON: &[(SchemaInput, &str)] = &[
+    (
+        SchemaInput::Unlisted {
+            reader: b"vpn",
+            root: crate::errors::Root::Tasks,
+            task: b"core",
+            setting: Some(b"domain"),
+        },
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"kind":"unlisted","reader":"vpn","root":"tasks","setting":"domain","task":"core"},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+    (
+        SchemaInput::Unlisted { reader: b"mail", root: crate::errors::Root::Exports, task: b"mail", setting: None },
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"kind":"unlisted","reader":"mail","root":"exports","setting":null,"task":"mail"},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+    (
+        SchemaInput::Dynamic(crate::errors::Root::Tasks),
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"kind":"dynamic","root":"tasks"},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+    (
+        SchemaInput::Dynamic(crate::errors::Root::Exports),
+        concat!(
+            r#"{"record":"error","kind":"schema","schema":{"kind":"dynamic","root":"exports"},"class":"configuration"}"#,
+            "\n"
+        ),
+    ),
+];
+#[test]
+fn a_reference_fault_prints_its_json_fields() {
+    for (row, &(input, expected)) in REFERENCES_JSON.iter().enumerate() {
+        assert_eq!(
+            form::print(
+                Form::JsonLines,
+                &Record::Error(fixtures::reference_error(input)),
+                Some(crate::records::Type::Error),
+                &limits::SHIPPED
+            )
+            .as_deref(),
+            Ok(expected.as_bytes()),
+            "row {row}"
+        );
+    }
+}

@@ -617,3 +617,31 @@ fn a_boolean_in_a_string_field_prints_an_evaluation_error_at_the_field() {
         b"tasks/motd/task.json:3:21: x1-prod: motd: a value of the wrong type\n"
     );
 }
+
+#[test]
+fn a_typo_in_a_settings_reference_prints_the_declared_names() {
+    let repository = Repository::make("typo-reference", &fixtures::thin_with(core::slice::from_ref(&fixtures::TYPO)));
+    assert_eq!(
+        fixtures::render(&repository, &[], Form::Text).stdout,
+        b"tasks/motd/task.json:3:21: motd: undeclared setting \"greting\"; motd declares greeting\n"
+    );
+}
+#[test]
+fn a_typo_in_a_settings_reference_exits_with_configuration_failure() {
+    let repository =
+        Repository::make("typo-reference-exit", &fixtures::thin_with(core::slice::from_ref(&fixtures::TYPO)));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}
+#[test]
+fn a_typo_in_a_branch_no_run_takes_prints_at_its_line() {
+    let repository = Repository::make("typo-branch", &fixtures::thin_with(fixtures::TYPO_BRANCH));
+    assert_eq!(
+        fixtures::render(&repository, &[], Form::Text).stdout,
+        b"tasks/motd/tree/etc/issue.j2:1:27: motd: undeclared setting \"greting\"; motd declares greeting\n"
+    );
+}
+#[test]
+fn a_typo_in_an_untaken_branch_exits_with_configuration_failure() {
+    let repository = Repository::make("typo-branch-exit", &fixtures::thin_with(fixtures::TYPO_BRANCH));
+    assert_eq!(fixtures::render(&repository, &[], Form::Text).exit, Exit::Code(2));
+}

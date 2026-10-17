@@ -145,6 +145,8 @@ pub fn duplicate() -> crate::errors::Error {
 
 #[derive(Clone, Copy, Debug)]
 pub enum SchemaInput {
+    Unlisted { reader: &'static [u8], root: crate::errors::Root, task: &'static [u8], setting: Option<&'static [u8]> },
+    Dynamic(crate::errors::Root),
     Malformed(crate::errors::Format),
     Target { name: &'static [u8], environment: &'static [u8] },
     File(&'static [u8]),
@@ -174,6 +176,14 @@ pub fn schema_fault(input: SchemaInput) -> crate::errors::Schema {
         }
         SchemaInput::File(path) => Schema::File { path: copy_of(path) },
         SchemaInput::Large { path, max } => Schema::Large { path: copy_of(path), max },
+        SchemaInput::Unlisted { reader, root, task, setting } => {
+            let mut member = None;
+            if let Some(setting) = setting {
+                member = Some(copy_of(setting));
+            }
+            Schema::Unlisted { reader: copy_of(reader), root, task: copy_of(task), setting: member }
+        }
+        SchemaInput::Dynamic(root) => Schema::Dynamic { root },
         SchemaInput::Main => Schema::Main,
         SchemaInput::Security => Schema::Security,
         SchemaInput::Undeclared { setting, declared } => {
@@ -323,5 +333,13 @@ pub fn missing_task() -> crate::errors::Error {
 pub fn key_collision() -> crate::errors::Error {
     let mut error = duplicate();
     error.kind = crate::errors::Kind::Collision(crate::errors::Collision::Key { key: copy_of(b"ops") });
+    error
+}
+#[must_use]
+pub fn reference_error(input: SchemaInput) -> crate::errors::Error {
+    let mut error = duplicate();
+    error.kind = crate::errors::Kind::Schema(schema_fault(input));
+    error.at = None;
+    error.also = None;
     error
 }

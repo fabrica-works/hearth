@@ -396,6 +396,8 @@ pub const fn kind(schema: &Schema) -> &'static str {
         Schema::Target { .. } => "target",
         Schema::File { .. } => "file",
         Schema::Large { .. } => "large",
+        Schema::Unlisted { reader: _, root: _, task: _, setting: _ } => "unlisted",
+        Schema::Dynamic { root: _ } => "dynamic",
         Schema::Main => "main",
         Schema::Security => "security",
     }

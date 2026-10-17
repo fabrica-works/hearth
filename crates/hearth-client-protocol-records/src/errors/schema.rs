@@ -27,6 +27,10 @@ impl Format {
 impl Schema {
     pub(super) fn text(&self, lines: &mut Lines, task: Option<&[u8]>) {
         match self {
+            Self::Unlisted { reader, root, task, setting } => {
+                unlisted_text(lines, reader, *root, task, setting.as_deref());
+            }
+            Self::Dynamic { root } => dynamic_text(lines, *root),
             Self::Malformed { format } => {
                 lines.put(b"malformed ");
                 lines.put(format.name());
@@ -128,6 +132,10 @@ impl Schema {
     pub(super) fn json(&self, json: &mut Encoder) {
         json.object_start();
         match self {
+            Self::Unlisted { reader, root, task, setting } => {
+                unlisted_json(json, reader, *root, task, setting.as_deref());
+            }
+            Self::Dynamic { root } => dynamic_json(json, *root),
             Self::Malformed { format } => {
                 field(json, b"format", format.name());
                 field(json, b"kind", b"malformed");
@@ -219,4 +227,52 @@ impl Schema {
         }
         json.object_end();
     }
+}
+
+impl super::Root {
+    fn name(self) -> &'static [u8] {
+        match self {
+            Self::Tasks => b"tasks",
+            Self::Exports => b"exports",
+        }
+    }
+}
+fn unlisted_text(lines: &mut Lines, reader: &[u8], root: super::Root, task: &[u8], setting: Option<&[u8]>) {
+    lines.put(root.name());
+    lines.put(b".");
+    lines.put(task);
+    if let Some(setting) = setting {
+        lines.put(b".");
+        lines.put(setting);
+    }
+    if root == super::Root::Tasks && setting.is_none() {
+        lines.put(b" is not an optional read of ");
+        lines.put(reader);
+    } else {
+        lines.put(b" is not in ");
+        lines.put(reader);
+        lines.put(b"'s reads");
+    }
+}
+fn unlisted_json(json: &mut Encoder, reader: &[u8], root: super::Root, task: &[u8], setting: Option<&[u8]>) {
+    field(json, b"kind", b"unlisted");
+    field(json, b"reader", reader);
+    field(json, b"root", root.name());
+    json.key(b"setting");
+    if let Some(setting) = setting {
+        json.string(setting);
+    } else {
+        json.null();
+    }
+    field(json, b"task", task);
+}
+
+fn dynamic_text(lines: &mut Lines, root: super::Root) {
+    lines.put(root.name());
+    lines.put(b" takes only literal names");
+}
+
+fn dynamic_json(json: &mut Encoder, root: super::Root) {
+    field(json, b"kind", b"dynamic");
+    field(json, b"root", root.name());
 }

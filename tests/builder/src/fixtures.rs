@@ -701,3 +701,9 @@ pub const DISTINCT_TEAMS: File =
 
 pub const UNSET: File = File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"origin\": {\"type\": \"string\", \"optional\": true, \"doc\": \"Where from.\"}},\n\"groups\": {\n    \"ops\": {\"from\": \"{{ settings.origin }}\"},\n    \"dev\": {\"from\": \"x{{ settings.origin }}\"}}}" };
 pub const BOOLEAN_FIELD: File = File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"enabled\": {\"type\": \"bool\", \"default\": true, \"doc\": \"Enabled.\"}},\n\"groups\": {\n    \"ops\": {\"from\": \"{{ settings.enabled }}\"}}}" };
+
+pub const TYPO: File = File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"greeting\": {\"type\": \"string\", \"default\": \"hello\", \"doc\": \"The greeting.\"}},\n\"requires\": {\n    \"known\": {\"if\": \"settings.greting != ''\", \"message\": \"set one\"}}}" };
+pub const TYPO_BRANCH: &[File] = &[
+ File { path: "tasks/motd/task.json", mode: 0o644, body: b"{\"settings\": {\"greeting\": {\"type\": \"string\", \"default\": \"hello\", \"doc\": \"The greeting.\"}}}" },
+ File { path: "tasks/motd/tree/etc/issue.j2", mode: 0o644, body: b"{% if false %}{{ settings.greting }}{% endif %}\n" },
+];

@@ -1,6 +1,7 @@
 //! Declared schemas, defaults and target settings (format.md, 6).
 mod debian;
 pub mod forms;
+pub mod references;
 mod targets;
 use crate::{
     errors::Schema,
@@ -106,6 +107,15 @@ pub fn declarations(
                     }
                 }
             }
+        }
+        let mut references = List::with_capacity(16);
+        references::declaration(declaration, document, &mut references);
+        for fault in &references {
+            let mut fault = fault.clone();
+            if let Schema::Unlisted { reader, root: _, task: _, setting: _ } = &mut fault.schema {
+                reader.clone_from(task);
+            }
+            push(faults, task, fault);
         }
         if before == faults.len() {
             let mut local = List::with_capacity(16);

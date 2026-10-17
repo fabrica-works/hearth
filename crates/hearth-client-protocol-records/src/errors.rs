@@ -631,6 +631,8 @@ impl Takes {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Schema {
+    Unlisted { reader: Box<[u8]>, root: Root, task: Box<[u8]>, setting: Option<Box<[u8]>> },
+    Dynamic { root: Root },
     Task { task: Box<[u8]> },
     Unread { task: Box<[u8]>, setting: Box<[u8]>, declared: Box<[Box<[u8]>]> },
     Wrong { expected: TypeName },
@@ -670,4 +672,11 @@ pub use composition::{Composition, Host};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Collision {
     Key { key: Box<[u8]> },
+}
+
+/// Reference roots restricted to literal names (format.md, 6.4).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Root {
+    Tasks,
+    Exports,
 }
