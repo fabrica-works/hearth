@@ -16,6 +16,8 @@ mod client;
 mod git;
 pub mod limits;
 mod read;
+mod store;
+use hearth_protocol_tree as tree;
 pub mod translate;
 use alloc::boxed::Box;
 use git_machine::{invocation, listing, oid::Oid, rev_parse};
@@ -41,7 +43,7 @@ pub struct MaxOut {
     pub above: u32,
     pub below: u32,
 }
-pub const MAX_OUT_UP: MaxOut = MaxOut { above: 0, below: 1 };
+pub const MAX_OUT_UP: MaxOut = MaxOut { above: 1, below: 1 };
 pub const MAX_OUT_DOWN: MaxOut = MaxOut { above: 1, below: 1 };
 pub const MAX_OUT_RESUME: MaxOut = MaxOut { above: 1, below: 1 };
 #[derive(Debug)]
@@ -63,10 +65,24 @@ enum Mode {
     },
     Read(Box<read::Read>),
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Root {
+    pub fd: Fd,
+    pub token: Token,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Roots {
+    pub store: Root,
+    pub cache: Root,
+    pub resolutions: Root,
+    pub staging: Root,
+}
 #[derive(Debug)]
 pub struct Protocol {
-    root: Fd,
-    cache: Fd,
+    roots: Roots,
+    store: store::Store,
+    form: Form,
+    startup: Option<Box<[u8]>>,
     rng: skein_lib::Rng,
     call: Option<Call>,
     client: client::Client,
@@ -76,10 +92,12 @@ pub struct Protocol {
 }
 impl Protocol {
     #[must_use]
-    pub fn new(limits: &Limits, call: Call, form: Form, root: Fd, cache: Fd, seed: u64) -> Self {
+    pub fn new(limits: &Limits, call: Call, form: Form, roots: Roots, seed: u64) -> Self {
         Self {
-            root,
-            cache,
+            roots,
+            store: store::Store::new(),
+            form,
+            startup: None,
             rng: skein_lib::Rng::new(seed),
             call: Some(call),
             client: client::Client::new(form, limits.printer),
@@ -87,6 +105,10 @@ impl Protocol {
             child: None,
             mode: None,
         }
+    }
+    #[must_use]
+    pub fn take_startup(&mut self) -> Option<Box<[u8]>> {
+        self.startup.take()
     }
     #[must_use]
     pub fn code(&self) -> Option<u8> {
@@ -145,7 +167,7 @@ impl Protocol {
     fn spawn(&mut self, command: invocation::Command<'_>, below: &mut Queue<Asked>) {
         let owner = Token::new(self.next);
         self.next = self.next.checked_add(1).expect("bounded commands in one call");
-        self.child = Some(git::Child::spawn(owner, self.root, command, below));
+        self.child = Some(git::Child::spawn(owner, self.roots.store.fd, command, below));
     }
 }
 pub fn down(
@@ -156,6 +178,20 @@ pub fn down(
     below: &mut Queue<Asked>,
 ) {
     match rq {
+        Request::Store(request) => protocol.store.down(request, &protocol.roots, &env.limits, below),
+        Request::Unopened { to, why } => {
+            assert_eq!(to.into_token(), Token::new(0), "initial call");
+            protocol.startup = Some(
+                records::form::print(
+                    protocol.form,
+                    &records::records::Record::Startup(store::startup(why)),
+                    None,
+                    &env.limits.printer,
+                )
+                .expect("startup fits printer limit"),
+            );
+            protocol.client.stop();
+        }
         Request::Render(request) => {
             assert!(protocol.mode.is_none() && protocol.child.is_none(), "one git request at a time");
             match request {
@@ -180,7 +216,7 @@ pub fn down(
                         request,
                         blobs,
                         env,
-                        protocol.cache,
+                        protocol.roots.cache.fd,
                         protocol.rng.next_u64(),
                     ))));
                 }
@@ -191,10 +227,14 @@ pub fn down(
         }
     }
 }
-pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, _above: &mut Queue<Event>, below: &mut Queue<Asked>) {
+pub fn up(protocol: &mut Protocol, env: &Env<Limits>, ev: Told, above: &mut Queue<Event>, below: &mut Queue<Asked>) {
     let event = match ev {
         Told::Io(event) => event,
         Told::File(event) => {
+            if event.owner() == store::OWNER {
+                protocol.store.up(event, &env.limits, above);
+                return;
+            }
             let Some(Mode::Read(read)) = &mut protocol.mode else { unreachable!("cache read exists") };
             read.file_up(event);
             return;

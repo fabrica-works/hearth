@@ -4,7 +4,12 @@ use crate::{config, git_machine, records};
 pub struct Limits {
     pub git: git_machine::limits::Limits,
     pub config: config::limits::Limits,
+    pub tree: crate::tree::limits::Limits,
     pub printer: records::limits::Limits,
 }
-pub const SHIPPED: Limits =
-    Limits { git: git_machine::limits::SHIPPED, config: config::limits::SHIPPED, printer: records::limits::SHIPPED };
+pub const SHIPPED: Limits = Limits {
+    tree: crate::tree::limits::SHIPPED,
+    git: git_machine::limits::SHIPPED,
+    config: config::limits::SHIPPED,
+    printer: records::limits::SHIPPED,
+};

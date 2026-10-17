@@ -8,7 +8,7 @@ pub use service::{Limits, domain::vocabulary::Call, protocol::Form};
 use skein_io::kernel::{Complete, Exit, Fd, Submit};
 use skein_lib::{Queue, Time, Wall};
 use skein_shell::{Host, OutputKind};
-use std::{os::unix::fs::DirBuilderExt, path::PathBuf};
+use std::{io::Write, os::unix::fs::DirBuilderExt, path::PathBuf};
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Invocation {
     pub call: Call,
@@ -21,6 +21,8 @@ pub struct Client {
     limits: Limits,
     store: Option<Fd>,
     cache: Option<Fd>,
+    resolutions: Option<Fd>,
+    staging: Option<Fd>,
 }
 impl Client {
     pub fn open(invocation: Invocation, limits: &Limits, output: Fd, seed: u64) -> Result<Self, std::io::Error> {
@@ -29,16 +31,26 @@ impl Client {
             .map_err(|error| std::io::Error::other(format!("invalid output: {error:?}")))?;
         std::fs::DirBuilder::new().recursive(true).mode(0o700).create(&invocation.store)?;
         let store = skein_shell::make_root(&invocation.store, 0o700).map_err(std::io::Error::from_raw_os_error)?;
-        let cache = match skein_shell::make_root(&invocation.store.join("cache"), 0o700) {
-            Ok(cache) => cache,
-            Err(error) => {
-                skein_shell::close_keeper_fd(store);
-                return Err(std::io::Error::from_raw_os_error(error));
+        let mut opened = vec![store];
+        for name in ["cache", "resolutions", "staging"] {
+            match skein_shell::make_root(&invocation.store.join(name), 0o700) {
+                Ok(root) => opened.push(root),
+                Err(error) => {
+                    for root in opened {
+                        skein_shell::close_keeper_fd(root);
+                    }
+                    return Err(std::io::Error::from_raw_os_error(error));
+                }
             }
-        };
+        }
+        let mut opened = opened.into_iter();
+        let store = opened.next().expect("store");
+        let cache = opened.next().expect("cache");
+        let resolutions = opened.next().expect("resolutions");
+        let staging = opened.next().expect("staging");
         let mut service = Service::new(
-            &Configuration { limits: *limits },
-            Roots { store, cache },
+            &Configuration { limits: *limits, uid: skein_shell::effective_user() },
+            Roots { store, cache, resolutions, staging },
             invocation.call,
             invocation.form,
             seed,
@@ -48,11 +60,20 @@ impl Client {
             OutputKind::Append => service.adopt_output_file(output),
         };
         if adopted.is_err() {
+            skein_shell::close_keeper_fd(staging);
+            skein_shell::close_keeper_fd(resolutions);
             skein_shell::close_keeper_fd(cache);
             skein_shell::close_keeper_fd(store);
             return Err(std::io::Error::other("no output slot"));
         }
-        Ok(Self { service, limits: *limits, store: Some(store), cache: Some(cache) })
+        Ok(Self {
+            service,
+            limits: *limits,
+            store: Some(store),
+            cache: Some(cache),
+            resolutions: Some(resolutions),
+            staging: Some(staging),
+        })
     }
 }
 impl Host for Client {
@@ -91,6 +112,14 @@ impl Host for Client {
         0
     } // No heap claim until hearth 28.
     fn drain(&mut self) {
+        if let Some(bytes) = self.service.take_startup() {
+            let _written = std::io::stderr().lock().write_all(&bytes);
+        }
+        if self.service.is_empty() {
+            for root in [self.resolutions.take(), self.staging.take()].into_iter().flatten() {
+                skein_shell::close_keeper_fd(root);
+            }
+        }
         if self.service.is_empty()
             && let Some(cache) = self.cache.take()
         {

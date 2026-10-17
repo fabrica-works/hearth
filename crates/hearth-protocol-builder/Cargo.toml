@@ -11,6 +11,7 @@ skein-io.workspace = true
 hearth-domain-builder.workspace = true
 hearth-protocol-git.workspace = true
 hearth-protocol-config.workspace = true
+hearth-protocol-tree.workspace = true
 hearth-client-protocol-records.workspace = true
 
 [dev-dependencies]

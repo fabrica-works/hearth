@@ -1,11 +1,12 @@
 //! The in-process client's call and replies (client/README.md, 3.1).
-use crate::render;
+use crate::{render, store};
 use alloc::boxed::Box;
 use skein_lib::ReplyTo;
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
     Call { reply_to: ReplyTo, call: Call },
     Render(render::vocabulary::Event),
+    Store(store::vocabulary::Event),
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Call {
@@ -15,6 +16,8 @@ pub enum Call {
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
     Render(render::vocabulary::Request),
+    Store(store::vocabulary::Request),
+    Unopened { to: ReplyTo, why: store::vocabulary::Why },
     Answer(Answer),
     Reply { to: ReplyTo, outcome: render::vocabulary::Outcome, diff: Option<render::diff::Tally> },
 }

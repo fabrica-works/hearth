@@ -2,6 +2,7 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+use alloc::boxed::Box;
 pub use hearth_domain_builder as domain;
 pub use hearth_protocol_builder as protocol;
 pub mod limits;
@@ -20,11 +21,14 @@ use skein_lib::{Env, Queue, Time, Wall};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Configuration {
     pub limits: Limits,
+    pub uid: u32,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Roots {
     pub store: Fd,
     pub cache: Fd,
+    pub resolutions: Fd,
+    pub staging: Fd,
 }
 #[derive(Debug)]
 pub struct Service {
@@ -50,16 +54,36 @@ impl Service {
     pub fn new(configuration: &Configuration, roots: Roots, call: Call, form: protocol::Form, seed: u64) -> Self {
         let limits = &configuration.limits;
         assert!(limits.io.is_usable() && limits.queue >= 3, "usable io and queues holding every MAX_OUT");
+        let mut files = FileIo::with_whole_limit(
+            limits.files.files,
+            limits.files.read,
+            limits.files.entries,
+            limits.files.whole,
+            limits.files.timeout,
+        );
+        files.seed_randomness(seed);
+        let roots = protocol::Roots {
+            store: protocol::Root { fd: roots.store, token: files.adopt_root(roots.store).expect("store root slot") },
+            cache: protocol::Root { fd: roots.cache, token: files.adopt_root(roots.cache).expect("cache root slot") },
+            resolutions: protocol::Root {
+                fd: roots.resolutions,
+                token: files.adopt_root(roots.resolutions).expect("resolutions root slot"),
+            },
+            staging: protocol::Root {
+                fd: roots.staging,
+                token: files.adopt_root(roots.staging).expect("staging root slot"),
+            },
+        };
         Self {
             io: Io::new(&limits.io),
-            files: FileIo::new(limits.files.files, limits.files.read, limits.files.entries, limits.files.timeout),
+            files,
             file_told: Queue::with_capacity(limits.queue),
             io_submissions: Queue::with_capacity(limits.queue),
             file_submissions: Queue::with_capacity(limits.queue),
             io_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.io },
-            protocol: Protocol::new(&limits.protocol, call, form, roots.store, roots.cache, seed),
+            protocol: Protocol::new(&limits.protocol, call, form, roots, seed),
             protocol_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.protocol },
-            domain: Builder::new(&limits.domain),
+            domain: Builder::new(&limits.domain, configuration.uid),
             domain_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.domain },
             completions: Queue::with_capacity(limits.queue),
             submissions: Queue::with_capacity(limits.queue),
@@ -92,6 +116,10 @@ impl Service {
         &mut self.submissions
     }
     #[must_use]
+    pub fn take_startup(&mut self) -> Option<Box<[u8]>> {
+        self.protocol.take_startup()
+    }
+    #[must_use]
     pub fn code(&self) -> Option<u8> {
         if self.is_empty() { self.protocol.code() } else { None }
     }
@@ -99,7 +127,7 @@ impl Service {
     pub fn is_empty(&self) -> bool {
         self.io.is_empty()
             && self.files.takes()
-            && self.files.open_files() == 0
+            && self.files.open_files() == 4
             && self.file_told.is_empty()
             && self.file_submissions.is_empty()
             && self.io_submissions.is_empty()
@@ -121,6 +149,10 @@ impl Service {
             || !self.file_submissions.is_empty()
             || !self.io_submissions.is_empty()
             || self.protocol.work_pending()
+            || match domain::next_deadline(&self.domain) {
+                Some(at) => at <= now,
+                None => false,
+            }
             || self.domain.work_pending()
             || !self.completions.is_empty()
             || !self.told.is_empty()
@@ -130,10 +162,10 @@ impl Service {
     }
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        match (self.io.next_deadline(), self.files.next_deadline()) {
-            (Some(a), Some(b)) => Some(a.min(b)),
-            (a, None) | (None, a) => a,
-        }
+        [self.io.next_deadline(), self.files.next_deadline(), domain::next_deadline(&self.domain)]
+            .into_iter()
+            .flatten()
+            .min()
     }
 }
 #[must_use]
@@ -278,6 +310,9 @@ fn domain_stage(service: &mut Service) {
         let before = service.answers.len();
         domain::step(&mut service.domain, &service.domain_env, event, &mut service.answers);
         within(before, service.answers.len(), domain::MAX_OUT);
+    }
+    if service.calls.is_empty() && service.answers.room() >= domain::MAX_OUT {
+        domain::fire(&mut service.domain, &service.domain_env, &mut service.answers);
     }
 }
 fn protocol_down(service: &mut Service) {

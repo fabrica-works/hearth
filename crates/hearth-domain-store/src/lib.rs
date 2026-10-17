@@ -1,0 +1,49 @@
+//! Opening the store before a builder call (store.md, 8.2).
+#![cfg_attr(not(test), no_std)]
+#![forbid(unsafe_code)]
+extern crate alloc;
+pub mod limits;
+mod start;
+pub mod vocabulary;
+use limits::Limits;
+use skein_lib::{Deadlines, Env, Queue, Time};
+use vocabulary::{Event, Output, Request};
+pub const MAX_OUT: u32 = 1;
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum Timer {
+    Retry,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Phase {
+    Closed,
+    Locking,
+    Recording,
+    Writing,
+    Ready,
+}
+#[derive(Debug)]
+pub struct Store {
+    phase: Phase,
+    uid: u32,
+    timers: Deadlines<Timer>,
+}
+impl Store {
+    #[must_use]
+    pub fn new(_limits: &Limits, uid: u32) -> Self {
+        Self { phase: Phase::Closed, uid, timers: Deadlines::with_capacity(1) }
+    }
+}
+pub fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Queue<Output>) {
+    start::step(store, env, ev, out);
+}
+pub fn fire(store: &mut Store, env: &Env<Limits>, out: &mut Queue<Output>) {
+    if let Some(Timer::Retry) = store.timers.expire(env.now) {
+        out.push(Output::Request(Request::Lock));
+    }
+}
+#[must_use]
+pub fn next_deadline(store: &Store) -> Option<Time> {
+    store.timers.next()
+}
+#[cfg(test)]
+mod tests;

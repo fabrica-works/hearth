@@ -3,4 +3,5 @@ mod client;
 mod fixtures;
 mod git;
 mod read;
+mod store;
 mod translate;

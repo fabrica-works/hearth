@@ -67,7 +67,7 @@ impl Layer {
     }
     pub fn with_form(form: crate::Form, limits: limits::Limits) -> Self {
         let mut layer = Self {
-            protocol: Protocol::new(&limits, call(), form, Fd::new(3), Fd::new(4), 7),
+            protocol: Protocol::new(&limits, call(), form, roots(), 7),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             above: Queue::with_capacity(1),
             below: Queue::with_capacity(1),
@@ -310,5 +310,24 @@ pub fn config_change() -> render::diff::Change {
             })]),
             rebuild: diff::Rebuild::FromConfig,
         },
+    }
+}
+
+pub fn roots() -> crate::Roots {
+    crate::Roots {
+        store: crate::Root { fd: Fd::new(3), token: Token::new(31) },
+        cache: crate::Root { fd: Fd::new(4), token: Token::new(32) },
+        resolutions: crate::Root { fd: Fd::new(5), token: Token::new(33) },
+        staging: crate::Root { fd: Fd::new(6), token: Token::new(34) },
+    }
+}
+
+pub const STORE_OWNER: Token = Token::new(20);
+pub fn store_record() -> builder::store::vocabulary::StoreRecord {
+    builder::store::vocabulary::StoreRecord { layout: 1, made: Wall::from_nanos(77), range: None, uid: 1000 }
+}
+impl Layer {
+    pub fn startup(&mut self) -> Option<Box<[u8]>> {
+        self.protocol.take_startup()
     }
 }

@@ -136,23 +136,7 @@ pub fn render_at(repository: &Repository, at: &str, targets: &[&[u8]], form: For
     run(repository, call, form, None)
 }
 fn run(repository: &Repository, call: Call, form: Form, store: Option<&Path>) -> Rendered {
-    let output = repository.scratch.path().join("stdout");
-    let fd = Fd::new(fs::File::create(&output).expect("output file").into_raw_fd());
-    let limits = hearth::limits();
-    let mut client = Client::open(
-        Invocation {
-            call,
-            form,
-            store: store.map_or_else(|| repository.scratch.path().join("store"), Path::to_path_buf),
-        },
-        &limits,
-        fd,
-        7,
-    )
-    .expect("client startup");
-    let mut kernel = Kernel::open(Config { operations: client.operations() }).expect("io_uring is required");
-    let exit = skein_shell::drive(&mut kernel, &Clock::new(), &mut client);
-    Rendered { exit, stdout: fs::read(output).expect("printed output") }
+    run_holding(repository, call, form, store, &hearth::limits(), Release::After(skein_lib::Duration::ZERO)).rendered
 }
 
 pub const THIN_TEXT: &str = "target       x1-prod   base x1   environment prod\nplacement    metal efi 7th-gen\nspec         9970fb4d8f97\nconfig       part e2475ba7ef36\n  /etc/motd                file 0644 root:root 775324fcea7f\n  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\n";
@@ -267,3 +251,121 @@ pub const FIXED_X1_LAB: File = File {
     body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"}}",
     mode: 0o644,
 };
+
+#[must_use]
+pub fn with_store(store: hearth_domain_store::limits::Limits) -> hearth::Limits {
+    hearth::Limits { domain: hearth::service::domain::Limits { store, ..hearth::limits().domain }, ..hearth::limits() }
+}
+#[must_use]
+pub fn render_with(repository: &Repository, limits: &hearth::Limits) -> Rendered {
+    render_call(repository, "HEAD", &[], Form::Text, limits, Release::After(skein_lib::Duration::ZERO)).rendered
+}
+#[derive(Clone, Copy, Debug)]
+pub enum Release {
+    After(skein_lib::Duration),
+}
+#[derive(Debug)]
+pub struct Held {
+    pub rendered: Rendered,
+    pub printed_while_held: Vec<u8>,
+}
+#[must_use]
+pub fn render_holding(repository: &Repository, limits: &hearth::Limits, release: Release) -> Held {
+    render_call(repository, "HEAD", &[], Form::Text, limits, release)
+}
+
+fn render_call(
+    repository: &Repository,
+    at: &str,
+    targets: &[&[u8]],
+    form: Form,
+    limits: &hearth::Limits,
+    release: Release,
+) -> Held {
+    let call = Call::Render {
+        repository: repository.work_tree.join(".git").as_os_str().as_bytes().into(),
+        revision: at.as_bytes().into(),
+        targets: targets.iter().map(|target| Box::<[u8]>::from(*target)).collect(),
+    };
+    run_holding(repository, call, form, None, limits, release)
+}
+fn run_holding(
+    repository: &Repository,
+    call: Call,
+    form: Form,
+    store: Option<&Path>,
+    limits: &hearth::Limits,
+    release: Release,
+) -> Held {
+    let output = repository.scratch.path().join("stdout");
+    let fd = Fd::new(fs::File::create(&output).expect("output file").into_raw_fd());
+    let store = store.map_or_else(|| repository.scratch.path().join("store"), Path::to_path_buf);
+    fs::create_dir_all(&store).expect("store directory");
+    fs::set_permissions(&store, fs::Permissions::from_mode(0o700)).expect("private store");
+    let Release::After(span) = release;
+    let lock = if span == skein_lib::Duration::ZERO {
+        None
+    } else {
+        let lock = fs::File::open(&store).expect("lock root");
+        lock.lock().expect("lock store");
+        Some(lock)
+    };
+    let client = Client::open(Invocation { call, form, store }, limits, fd, 7).expect("client startup");
+    let mut held = Holding { client, lock, first: None, span, output: output.clone(), printed: Vec::new() };
+    let mut kernel = Kernel::open(Config { operations: held.operations() }).expect("io_uring is required");
+    let exit = skein_shell::drive(&mut kernel, &Clock::new(), &mut held);
+    Held {
+        rendered: Rendered { exit, stdout: fs::read(output).expect("printed output") },
+        printed_while_held: held.printed,
+    }
+}
+
+#[derive(Debug)]
+struct Holding {
+    client: Client,
+    lock: Option<fs::File>,
+    first: Option<skein_lib::Time>,
+    span: skein_lib::Duration,
+    output: PathBuf,
+    printed: Vec<u8>,
+}
+impl Host for Holding {
+    fn iterate(&mut self, now: skein_lib::Time, wall: skein_lib::Wall) {
+        let first = *self.first.get_or_insert(now);
+        if self.lock.is_some() && now >= first.saturating_add(self.span) {
+            self.printed = fs::read(&self.output).expect("output while lock held");
+            self.lock = None;
+        }
+        self.client.iterate(now, wall);
+    }
+    fn completions(&mut self) -> &mut skein_lib::Queue<skein_io::kernel::Complete> {
+        self.client.completions()
+    }
+    fn submissions(&mut self) -> &mut skein_lib::Queue<skein_io::kernel::Submit> {
+        self.client.submissions()
+    }
+    fn work_pending(&self, now: skein_lib::Time) -> bool {
+        self.client.work_pending(now)
+    }
+    fn next_deadline(&self) -> Option<skein_lib::Time> {
+        self.client.next_deadline()
+    }
+    fn next_policy_deadline(&self) -> Option<skein_lib::Time> {
+        self.client.next_policy_deadline()
+    }
+    fn is_empty(&self) -> bool {
+        self.client.is_empty()
+    }
+    fn exit(&self) -> Option<Exit> {
+        self.client.exit()
+    }
+    fn operations(&self) -> u32 {
+        self.client.operations()
+    }
+    fn worst_case(&self) -> u64 {
+        self.client.worst_case()
+    }
+    fn drain(&mut self) {
+        self.client.drain();
+    }
+}

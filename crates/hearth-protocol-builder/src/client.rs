@@ -117,7 +117,9 @@ impl Client {
                 let diff = super::translate::changes::optional_tally(diff);
                 records::records::Record::Terminal(records::records::Terminal { outcome, diff, left_out: 0 })
             }
-            Request::Render(_) => unreachable!("git requests stay in the protocol"),
+            Request::Store(_) | Request::Unopened { .. } | Request::Render(_) => {
+                unreachable!("git requests stay in the protocol")
+            }
         };
         if self.broken.is_none() {
             self.active = true;
@@ -129,6 +131,11 @@ impl Client {
                 &mut self.requests,
             );
         }
+    }
+    pub fn stop(&mut self) {
+        self.terminal = Some(crate::render::vocabulary::Outcome::TryAgain);
+        self.finished = true;
+        self.requests.push(Down::Finish);
     }
     pub fn work_pending(&self) -> bool {
         !self.requests.is_empty()

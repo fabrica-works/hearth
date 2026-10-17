@@ -1,7 +1,7 @@
 use crate::{Limits, render, vocabulary::Call};
 use alloc::boxed::Box;
 use skein_lib::{Env, Time, Wall, bytes};
-pub const LIMITS: Limits = Limits { render: render::limits::SHIPPED };
+pub const LIMITS: Limits = Limits { render: render::limits::SHIPPED, store: crate::store::limits::SHIPPED };
 pub fn env() -> Env<Limits> {
     Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS }
 }

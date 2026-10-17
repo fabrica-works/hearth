@@ -15,6 +15,7 @@ pub struct Files {
     pub files: u32,
     pub read: u32,
     pub entries: u32,
+    pub whole: u32,
     pub timeout: Duration,
 }
 pub const SHIPPED: Limits = Limits {
@@ -31,8 +32,8 @@ pub const SHIPPED: Limits = Limits {
         close_timeout: Duration::from_secs(5),
         retry: Duration::from_millis(50),
     },
-    files: Files { files: 2, read: 16_384, entries: 1, timeout: Duration::from_secs(5) },
+    files: Files { files: 8, read: 16_384, entries: 1, whole: 4_194_328, timeout: Duration::from_secs(5) },
     protocol: protocol::limits::SHIPPED,
-    domain: domain::Limits { render: domain::render::limits::SHIPPED },
+    domain: domain::Limits { render: domain::render::limits::SHIPPED, store: domain::store::limits::SHIPPED },
     queue: 32,
 };

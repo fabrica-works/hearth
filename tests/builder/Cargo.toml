@@ -6,6 +6,8 @@ rust-version.workspace = true
 publish.workspace = true
 [dependencies]
 hearth.workspace = true
+hearth-protocol-tree.workspace = true
+hearth-domain-store.workspace = true
 skein-shell.workspace = true
 skein-scratch.workspace = true
 skein-io.workspace = true

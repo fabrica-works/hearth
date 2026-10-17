@@ -514,3 +514,36 @@ fn a_changed_config_entry_translates_without_sizes_or_hunks() {
         "config node fields and rebuild preserved"
     );
 }
+
+const STORE_RECORDS: &[(crate::tree::store::Store, crate::builder::store::vocabulary::StoreRecord)] = &[
+    (
+        crate::tree::store::Store { layout: 1, made: skein_lib::Wall::from_nanos(77), range: None, uid: 1000 },
+        crate::builder::store::vocabulary::StoreRecord {
+            layout: 1,
+            made: skein_lib::Wall::from_nanos(77),
+            range: None,
+            uid: 1000,
+        },
+    ),
+    (
+        crate::tree::store::Store {
+            layout: 2,
+            made: skein_lib::Wall::from_nanos(99),
+            range: Some(crate::tree::store::Range { base: 100_000, count: 65_536 }),
+            uid: 1001,
+        },
+        crate::builder::store::vocabulary::StoreRecord {
+            layout: 2,
+            made: skein_lib::Wall::from_nanos(99),
+            range: Some(crate::builder::store::vocabulary::Range { base: 100_000, count: 65_536 }),
+            uid: 1001,
+        },
+    ),
+];
+#[test]
+fn each_store_record_field_translates_and_back() {
+    for &(record, translated) in STORE_RECORDS {
+        assert_eq!(crate::translate::store::store_record(record), translated, "{record:?}");
+        assert_eq!(crate::translate::store::tree_store(translated), record, "{translated:?}");
+    }
+}
