@@ -53,8 +53,8 @@ impl Client {
         let cache = opened.next().expect("cache");
         let resolutions = opened.next().expect("resolutions");
         let staging = opened.next().expect("staging");
-        let mut service = Service::new(
-            &Configuration {
+        let client = Self::with_output(
+            Configuration {
                 proxy: invocation.proxy,
                 limits: *limits,
                 uid: skein_shell::effective_user(),
@@ -63,27 +63,60 @@ impl Client {
             Roots { store, cache, resolutions, staging },
             invocation.call,
             invocation.form,
+            output,
+            kind,
             seed,
         );
-        let adopted = match kind {
+        let mut client = match client {
+            Ok(client) => client,
+            Err(error) => {
+                for root in [staging, resolutions, cache, store] {
+                    skein_shell::close_keeper_fd(root);
+                }
+                return Err(error);
+            }
+        };
+        client.store = Some(store);
+        client.cache = Some(cache);
+        client.resolutions = Some(resolutions);
+        client.staging = Some(staging);
+        Ok(client)
+    }
+    /// Start over caller-owned directories and an append output (testing.md, 2.6).
+    #[must_use]
+    pub fn with_roots(
+        configuration: Configuration,
+        roots: Roots,
+        call: Call,
+        form: Form,
+        output: Fd,
+        seed: u64,
+    ) -> Self {
+        Self::with_output(configuration, roots, call, form, output, OutputKind::Append, seed)
+            .expect("the test configuration reserves its output slot")
+    }
+    fn with_output(
+        configuration: Configuration,
+        roots: Roots,
+        call: Call,
+        form: Form,
+        output: Fd,
+        kind: OutputKind,
+        seed: u64,
+    ) -> Result<Self, std::io::Error> {
+        let mut service = Service::new(&configuration, roots, call, form, seed);
+        match kind {
             OutputKind::Pipe => service.adopt_output_pipe(output),
             OutputKind::Append => service.adopt_output_file(output),
-        };
-        if adopted.is_err() {
-            skein_shell::close_keeper_fd(staging);
-            skein_shell::close_keeper_fd(resolutions);
-            skein_shell::close_keeper_fd(cache);
-            skein_shell::close_keeper_fd(store);
-            return Err(std::io::Error::other("no output slot"));
         }
-        Ok(Self {
-            service,
-            limits: *limits,
-            store: Some(store),
-            cache: Some(cache),
-            resolutions: Some(resolutions),
-            staging: Some(staging),
-        })
+        .map_err(|_| std::io::Error::other("no output slot"))?;
+        let limits = configuration.limits;
+        drop(configuration);
+        Ok(Self { service, limits, store: None, cache: None, resolutions: None, staging: None })
+    }
+    /// Adopt a caller-opened append descriptor for store progress.
+    pub fn adopt_error_file(&mut self, fd: Fd) -> Result<(), Fd> {
+        self.service.adopt_error_file(fd)
     }
     pub fn adopt_error(&mut self, fd: Fd) -> Result<(), std::io::Error> {
         let kind = skein_shell::prepare_output(fd)

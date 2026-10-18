@@ -33,6 +33,7 @@ pub struct Fake {
     pub ledger: Vec<linux::Entry>,
     pub renames: Vec<Rename>,
     pub locks: BTreeSet<Handle>,
+    pub served_bytes: u64,
 }
 #[derive(Clone, Debug)]
 pub struct Shared(Rc<RefCell<Fake>>);
@@ -77,6 +78,7 @@ impl Shared {
             ledger: Vec::new(),
             renames: Vec::new(),
             locks: BTreeSet::new(),
+            served_bytes: 0,
         })))
     }
     #[must_use]
@@ -86,6 +88,10 @@ impl Shared {
     #[must_use]
     pub fn borrow_mut(&self) -> RefMut<'_, Fake> {
         self.0.borrow_mut()
+    }
+    #[must_use]
+    pub fn served_bytes(&self) -> u64 {
+        self.borrow().served_bytes
     }
     #[must_use]
     pub fn contents(&self, path: &[u8]) -> Option<Vec<u8>> {
@@ -147,6 +153,7 @@ pub struct Scenario<'a> {
     pub call: Call,
     pub form: hearth::Form,
     pub fault: Option<Fault>,
+    pub pace: crate::pace::Pace,
 }
 #[derive(Clone, Copy, Debug)]
 pub enum Fault {
@@ -167,6 +174,7 @@ pub fn thin() -> Scenario<'static> {
         },
         form: hearth::Form::Text,
         fault: None,
+        pace: crate::pace::Pace::calm(),
     }
 }
 #[must_use]
@@ -302,18 +310,22 @@ impl Shared {
     #[must_use]
     pub fn for_scenario(scenario: &Scenario<'_>, seed: u64, pipe: u32) -> Self {
         let shared = Self::build(scenario.files, seed, pipe, scenario.fault);
-        if let Call::Diff { .. } = scenario.call {
+        if let Call::Diff { resolve, .. } = scenario.call {
             let mut fake = shared.borrow_mut();
             let repository = fake.repositories.0.get_mut(GIT_DIR).expect("laid repository");
             let hearth_fake_git::repository::Resolved::Commit(before) = repository.resolve(b"HEAD") else {
                 unreachable!("initial commit")
             };
             repository.set_ref(b"refs/heads/before", before);
-            let files: Vec<_> = scenario
+            let replacement = if resolve { CHANGED_PACKAGE_TARGET } else { super::MOTD_KIND };
+            let mut files: Vec<_> = scenario
                 .files
                 .iter()
-                .map(|file| if file.path == super::MOTD_KIND.path { super::MOTD_KIND } else { *file })
+                .map(|file| if file.path == replacement.path { replacement } else { *file })
                 .collect();
+            if resolve {
+                files.push(DIFF_PACKAGE_TASK);
+            }
             repository.commit(&commit(&files, Box::new([before])));
         }
         shared
@@ -328,3 +340,16 @@ impl Shared {
 
 mod protocol_world;
 pub use protocol_world::*;
+
+/// Hosted tools reserve one in-flight kernel operation.
+pub const HOST_OPERATIONS: u32 = 1;
+/// Read files and stdin in the same four-KiB chunks as the protocol world's pipes.
+pub const HOST_BUFFER: usize = WORLD_PIPE as usize;
+/// The plan's one-MiB bound for each hosted tool.
+pub const FAKE_WORST_CASE: u64 = 1 << 20;
+
+/// The adapter's one startup-close identity cannot collide with service operations.
+pub const STARTUP_CLOSE: skein_lib::Token = skein_lib::Token::new(u64::MAX);
+
+mod simulation_world;
+pub use simulation_world::*;

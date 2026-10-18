@@ -6,3 +6,7 @@ pub mod files;
 pub mod io;
 pub mod protocol;
 pub mod referee;
+
+pub mod hosted;
+pub mod pace;
+pub mod simulated;
