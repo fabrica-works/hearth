@@ -4,7 +4,7 @@ use engine::{Oracle, Outcome};
 use hearth_render_world::{
     expressions::{self, Style},
     fixtures::{self, oracle as inputs},
-    templates,
+    spacing, templates,
 };
 use inputs::Row;
 use std::borrow::Cow;
@@ -120,4 +120,50 @@ fn a_difference_not_listed_fails_naming_both_outputs() {
         (mismatch.template.as_str(), mismatch.hearth, mismatch.oracle),
         ("{{ true + true }}", Outcome::Fails, Outcome::Text(Cow::Borrowed("2")))
     );
+}
+
+#[test]
+fn generated_templates_render_as_the_oracle_renders_them() {
+    inputs::compare(inputs::CASES, inputs::TEMPLATE_SEED, &Oracle::new(), Oracle::compare, |rng, roots| {
+        let tree = templates::tree(rng, roots, templates::ORACLE);
+        spacing::dressed(rng, &tree)
+    });
+}
+#[test]
+fn markers_on_every_delimiter_render_as_the_oracle_renders_them() {
+    let tree = inputs::marker_tree();
+    inputs::compare(inputs::CASES, inputs::TEMPLATE_SEED, &Oracle::new(), Oracle::compare, |rng, _| {
+        spacing::dressed(rng, &tree)
+    });
+}
+#[test]
+fn raw_bodies_render_as_the_oracle_renders_them() {
+    inputs::compare(inputs::CASES, inputs::TEMPLATE_SEED, &Oracle::new(), Oracle::compare, |rng, _| spacing::raw(rng));
+}
+const SCOPES: &[Row<Outcome>] = &[
+    Row {
+        name: "nested loops restore their parent",
+        template: "{% for x in [1,2] %}{{ loop.index }}{% for y in [3,4] %}{{ loop.index0 }}{{ loop.first }}{{ loop.last }}{{ loop.length }}{% set x = y %}{% endfor %}{{ x }}{{ loop.index }}{% endfor %}",
+        expected: Outcome::Text(Cow::Borrowed("10truefalse21falsetrue21120truefalse21falsetrue222")),
+    },
+    Row {
+        name: "assignment survives the loop",
+        template: "{% set x = 7 %}{% for y in [1,2] %}{% set x = y %}{{ x }}{% endfor %}{{ x }}",
+        expected: Outcome::Text(Cow::Borrowed("127")),
+    },
+    Row {
+        name: "branch assignment survives the branch",
+        template: "{% set x = 1 %}{% if true %}{% set x = 2 %}{% endif %}{{ x }}",
+        expected: Outcome::Text(Cow::Borrowed("2")),
+    },
+];
+#[test]
+fn loops_and_assignments_scope_as_the_oracle_scopes_them() {
+    inputs::pinned(SCOPES, &Oracle::new(), Oracle::outcomes);
+}
+#[test]
+fn comments_and_trim_blocks_render_as_the_oracle_renders_them() {
+    inputs::compare(inputs::CASES, inputs::TEMPLATE_SEED, &Oracle::new(), Oracle::compare, |rng, _| {
+        format!("before\n{}\nafter\n", spacing::comment(rng))
+    });
 }

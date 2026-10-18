@@ -21,6 +21,13 @@ pub struct Difference {
 }
 pub const DIFFERENCES: &[Difference] = &[
     Difference {
+        id: "assignment across iterations",
+        template: "{% set x = 7 %}{% for y in [1,2] %}{{ x }}{% set x = y %}{{ x }}{% endfor %}{{ x }}",
+        hearth: Outcome::Text(Cow::Borrowed("71727")),
+        oracle: Outcome::Text(Cow::Borrowed("71127")),
+        reason: "Format.md 7.3 scopes assignments to one loop iteration; the oracle retains them for the loop.",
+    },
+    Difference {
         id: "string sort",
         template: "{{ ['a','B'] | sort | join(',') }}",
         hearth: Outcome::Text(Cow::Borrowed("B,a")),

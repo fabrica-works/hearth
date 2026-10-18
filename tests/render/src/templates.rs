@@ -1,14 +1,16 @@
 //! Generated template trees, independent of the compiler's flat instructions.
-use crate::expressions::{self, Roots, Tree as Expression};
+use crate::expressions::{self, Roots, Style, Tree as Expression};
 use hearth_domain_render::{evaluate::Value, limits::Limits};
 use skein_lib::Rng;
 #[derive(Clone, Copy, Debug)]
 pub struct Shape {
+    pub style: Style,
     pub depth: u32,
     pub width: u32,
 }
-pub const SMALL: Shape = Shape { depth: 3, width: 3 };
-pub const WIDE: Shape = Shape { depth: 4, width: 4 };
+pub const SMALL: Shape = Shape { style: Style::Hearth, depth: 3, width: 3 };
+pub const WIDE: Shape = Shape { depth: 4, width: 4, ..SMALL };
+pub const ORACLE: Shape = Shape { style: Style::Oracle, ..SMALL };
 #[derive(Clone, Debug)]
 pub enum Tree {
     Text(Vec<u8>),
@@ -21,11 +23,11 @@ pub enum Tree {
 #[must_use]
 pub fn tree(rng: &mut Rng, roots: &Roots, shape: Shape) -> Tree {
     if shape.depth == 0 {
-        return leaf(rng, roots);
+        return leaf(rng, roots, shape.style);
     }
     let sub = Shape { depth: shape.depth - 1, ..shape };
     match rng.below(7) {
-        0 => leaf(rng, roots),
+        0 => leaf(rng, roots, shape.style),
         1 => Tree::Sequence((0..rng.between(1, u64::from(shape.width))).map(|_| tree(rng, roots, sub)).collect()),
         2 => Tree::Branch {
             arms: vec![
@@ -39,9 +41,17 @@ pub fn tree(rng: &mut Rng, roots: &Roots, shape: Shape) -> Tree {
             iterable: Expression::List(
                 (0..rng.below(4)).map(|i| Expression::Int(i64::try_from(i).expect("small"))).collect(),
             ),
-            body: Box::new(Tree::Sequence(vec![Tree::Output(Expression::Name(b"x")), tree(rng, roots, sub)])),
+            body: Box::new(Tree::Sequence(vec![
+                Tree::Output(Expression::Name(b"x")),
+                loop_output(rng, shape.style),
+                tree(rng, roots, sub),
+            ])),
         },
-        4 => Tree::For { pair: false, iterable: Expression::Name(b"settings"), body: Box::new(tree(rng, roots, sub)) },
+        4 => Tree::For {
+            pair: false,
+            iterable: Expression::Name(b"settings"),
+            body: Box::new(Tree::Sequence(vec![loop_output(rng, shape.style), tree(rng, roots, sub)])),
+        },
         5 => Tree::For {
             pair: true,
             iterable: Expression::Filter(
@@ -49,7 +59,19 @@ pub fn tree(rng: &mut Rng, roots: &Roots, shape: Shape) -> Tree {
                 hearth_domain_render::evaluate::Filter::Items,
                 vec![],
             ),
-            body: Box::new(Tree::Sequence(vec![Tree::Output(Expression::Name(b"y")), tree(rng, roots, sub)])),
+            body: Box::new(Tree::Sequence(vec![
+                Tree::Output(if shape.style == Style::Oracle {
+                    Expression::Filter(
+                        Box::new(Expression::Name(b"y")),
+                        hearth_domain_render::evaluate::Filter::Tojson,
+                        vec![],
+                    )
+                } else {
+                    Expression::Name(b"y")
+                }),
+                loop_output(rng, shape.style),
+                tree(rng, roots, sub),
+            ])),
         },
         _ => Tree::Sequence(vec![
             Tree::Set { value: Expression::Int(i64::try_from(rng.below(10)).expect("small")) },
@@ -57,8 +79,27 @@ pub fn tree(rng: &mut Rng, roots: &Roots, shape: Shape) -> Tree {
         ]),
     }
 }
+// Wide statement trees already explore nesting; the separate expression sweep draws depth six.
+const ORACLE_EXPRESSION: expressions::Shape = expressions::Shape { depth: 2, ..expressions::ORACLE };
 const LOOP_FIELDS: &[&[u8]] = &[b"index", b"index0", b"length", b"first", b"last"];
-fn leaf(rng: &mut Rng, roots: &Roots) -> Tree {
+fn loop_output(rng: &mut Rng, style: Style) -> Tree {
+    if style == Style::Hearth {
+        return Tree::Text(Vec::new());
+    }
+    Tree::Output(Expression::Key(
+        Box::new(Expression::Name(b"loop")),
+        LOOP_FIELDS[usize::try_from(rng.below(LOOP_FIELDS.len() as u64)).expect("field")],
+        hearth_domain_render::evaluate::Missing::Error,
+    ))
+}
+fn leaf(rng: &mut Rng, roots: &Roots, style: Style) -> Tree {
+    if style == Style::Oracle {
+        return if rng.chance(250) {
+            Tree::Text(b"text".to_vec())
+        } else {
+            Tree::Output(expressions::tree(rng, roots, ORACLE_EXPRESSION))
+        };
+    }
     match rng.below(4) {
         0 => Tree::Text(b"text".to_vec()),
         1 => Tree::Output(Expression::Key(
@@ -80,41 +121,128 @@ fn leaf(rng: &mut Rng, roots: &Roots) -> Tree {
         }
     }
 }
+/// The printer hands complete tags to the whitespace generator, never bytes to mutate.
+pub enum Text {
+    Literal(Vec<u8>),
+    Output(String),
+    Statement(String),
+}
 #[must_use]
-pub fn text(tree: &Tree) -> Vec<u8> {
+pub fn tokens(tree: &Tree, style: Style) -> Vec<Text> {
+    let expression = |tree| expressions::text(tree, style);
     match tree {
-        Tree::Text(bytes) => bytes.clone(),
-        Tree::Output(value) => {
-            [b"{{ ".as_slice(), expressions::text(value, expressions::Style::Hearth).as_bytes(), b" }}"].concat()
-        }
-        Tree::Sequence(children) => children.iter().flat_map(text).collect(),
+        Tree::Text(bytes) => vec![Text::Literal(bytes.clone())],
+        Tree::Output(value) => vec![Text::Output(expression(value))],
+        Tree::Sequence(children) => children.iter().flat_map(|child| tokens(child, style)).collect(),
         Tree::Branch { arms, otherwise } => {
-            let mut bytes = vec![];
+            let mut out = Vec::new();
             for (index, (condition, body)) in arms.iter().enumerate() {
-                bytes.extend_from_slice(if index == 0 { b"{% if " } else { b"{% elif " });
-                bytes.extend(expressions::text(condition, expressions::Style::Hearth).bytes());
-                bytes.extend_from_slice(b" %}");
-                bytes.extend(text(body));
+                let keyword = if index == 0 { "if" } else { "elif" };
+                out.push(Text::Statement(format!("{keyword} {}", expression(condition))));
+                out.extend(tokens(body, style));
             }
-            bytes.extend_from_slice(b"{% else %}");
-            bytes.extend(text(otherwise));
-            bytes.extend_from_slice(b"{% endif %}");
-            bytes
+            out.push(Text::Statement("else".into()));
+            out.extend(tokens(otherwise, style));
+            out.push(Text::Statement("endif".into()));
+            out
         }
-        Tree::For { pair, iterable, body } => [
-            if *pair { b"{% for x, y in ".as_slice() } else { b"{% for x in ".as_slice() },
-            expressions::text(iterable, expressions::Style::Hearth).as_bytes(),
-            b" %}",
-            &text(body),
-            b"{% endfor %}",
-        ]
-        .concat(),
-        Tree::Set { value } => {
-            [b"{% set x = ".as_slice(), expressions::text(value, expressions::Style::Hearth).as_bytes(), b" %}"]
-                .concat()
+        Tree::For { pair, iterable, body } => {
+            let names = if *pair { "x, y" } else { "x" };
+            let mut out = vec![Text::Statement(format!("for {names} in {}", expression(iterable)))];
+            out.extend(tokens(body, style));
+            out.push(Text::Statement("endfor".into()));
+            out
         }
+        Tree::Set { value } => vec![Text::Statement(format!("set x = {}", expression(value)))],
     }
 }
+#[must_use]
+pub fn text(tree: &Tree) -> Vec<u8> {
+    tokens(tree, Style::Hearth)
+        .into_iter()
+        .flat_map(|token| match token {
+            Text::Literal(bytes) => bytes,
+            Text::Output(value) => format!("{{{{ {value} }}}}").into_bytes(),
+            Text::Statement(value) => format!("{{% {value} %}}").into_bytes(),
+        })
+        .collect()
+}
+/// Constructs present in the generated tree; dressing adds its comments and raw envelope.
+#[must_use]
+pub fn constructs(tree: &Tree) -> std::collections::BTreeSet<&'static str> {
+    let mut found = std::collections::BTreeSet::new();
+    for token in tokens(tree, Style::Oracle) {
+        match token {
+            Text::Literal(_) => {
+                found.insert("text");
+            }
+            Text::Output(_) => {
+                found.insert("output");
+            }
+            Text::Statement(ref body) => {
+                for keyword in ["if", "elif", "else", "endif", "for", "endfor", "set"] {
+                    if body.split_whitespace().next() == Some(keyword) {
+                        found.insert(keyword);
+                    }
+                }
+            }
+        }
+        let body = match &token {
+            Text::Output(body) | Text::Statement(body) => body.as_str(),
+            Text::Literal(_) => "",
+        };
+        for filter in FILTER_CONSTRUCTS {
+            if body.contains(&format!("| {filter}")) {
+                found.insert(*filter);
+            }
+        }
+    }
+    found
+}
+const FILTER_CONSTRUCTS: &[&str] = &[
+    "default",
+    "join",
+    "split",
+    "first",
+    "last",
+    "length",
+    "replace",
+    "items",
+    "keys",
+    "sort",
+    "tojson",
+    "shell_quote",
+    "systemd_escape",
+    "systemd_escape_path",
+    "basename",
+    "dirname",
+];
+pub const CONSTRUCTS: &[&str] = &[
+    "output",
+    "if",
+    "elif",
+    "else",
+    "endif",
+    "for",
+    "endfor",
+    "set",
+    "default",
+    "join",
+    "split",
+    "first",
+    "last",
+    "length",
+    "replace",
+    "items",
+    "keys",
+    "sort",
+    "tojson",
+    "shell_quote",
+    "systemd_escape",
+    "systemd_escape_path",
+    "basename",
+    "dirname",
+];
 #[must_use]
 pub fn output_of(expression: &str) -> String {
     format!("{{{{ {expression} }}}}")

@@ -43,3 +43,45 @@ pub fn roots() -> Roots {
     );
     roots
 }
+
+/// Session 30.5 draws 200 templates and 3,750 sweep inputs from its own seed block.
+pub const TEMPLATE_SEED: u64 = super::properties::SEED + 0x5000;
+pub const SWEEP_CASES: core::ops::Range<u64> = 0..3_750;
+pub const WIDE_EXPRESSIONS: expressions::Shape =
+    expressions::Shape { style: expressions::Style::Oracle, ..expressions::WIDE };
+pub const WIDE_TEMPLATES: crate::templates::Shape =
+    crate::templates::Shape { style: expressions::Style::Oracle, ..crate::templates::WIDE };
+/// Every statement delimiter and output has a place in this input, before dressing.
+#[must_use]
+pub fn marker_tree() -> crate::templates::Tree {
+    use crate::templates::Tree;
+    Tree::Sequence(vec![
+        Tree::Set { value: expressions::Tree::Int(2) },
+        Tree::Branch {
+            arms: vec![
+                (expressions::Tree::Bool(true), Tree::Output(expressions::Tree::Name(b"x"))),
+                (expressions::Tree::Bool(false), Tree::Text(b"elif".to_vec())),
+            ],
+            otherwise: Box::new(Tree::Text(b"else".to_vec())),
+        },
+        Tree::For {
+            pair: false,
+            iterable: expressions::Tree::List(vec![expressions::Tree::Int(1)]),
+            body: Box::new(Tree::Output(expressions::Tree::Name(b"x"))),
+        },
+    ])
+}
+
+/// Draw each seeded input once and apply the independent engine's comparison.
+pub fn compare<T, E: std::fmt::Display>(
+    cases: core::ops::Range<u64>,
+    seed: u64,
+    engine: &T,
+    check: impl Fn(&T, &str, &Roots) -> Result<(), E>,
+    mut template: impl FnMut(&mut Rng, &Roots) -> String,
+) {
+    for case in cases {
+        let (mut rng, roots) = draw(seed + case);
+        check(engine, &template(&mut rng, &roots), &roots).unwrap_or_else(|mismatch| panic!("seed {case}: {mismatch}"));
+    }
+}
