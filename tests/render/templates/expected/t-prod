@@ -1,0 +1,37 @@
+target       t-prod   base t   environment prod
+placement    vm bios incus
+spec         dcb2b33c5bab
+boot         part bc6cab417252
+  mutable    false
+packages     part 5f69bb2a41f1   resolution 4ee22520f418 needed
+  sources    forky amd64 main 20261001T030405Z
+  variant    apt
+  microcode  none
+  apt        install_recommends false
+software     part 656d135b92c3
+config       part 9bd603e59c3f
+  /etc/syntax/basename-dirname       file 0644 root:root 80900711a39e
+  /etc/syntax/comment                file 0644 root:root b8f30bb07b2f
+  /etc/syntax/dash-markers           file 0644 root:root edeaaff3f177
+  /etc/syntax/filters-order          file 0644 root:root 3a5cdf77daab
+  /etc/syntax/filters-text           file 0644 root:root 109c9c20ec69
+  /etc/syntax/for-items              file 0644 root:root b21599163036
+  /etc/syntax/for-list-loop-vars     file 0644 root:root 296a7936c3b3
+  /etc/syntax/for-map-keys           file 0644 root:root 179aa587d6ad
+  /etc/syntax/if-elif-else           file 0644 root:root e056a35db086
+  /etc/syntax/lstrip-blocks          file 0644 root:root 880553fca8fc
+  /etc/syntax/plus-markers           file 0644 root:root dabc68dd0435
+  /etc/syntax/precedence             file 0644 root:root 6a408d1906c5
+  /etc/syntax/raw                    file 0644 root:root 36bb504b9bb6
+  /etc/syntax/set-in-for-and-after   file 0644 root:root 15972e030cc3
+  /etc/syntax/shell-quote            file 0644 root:root bf693bc12cb9
+  /etc/syntax/systemd-escape         file 0644 root:root a41ba0c262ba
+  /etc/syntax/systemd-escape-path    file 0644 root:root 03ab2b6a399c
+  /etc/syntax/tojson                 file 0644 root:root 27d735202f22
+  /etc/syntax/trailing-newline-kept  file 0644 root:root 10159baf262b
+  /etc/syntax/trim-blocks            file 0644 root:root 880553fca8fc
+  /etc/syntax/undefined-tested       file 0644 root:root f545bc4aba45
+data         part 2d4765200bab
+secrets      part ac870b5c968e
+live         part 6f1b7fda0c21
+exports      part 970579fd41be

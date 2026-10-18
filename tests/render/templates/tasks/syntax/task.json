@@ -1,0 +1,33 @@
+{
+  "settings": {
+    "text": {
+      "type": "string",
+      "doc": "Text."
+    },
+    "number": {
+      "type": "int",
+      "doc": "Number."
+    },
+    "flag": {
+      "type": "bool",
+      "doc": "Flag."
+    },
+    "words": {
+      "type": {
+        "list": "string"
+      },
+      "doc": "Words."
+    },
+    "numbers": {
+      "type": {
+        "map": "int"
+      },
+      "doc": "Numbers."
+    },
+    "optional": {
+      "type": "string",
+      "optional": true,
+      "doc": "Absent."
+    }
+  }
+}

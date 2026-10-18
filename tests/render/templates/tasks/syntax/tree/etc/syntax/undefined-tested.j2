@@ -1,0 +1,1 @@
+{{ settings.optional is defined }}|{{ settings.optional | default('fallback') }}|{% if settings.optional %}present{% else %}absent{% endif +%}

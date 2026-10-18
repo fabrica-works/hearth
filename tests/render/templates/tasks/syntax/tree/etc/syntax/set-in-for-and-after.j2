@@ -1,0 +1,6 @@
+{% set memo = 'outer' %}
+{% for word in settings.words %}
+{% set memo = word %}
+{{ memo }}
+{% endfor %}
+{{ memo }}

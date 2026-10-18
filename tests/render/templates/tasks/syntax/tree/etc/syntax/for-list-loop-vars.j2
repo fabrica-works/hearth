@@ -1,0 +1,3 @@
+{% for word in settings.words %}
+{{ word }}:{{ loop.index }}:{{ loop.index0 }}:{{ loop.first }}:{{ loop.last }}:{{ loop.length }}
+{% endfor %}

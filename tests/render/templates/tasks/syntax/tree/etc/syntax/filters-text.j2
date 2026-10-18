@@ -1,0 +1,4 @@
+{{ settings.words | join(',') }}
+{{ 'x:y' | split(':') | join('-') }}
+{{ 'aaba' | replace('a', 'z') }}
+{{ settings.words | first }}:{{ settings.words | last }}:{{ settings.words | length }}

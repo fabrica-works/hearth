@@ -1,0 +1,15 @@
+{
+  "syntax": {
+    "text": "alpha'beta",
+    "number": 7,
+    "flag": true,
+    "words": [
+      "b",
+      "a"
+    ],
+    "numbers": {
+      "z": 2,
+      "a": 1
+    }
+  }
+}
