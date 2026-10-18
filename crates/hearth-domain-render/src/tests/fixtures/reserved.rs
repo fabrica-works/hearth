@@ -55,3 +55,64 @@ pub type TmpfilePathCase<'a> = (&'a [u8], &'a [(Name, &'a [u8])], &'a [Rule]);
 pub fn data_rules(key: &[u8], class: &[u8], path: &[u8]) -> Box<[Rule]> {
     word_rules(Map::Data, key, &[(Name::Class, class), (Name::Path, path)], false)
 }
+pub fn live(
+    action: &[u8],
+    unit: Option<&[u8]>,
+    paths: &[&[u8]],
+    installed: &[reserved::Installed<'_>],
+) -> Box<[Refused]> {
+    reserved::live(&super::live_entry(action, unit, paths), installed)
+}
+pub fn live_rules(action: &[u8], unit: Option<&[u8]>, paths: &[&[u8]]) -> Box<[Rule]> {
+    rules(&live(action, unit, paths, &[]))
+}
+pub fn hearth_groups(group: &[u8], groups: &[&[u8]]) -> Expansion {
+    hearth_with_secret(
+        group,
+        groups,
+        super::kinds::file(b"mail/tls/mx1.key", [super::kinds::text(Name::Group, b"stewards")]),
+    )
+}
+pub fn default_hearth_group(group: &[u8]) -> Expansion {
+    hearth_with_secret(group, &[], super::kinds::file(b"mail/tls/mx1.key", []))
+}
+fn hearth_with_secret(group: &[u8], groups: &[&[u8]], secret: crate::entries::Concrete) -> Expansion {
+    use super::kinds::{account_expansion, file, strings, text};
+    account_expansion(&[
+        (b"hearth", Map::Users, &[file(b"hearth", [text(Name::Group, group), strings(Name::Groups, groups)])]),
+        (b"mail", Map::Secrets, core::slice::from_ref(&secret)),
+    ])
+}
+
+pub const HEARTH_TASKS: &[(&[u8], &[Rule])] = &[(b"hearth", &[Rule::NeverLivePath]), (b"other", &[])];
+pub fn live_with_download(task: &[u8]) -> Expansion {
+    use super::kinds::{account_expansion, file, strings, text};
+    account_expansion(&[
+        (task, Map::Software, &[file(b"tool", [text(Name::Path, TOOL_PATH)])]),
+        (b"mail", Map::Live, &[file(b"tool", [text(Name::Action, b"none"), strings(Name::Paths, &[TOOL_BINARY])])]),
+    ])
+}
+pub type EntryFieldCase<'a> = (&'a [(Name, &'a [u8])], &'a [Rule]);
+pub fn ordered_secret(fields: &[(Name, &[u8])]) -> Expansion {
+    let mut expansion = super::secret_entry(Map::Secrets, b"key", fields);
+    for task in &mut expansion.tasks {
+        for group in &mut task.groups {
+            for entry in &mut group.entries {
+                for (index, field) in entry.fields.iter_mut().enumerate() {
+                    field.at.column =
+                        super::FIELD_AT.column.saturating_add(u32::try_from(index).expect("fixture field count"));
+                }
+            }
+        }
+    }
+    expansion
+}
+
+pub type LiveUnitCase<'a> = (Option<&'a [u8]>, &'a [u8], &'a [Rule]);
+pub type HearthGroupCase<'a> = (&'a [u8], &'a [&'a [u8]], &'a [Rule]);
+
+pub const TOOL_PATH: &[u8] = b"/opt/tool";
+pub const TOOL_BINARY: &[u8] = b"/opt/tool/bin/tool";
+pub fn live_unit_rules(action: &[u8], unit: Option<&[u8]>) -> Box<[Rule]> {
+    live_rules(action, unit, &[TOOL_PATH])
+}

@@ -1,4 +1,6 @@
 //! Refuse reserved entries before kinds validate them (format.md, 5.11).
+mod live;
+mod owners;
 mod paths;
 mod words;
 use crate::{
@@ -19,7 +21,7 @@ pub enum Spot {
 pub struct Refused {
     pub task: Box<[u8]>,
     pub spot: Spot,
-    pub also: Option<Position>,
+    pub also: Option<Place>,
     pub reserved: Reserved,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -39,31 +41,34 @@ pub struct Installed<'a> {
 pub fn tree(installed: &[Installed<'_>]) -> Box<[Refused]> {
     paths::tree(installed)
 }
-fn first(row: &Located<'_>, map: Map, container: bool) -> Option<Refused> {
-    let words = words::entry(row, map, container);
-    let paths = paths::entry(row, map);
-    match (words, paths) {
-        (Some(words), Some(paths)) => {
-            if words.spot == Spot::Declared(row.entry.at) {
-                return Some(words);
-            }
-            if paths.spot == Spot::Declared(row.entry.at) {
-                return Some(paths);
-            }
-            for field in &row.entry.fields {
-                if words.spot == Spot::Declared(field.at) {
-                    return Some(words);
-                }
-                if paths.spot == Spot::Declared(field.at) {
-                    return Some(paths);
-                }
-            }
-            Some(words)
-        }
-        (Some(fault), None) | (None, Some(fault)) => Some(fault),
-        (None, None) => None,
+fn first(row: &Located<'_>, map: Map, container: bool, expansion: &Expansion) -> Option<Refused> {
+    let mut candidates =
+        [words::entry(row, map, container), paths::entry(row, map), owners::entry(row, map, expansion)];
+    if let Some(fault) = at(&mut candidates, row.entry.at) {
+        return Some(fault);
     }
+    for field in &row.entry.fields {
+        if let Some(fault) = at(&mut candidates, field.at) {
+            return Some(fault);
+        }
+    }
+    None
 }
+fn at(candidates: &mut [Option<Refused>], at: Position) -> Option<Refused> {
+    for candidate in candidates {
+        if let Some(fault) = candidate
+            && fault.spot == Spot::Declared(at)
+        {
+            return candidate.take();
+        }
+    }
+    None
+}
+#[must_use]
+pub fn live(expansion: &Expansion, installed: &[Installed<'_>]) -> Box<[Refused]> {
+    live::live(expansion, installed)
+}
+
 fn refused(row: &Located<'_>, at: Position, rule: Rule, what: &[u8]) -> Refused {
     Refused {
         task: copy_of(row.task),
@@ -86,7 +91,7 @@ pub fn entries(expansion: &mut Expansion, target: &[u8], container: bool) -> Box
         for group in &task.groups {
             for entry in &group.entries {
                 let row = Located { task: &task.task, entry };
-                if let Some(fault) = first(&row, group.map, container) {
+                if let Some(fault) = first(&row, group.map, container, expansion) {
                     pending.push(Pending { map: group.map, key: entry.key.clone(), fault }).expect("entry count");
                 }
             }
@@ -137,12 +142,16 @@ pub(crate) fn error(fault: Refused, meta: &Meta) -> Error {
         kind: Kind::Reserved(fault.reserved),
         class: Class::Configuration,
         at: Some(Place { path: path.clone(), position }),
-        also: also(&path, fault.also),
+        also: fault.also,
         target: Some(meta.target.clone()),
         task: Some(fault.task),
     }
 }
 
-fn also(path: &[u8], position: Option<Position>) -> Option<Place> {
-    Some(Place { path: copy_of(path), position: Some(position?) })
+fn declaration(task: &[u8]) -> Box<[u8]> {
+    let mut path = Writer::new(task.len().saturating_add(b"tasks//task.json".len()));
+    path.put(b"tasks/").expect("prefix");
+    path.put(task).expect("task");
+    path.put(b"/task.json").expect("suffix");
+    path.finish()
 }

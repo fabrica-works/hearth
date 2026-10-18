@@ -30,4 +30,9 @@ pub enum Rule {
     Runtime,
     LogFile,
     InitramfsConf,
+    SecretMode,
+    HearthOwner,
+    LiveNone,
+    NeverLiveUnit,
+    NeverLivePath,
 }

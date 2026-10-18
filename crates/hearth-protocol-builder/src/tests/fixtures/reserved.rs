@@ -43,6 +43,11 @@ pub const RESERVED_RULES: &[render::errors::Rule] = &[
     render::errors::Rule::Runtime,
     render::errors::Rule::LogFile,
     render::errors::Rule::InitramfsConf,
+    render::errors::Rule::SecretMode,
+    render::errors::Rule::HearthOwner,
+    render::errors::Rule::LiveNone,
+    render::errors::Rule::NeverLiveUnit,
+    render::errors::Rule::NeverLivePath,
 ];
 #[must_use]
 pub fn reserved_rules() -> &'static [render::errors::Rule] {

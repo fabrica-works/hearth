@@ -49,3 +49,26 @@ fn reserved_paths_exit_2() {
         assert_eq!(f::rendered_files(files).exit, expected, "row {row}");
     }
 }
+#[test]
+fn a_secret_owned_by_hearth_is_refused_at_its_owner() {
+    assert_eq!(f::rendered(&f::SECRET_HEARTH).stdout, b"tasks/motd/task.json:1:71: x1-prod: motd: \"mail/tls/mx1.key\" is reserved: hearth must not be able to read this secret or identity file (format.md, 9.1)\n");
+}
+#[test]
+fn a_never_live_unit_is_refused_at_its_unit() {
+    assert_eq!(f::rendered(&f::LIVE_NEVER).stdout, b"tasks/motd/task.json:1:19: x1-prod: motd: \"systemd-networkd.service\" is reserved: this core service must not restart live (format.md, 5.14)\n");
+}
+#[test]
+fn a_unit_with_none_is_refused_at_its_unit() {
+    assert_eq!(f::rendered(&f::LIVE_NONE).stdout, b"tasks/motd/task.json:1:18: x1-prod: motd: \"x.service\" is reserved: action none names no unit (format.md, 5.14)\n");
+}
+const SECRET_LIVE_EXITS: &[(&hearth_builder_world::fixtures::File, Exit)] = &[
+    (&f::SECRET_HEARTH, f::CONFIGURATION_EXIT),
+    (&f::LIVE_NEVER, f::CONFIGURATION_EXIT),
+    (&f::LIVE_NONE, f::CONFIGURATION_EXIT),
+];
+#[test]
+fn reserved_secrets_and_live_entries_exit_2() {
+    for (row, &(file, expected)) in SECRET_LIVE_EXITS.iter().enumerate() {
+        assert_eq!(f::rendered(file).exit, expected, "row {row}");
+    }
+}

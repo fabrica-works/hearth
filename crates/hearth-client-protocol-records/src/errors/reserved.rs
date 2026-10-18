@@ -30,6 +30,11 @@ pub enum Rule {
     Runtime,
     LogFile,
     InitramfsConf,
+    SecretMode,
+    HearthOwner,
+    LiveNone,
+    NeverLiveUnit,
+    NeverLivePath,
 }
 use crate::form::{json::field, text::Lines};
 use skein_json::writer::Encoder;
@@ -59,6 +64,11 @@ impl Rule {
             Self::Runtime => b"runtime",
             Self::LogFile => b"log_file",
             Self::InitramfsConf => b"initramfs_conf",
+            Self::SecretMode => b"secret_mode",
+            Self::HearthOwner => b"hearth_owner",
+            Self::LiveNone => b"live_none",
+            Self::NeverLiveUnit => b"never_live_unit",
+            Self::NeverLivePath => b"never_live_path",
         }
     }
 }
@@ -104,6 +114,15 @@ impl Reserved {
             Rule::InitramfsConf => {
                 lines.put(b"the packages part writes tiny-initramfs configuration (machine.md, 7.1)");
             }
+            Rule::SecretMode => {
+                lines.put(b"a secret or identity mode gives others nothing and has no special bits (format.md, 9.1)");
+            }
+            Rule::HearthOwner => {
+                lines.put(b"hearth must not be able to read this secret or identity file (format.md, 9.1)");
+            }
+            Rule::LiveNone => lines.put(b"action none names no unit (format.md, 5.14)"),
+            Rule::NeverLiveUnit => lines.put(b"this core service must not restart live (format.md, 5.14)"),
+            Rule::NeverLivePath => lines.put(b"this path must not change live (format.md, 5.14)"),
         }
     }
     pub(super) fn json(&self, json: &mut Encoder) {

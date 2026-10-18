@@ -6,6 +6,7 @@ mod files;
 pub(crate) mod guards;
 mod packages;
 mod references;
+mod reserved;
 mod resolution;
 pub(crate) mod scripts;
 mod secrets;
@@ -480,14 +481,14 @@ impl Side {
             else {
                 continue;
             };
-            let Some((secrets, live, software, mut accounts)) =
+            let Some((secrets, software, mut accounts)) =
                 secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome)
             else {
                 continue;
             };
             let Some(data) = self.data(&expansion, &meta) else { continue };
-            let Some(installation) =
-                self.installation(&meta, &checked, &expansion, &mut accounts, &mut packages, &mut boot)
+            let Some((installation, live)) =
+                self.reserved_installation(&meta, &checked, &expansion, &mut accounts, &mut packages, &mut boot)
             else {
                 continue;
             };

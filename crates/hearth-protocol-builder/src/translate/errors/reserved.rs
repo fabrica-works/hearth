@@ -28,5 +28,10 @@ fn rule(rule: source::Rule) -> target::Rule {
         source::Rule::Runtime => target::Rule::Runtime,
         source::Rule::LogFile => target::Rule::LogFile,
         source::Rule::InitramfsConf => target::Rule::InitramfsConf,
+        source::Rule::SecretMode => target::Rule::SecretMode,
+        source::Rule::HearthOwner => target::Rule::HearthOwner,
+        source::Rule::LiveNone => target::Rule::LiveNone,
+        source::Rule::NeverLiveUnit => target::Rule::NeverLiveUnit,
+        source::Rule::NeverLivePath => target::Rule::NeverLivePath,
     }
 }

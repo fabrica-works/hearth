@@ -27,6 +27,11 @@ const TEXT: &[(Rule, &[u8])] = &[
     (Rule::Runtime, b"\"rootwait\" is reserved: runtime, noise and history are not task files (format.md, 5.11)\n"),
     (Rule::LogFile, b"\"rootwait\" is reserved: a file beneath /var/log must be empty (format.md, 5.11)\n"),
     (Rule::InitramfsConf, b"\"rootwait\" is reserved: the packages part writes tiny-initramfs configuration (machine.md, 7.1)\n"),
+    (Rule::SecretMode, b"\"rootwait\" is reserved: a secret or identity mode gives others nothing and has no special bits (format.md, 9.1)\n"),
+    (Rule::HearthOwner, b"\"rootwait\" is reserved: hearth must not be able to read this secret or identity file (format.md, 9.1)\n"),
+    (Rule::LiveNone, b"\"rootwait\" is reserved: action none names no unit (format.md, 5.14)\n"),
+    (Rule::NeverLiveUnit, b"\"rootwait\" is reserved: this core service must not restart live (format.md, 5.14)\n"),
+    (Rule::NeverLivePath, b"\"rootwait\" is reserved: this path must not change live (format.md, 5.14)\n"),
 ];
 #[test]
 fn a_reserved_error_prints_the_rules_words() {
@@ -48,6 +53,11 @@ const JSON: &[(Rule, &[u8])] = &[
     (Rule::Runtime, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"runtime\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
     (Rule::LogFile, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"log_file\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
     (Rule::InitramfsConf, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"initramfs_conf\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
+    (Rule::SecretMode, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"secret_mode\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
+    (Rule::HearthOwner, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"hearth_owner\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
+    (Rule::LiveNone, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"live_none\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
+    (Rule::NeverLiveUnit, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"never_live_unit\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
+    (Rule::NeverLivePath, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"never_live_path\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
 ];
 #[test]
 fn json_gives_the_rule_and_what() {

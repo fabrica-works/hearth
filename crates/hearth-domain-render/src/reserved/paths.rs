@@ -18,6 +18,8 @@ enum Match {
     Log,
     DataBoundary,
     DataRoot,
+    SystemdConf,
+    SystemdDropin,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Except {
@@ -27,15 +29,55 @@ enum Except {
     Local,
     Data,
     OtherKinds,
+    Live,
 }
 struct Row {
     rule: Rule,
     pattern: Match,
     except: Except,
 }
-use Except::{Data, Local, None as Never, OtherKinds, Secret, Tmpfiles};
+use Except::{Data, Live, Local, None as Never, OtherKinds, Secret, Tmpfiles};
 use Match::{Beneath, Exact, Pattern};
 const ROWS: &[Row] = &[
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/systemd/system.conf"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/systemd/system.conf.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/usr/local/lib/systemd/system.conf.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/systemd/system-generators"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/usr/local/lib/systemd/system-generators"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/systemd/system-environment-generators"), except: Live },
+    Row {
+        rule: Rule::NeverLivePath,
+        pattern: Beneath(b"/usr/local/lib/systemd/system-environment-generators"),
+        except: Live,
+    },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/udev"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/usr/local/lib/udev"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/modprobe.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/usr/local/lib/modprobe.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/modules"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/modules-load.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/usr/local/lib/modules-load.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/sysctl.conf"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/sysctl.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/usr/local/lib/sysctl.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/binfmt.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/usr/local/lib/binfmt.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/kernel"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/usr/local/lib/kernel"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/initramfs-tools"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/tiny-initramfs"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/crypttab"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/default/grub"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/fstab"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/hostname"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/localtime"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/locale.conf"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/vconsole.conf"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/machine-id"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/os-release"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Beneath(b"/etc/apparmor.d"), except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Match::SystemdConf, except: Live },
+    Row { rule: Rule::NeverLivePath, pattern: Match::SystemdDropin, except: Live },
     Row { rule: Rule::DataRoot, pattern: Match::DataBoundary, except: OtherKinds },
     Row { rule: Rule::ActivatorFile, pattern: Exact(b"/etc/fstab"), except: Never },
     Row { rule: Rule::ActivatorFile, pattern: Beneath(b"/.hearth"), except: Never },
@@ -114,6 +156,8 @@ fn matched(pattern: Match, path: &[u8], shape: Shape) -> bool {
         }
         Match::Log => beneath(path, b"/var/log") && shape == Shape::File { empty: false },
         Match::DataBoundary => [b"/srv".as_slice(), b"/var", b"/home"].contains(&path),
+        Match::SystemdConf => child(path, b"/etc/systemd").is_some() && name.ends_with(b".conf"),
+        Match::SystemdDropin => child(path, b"/usr/local/lib/systemd").is_some() && name.ends_with(b".conf.d"),
         Match::DataRoot => !strict(path, b"/srv") && !strict(path, b"/var") && !strict(path, b"/home"),
     }
 }
@@ -123,12 +167,21 @@ fn above(pattern: Match, path: &[u8]) -> bool {
         Pattern(root, ..) => beneath(root, path),
         Match::Dropin => beneath(b"/etc/systemd/system.conf.d", path),
         Match::Log => path != b"/var/log" && beneath(b"/var/log", path),
-        Match::Trial | Match::OverlayLink | Match::DataBoundary | Match::DataRoot => false,
+        Match::Trial
+        | Match::OverlayLink
+        | Match::DataBoundary
+        | Match::DataRoot
+        | Match::SystemdConf
+        | Match::SystemdDropin => false,
     }
 }
 fn check(path: &[u8], shape: Shape, map: Option<Map>, own_data: bool) -> Option<Rule> {
     for row in ROWS {
+        if row.except == Live {
+            continue;
+        }
         let exempt = match row.except {
+            Live => true,
             Never => false,
             Secret => map == Some(Map::Secrets) || map == Some(Map::Identity),
             Tmpfiles => map == Some(Map::Tmpfiles),
@@ -197,4 +250,21 @@ pub(super) fn tree(installed: &[Installed<'_>]) -> Box<[Refused]> {
         }
     }
     faults.into_boxed()
+}
+
+pub(super) fn never(path: &[u8]) -> bool {
+    for row in ROWS {
+        if row.except == OtherKinds || (row.except == Local && beneath(path, b"/usr/local")) {
+            continue;
+        }
+        for end in 1..=path.len() {
+            if end != path.len() && path.get(end) != Some(&b'/') {
+                continue;
+            }
+            if matched(row.pattern, path.get(..end).expect("path prefix"), Shape::Link) {
+                return true;
+            }
+        }
+    }
+    false
 }
