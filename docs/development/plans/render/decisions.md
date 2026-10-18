@@ -1160,6 +1160,47 @@ None yet.
      `1 << 30`, the step reports it by layer, and the question comes back for the
      defaults. Nothing is deferred, so `later.md` gains no row.
 
+193. **hearth 29.4's error cases: store left out, exported's cause, composition in a base, resolution in name order** (plan defect, hearth-29.4's blocks of 2026-10-18T01:54:26Z, 01:54:42Z and 01:56:51Z).
+     Four plan defects, each answered by the design in its own words; the fourth
+     was raised as a design gap, and render.md 5.7 answers it.
+
+     1. **store has no case.** render.md 9.2: "`errors` (one case per kind of
+        7.2 that a repository causes; `tool` and `resolution` are builder-world
+        cases …)". 7.2's store is "a store full at a limit, or whose upkeep
+        failed (store.md, 8.1): operational, the call's": no repository causes
+        it. The report's proposal stands: the test is
+        `every_kind_of_7_2_but_checks_and_store_has_a_case`, its `const` list
+        without `store`. store's error stays where it is tested on main
+        (`tests/builder/tests/store.rs:327`,
+        `a_full_store_answers_its_error_naming_the_store_and_the_limit`); 29.4
+        adds no store world.
+     2. **exported keeps VPN_BAD and its cause.** 7.2's exported: "`target` is
+        the reader, the kind names the exporter and its task, `at` is the
+        cause's place, and the class is the cause's"; 7.1: "A target asked that
+        does not render always has an error printed for it: its own". So the
+        exporter's own error always prints beside its reader's. The report's
+        proposal stands: `errors/exported` is hearth 20's `VPN` with `VPN_BAD`,
+        their names kept (`ion-prod`, `carbon-prod`, the lab pair), plus base
+        `ok`; its output is the healthy specs, then `ion-prod`'s `schema` error
+        and `carbon-prod`'s `exported` error, as
+        `tests/builder/tests/real/exports.rs:93-94` pins them. The Don't is now
+        "a case with two faults": one fault each, this one printing its cause.
+     3. **composition's fault moves to a base.** 7.1: "a broken document fails
+        the targets that compose it"; every target composes `fleet.json`, so
+        Choices 7a's "`ok-prod` renders" cannot hold for a fault there. Keep the
+        one assertion shape instead of an exception: the case is 7.2's
+        "`placement` in a base", `placement` in `hosts/bad/bad.json`, which
+        fails base `bad`'s targets alone; `fleet.json` keeps no `null`. If
+        `ok-prod` does not render with it, block with the output.
+     4. **errors/resolution prints in target name order.** render.md 5.7: "the
+        targets in name order … A key that fails is the error of each target
+        that holds it (7.2), with no place (7.1) …; each keeps its spec, with
+        that key needed." Its `expected/output` is what the report saw:
+        `bad-prod`'s spec with its packages `needed`, then `ok-prod`'s `known`
+        with its `keys` line, then `bad-prod: apt cannot locate package
+        "hearth-absent"`; exit 2. No session suppresses the spec. This case
+        alone; every process case keeps `ok-prod`'s spec before its errors.
+
 ## For the user
 
 The long-term choices the user may veto:

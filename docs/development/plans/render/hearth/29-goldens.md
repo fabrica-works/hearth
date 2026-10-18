@@ -295,12 +295,15 @@ alone (20.3): the lab and prod specs differ in their witnessed peers.
 goes on) and a base `bad` (`bad-prod` carries the fault). Cases, a kind
 each: `decode` (a duplicate key and a fraction in `hosts/bad/bad.json`),
 `repository` (a file in a task outside `task.json` and `tree/`), `composition`
-(`null` for a task in `fleet.json`), `schema` (an undeclared setting
+(`placement` in `hosts/bad/bad.json`, a base: a fault in `fleet.json`
+fails every target, render.md 7.1), `schema` (an undeclared setting
 that lists the declared, 7.3), `evaluation` (an undefined value in a
 template), `guard` (a false `requires`), `reserved` (the `rootwait` boot
 parameter), `ids` (a data path whose owner has no fixed id), `collision`
-(one tree path from two tasks), `exported` (hearth 20's `VPN_BAD`
-reader and exporter); `sorted`: three faults in two files and two
+(one tree path from two tasks), `exported` (hearth 20's `VPN` with
+`VPN_BAD`, their names kept, and base `ok`: `ion-prod`'s `schema` error,
+the cause, prints with `carbon-prod`'s `exported` error, render.md 7.1 and
+7.2); `sorted`: three faults in two files and two
 targets, whose order is path, line, column, target (22.1). `tool` and
 `resolution` are builder-world cases, git or mmdebstrap's fake failing
 (render.md 9.2). `expected/output` holds the
@@ -308,7 +311,9 @@ spec of `ok-prod` then the errors; `expected/exit` is 2. `errors/tool` runs
 only through `protocol::run` with `Fault::KilledAt`, `errors/resolution`
 with `--resolve` and fake mmdebstrap asked for a package no index carries;
 each has `expected/output`; `expected/exit` is 75 for `tool` and 2 for
-`resolution`, whose output prints `ok-prod`'s spec first: apt that cannot
+`resolution`, whose output prints each spec in target name order,
+`bad-prod`'s with its packages `needed`, then `ok-prod`'s `known` with its
+`keys` line, then the error (render.md 5.7): apt that cannot
 locate a package is a configuration cause (render.md 7.1, client/README.md
 3.3). `errors/resolution`'s scenario is `fixtures::resolving(&files)`
 (`worlds.rs:195`, `resolve: true`), as `scenario_of` sets no `--resolve`.
@@ -320,15 +325,16 @@ Test shape: process, under 0.15 s:
 `each_error_case_prints_its_errors_after_the_healthy_spec` (a table over
 `ERROR_CASES`, one assertion shape, 0.15 s a case: under 1.7 s),
 `errors_are_sorted_by_path_line_column_and_target`,
-`every_kind_of_7_2_but_checks_has_a_case` (a `const` list against
-`errors/*`), `an_error_case_exits_2`,
+`every_kind_of_7_2_but_checks_and_store_has_a_case` (a `const` list against
+`errors/*`; `store` is no repository's, render.md 9.2), `an_error_case_exits_2`,
 `the_tool_and_resolution_errors_print_through_the_protocol_world`;
 world: `exports_digests_do_not_depend_on_arrival_order`.
 Proof: process, `each_error_case_prints_its_errors_after_the_healthy_spec`:
 each fault is printed as 7.3 writes it, at its file, line and column, and
 `ok-prod` is rendered whole. Bound: 0.15 s a case.
-Don't: errors past the bound (22.1 tests 300); a case with two kinds; the
-M5 kinds (`checks`).
+Don't: errors past the bound (22.1 tests 300); a case with two faults
+(`exported`'s one fault prints its cause and its reader's error); the
+M5 kinds (`checks`); a `store` case.
 Size: no counted lines. Removes: nothing.
 
 ### 29.5 The `resolution` golden
