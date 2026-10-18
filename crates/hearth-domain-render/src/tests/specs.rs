@@ -17,7 +17,7 @@ fn a_spec_past_a_diffs_budget_fails_that_side() {
 }
 
 #[test]
-fn the_shipped_specs_budget_is_64_mib() {
+fn the_shipped_specs_budget_is_16_mib() {
     assert_eq!(crate::limits::SHIPPED.specs, specs::SHIPPED_SPEC_BYTES);
 }
 

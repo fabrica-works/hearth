@@ -134,13 +134,18 @@ fn a_tree_file_ending_in_j2_is_asked_as_a_template() {
 }
 #[test]
 fn a_template_past_its_limit_fails_its_tasks_targets_unread() {
-    let call = fixtures::template_call(b"tasks/motd/tree/etc/issue.j2", Mode::File, 1_048_577, limits::SHIPPED);
+    let call = fixtures::template_call(
+        b"tasks/motd/tree/etc/issue.j2",
+        Mode::File,
+        fixtures::TEMPLATE_BYTES + 1,
+        limits::SHIPPED,
+    );
     assert_eq!(call.pending.as_ref(), []);
     assert_eq!(
         call.errors.get(0).expect("limit error").kind,
         crate::errors::Kind::Decode(crate::errors::Decode::TooLarge {
             limit: crate::errors::Limit::Template,
-            max: 1_048_576
+            max: fixtures::TEMPLATE_BYTES
         })
     );
     assert_eq!(call.errors.get(0).expect("limit error").task.as_deref(), Some(b"motd".as_slice()));

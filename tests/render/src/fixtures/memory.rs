@@ -52,10 +52,9 @@ fn compiled_template(source: &str) -> hearth_domain_render::evaluate::template::
     hearth_protocol_builder::translate::instructions::template(compiled)
 }
 
-// Sixty-three one-MiB fields fit below the expanded 64-MiB allowance,
-// leaving space for their entry and field records and keys.
-const EXPANDED_COPIES: u64 =
-    hearth_domain_render::limits::SHIPPED.expanded / hearth_domain_render::limits::SHIPPED.document as u64 - 1;
+// Fifteen fields each fill the template's one-MiB output allowance.
+// Their records and keys fit in the expanded allowance's remaining MiB.
+const EXPANDED_COPIES: u64 = hearth_domain_render::limits::SHIPPED.expanded / TEMPLATE_LIMITS.rendered_file as u64 - 1;
 #[must_use]
 pub fn expanded_template()
 -> (hearth_domain_render::revision::declaration::Declaration, hearth_domain_render::evaluate::template::Template) {

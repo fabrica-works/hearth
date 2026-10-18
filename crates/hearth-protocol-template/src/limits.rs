@@ -9,7 +9,7 @@ pub struct Limits {
     pub statements: u32,
 }
 /// The shipped profile (render.md, 2.3).
-pub const SHIPPED: Limits = Limits { expression: 4096, nesting: 64, template: 1_048_576, statements: 32 };
+pub const SHIPPED: Limits = Limits { expression: 4096, nesting: 64, template: 262_144, statements: 32 };
 
 /// One of the crate's entry points.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

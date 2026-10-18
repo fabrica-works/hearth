@@ -6,5 +6,5 @@ pub struct Limits {
     /// The most room demanded at once, at least one.
     pub chunk: u32,
 }
-/// The shipped profile: 64 MiB per record.
-pub const SHIPPED: Limits = Limits { record: 67_108_864, chunk: 65_536 };
+/// The shipped profile: 16 MiB per record.
+pub const SHIPPED: Limits = Limits { record: 16_777_216, chunk: 65_536 };

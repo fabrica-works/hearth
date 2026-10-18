@@ -151,8 +151,14 @@ const CONFIG_FAULTS: &[(crate::config::Fault, render_errors::Decode, record_erro
     ),
     (
         crate::config::Fault::Json(skein_json::tokenizer::Error::TooLong),
-        render_errors::Decode::TooLarge { limit: render_errors::Limit::Document, max: 1_048_576 },
-        record_errors::Decode::TooLarge { limit: record_errors::Limit::Document, max: 1_048_576 },
+        render_errors::Decode::TooLarge {
+            limit: render_errors::Limit::Document,
+            max: super::super::fixtures::bounds::DOCUMENT_BYTES,
+        },
+        record_errors::Decode::TooLarge {
+            limit: record_errors::Limit::Document,
+            max: super::super::fixtures::bounds::DOCUMENT_BYTES,
+        },
     ),
 ];
 #[test]

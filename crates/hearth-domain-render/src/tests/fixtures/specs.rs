@@ -5,9 +5,9 @@ use crate::{
     vocabulary::{Answer, Output, Request},
 };
 use skein_lib::{List, Map, Queue, bytes};
-// The spec allowance is the design's 64 MiB. Two half-budget strings pass it together.
-pub const SHIPPED_SPEC_BYTES: u64 = 67_108_864;
-pub const SPEC_BYTES: u64 = 65_536; // A KiB for each shipped MiB keeps hashing cheap.
+// The spec allowance is the design's 16 MiB. Two half-budget strings pass it together.
+pub const SHIPPED_SPEC_BYTES: u64 = 16_777_216;
+pub const SPEC_BYTES: u64 = 16_384; // A KiB for each shipped MiB keeps hashing cheap.
 const LIMITS: crate::limits::Limits = crate::limits::Limits { specs: SPEC_BYTES, ..SHIPPED };
 pub const TOO_MANY_BYTES: u64 = SPEC_BYTES + 1;
 pub const HALF_BYTES: u64 = SPEC_BYTES / 2 + 1;

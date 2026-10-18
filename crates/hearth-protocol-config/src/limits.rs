@@ -6,7 +6,7 @@ pub struct Limits {
     pub keys: u32,
     pub settings: u32,
 }
-pub const SHIPPED: Limits = Limits { document: 1_048_576, depth: 32, keys: 4_096, settings: 512 };
+pub const SHIPPED: Limits = Limits { document: 262_144, depth: 32, keys: 4_096, settings: 512 };
 #[must_use]
 pub fn tokenizer(limits: &Limits) -> skein_json::tokenizer::Limits {
     skein_json::tokenizer::Limits {

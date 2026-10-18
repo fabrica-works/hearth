@@ -18,6 +18,8 @@ pub const REQUEST: Token = Token::new(1);
 pub const OUTPUT: Token = Token::new(201);
 pub const INPUT: Token = Token::new(202);
 pub const ERROR: Token = Token::new(203);
+pub mod bounds;
+pub mod git;
 pub const OID: &[u8] = b"0123456789abcdef0123456789abcdef01234567";
 pub const DOCUMENT: &[u8] = b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"}}";
 

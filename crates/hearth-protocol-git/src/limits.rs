@@ -14,9 +14,9 @@ pub struct Limits {
 pub const SHIPPED: Limits = Limits {
     tail_lines: 20,
     tail_line: 160,
-    entries: 65_536,
+    entries: 16_384,
     path: 4_096,
-    paths_total: 16_777_216,
+    paths_total: 4_194_304,
     chunk: 16_384,
     hunk_lines: 200,
     hunk_file: 1_048_576,

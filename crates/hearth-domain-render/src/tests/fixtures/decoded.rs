@@ -1,14 +1,16 @@
 use super::{bytes, composition};
 use crate::{limits, revision as r};
 
-// Ruling 194: 524,281 zeros, plus two 32-byte map entries and two key bytes.
+// Rulings 194 and 204: 131,065 zeros, plus two 32-byte map entries and two key bytes.
 const NO_ZEROES: u32 = 0; // The empty a/b map has no list elements.
-pub const DOCUMENT_ZEROES: u32 = 524_281;
-pub const DOCUMENT_HELD_BYTES: u64 = 16_777_058;
+pub const DOCUMENT_ZEROES: u32 = 131_065;
+pub const DOCUMENT_HELD_BYTES: u64 = 4_194_146;
 pub const ADMITTED_DOCUMENTS: u32 = 4;
 pub const OVER_BUDGET_DOCUMENTS: u32 = ADMITTED_DOCUMENTS + 1;
 // The source fits one document: two bytes per zero, then the enclosing syntax.
-pub const DOCUMENT_SOURCE_BYTES: u64 = 1_048_575;
+pub const DOCUMENT_SOURCE_BYTES: u64 = 262_143;
+/// The shipped template input allowance (render.md, 2.3).
+pub const TEMPLATE_BYTES: u64 = 262_144;
 pub const DOCUMENT_PATHS: &[&[u8]] = &[b"envs/a.json", b"envs/b.json", b"envs/c.json", b"envs/d.json", b"envs/e.json"];
 
 pub fn empty_document() -> r::Document {
@@ -74,11 +76,11 @@ pub fn decode_empty_documents(call: &mut crate::call::Side) {
 pub const DECODED_TOO_LARGE: crate::errors::Decode =
     crate::errors::Decode::TooLarge { limit: crate::errors::Limit::Decoded, max: limits::SHIPPED.decoded };
 
-// A one-MiB comment has four delimiter bytes and one more line than newlines.
+// A 256-KiB comment has four delimiter bytes and one more line than newlines.
 pub const COMMENT_NEWLINES: u32 = limits::SHIPPED.template.saturating_sub(4);
 pub const COMMENT_LINES: u32 = COMMENT_NEWLINES.saturating_add(1);
-pub const COMMENT_HELD_BYTES: u64 = 4_194_292;
-// Sixteen such line tables fit in 64 MiB; q is the seventeenth distinct blob.
+pub const COMMENT_HELD_BYTES: u64 = 1_048_564;
+// Sixteen such line tables fit in 16 MiB; q is the seventeenth distinct blob.
 const COMMENT_NAMES: &[u8] = b"abcdefghijklmnopq";
 pub fn comment_template() -> crate::evaluate::template::Template {
     let mut lines = skein_lib::List::with_capacity(COMMENT_LINES);

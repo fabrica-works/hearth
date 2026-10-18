@@ -34,12 +34,12 @@ pub const SHIPPED: Limits = Limits {
     errors: 256,
     error_bytes: 16_777_216,
     tasks: 1_024,
-    decoded: 67_108_864,
-    composed: 67_108_864,
-    specs: 67_108_864,
-    validated: 67_108_864,
-    document: 1_048_576,
-    template: 1_048_576,
+    decoded: 16_777_216,
+    composed: 16_777_216,
+    specs: 16_777_216,
+    validated: 16_777_216,
+    document: 262_144,
+    template: 262_144,
     statements: 32,
     iterations: 1_048_576,
     rendered_file: 16_777_216,
@@ -51,8 +51,8 @@ pub const SHIPPED: Limits = Limits {
     static_file: 67_108_864,
     hunk_file: 1_048_576,
     expansion: 65_536,
-    expanded: 67_108_864,
-    exported: 67_108_864,
+    expanded: 16_777_216,
+    exported: 16_777_216,
 };
 
 /// A literal that is five bytes cannot fit, for budget refusal tests.
@@ -66,8 +66,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     use alloc::boxed::Box;
     use skein_lib::{List, Map};
     // Render's domain receives the listing at render.md, 8.4's bounds.
-    const ENTRIES: u32 = 65_536;
-    const PATHS: u64 = 16_777_216;
+    const ENTRIES: u32 = 16_384;
+    const PATHS: u64 = 4_194_304;
     let listing = List::<revision::Entry>::worst_case(ENTRIES)?
         .checked_add(List::<vocabulary::Blob>::worst_case(ENTRIES)?)?
         .checked_add(Map::<revision::Oid, hearth_lib::encode::Digest>::worst_case(ENTRIES)?)?
