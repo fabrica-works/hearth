@@ -1201,6 +1201,22 @@ None yet.
         "hearth-absent"`; exit 2. No session suppresses the spec. This case
         alone; every process case keeps `ok-prod`'s spec before its errors.
 
+194. **hearth 28.s2's test document counts 16,777,058 bytes** (plan defect, hearth-28.s2's block of 2026-10-18T02:10:07Z).
+     A plan defect, which the design answers: render.md 2.3, "What is decoded
+     counts as it is held …: a document's or a declaration's values as values
+     count, a key's bytes as a string's", and "One evaluation": "The values it
+     makes count a string's bytes, and 32 bytes for each element of a list or
+     entry of a map". The plan's 16,776,992 is the list's 524,281 elements
+     alone. The report's proposal stands: `{"a":{"b":[0,…]}}` with 524,281
+     zeros counts 16,777,058 bytes, 524,281 × 32 for the elements, 32 for each
+     of the two map entries and 1 for each of the keys `a` and `b`; the test
+     asserts that number, and four such documents render while a fifth fails
+     the render at its path, as before. Four count 67,108,232 bytes, 632 under
+     64 MiB (67,108,864): if the repository's other documents, declarations and
+     templates take more than those 632, shorten each list by the fewest zeros
+     that let four fit, and give the count as the test computes it by 2.3's
+     rule, a literal with its sum in a comment.
+
 ## For the user
 
 The long-term choices the user may veto:
