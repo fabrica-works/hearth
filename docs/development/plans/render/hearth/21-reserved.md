@@ -103,6 +103,15 @@ it. Each proves on the real loop's `hearth render`, by the error it prints.
 
 ## Increments
 
+21.1 landed (hearth 6e8ce23) with `Reserved` and `Rule` in modules of
+their own: render `src/errors/reserved.rs`, `src/tests/fixtures/reserved.rs`;
+records `src/errors/reserved.rs`, `src/tests/errors/reserved.rs`,
+`src/tests/fixtures/reserved.rs`; protocol `src/translate/errors/reserved.rs`,
+`src/tests/translate/reserved.rs`, `src/tests/fixtures/reserved.rs`;
+`tests/builder/src/fixtures/reserved.rs`, `tests/builder/tests/real/reserved.rs`.
+Each rule 21.2 to 21.4 add goes there, and "protocol, records and
+`tests/builder` as 21.1's" names those files (ruling 180).
+
 ### 21.1 Reserved words: command-line keys and length, preseeds, units, tmpfiles
 Scope: 5.11's rows for `cmdline`, `preseeds`, `presets`, `tmpfiles`; machine.md
 6.2; `Kind::Reserved`; `Expansion::refuse`; `reserved::entries`.
@@ -190,8 +199,8 @@ Scope: 5.11's path rows; 5.5's "Forbidden destinations"; 5.7's data paths;
 `reserved::tree`.
 Needs: nothing beyond 21.1.
 Files: render new `src/reserved/paths.rs`, `src/reserved.rs`,
-`src/{call, errors}.rs`, `src/tests/{reserved, fixtures}.rs`; protocol,
-records and `tests/builder` as 21.1's.
+`src/call.rs`, `src/errors/reserved.rs`, `src/tests/{reserved,
+fixtures/reserved}.rs`; protocol, records and `tests/builder` as 21.1's.
 Shape: `ROWS` (Choices 4), each by its rule. `ActivatorFile`: `/etc/fstab`,
 `/.hearth`. `Dropin`: a child of `/etc/systemd/system.conf.d/`
 whose name begins `zz-hearth` or sorts bytewise after `zz-hearth-watchdog.conf`.
@@ -255,8 +264,8 @@ Removes: nothing.
 Scope: 5.11's rows for secrets and `live`; 9.1; 5.14's "Never live".
 Needs: nothing beyond 21.2.
 Files: render new `src/reserved/{owners, live}.rs`, `src/reserved.rs`,
-`src/{call, errors}.rs`, `src/tests/{reserved, fixtures}.rs`; protocol, records
-and `tests/builder` as 21.1's.
+`src/call.rs`, `src/errors/reserved.rs`, `src/tests/{reserved,
+fixtures/reserved}.rs`; protocol, records and `tests/builder` as 21.1's.
 Shape: `owners`: a secret's or identity item's `mode` with any bit outside
 `0770` set is `SecretMode` at `mode` (so `0604`, `2770`, `4700` and `1770`
 too; format.md 9.3); a secret's
@@ -306,30 +315,33 @@ Removes: nothing.
 Scope: format.md 5.12; render.md 3.2, and 3.4's container on its host;
 hearth 12's presence; log 68.
 Needs: nothing beyond 21.3; hearth 42.3 (`Composition::Task`, `CONTAINERS`).
-Files: render `src/{compose, call, errors}.rs`, `src/call/validation.rs`,
+Files: render `src/{compose, call, errors}.rs`, `src/errors/reserved.rs`, `src/call/validation.rs`,
 `src/tests/{compose, fixtures, errors}.rs`, `src/tests/fixtures/schemas.rs`;
 protocol, records and `tests/builder` as 21.1's, and the `Host` arms:
 records `src/errors/composition.rs`, `src/tests/errors.rs`; protocol
 `src/translate/errors.rs`, `src/tests/translate/composition.rs`;
-`tests/render/{src/fixtures.rs, tests/compose.rs}`; both fixtures modules: `THIN`
+`tests/render/{src/fixtures.rs, tests/compose.rs}`; `tests/render/src/fixtures/exports.rs`
+(`fleet()`, `:12`, gains the `tasks/hearth/task.json` entry: without it
+`tests/render/tests/exports.rs:43` sees 0 answers, not 2); both fixtures modules: `THIN`
 and the scripted `x1_prod` gain `tasks/hearth/task.json` `{}` (a ripple past
 README's 20 lines, as 17.1's: a planner's ruling), and each repository that
 is not built on them: `MOTD` and `CONTAINERS` (`tests/builder/src/fixtures.rs`,
-`:237`, `:646`). `LAYERS` and `CLUSTER` need nothing, and `CONTAINED`
+`:235`, `:650`). `LAYERS` and `CLUSTER` need nothing, and `CONTAINED`
 (`thin_with`) has THIN's; `VPN`, if hearth 20 lands it without `thin_with`.
-The ripple, at hearth c8f830d:
-- render's unit fixtures: `schemas.rs:176`'s `Present` gains `implicit:
-  false`; `removed_task` (`fixtures.rs:203`) gains a `tasks/hearth/task.json`
+The ripple, at hearth fdcc967:
+- render's unit fixtures: `schemas.rs:178`'s `Present` gains `implicit:
+  false`; `removed_task` (`fixtures.rs:151`) gains a `tasks/hearth/task.json`
   entry, its declaration (`declaration(&[], &[])`) and `call.defaults =
-  schema::declarations(..)`; the list capacities at `fixtures.rs:692` and
-  `:712` grow by one (4 to 5, 5 to 6), as `tests/errors.rs:116`'s count (4 to
+  schema::declarations(..)`; the list capacities at `fixtures.rs:657` and
+  `:682` grow by one (4 to 5, 5 to 6), as `tests/errors.rs:116`'s count (4 to
   5). `tests/compose.rs:140`, `:219`, `:238` and `:251` read
   `only(&settings.tasks)`, which now holds two: they read a new
   `fixtures::task_of(&Settings) -> &Present`, the task not `implicit`;
 - the render world: the scripted `x1_prod` (`tests/render/src/fixtures.rs:38`)
   gains the entry (oid `h`) and an empty `Declaration`;
-  `tests/render/tests/compose.rs:21`'s reads gain its oid, `thin.rs:121`'s
-  count goes from 4 to 5, and `thin.rs:142`'s reads gain `oid(b'h')`.
+  `tests/render/tests/compose.rs:21`'s reads gain its oid, last, after
+  `oid(b'2')`; `thin.rs:109`'s count goes from 4 to 5, and `thin.rs:127`'s
+  reads gain `oid(b'h')`, last.
 Shape: `compose::compose` adds `hearth` to the present tasks of a target whose
 placement is not a container, in name order, `implicit`. Naming `hearth` in a
 presence layer (base, member, base-env) of a container, with any value, is
@@ -339,14 +351,18 @@ kind reports it), both `reserved`, at the key, `task` `hearth`, `target` named
 (`fleet.json`'s and an environment's once, without a target). A present
 `hearth` with no `tasks/hearth/task.json` is 42.3's `Composition::Task` at that
 path, no position, for each such target: 42.3 added the variant, and 21.4
-emits it for the implicit task (nothing on main does). A non-null `hearth` in a base or member of
+emits it for the implicit task (main emits it only at a named task's key,
+`compose.rs:642`, and skips `hearth` there). A non-null `hearth` in a base or member of
 any other target is accepted: one `Present` (not two), `implicit` false.
-`fleet.json` and `envs/` keys for `hearth` are settings, as for any task; a
+`fleet.json` and `envs/` keys for `hearth` are settings, as for any task
+(`compose::present`, `compose.rs:580`, holds the implicit `hearth` too: the
+unclaimed check, `schema/targets.rs:201`, reads it); a
 container has none: a key for it on a container is dropped, with no error. Nothing else:
 the task's packages, user, software and presets are the repository's.
 A container reads of its host its placement alone (render.md 3.4, the
 designer's answer of 2026-10-17). `compose::placed` reports the `on` as now
-(`Unknown`, `Elsewhere`, `Container`); then, in `answer()` (`call.rs:449`):
+(`Unknown`, `Elsewhere`, `Container`); then, in `placement_host_valid`
+(`call.rs:408` to `:421`, which `answer()` calls at `:444`):
 - while a document the host composes is refused, the container is left out,
   `Failed`, with no error of its own (42.3): `Side::host_valid` keeps of
   `dependencies_valid` its four documents alone (each decoded, and none
@@ -357,7 +373,7 @@ designer's answer of 2026-10-17). `compose::placed` reports the `on` as now
   `On { on, host: Unplaced }` (`Host::Unplaced` new; text `, a target with
   no placement`, JSON `"unplaced"`), at its `on`, in the document `placed`
   names for the other `Host`s.
-`validation::host_schema` goes, with its call at `call.rs:451`; `needed` is
+`validation::host_schema` goes, with its call at `call.rs:413`; `needed` is
 the asked targets alone, so that a container asked reads none of its host's
 files and prints none of their errors.
 Test shape: unit, `src/tests/compose.rs`, under 20 ms:
@@ -449,6 +465,7 @@ impl Expansion { pub fn refuse(&mut self, map: Map, task: &[u8], key: &[u8]); } 
 // src/compose.rs (12's): `Present::implicit: bool` (`Install::at: Option<Position>` is 18.1's)
 
 // crates/hearth-domain-render/src/errors.rs: `Kind` gains `Reserved(Reserved)`; `Composition` none; `Host` gains `Unplaced` (21.4)
+// crates/hearth-domain-render/src/errors/reserved.rs (where 21.1 landed them):
 /// render.md 7.2's `reserved`: the rule, and the key, word, unit or path at fault.
 pub struct Reserved { pub rule: Rule, pub what: Box<[u8]> }
 pub enum Rule {
