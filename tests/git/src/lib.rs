@@ -6,4 +6,5 @@ pub mod world;
 pub mod expect;
 mod hunks;
 pub mod mutate;
+pub mod reference;
 mod replay;

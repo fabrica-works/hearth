@@ -25,6 +25,7 @@ pub mod limits;
 mod read;
 mod resolve;
 mod store;
+pub use store::names::shape as store_shape;
 mod walk;
 use hearth_protocol_tree as tree;
 pub mod translate;

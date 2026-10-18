@@ -4,7 +4,8 @@ use crate::render::vocabulary::Digest;
 use alloc::boxed::Box;
 use skein_io::kernel::Kind;
 use skein_lib::Writer;
-pub(crate) fn shape(directory: Directory, name: &[u8], kind: Kind) -> Shape {
+#[must_use]
+pub fn shape(directory: Directory, name: &[u8], kind: Kind) -> Shape {
     if directory == Directory::Top {
         if let b"store.record" | b"cache" | b"resolutions" | b"staging" | b"layers" | b"targets" | b"state"
         | b"artifacts" | b"sources" | b"caches" | b"repo" | b"credentials" = name
