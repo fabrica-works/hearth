@@ -19,6 +19,7 @@ pub struct Place {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
+    Reserved(Reserved),
     Exported(Exported),
     Ids(Ids),
 
@@ -566,3 +567,6 @@ pub enum Why {
     NotPackageUser,
     NotPackageGroup,
 }
+
+mod reserved;
+pub use reserved::{Reserved, Rule};

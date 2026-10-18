@@ -80,7 +80,8 @@ fn each_cause_takes_its_kind_and_class() {
             let name = match error.kind {
                 Kind::Resolution(_) => "resolution",
                 Kind::Tool(_) => "tool",
-                Kind::Ids(_)
+                Kind::Reserved(_)
+                | Kind::Ids(_)
                 | Kind::Exported(_)
                 | Kind::Guard(_)
                 | Kind::Collision(_)

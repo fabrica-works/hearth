@@ -730,3 +730,6 @@ mod ids;
 
 #[path = "real/part_changes.rs"]
 mod part_changes;
+
+#[path = "real/reserved.rs"]
+mod reserved;

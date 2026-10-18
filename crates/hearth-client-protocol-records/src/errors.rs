@@ -20,6 +20,7 @@ pub struct Error {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
+    Reserved(Reserved),
     Exported(Exported),
     Ids(Ids),
 
@@ -77,6 +78,7 @@ impl Error {
         match &self.kind {
             Kind::Exported(exported) => exported.text(lines),
             Kind::Ids(ids) => ids.text(lines),
+            Kind::Reserved(reserved) => reserved.text(lines),
             Kind::Collision(collision) => collision.text(lines),
             Kind::Resolution(error) => error.text(lines),
             Kind::Store(error) => error.text(lines),
@@ -113,6 +115,11 @@ impl Error {
             field(json, b"side", side.name());
         }
         match &self.kind {
+            Kind::Reserved(reserved) => {
+                field(json, b"kind", b"reserved");
+                json.key(b"reserved");
+                reserved.json(json);
+            }
             Kind::Ids(ids) => {
                 field(json, b"kind", b"ids");
                 json.key(b"ids");
@@ -775,3 +782,6 @@ impl Exported {
 
 mod resolution;
 pub use resolution::Resolution;
+
+mod reserved;
+pub use reserved::{Reserved, Rule};

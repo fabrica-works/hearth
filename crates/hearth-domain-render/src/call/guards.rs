@@ -84,7 +84,14 @@ pub(crate) fn contained(
             }
         }
     }
-    if valid { Some(entries::Expansion { tasks: expanded.into_boxed() }) } else { None }
+    if !valid {
+        return None;
+    }
+    let mut expansion = entries::Expansion { tasks: expanded.into_boxed() };
+    if !crate::reserved::check(&mut expansion, meta, errors) {
+        return None;
+    }
+    Some(expansion)
 }
 
 #[cfg(test)]

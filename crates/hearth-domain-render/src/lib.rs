@@ -16,6 +16,7 @@ pub mod keys;
 pub mod kinds;
 pub mod limits;
 pub mod parts;
+pub mod reserved;
 pub mod resolution;
 pub mod revision;
 pub mod schema;

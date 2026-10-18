@@ -346,6 +346,27 @@ pub struct Located<'a> {
     pub entry: &'a Concrete,
 }
 impl Expansion {
+    /// A reserved entry cannot reach a kind and yield a second error.
+    pub fn refuse(&mut self, map: Map, task: &[u8], key: &[u8]) {
+        for expanded in &mut self.tasks {
+            if expanded.task.as_ref() != task {
+                continue;
+            }
+            for group in &mut expanded.groups {
+                if group.map != map {
+                    continue;
+                }
+                let mut kept = List::with_capacity(u32::try_from(group.entries.len()).expect("entry count"));
+                for entry in core::mem::replace(&mut group.entries, Box::new([])) {
+                    if entry.key.as_ref() != key {
+                        kept.push(entry).expect("entry count");
+                    }
+                }
+                group.entries = kept.into_boxed();
+            }
+        }
+    }
+
     #[must_use]
     pub fn of(&self, map: Map) -> Box<[Located<'_>]> {
         let mut count = 0_u32;
@@ -462,17 +483,8 @@ fn literal<'c>(
     Ok(Some(match literal {
         Literal::Text(text) => {
             if let Some(expression) = single(text) {
-                let value = located(
-                    evaluate::expression(
-                        &mut Evaluator::new(limits),
-                        expression,
-                        context,
-                        bindings,
-                        &mut Budget::new(limits),
-                    ),
-                    text.at(),
-                )?;
-                if value.undefined() {
+                let value = optional(expression, text.at(), context, bindings, limits)?;
+                if value.is_none() {
                     return Ok(None);
                 }
             }
@@ -481,19 +493,10 @@ fn literal<'c>(
         Literal::Plain { at, text } => Fielded::Text(charged(text, *at, left)?),
         Literal::Typed(text) => {
             let expression = single(text).ok_or(wrong(takes, text.at()))?;
-            let value = located(
-                evaluate::expression(
-                    &mut Evaluator::new(limits),
-                    expression,
-                    context,
-                    bindings,
-                    &mut Budget::new(limits),
-                ),
-                text.at(),
-            )?;
-            if value.undefined() {
+            let value = optional(expression, text.at(), context, bindings, limits)?;
+            let Some(value) = value else {
                 return Ok(None);
-            }
+            };
             typed(value, takes, text.at(), left)?
         }
         Literal::Int(number) => Fielded::Int(number.value),
@@ -590,19 +593,8 @@ fn range<'c>(
             Literal::Int(number) => number.value,
             Literal::Typed(text) => {
                 let expression = single(text).ok_or(wrong(Takes::Int, text.at()))?;
-                let value = located(
-                    evaluate::expression(
-                        &mut Evaluator::new(limits),
-                        expression,
-                        context,
-                        bindings,
-                        &mut Budget::new(limits),
-                    ),
-                    text.at(),
-                )?;
-                if value.undefined() {
-                    return Err(failure(FaultKind::Undefined, text.at()));
-                }
+                let value = optional(expression, text.at(), context, bindings, limits)?;
+                let value = value.ok_or(failure(FaultKind::Undefined, text.at()))?;
                 let Fielded::Int(value) = typed(value, Takes::Int, text.at(), left)? else {
                     unreachable!("integer type");
                 };
@@ -674,4 +666,18 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(fields.checked_mul(input)?)?
         .checked_add(limits.expanded.checked_mul(4)?)?
         .checked_add(List::<Operand<'_>>::worst_case(limits.document)?)
+}
+
+fn optional<'c>(
+    expression: &evaluate::Expression,
+    at: Position,
+    context: &Context<'c>,
+    bindings: &Bindings<'c>,
+    limits: &Limits,
+) -> Result<Option<Operand<'c>>, Fault> {
+    let value = located(
+        evaluate::expression(&mut Evaluator::new(limits), expression, context, bindings, &mut Budget::new(limits)),
+        at,
+    )?;
+    if value.undefined() { Ok(None) } else { Ok(Some(value)) }
 }

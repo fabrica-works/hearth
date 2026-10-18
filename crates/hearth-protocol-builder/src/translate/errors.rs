@@ -1,5 +1,6 @@
 //! Exhaustive config faults and client error records (render.md, 7.1).
 mod ids;
+mod reserved;
 use crate::{
     config, records,
     render::{self, errors as target},
@@ -68,6 +69,7 @@ fn config_field(field: config::Field) -> target::Field {
 pub fn error(error: target::Error) -> records::errors::Error {
     let target::Error { kind, class, at, also, target, task, side } = error;
     let kind = match kind {
+        target::Kind::Reserved(value) => records::errors::Kind::Reserved(reserved::reserved(value)),
         target::Kind::Ids(value) => records::errors::Kind::Ids(ids::ids(value)),
         target::Kind::Exported(value) => records::errors::Kind::Exported(exported(value)),
         target::Kind::Collision(value) => records::errors::Kind::Collision(collisions::collision(value)),
