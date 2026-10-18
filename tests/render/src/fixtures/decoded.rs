@@ -10,8 +10,10 @@ use skein_world::domain::heap::Meter;
 
 // A one-MiB newline-only template holds its text and 1,048,577 u32 offsets.
 // The decoded charge adds the one instruction's 32 bytes (render.md, 2.3).
-pub const DECODED_TEMPLATE_BYTES: u64 = 1_048_608; // 1,048,576 text bytes + 32.
-pub const DECODED_TEMPLATES: u32 = 63; // 67,108,864 / 1,048,608.
+pub const DECODED_TEMPLATE_BYTES: u64 = 5_242_916; // Text + 32 + 1,048,577 * 4.
+pub const DECODED_TEMPLATES: u32 = 12; // 67,108,864 / 5,242,916.
+// Sixteen one-MiB comments have 1,048,573 lines each and almost fill 64 MiB.
+pub const COMMENT_TEMPLATES: u32 = 16;
 #[must_use]
 pub fn newline_template() -> hearth_domain_render::evaluate::template::Template {
     use hearth_domain_render::evaluate::template::{Does, Instruction, Template};
@@ -27,8 +29,15 @@ const DECODE_OUTPUTS: u32 = 1; // The domain emits one request at a time.
 const DECODE_STEPS: u32 = 16; // Two read phases and the resumes between them.
 #[must_use]
 pub fn decoded_templates_repository() -> Repository {
+    templates_repository(DECODED_TEMPLATES)
+}
+#[must_use]
+pub fn decoded_comments_repository() -> Repository {
+    templates_repository(COMMENT_TEMPLATES)
+}
+fn templates_repository(count: u32) -> Repository {
     let mut repository = with_task();
-    for index in 0..DECODED_TEMPLATES {
+    for index in 0..count {
         let mut file =
             entry(format!("tasks/motd/tree/file-{index}.j2").as_bytes(), u8::try_from(index).expect("template id"));
         file.size = u64::from(SHIPPED.template);
@@ -37,8 +46,20 @@ pub fn decoded_templates_repository() -> Repository {
     repository.entries.sort_by(|first, second| first.path.cmp(&second.path));
     repository
 }
-pub fn checked_decoding(repository: &Repository, bound: u64) {
-    let template = newline_template();
+#[must_use]
+pub fn comment_template() -> render::evaluate::template::Template {
+    // {#, then template - 4 newlines, then #}: every first-byte offset stays.
+    let newlines = SHIPPED.template - 4;
+    let mut lines = Vec::with_capacity((newlines + 1) as usize);
+    lines.push(0);
+    lines.extend(3..=newlines + 2);
+    render::evaluate::template::Template { instructions: Box::new([]), lines: lines.into() }
+}
+#[must_use]
+pub fn decoded_bound() -> u64 {
+    render::revision::decoded_worst_case(&SHIPPED).expect("decoded bound")
+}
+pub fn checked_decoding(repository: &Repository, bound: u64, template: &render::evaluate::template::Template) {
     let meter = Meter::new();
     let mut domain = render::Render::new(&SHIPPED);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: SHIPPED };

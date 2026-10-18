@@ -1,4 +1,4 @@
-//! Flat compiled text and names, with 32 bytes per instruction/operation (2.3).
+//! Compiled text and names: 32 bytes per instruction/operation and 4 per line (2.3).
 use crate::evaluate::{
     ELEMENT, Expression, Op,
     template::{Does, Instruction, Names, Template},
@@ -6,6 +6,7 @@ use crate::evaluate::{
 
 pub(crate) fn template(template: &Template) -> u64 {
     instructions(&template.instructions)
+        .saturating_add(u64::try_from(template.lines.len()).expect("template lines fit u64").saturating_mul(4))
 }
 pub(crate) fn instructions(instructions: &[Instruction]) -> u64 {
     let mut bytes = 0_u64;

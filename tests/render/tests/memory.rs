@@ -70,9 +70,8 @@ fn collecting_errors_at_the_limits_holds_no_more_than_the_worst_case() {
 
 #[test]
 fn decoding_at_the_limits_holds_no_more_than_the_worst_case() {
-    let bound = hearth_domain_render::revision::decoded_worst_case(&limits::SHIPPED).expect("decoded bound");
     let repository = fixtures::decoded_templates_repository();
-    fixtures::checked_decoding(&repository, bound);
+    fixtures::checked_decoding(&repository, fixtures::decoded_bound(), &fixtures::newline_template());
 }
 
 #[test]
@@ -88,4 +87,10 @@ fn rendering_every_target_holds_one_targets_settings() {
     );
     assert_eq!(run.outcome, hearth_domain_render::vocabulary::Outcome::Done);
     assert_eq!(run.answers.len(), fixtures::settings::LIMITS.targets as usize);
+}
+
+#[test]
+fn decoding_comment_only_templates_holds_no_more_than_the_worst_case() {
+    let repository = fixtures::decoded_comments_repository();
+    fixtures::checked_decoding(&repository, fixtures::decoded_bound(), &fixtures::comment_template());
 }

@@ -67,3 +67,58 @@ pub fn decode_empty_documents(call: &mut crate::call::Side) {
         call.decoded(&blob.oid, crate::vocabulary::Decoded::Document(document_with_zeroes(NO_ZEROES)));
     }
 }
+
+pub const DECODED_TOO_LARGE: crate::errors::Decode =
+    crate::errors::Decode::TooLarge { limit: crate::errors::Limit::Decoded, max: limits::SHIPPED.decoded };
+
+// A one-MiB comment has four delimiter bytes and one more line than newlines.
+pub const COMMENT_NEWLINES: u32 = limits::SHIPPED.template.saturating_sub(4);
+pub const COMMENT_LINES: u32 = COMMENT_NEWLINES.saturating_add(1);
+pub const COMMENT_HELD_BYTES: u64 = 4_194_292;
+// Sixteen such line tables fit in 64 MiB; q is the seventeenth distinct blob.
+const COMMENT_NAMES: &[u8] = b"abcdefghijklmnopq";
+pub fn comment_template() -> crate::evaluate::template::Template {
+    let mut lines = skein_lib::List::with_capacity(COMMENT_LINES);
+    lines.push(0).expect("first line");
+    for offset in 3..=COMMENT_NEWLINES.saturating_add(2) {
+        lines.push(offset).expect("comment lines");
+    }
+    crate::evaluate::template::Template { lines: lines.into_boxed(), instructions: Box::new([]) }
+}
+pub fn decoded_comment_templates() -> crate::call::Side {
+    let mut call = super::template_call(
+        b"tasks/motd/tree/a.j2",
+        r::Mode::File,
+        u64::from(limits::SHIPPED.template),
+        limits::SHIPPED,
+    );
+    let count = u32::try_from(COMMENT_NAMES.len()).expect("comment count");
+    let mut entries = skein_lib::List::with_capacity(count);
+    let mut invalid = skein_lib::List::with_capacity(count);
+    for name in COMMENT_NAMES {
+        let mut path = skein_lib::Writer::new(b"tasks/motd/tree/a.j2".len());
+        path.put(b"tasks/motd/tree/").expect("prefix");
+        path.put(core::slice::from_ref(name)).expect("name");
+        path.put(b".j2").expect("extension");
+        let path = path.finish();
+        entries
+            .push(r::Entry {
+                oid: r::Oid(path.clone()),
+                path,
+                mode: r::Mode::File,
+                size: u64::from(limits::SHIPPED.template),
+            })
+            .expect("comment count");
+        invalid.push(false).expect("comment count");
+    }
+    call.entries = entries.into_boxed();
+    call.invalid = invalid.into_boxed();
+    call.files = false;
+    let mut output = skein_lib::Queue::with_capacity(super::SINGLE_REQUEST);
+    call.files(limits::SHIPPED, &mut output);
+    let template = comment_template();
+    for blob in call.pending.clone() {
+        call.decoded(&blob.oid, crate::vocabulary::Decoded::Template(template.clone()));
+    }
+    call
+}
