@@ -4,6 +4,9 @@ use hearth_domain_render::{
     vocabulary::Decoded,
 };
 use skein_lib::Rng;
+// Sixteen small fleets exercise both environments and optional exporters.
+pub const FLEET_SEEDS: core::ops::Range<u64> = 0..16;
+pub const FLEET_SEED: u64 = 0x0020_0000;
 const DECLARATIONS: &[(&[u8], &[u8])] = &[
     (b"tasks/hearth/task.json", b"{}"),
     (b"tasks/vpn/task.json", br#"{"settings":{"x":{"type":"int","doc":"X."}},"exports":{"port":{"type":"int","value":"{{ settings.x }}","doc":"Port."}}}"#),

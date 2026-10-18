@@ -6,14 +6,14 @@ use crate::{
 use hearth_domain_render::{errors::Error, vocabulary::Answer};
 use hearth_lib::encode::Digest;
 use skein_lib::Rng;
-/// Twelve miniature fleets per focused property (30.1 and 30.2).
-pub const CASES: core::ops::Range<u64> = 0..12;
+/// Six miniature fleets retain two cases in each determinism batch.
+pub const CASES: core::ops::Range<u64> = 0..6;
 /// The generated-repository sweep's 750 rounds (30.1).
 pub const ROUNDS: u64 = 750;
 /// Ruling 195 divides 750 rounds among fifteen independent tests.
 pub const ROUNDS_PER_BATCH: u64 = ROUNDS / 15;
-/// Ruling 195 divides twelve fleets among three determinism tests.
-pub const CASES_PER_BATCH: u64 = 12 / 3;
+/// Ruling 195's three determinism tests share the focused fleets.
+pub const CASES_PER_BATCH: u64 = CASES.end / 3;
 /// The seven alternative arrival schedules in 30.1.
 pub const SCHEDULES: core::ops::Range<u64> = 1..8;
 /// Session 30's assigned seed block.

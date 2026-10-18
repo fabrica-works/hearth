@@ -9,6 +9,7 @@ mod packages;
 mod references;
 mod reserved;
 pub(crate) mod resolution;
+mod reuse;
 pub(crate) mod scripts;
 mod secrets;
 mod selection;
@@ -33,6 +34,7 @@ pub(crate) struct Side {
     pub commit: Option<Oid>,
     pub targets: Box<[Target]>,
     pub documents: Documents,
+    pub reuse: Option<reuse::Reuse>,
     pub errors: errors::Collector,
     pub error_next: u32,
     pub paths: Box<[Box<[u8]>]>,
@@ -71,6 +73,7 @@ impl Side {
             commit: None,
             targets: Box::new([]),
             documents: Documents::new(&[]),
+            reuse: None,
             errors: errors::Collector::new(limits),
             error_next: 0,
             paths: Box::new([]),
@@ -114,6 +117,9 @@ impl Side {
         if self.errors.outcome() != Outcome::Done {
             self.outcome = self.outcome.worst(Outcome::Failed);
         }
+        if let Some(reuse) = &mut self.reuse {
+            reuse.listed(entries, &limits);
+        }
         self.entries = entries.into();
         self.documents = Documents::new(entries);
         self.read_documents(limits, out);
@@ -150,6 +156,12 @@ impl Side {
         }
     }
     fn prepare(&mut self, limits: Limits, out: &mut Queue<Output>) -> bool {
+        if let Some(reuse) = &self.reuse
+            && reuse.reading()
+            && self.read_next(out)
+        {
+            return true;
+        }
         if !self.files {
             self.discover(limits);
         }
@@ -195,16 +207,7 @@ impl Side {
         }
         self.paths = paths.into_boxed();
         self.pending = blobs.into_boxed();
-        if self.pending.is_empty() {
-            self.ready = true;
-        } else {
-            out.push(Output::Request(Request::Read {
-                request: Token::new(2),
-                repository: self.repository.clone(),
-                commit: self.commit.clone().expect("listed commit"),
-                blobs: self.pending.clone(),
-            }));
-        }
+        self.start_reads(out);
     }
     pub fn cached(&mut self, oid: &Oid, size: u64, digest: hearth_lib::encode::Digest) {
         let expected =
@@ -213,7 +216,7 @@ impl Side {
         self.cached.insert(oid.clone(), digest).expect("listing capacity");
         self.sizes.insert(digest, size).expect("listing capacity");
         self.read = self.read.saturating_add(1);
-        self.ready = usize::try_from(self.read).expect("bounded cursor") == self.pending.len();
+        self.ready = self.reuse.is_some() || usize::try_from(self.read).expect("bounded cursor") == self.pending.len();
     }
     fn needs(&self, name: &[u8]) -> bool {
         for (target, tasks) in self.targets.iter().zip(&self.tasks) {
@@ -285,17 +288,7 @@ impl Side {
         self.paths = paths.into_boxed();
         self.pending = blobs.into_boxed();
         self.read = 0;
-        if self.pending.is_empty() {
-            return false;
-        }
-        self.ready = false;
-        out.push(Output::Request(Request::Read {
-            request: Token::new(2),
-            repository: self.repository.clone(),
-            commit: self.commit.clone().expect("commit"),
-            blobs: self.pending.clone(),
-        }));
-        true
+        self.start_reads(out)
     }
     pub fn fail(&mut self, outcome: Outcome) {
         self.rendering = None;
@@ -583,7 +576,9 @@ impl Call {
                     &diff.from.as_ref().expect("first side").finding,
                     limits.specs,
                 );
+                let reuse = reuse::Reuse::take_side(&mut self.side);
                 self.side = Side::new(self.side.repository.clone(), self.side.names.clone(), &limits);
+                self.side.reuse = Some(reuse);
                 self.side.specs_before = held;
                 self.side.errors = errors;
                 self.side.errors.side(crate::diff::Side::To);

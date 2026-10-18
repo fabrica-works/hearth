@@ -14,7 +14,8 @@ impl Side {
         assert_eq!(&expected.oid, oid, "blobs answer in request order");
         if !self.admit_decoded(oid, &read) {
             self.read = self.read.saturating_add(1);
-            self.ready = usize::try_from(self.read).expect("bounded cursor") == self.pending.len();
+            self.ready =
+                self.reuse.is_some() || usize::try_from(self.read).expect("bounded cursor") == self.pending.len();
             return;
         }
         let expected = self.pending.get(usize::try_from(self.read).expect("bounded cursor")).expect("pending blob");
@@ -64,7 +65,7 @@ impl Side {
             }
         }
         self.read = self.read.saturating_add(1);
-        self.ready = usize::try_from(self.read).expect("bounded cursor") == self.pending.len();
+        self.ready = self.reuse.is_some() || usize::try_from(self.read).expect("bounded cursor") == self.pending.len();
     }
     fn admit_decoded(&mut self, oid: &Oid, read: &Decoded) -> bool {
         if self.budget.exceeded() {
@@ -98,6 +99,9 @@ impl Side {
                 }
             }
             Decoded::Link(_) | Decoded::Refused { .. } => {}
+        }
+        if let Some(reuse) = &mut self.reuse {
+            reuse.fit(self.budget.remaining());
         }
         if let Some(path) = failed {
             self.errors.push(errors::refused(

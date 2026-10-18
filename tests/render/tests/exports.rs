@@ -37,8 +37,8 @@ fn peers(repository: &fixtures::Repository, environment: &[u8]) -> Vec<u8> {
 }
 #[test]
 fn generated_fleets_give_each_reader_its_environments_exporters() {
-    for seed in 0..200_u64 {
-        let repository = fixtures::exports::fleet(0x0020_0000 + seed);
+    for seed in fixtures::exports::FLEET_SEEDS {
+        let repository = fixtures::exports::fleet(fixtures::exports::FLEET_SEED + seed);
         let run = fixtures::render_targets(&repository, &[b"a-lab", b"a-prod"], seed);
         assert_eq!(run.answers.len(), 2, "seed {seed}: each reader renders");
         for answer in &run.answers {

@@ -111,3 +111,17 @@ fn rendering_specs_at_the_limits_holds_no_more_than_the_worst_case() {
         "the leading specs fit before the next target fails"
     );
 }
+
+#[test]
+fn a_diff_keeping_the_first_sides_blobs_holds_no_more_than_the_worst_case() {
+    let repository = fixtures::reuse::kept_templates();
+    let run = hearth_render_world::parent::checked_diff(
+        &repository,
+        &repository,
+        fixtures::reuse::SEED,
+        fixtures::reuse::LIMITS,
+        fixtures::reuse::bound(),
+    );
+    assert_eq!(run.outcome, hearth_domain_render::vocabulary::Outcome::Done);
+    assert_eq!(fixtures::reuse::second_reads(&run), []);
+}

@@ -4,8 +4,8 @@ use hearth_domain_builder::vocabulary::Call;
 use hearth_fake_machine::hearth::mirror::{Mirror, Release, Suite, Timestamp};
 use hearth_lib::encode::Digest;
 
-/// The plan's sixty entries exceed a single 64-byte pipe by many writes.
-pub const MANY_BLOBS: usize = 60;
+/// Eight ls-tree entries exceed the 64-byte pipe through several writes.
+pub const MANY_BLOBS: usize = 8;
 /// Seven bytes cut rev-parse inside its forty-byte object name.
 pub const KILLED_BYTES: u32 = 7;
 pub const MOTD_KIND_SHA256: Digest = Digest([

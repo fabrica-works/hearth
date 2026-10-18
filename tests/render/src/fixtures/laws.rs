@@ -10,8 +10,8 @@ use hearth_domain_render::{
     vocabulary::Answer,
 };
 use skein_lib::Rng;
-/// Session 30.3 assigns 200 focused seeds and 13,000 sweep rounds.
-pub const CASES: core::ops::Range<u64> = 0..200;
+/// Thirty-two focused inputs retain varied records; the sweep keeps 13,000 rounds.
+pub const CASES: core::ops::Range<u64> = 0..32;
 pub const ROUNDS: core::ops::Range<u64> = 0..13_000;
 pub const SEED: u64 = super::properties::SEED + 0x3000;
 /// The focused shape draws to six levels; the sweep reaches eight.

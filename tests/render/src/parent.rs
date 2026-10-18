@@ -19,7 +19,7 @@ pub fn run(repository: &Repository, targets: &[&[u8]], seed: u64) -> Run {
 }
 #[must_use]
 pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: limits::Limits) -> Run {
-    drive(repository, targets, seed, limits, skein_world::Memory::Unchecked, 0)
+    drive(Revisions { from: repository, to: None }, targets, seed, limits, skein_world::Memory::Unchecked, 0)
 }
 #[must_use]
 pub fn checked(
@@ -30,10 +30,46 @@ pub fn checked(
     memory: skein_world::Memory,
 ) -> Run {
     assert_eq!(memory, skein_world::Memory::Checked);
-    drive(repository, &[], seed, limits, memory, bound)
+    drive(Revisions { from: repository, to: None }, &[], seed, limits, memory, bound)
+}
+#[derive(Clone, Copy)]
+struct Revisions<'a> {
+    from: &'a Repository,
+    to: Option<&'a Repository>,
+}
+impl<'a> Revisions<'a> {
+    fn listing(self, revision: &[u8], request: skein_lib::Token) -> (&'a Repository, Event) {
+        let (repository, commit) = if revision == b"after" {
+            (self.to.expect("second revision"), fixtures::oid(b'b'))
+        } else {
+            (self.from, fixtures::oid(b'a'))
+        };
+        (repository, Event::Listed { request, commit, entries: repository.entries.clone().into_boxed_slice() })
+    }
+    fn event(self, targets: &[&[u8]]) -> Event {
+        if self.to.is_some() {
+            Event::Diff {
+                resolve: false,
+                repository: Box::from(b"/repository/.git".as_slice()),
+                from: Box::from(b"before".as_slice()),
+                to: Box::from(b"after".as_slice()),
+                targets: targets.iter().map(|target| Box::from(*target)).collect(),
+            }
+        } else {
+            render_event(targets)
+        }
+    }
+}
+#[must_use]
+pub fn diff(from: &Repository, to: &Repository, seed: u64, limits: limits::Limits) -> Run {
+    drive(Revisions { from, to: Some(to) }, &[], seed, limits, skein_world::Memory::Unchecked, 0)
+}
+#[must_use]
+pub fn checked_diff(from: &Repository, to: &Repository, seed: u64, limits: limits::Limits, bound: u64) -> Run {
+    drive(Revisions { from, to: Some(to) }, &[], seed, limits, skein_world::Memory::Checked, bound)
 }
 fn drive(
-    repository: &Repository,
+    revisions: Revisions<'_>,
     targets: &[&[u8]],
     seed: u64,
     limits: limits::Limits,
@@ -51,7 +87,9 @@ fn drive(
     if let Some(meter) = &meter {
         meter.start();
     }
-    render::step(&mut render, &env, render_event(targets), &mut queue);
+    let event = revisions.event(targets);
+    let mut repository = revisions.from;
+    render::step(&mut render, &env, event, &mut queue);
     if let Some(meter) = &meter {
         let measured = meter.end();
         meter.check(measured, bound, &"initial call");
@@ -80,12 +118,12 @@ fn drive(
                         Request::Keep { request, sha256, .. } => {
                             vec![Event::Kept { request: *request, sha256: *sha256 }]
                         }
-                        Request::List { request, .. } => vec![Event::Listed {
-                            request: *request,
-                            commit: fixtures::oid(b'a'),
-                            entries: repository.entries.clone().into_boxed_slice(),
-                        }],
-                        Request::Hunks { .. } => unreachable!("render worlds do not diff"),
+                        Request::List { request, revision, .. } => {
+                            let (selected, event) = revisions.listing(revision, *request);
+                            repository = selected;
+                            vec![event]
+                        }
+                        Request::Hunks { request, .. } => vec![hunk_failure(*request)],
                         Request::Read { request, blobs, .. } => {
                             blobs.iter().map(|blob| blob_event(repository, blob, *request, &limits)).collect()
                         }
@@ -163,6 +201,9 @@ pub(crate) fn blob_event(
         let body = &repository.blobs.iter().find(|(oid, _)| *oid == blob.oid).expect("scripted link").1;
         Event::Read { request, oid: blob.oid.clone(), read: render::vocabulary::Decoded::Link(body.clone()) }
     } else if blob.kind == render::vocabulary::As::Template {
+        if let Some((_, read)) = repository.documents.iter().find(|(oid, _)| *oid == blob.oid) {
+            return Event::Read { request, oid: blob.oid.clone(), read: read.clone() };
+        }
         let body = &repository.blobs.iter().find(|(oid, _)| *oid == blob.oid).expect("scripted template").1;
         let read = match hearth_protocol_template::template::compile(
             body,
@@ -213,5 +254,15 @@ fn event_token(event: &Event) -> skein_lib::Token {
         | Event::Unresolved { request }
         | Event::Failed { request, .. } => *request,
         Event::Render { .. } | Event::Diff { .. } => unreachable!("only answers scheduled"),
+    }
+}
+
+// This world exercises render reads; a parent can decline text materialization.
+fn hunk_failure(request: skein_lib::Token) -> Event {
+    Event::Failed {
+        request,
+        class: render::vocabulary::Class::Operational,
+        at: None,
+        failure: render::vocabulary::Failure::Store,
     }
 }

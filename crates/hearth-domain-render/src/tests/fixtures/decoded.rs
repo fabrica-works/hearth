@@ -11,6 +11,9 @@ pub const OVER_BUDGET_DOCUMENTS: u32 = ADMITTED_DOCUMENTS + 1;
 pub const DOCUMENT_SOURCE_BYTES: u64 = 1_048_575;
 pub const DOCUMENT_PATHS: &[&[u8]] = &[b"envs/a.json", b"envs/b.json", b"envs/c.json", b"envs/d.json", b"envs/e.json"];
 
+pub fn empty_document() -> r::Document {
+    document_with_zeroes(NO_ZEROES)
+}
 pub fn list_document() -> r::Document {
     document_with_zeroes(DOCUMENT_ZEROES)
 }

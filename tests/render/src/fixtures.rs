@@ -682,3 +682,5 @@ pub mod specs;
 fn sort_entries(repository: &mut Repository) {
     repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
 }
+
+pub mod reuse;

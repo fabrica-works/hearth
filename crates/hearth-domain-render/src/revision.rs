@@ -309,6 +309,12 @@ impl Documents {
             }
         }
     }
+    pub(crate) fn take(&mut self, index: usize) -> Option<crate::vocabulary::Decoded> {
+        if let Some(document) = self.decoded.get_mut(index)?.take() {
+            return Some(crate::vocabulary::Decoded::Document(document));
+        }
+        Some(crate::vocabulary::Decoded::Declaration(self.declared.get_mut(index)?.take()?))
+    }
     fn last_copy(&self, oid: &Oid, declared: bool) -> Option<usize> {
         let mut last = None;
         for (index, entry) in self.entries.iter().enumerate() {
@@ -347,6 +353,10 @@ impl Budget {
     #[must_use]
     pub const fn exceeded(&self) -> bool {
         self.exceeded
+    }
+    #[must_use]
+    pub(crate) const fn remaining(&self) -> u64 {
+        self.max.saturating_sub(self.held)
     }
     #[must_use]
     pub fn take(&mut self, size: u64) -> bool {

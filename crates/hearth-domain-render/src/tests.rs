@@ -47,3 +47,5 @@ mod decoded;
 mod settings;
 
 mod specs;
+
+mod diff_reuse;
