@@ -970,6 +970,11 @@ None yet.
 
      A further API that the plan names and the code lacks, where the design asks for it in its own words, is a skein step of the same shape: name it in the block, with the design's text.
 
+178. **hearth diff --resolve records every changed key before its first change** (steer of 2026-10-18T00:18:32Z).
+     **hearth-45.s2** (`hearth/45.s2-resolve-before-printing.md`), a step not in the plan, hearth 45's, in a fresh hearth session: `hearth diff --resolve` resolves and records every changed target's keys before it puts out its first change. render.md 5.7 says so in its own words: the two commands "resolve each needed key, one at a time (5.5), and record each closure before they print"; 45.2's Proof: "each recorded before the diff prints". At hearth 47d1170, `resolve_changed` (`call/comparison.rs:16`) looks only at `self.names.get(self.next)` (`:25`), which `Comparison::answer` (`call.rs:705`) then compares, so a second changed target's keys are resolved after the first target's change; render's `resolved_answer` resolves every key first. 45.2's test `changed_keys_are_resolved_once_from_then_to_and_recorded_before_the_changes` passes because its crossed fixture's first target holds both keys. The handover of 00:11:30Z left this open (re-check of 45, item 8); a read-only sub-agent read it at a1e09f3, and this ruling's author read `comparison.rs:16-38` and `call.rs:705-735` at 47d1170.
+
+     What stays unchanged: render's order; a target's from-then-to order; a failed key's error after the changes; 28.4's world test `diff_resolve_resolves_each_changed_key_once_in_turn_before_printing`, whose one changed target holds under either order, and which 28.4 keeps as its session file says. A further test or fixture that asserts the interleaved order takes the new one, and the commit body names its file.
+
 ## For the user
 
 The long-term choices the user may veto:
