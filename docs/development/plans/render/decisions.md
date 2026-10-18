@@ -1065,6 +1065,15 @@ None yet.
      3. Unchanged: the Choices' faults and their sweep (`a_builder_killed_before_each_submission_restarts_cold_and_settles`, the stalled mmdebstrap), `Config::chaos()` itself (skein's), and every test that runs `Config::calm()`.
      4. A further fault of `Faults::CHAOS` that ends a run whose calm run settles (an operation failed or stopped with no retry in M1) is set to 0 the same way; the commit body names it, with the seed and the log line that met it.
 
+187. **hearth 28.5's kill sweep hosts two of each tool** (plan defect, hearth-28.5's block of 2026-10-18T01:25:54Z).
+     **hearth 28.5's kill sweep hosts two of each tool** (plan defect, hearth-28.5's block of 2026-10-18T01:25:54Z).
+
+     28.4's Shape gave the hosted tools "instances 1", for worlds where one client runs them in turn; 28.5's `a_builder_killed_before_each_submission_restarts_cold_and_settles` cuts with `Cut::Kill`, which skein-world applies to the cut's host alone (`world.rs:629`, `Cut::Kill => vec![cut.host]`), so the killed client's git runs on to its end while the restarted client launches its own, and admission counts every unfinished instance (`world.rs:498-505`). The plan did not provision for the cut it asked for; the report's proposal is taken. Skein's `Cut::Kill` stays as it is.
+
+     1. The kill sweep's world hosts `/usr/bin/git` and `/usr/bin/mmdebstrap` with `instances: 2`; every other world (`simulated::run`, `two`, `with_lock`, the replay, the fuzzy chaos story) keeps 1, as `simulated.rs:133` and `:142` give them now.
+     2. Both instances run at their fakes' pace; the sweep's assertions stay (n in 0..40, 40 past the run's last submission, the output ending with `THIN_TEXT`).
+     3. A further hosted program that a cut's restart launches while the killed client's instance still runs takes 2 the same way, in that world alone; the commit body names it.
+
 ## For the user
 
 The long-term choices the user may veto:

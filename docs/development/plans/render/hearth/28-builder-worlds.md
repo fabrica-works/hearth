@@ -331,6 +331,9 @@ short reads, writes, receives and sends, cancel races and late resets, and set
 to 0 the faults that end an operation for good: `no_space`, `read_only`,
 `io_error`, `hung` (a hung git has no deadline in M1, Choices), `no_buffer`,
 `reset`, `refuse`, `timed_out`; the replay and the fuzzy story run under it.
+The kill sweep's world hosts git and mmdebstrap with `instances: 2` (ruling
+187): a killed client's tool runs on to its end, as `Cut::Kill` cuts only its
+host, beside the restarted client's; the other worlds keep 1.
 Test shape: `tests/simulation.rs`, 0.5 s: ref below,
 `a_digested_run_traces_the_domain_and_machine_digests` (more than one distinct
 `Event::Digest` under the client's pid, the machine's under `Pid::MACHINE`, none
