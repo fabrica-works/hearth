@@ -1004,6 +1004,15 @@ None yet.
      2. It changes nothing in `entries.rs`'s key check (`:131`, `keys` across the task) or its tests (`tests/entries.rs:163`, `:177`), and it leaves `the_hearth_task_of_5_12_passes_every_reserved_rule` failing on the `hearth` key, as it is; it changes no key of 5.12's `task.json`.
      3. It does not land before the answer's ruling: once all else is done, it reports and waits.
 
+184. **hearth 28.5 lands without the 1 GiB test until the designer answers** (design gap, interim, hearth-28.5's block of 2026-10-18T01:14:16Z).
+     **hearth 28.5 lands without the 1 GiB test until the designer answers** (design gap, interim; hearth-28.5's block of 2026-10-18T01:14:16Z).
+
+     render.md 8.4 says "The builder's worst case is 6.3's sum over its layers at their limits, and the defaults keep it within 1 GiB, which a test holds". 28.5's first measure of the sum at the defaults is 1,240,426,175 bytes against 1,073,741,824: config declaration 502,936,768, `Collector` 271,777,248, the template evaluator 79,421,656, the store 50,746,183, two printers 67,108,864 each, and the decoded, validated and exported payloads. Whether the remaining steps reach 1 GiB by tighter formulas, or the design caps what a kept error holds or changes a default or the bound, is the design's: it goes to the designer (`question.md`, 2026-10-18T01:17Z, its second heading). The 1 GiB stays as written; no formula is loosened and no limit raised. Until the answer's ruling (184 is the interim):
+
+     1. 28.5 goes on with all of its Shape and Test shape but `the_shipped_limits_have_a_worst_case_within_1_gib`: `Hash` on the domains' state, `worst_case` at each layer with the shipped formulas as they stand, `Client::worst_case` their sum (removing hearth 11's `u64::MAX`), `a_larger_limit_gives_a_larger_worst_case`, `tests/memory.rs` under `small_limits()`, the replay and the sweeps.
+     2. It changes no `worst_case` formula outside its Files (`hearth-protocol-config`'s `json.rs`, `schema.rs`, `declaration.rs`; render's `errors.rs` and `evaluate/template.rs`; the store's and the printer's stay as they are), and adds no test that asserts the sum against `1 << 30`, ignored or not.
+     3. It lands when all else is done, as its session file says. Its report gives the sum `Client::worst_case` returns at the defaults, by layer, once, from one run of a unit test's output or a `dbg!` removed before the commit; nothing else is wanted. The answer's ruling names the step that adds the 1 GiB test and any tightening.
+
 ## For the user
 
 The long-term choices the user may veto:
