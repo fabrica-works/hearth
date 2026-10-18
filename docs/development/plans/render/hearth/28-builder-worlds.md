@@ -285,7 +285,9 @@ second's `Lock` refused `Busy` in the ledger, both print `THIN_TEXT`),
 `a_lock_held_past_the_resolve_limit_is_waited_out_then_the_call_renders` (held
 700 s, past render's 600 s; store.md 8.2 sets no limit: says busy once),
 `the_protocol_and_simulated_worlds_leave_the_same_store` (cache names and
-record bytes equal, no temporary).
+payloads equal, and each decoded record's `origin`, `sha256` and `size`;
+`at` and `took` are each world's clock, left out, and checked by the costs
+and pace stories; no temporary; ruling 182).
 ```rust
 // tests/builder/tests/simulation.rs
 #[test]

@@ -991,6 +991,10 @@ None yet.
 
      A further simulator behaviour that differs from the kernel's, where simulator.md says it keeps the kernel's, is a skein step of the same shape: name it in the block, with the log line that shows it.
 
+182. **hearth 28.4's two worlds leave the same store but for each record's clock** (plan defect, hearth-28.4's block of 2026-10-18T01:06:42Z).
+     **hearth 28.4's two worlds leave the same store but for each record's clock** (plan defect, hearth-28.4's block of 2026-10-18T01:06:42Z).
+     28.4's Test shape asked for "cache names and record bytes equal", but a cache record holds its provenance and cost (store.md 6.5; `CacheFile { at: Wall, origin, sha256, size, took: Duration }`, `crates/hearth-domain-store/src/vocabulary.rs:124`), and `at` and `took` come from each world's clock: the protocol world's `Wall::EPOCH` and scheduled latency, the simulator's advancing wall and hosted `Pace`. The plan asked for more than the design makes equal; the report's proposal is taken. `the_protocol_and_simulated_worlds_leave_the_same_store` compares the cache names and each file's payload bytes, and decodes each record to compare its `origin`, `sha256` and `size`; it leaves out `at` and `took`, which the costs story (`Costs { fetched, took }`) and `git_and_mmdebstrap_take_the_time_their_work_takes` check in each world; no temporary is left. Neither world's clock is forced to the other's. A further field that holds a world's own clock or schedule is left out the same way, and the commit body names it.
+
 ## For the user
 
 The long-term choices the user may veto:
