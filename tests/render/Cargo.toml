@@ -6,6 +6,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+hearth-config-world = { path = "../config" }
 hearth-protocol-template.workspace = true
 hearth-protocol-config.workspace = true
 hearth-protocol-builder.workspace = true

@@ -779,3 +779,5 @@ pub use reserved::{MOTD_DIFF_TEXT, MOTD_KIND};
 
 mod goldens;
 pub use goldens::*;
+
+pub mod properties;
