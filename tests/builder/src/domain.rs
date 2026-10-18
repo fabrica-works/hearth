@@ -52,7 +52,12 @@ pub struct Run {
 impl Run {
     #[must_use]
     pub fn new(scenario: &Scenario<'_>, seed: u64) -> Self {
-        Self::over(scenario.call.clone(), Shared::new(scenario.files, seed), scenario.fault, seed)
+        Self::over(
+            scenario.call.clone(),
+            Shared::for_scenario(scenario, seed, crate::fixtures::WORLD_PIPE),
+            scenario.fault,
+            seed,
+        )
     }
     fn over(call: Call, shared: Shared, fault: Option<crate::fixtures::Fault>, seed: u64) -> Self {
         let limits = hearth::limits().domain;

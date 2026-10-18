@@ -331,7 +331,13 @@ impl Shared {
                 unreachable!("initial commit")
             };
             repository.set_ref(b"refs/heads/before", before);
-            let replacement = if resolve { CHANGED_PACKAGE_TARGET } else { super::MOTD_KIND };
+            let replacement = if resolve {
+                CHANGED_PACKAGE_TARGET
+            } else if scenario.files.iter().any(|file| file.path == super::MOTD_KIND.path) {
+                super::MOTD_KIND
+            } else {
+                super::budgets::FLEET_EDIT
+            };
             let mut files: Vec<_> = scenario
                 .files
                 .iter()

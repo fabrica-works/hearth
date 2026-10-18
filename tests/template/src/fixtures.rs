@@ -5,6 +5,9 @@ use hearth_protocol_template::{
 use skein_lib::Rng;
 use std::collections::BTreeSet;
 pub const LIMITS: Limits = SHIPPED;
+/// A sixteenth of the shipped text size still fills every allocation in the
+/// template/interpolation formula, including all offsets and instructions.
+pub const MEMORY_LIMITS: Limits = Limits { template: SHIPPED.template / 16, ..SHIPPED };
 #[derive(Clone, Copy, Debug)]
 pub struct Shape {
     pub width: u32,

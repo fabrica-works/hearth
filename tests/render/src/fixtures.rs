@@ -462,23 +462,7 @@ pub fn with_peer_targets(peer: &[u8]) -> Repository {
     repository
 }
 
-#[must_use]
-pub fn templates_at_the_limits() -> [(hearth_domain_render::evaluate::template::Template, &'static str); 4] {
-    let loops = format!("{}{{{{ loop.index }}}}{}", "{% for x in [1] %}".repeat(32), "{% endfor %}".repeat(32));
-    let output = "{% for x in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16] %}{{ settings.text }}{% endfor %}".to_owned();
-    let sets = "{% set x = 1 %}".repeat(65_000);
-    let chain = format!("{{{{ {} }}}}", vec!["settings.text"; 20].join(" ~ "));
-    [(loops, "32 nested loops"), (output, "16 MiB output"), (sets, "set bindings"), (chain, "concat past made")].map(
-        |(source, what)| {
-            let compiled = hearth_protocol_template::template::compile(
-                source.as_bytes(),
-                &hearth_protocol_template::limits::SHIPPED,
-            )
-            .expect("limit template compiles");
-            (hearth_protocol_builder::translate::instructions::template(compiled), what)
-        },
-    )
-}
+pub use memory::templates_at_the_limits;
 
 pub const EXPANSION_LIMITS: Limits = Limits { expansion: 4096, ..SHIPPED };
 #[must_use]

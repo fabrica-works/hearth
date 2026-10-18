@@ -48,17 +48,21 @@ pub fn run(scenario: &Scenario<'_>, seed: u64) -> Run {
 }
 #[must_use]
 pub fn with_pipe(scenario: &Scenario<'_>, seed: u64, pipe: u32) -> Run {
-    World::new(scenario, seed, pipe).finish()
+    World::new(scenario, seed, pipe, &hearth::limits()).finish()
+}
+/// The same cut-pipe world at a fixture's declared limits.
+#[must_use]
+pub fn with_limits(scenario: &Scenario<'_>, seed: u64, limits: &hearth::Limits) -> Run {
+    World::new(scenario, seed, fixtures::WORLD_PIPE, limits).finish()
 }
 #[must_use]
 pub fn with_lock(scenario: &Scenario<'_>, seed: u64, release: Time) -> Run {
-    let mut world = World::new(scenario, seed, fixtures::WORLD_PIPE);
+    let mut world = World::new(scenario, seed, fixtures::WORLD_PIPE, &hearth::limits());
     world.below.hold_lock_until(release);
     world.finish()
 }
 impl World {
-    fn new(scenario: &Scenario<'_>, seed: u64, pipe: u32) -> Self {
-        let limits = hearth::limits();
+    fn new(scenario: &Scenario<'_>, seed: u64, pipe: u32, limits: &hearth::Limits) -> Self {
         let below = Below::new(scenario, seed, pipe);
         let mut protocol = Protocol::new(
             &limits.protocol,

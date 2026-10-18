@@ -128,10 +128,16 @@ fn decoded_step(
     meter.check(step, bound, &"decoded arrival");
 }
 
-// Ruling 194: each motd/x map is 16,776,933 = 524,277 * 32 + 2 * 32 + 5.
-// The other decoded files take 1,065 bytes. Four fewer zeros in each map
-// remove 512 bytes, the smallest cut that lets all four fit.
-pub const REVISION_ZEROES: usize = 524_277;
+// Keep ruling 194's four fitting documents and fifth refused document at a
+// sixteenth of the shipped decoded budget. Each map charges 32 per value,
+// plus 69 enclosing bytes; the other files charge 1,065 bytes. Eleven fewer
+// values per quarter leave 67 bytes after all four documents have arrived.
+pub const DECODED_LIMITS: limits::Limits = limits::Limits { decoded: SHIPPED.decoded / 16, ..SHIPPED };
+pub const REVISION_ZEROES: usize = (DECODED_LIMITS.decoded / 4 / 32) as usize - 11;
+#[must_use]
+pub fn large_decoded_run(extra: bool) -> parent::Run {
+    parent::run_with(&large_decoded_revision(extra), &[], 0, DECODED_LIMITS)
+}
 const LIST_TYPE: u32 = 1; // Int is the first type, its list the second.
 #[must_use]
 pub fn large_decoded_revision(extra: bool) -> Repository {

@@ -14,7 +14,7 @@ fn evaluating_at_the_limits_holds_no_more_than_the_worst_case() {
     fixtures::memory::each(bound, fixtures::at_the_limits(), |expression, roots| {
         let mut evaluator = Evaluator::new(&limits::SHIPPED);
         let mut budget = Budget::new(&limits::SHIPPED);
-        let (context, bindings) = (roots.context(), Bindings::with_capacity(0));
+        let (context, bindings) = (roots.context(), Bindings::with_capacity(fixtures::memory::EMPTY_BINDINGS));
         let evaluated = evaluate::expression(&mut evaluator, expression, &context, &bindings, &mut budget);
         drop(evaluated);
         drop(evaluator);
@@ -23,15 +23,11 @@ fn evaluating_at_the_limits_holds_no_more_than_the_worst_case() {
 
 #[test]
 fn running_templates_at_the_limits_holds_no_more_than_the_worst_case() {
-    let bound = evaluate::template::worst_case(&limits::SHIPPED).expect("the shipped run has a worst case");
+    let limits = &fixtures::memory::TEMPLATE_LIMITS;
+    let bound = evaluate::template::worst_case(limits).expect("the configured run has a worst case");
     fixtures::memory::each(bound, fixtures::templates_at_the_limits(), |template, roots| {
-        let rendered = evaluate::template::run(
-            template,
-            &roots.context(),
-            None,
-            &limits::SHIPPED,
-            u64::from(limits::SHIPPED.rendered_file),
-        );
+        let rendered =
+            evaluate::template::run(template, &roots.context(), None, limits, u64::from(limits.rendered_file));
         drop(rendered);
     });
 }

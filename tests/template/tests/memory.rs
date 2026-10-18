@@ -22,7 +22,7 @@ fn compiling_at_the_limits_holds_no_more_than_the_worst_case() {
 
 #[test]
 fn compiling_templates_and_strings_at_the_limits_holds_no_more_than_the_worst_case() {
-    let limits = &fixtures::LIMITS;
+    let limits = &fixtures::MEMORY_LIMITS;
     let template_bound = limits::worst_case(Decoder::Template, limits).expect("template bound");
     let string_bound =
         limits::worst_case(Decoder::Interpolated { length: limits.template }, limits).expect("string bound");
