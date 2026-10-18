@@ -1119,6 +1119,47 @@ None yet.
      If render refuses 3.7's values under 5.12's declaration, that is a design
      gap: block on it, with the error printed.
 
+192. **hearth 28.s: render holds at once what 8.4 lists, and the 1 GiB test** (design answer, hearth-28.5's block of 2026-10-18T01:14:16Z).
+     The designer's answer, hearth 36959af, below; the step it asks for is hearth 28.s1 to 28.s6 (`hearth/28.s-held-bounds.md`), and 28.s5 takes 8.4's "Each layer's formula is its peak" to every term of `Client::worst_case`, the service's `domain.max(protocol) × queue` included.
+
+     The 1 GiB and the defaults stay, and the plan aims at them: no step left
+     does, so a step the supervisor names builds the bounds below and lands
+     `the_shipped_limits_have_a_worst_case_within_1_gib`. 28.5's Test shape now
+     says so; 28.5 lands without it (ruling 184). Of the choices, (a) with (b);
+     not (c). The miss has two causes:
+
+     1. **Formulas that add maxima which cannot coexist,** the code's. 8.4 now:
+        "**Each layer's formula is its peak:** what the layer holds at once at
+        its limits, not the sum of every maximum it reaches in turn."
+     2. **Holders the design left unbounded,** now bounded; 8.4's list is "what
+        it holds at once":
+        - decoded data, charged by file bytes (`revision.rs:325`, `take`). 2.3:
+          "**What is decoded counts as it is held,** not by its file's bytes";
+        - errors (b). 7.1: "The errors kept are the longest start of that order
+          that holds at most 256 errors and 16 MiB of the bytes they carry,
+          every string of every field counted"; one sorting after the first
+          dropped is counted, not kept;
+        - every target's settings (`call.rs:303`, `compose`). Section 3: "A
+          target's settings are composed when it renders, and another target's
+          task or placement when step 4 reads it, and none is kept past its
+          use"; 8.4 keeps "the tasks each target has, by index";
+        - entries, specs and records. 2.3 adds "one target's composed settings;
+          its validated settings; its expanded entries | 64 MiB each" and "the
+          specs one command holds, with the sizes of the files they name and
+          their resolutions' closures, a diff's two sides together | 64 MiB";
+          8.4: "Of a resolution record, a render holds the closure's digest
+          [...] and a diff the closures it compares". A spec past it "fails
+          that target (in a diff, on that side)".
+
+     The step: render's decoded count, the Collector's byte bound and cut,
+     composition per target with presence by index, the specs' budget and the
+     closure's digest alone in a render; each formula at its peak (`json.rs:314`'s
+     ×4, `schema.rs:311`'s ×3, `entries.rs:655`'s `fields × input`, `limits.rs:58`'s
+     per-target settings, entries and records and `retained × 4`), each held by
+     `tests/memory.rs`; then the 1 GiB test. If the peaks' sum still passes
+     `1 << 30`, the step reports it by layer, and the question comes back for the
+     defaults. Nothing is deferred, so `later.md` gains no row.
+
 ## For the user
 
 The long-term choices the user may veto:

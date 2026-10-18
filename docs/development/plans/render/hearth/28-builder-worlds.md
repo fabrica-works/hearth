@@ -340,8 +340,9 @@ Test shape: `tests/simulation.rs`, 0.5 s: ref below,
 for hosted fakes). Unit, `hearth-service-builder`: `a_larger_limit_gives_a_larger_worst_case`.
 Not in 28.5: `the_shipped_limits_have_a_worst_case_within_1_gib` (render.md
 8.4: the sum at the defaults, `Client::worst_case`, at most `1 << 30`) lands
-with the step that builds render.md 2.3's and 8.4's held bounds, as the
-designer's 28.5 answer amended them (ruling 184). `tests/memory.rs` (a
+with hearth 28.s6 (`hearth/28.s-held-bounds.md`), after 28.s1 to 28.s5 build
+render.md 2.3's and 8.4's held bounds, as the designer's 28.5 answer
+amended them (rulings 184 and 192). `tests/memory.rs` (a
 binary of its own, `Counting`): `the_builder_holds_no_more_than_its_worst_case_at_every_iteration`
 (`Memory::Checked`, `small_limits()`; the store lists more than one 1,024
 page, asserted from the ledger's `List` count, store.md 8.2). Fuzzy, `fuzzy_simulation.rs`:
