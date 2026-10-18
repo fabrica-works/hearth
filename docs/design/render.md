@@ -141,14 +141,16 @@ defaults alone (client/README.md, 3.5).
 | a JSON document; its depth; keys in an object | 1 MiB; 32; 4,096 |
 | a template; an expression, wherever it stands (a `task.json` string, a template's tag or `{{ }}`, an interpolation) | 1 MiB; 4 KiB |
 | a static file, or a `file` setting's target: streamed to the cache, never held | 64 MiB |
-| JSON documents and templates decoded from one revision, held in memory | 64 MiB |
+| JSON documents, declarations and templates decoded from one revision, counted as they are held | 64 MiB |
 | targets in a revision; tasks; settings in a task | 1,024; 1,024; 512 |
 | nesting of statements in a template; of an expression | 32; 64 |
 | entries one `task.json`'s declarations expand to for one target, an `if` that is false making none | 65,536 |
 | loop iterations in one evaluation | 1,048,576 |
-| values one evaluation makes; one target's validated settings; the exports of one environment | 16 MiB; 64 MiB; 64 MiB |
+| values one evaluation makes; the exports of one environment | 16 MiB; 64 MiB |
+| one target's composed settings; its validated settings; its expanded entries | 64 MiB each |
+| the specs one command holds, with the sizes of the files they name and their resolutions' closures, a diff's two sides together | 64 MiB |
 | a rendered file, held until it is in the cache; bytes rendered for one target | 16 MiB; 256 MiB |
-| errors kept from one render | 256, then a count |
+| errors kept from one command, a diff's two sides together | 256, and 16 MiB of the bytes they carry; then a count |
 
 - **A level of nesting** is, in an expression, each `(`, a list's or an
   index's `[`, a filter's `(`, a `not`, and an `if` or an `else` still
@@ -158,16 +160,25 @@ defaults alone (client/README.md, 3.5).
 - **One evaluation** is one expression's, or one template's run for one
   target. The values it makes count a string's bytes, and 32 bytes for
   each element of a list or entry of a map; a list it makes nests at
-  most 64 deep. Validated settings and exports count alike.
+  most 64 deep. Composed and validated settings, expanded entries,
+  exports, specs and closures count alike, a record as a map of its
+  fields.
+- **What is decoded counts as it is held,** not by its file's bytes: a
+  document's or a declaration's values as values count, a key's bytes as
+  a string's, and a template the bytes of the text and names it holds,
+  and 32 bytes for each instruction and operation (8.3). The document,
+  declaration or template whose count passes the 64 MiB fails the render
+  at its path.
 - **What a limit fails** is what holds the excess. The listing's limits,
   the 64 MiB of decoded documents and templates, and the 1,025th target
   or task fail the render: no target renders, and the error is the
   revision's, at the path at fault. A document, a template, an
   expression or a static file past its limit, or a task past its
   settings, fails what needs that file (3.1). A limit met while
-  composing, validating, evaluating or rendering a target fails that
-  target. One met while reading the revision is `decode`; any other is
-  `evaluation` (7.2).
+  composing, validating, expanding, evaluating or rendering a target, or
+  holding its spec, fails that target (in a diff, on that side). One met
+  while reading the revision is `decode`; any other is `evaluation`
+  (7.2).
 
 ### 2.4 The builder's clone and its fetch
 
@@ -213,7 +224,9 @@ revision ──git──▶ 1 decode ──▶ 2 compose ──▶ 3 validate �
 ```
 
 Step 1 and discovery run once per revision; the rest once per target,
-and step 4 reads other targets of the same environment.
+and step 4 reads other targets of the same environment. A target's
+settings are composed when it renders, and another target's task or
+placement when step 4 reads it, and none is kept past its use (8.4).
 
 ### 3.1 Decode
 
@@ -1071,9 +1084,11 @@ error
   an error printed for it: its own, or the revision's error it is left
   out under (3.1, 3.4). Errors are sorted by path, line, column and
   target, then side, those with no place after those with one, by
-  target; and bounded (2.3): one bound over a command's answer, a diff's
-  two sides together. An error past the 256th is counted, not kept, and
-  still decides the exit code (client/README.md, 3.3).
+  target; and bounded (2.3), one bound over a command's answer, a diff's
+  two sides together. The errors kept are the longest start of that
+  order that holds at most 256 errors and 16 MiB of the bytes they carry,
+  every string of every field counted; the rest are counted, not kept,
+  and still decide the exit code (client/README.md, 3.3).
 - **One fault gives one error, where render stops reading:**
   - a document or a declaration gives its first fault, and the targets
     it fails print it once, without a target;
@@ -1101,11 +1116,11 @@ error
 
 | Kind | Examples |
 |---|---|
-| decode | not JSON, a duplicate key, a fraction, invalid UTF-8, a `null` inside a list, a document or a declaration not of its shape as written (a key, a name, a JSON form, or a value outside an entry that format.md bounds itself, such as `doc`'s one line or a script's `order`: format.md, 5.1, 5.2 and 5.8), a key of a later milestone (format.md, 2.2), a template's syntax, an unknown filter; a limit met while reading the revision: its listing's, a file's, the decoded documents' and templates', the 1,025th target or task, a task's 513th setting (2.3) |
+| decode | not JSON, a duplicate key, a fraction, invalid UTF-8, a `null` inside a list, a document or a declaration not of its shape as written (a key, a name, a JSON form, or a value outside an entry that format.md bounds itself, such as `doc`'s one line or a script's `order`: format.md, 5.1, 5.2 and 5.8), a key of a later milestone (format.md, 2.2), a template's syntax, an unknown filter; a limit met while reading the revision: its listing's, a file's, the decoded documents', declarations' and templates', the 1,025th target or task, a task's 513th setting (2.3) |
 | repository | a document out of place, an environment that does not exist, a directory named out of form, a path that is not UTF-8, a submodule, a stray file in a task, two sources for one destination, a `.j2` link or a bare `.j2` |
 | composition | two targets of one name, a target's name past 63 bytes, a task that does not exist, `null` for a task in a default (the `hearth` task's is `reserved`), `placement` in a base, `null` for `placement` or `members`, `members` in `fleet.json` or `envs/`, a target with no placement, a container's `on` that names a container, a target of another environment or one with no placement (3.4); [M5] a container's parameters on another kind, or an id range that overlaps another's (format.md, 3.5) |
 | schema | an undeclared setting, a wrong type, a missing required setting, an undeclared read, a bad default, an entry's field out of its kind's form once evaluated, such as a tmpfiles type or a boot parameter's `order` (format.md, 5.2), a value of a later milestone (format.md, 2.2) |
-| evaluation | an undefined value used, a type error in an expression, an overflow, a `for_each` that is not a map or list; a limit met while composing, validating, evaluating or rendering a target (2.3) |
+| evaluation | an undefined value used, a type error in an expression, an overflow, a `for_each` that is not a map or list; a limit met while composing, validating, expanding, evaluating or rendering a target, or holding its spec (2.3) |
 | exported | another target's exports that this one reads cannot be computed (3.4): `target` is the reader, the kind names the exporter and its task, `at` is the cause's place, and the class is the cause's |
 | guard | a false `requires`, with its message |
 | reserved | a command-line key, a path, a unit name, a drop-in that sorts after `zz-hearth-watchdog.conf`, a tmpfiles line, an initramfs setting or a preseed that hearth reserves; anything but a directory above a reserved path, and a tmpfiles path with a glob or a specifier; a `live` entry render can tell is never live; a secret or identity file `hearth` could read, or one whose `mode` has a bit outside `0770`; `null` for the `hearth` task, in any layer; an initramfs module, a boot parameter or the `hearth` task on a container; [M5] a host's preset that enables one of its containers' nspawn units (format.md, 3.4, 5.11, 5.12, 5.14 and 9.3; build.md, 7.3, 7.4 and 9.2; slots.md, 5.5; machine.md, 6.2) |
@@ -1229,12 +1244,25 @@ every request                                          Failed { request, class, 
 ### 8.4 Limits and the worst case
 
 - **Render's limits are 2.3's,** and its worst case
-  (`programming-model.md`, 6.3) is the revision's listing (65,536
-  entries, 16 MiB of paths), its decoded JSON and templates (64 MiB), an
-  object id, size and digest per static file, the exports of one
-  environment (64 MiB), one target's validated settings (64 MiB), one
-  evaluation's values (16 MiB), and one rendered file at a time
-  (16 MiB).
+  (`programming-model.md`, 6.3) is what it holds at once at those
+  limits: the revision's listing (65,536 entries, 16 MiB of paths), with
+  an object id, size and digest per static file; its decoded documents,
+  declarations and templates (64 MiB, counted as they are held); the
+  tasks each target has, by index; the exports of one environment
+  (64 MiB); one target's composed settings, validated settings and
+  expanded entries (64 MiB each); one evaluation's values (16 MiB); one
+  rendered file (16 MiB); the command's specs, with their files' sizes
+  and their closures (64 MiB); and the errors it keeps (256, and 16 MiB
+  of the bytes they carry).
+- **It holds no other target's settings** (section 3). Of a resolution
+  record, a render holds the closure's digest, which its layer keys take
+  (4.5), and a diff the closures it compares (5.7, 6.1). A diff renders
+  its sides in turn, and keeps of the first only its specs, closures and
+  errors.
+- **Each layer's formula is its peak:** what the layer holds at once at
+  its limits, not the sum of every maximum it reaches in turn. The
+  counting allocator holds the live heap within it at every iteration
+  (`programming-model.md`, 6.3).
 - **The builder's worst case is 6.3's sum** over its layers at their
   limits, and the defaults keep it within 1 GiB, which a test holds. In
   M1 nothing configures the client's memory (client/README.md, 3.5), so
