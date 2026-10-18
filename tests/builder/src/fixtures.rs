@@ -426,24 +426,30 @@ pub enum Laid {
     Record(&'static str, hearth::service::domain::render::vocabulary::Digest),
 }
 pub fn lay(store: &Path, entries: &[Laid]) {
+    fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("cache")).expect("cache directory");
+    fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("resolutions")).expect("resolutions directory");
+    for (name, bytes) in laid_files(entries) {
+        fs::write(store.join(name), bytes).expect("laid file");
+    }
+}
+#[must_use]
+pub fn laid_files(entries: &[Laid]) -> Vec<(String, Vec<u8>)> {
     use hearth_protocol_tree::{
         cache_file::{self, CacheFile, Origin},
         limits,
     };
-    fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("cache")).expect("cache directory");
-    fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("resolutions")).expect("resolutions directory");
-    for entry in entries {
-        if let Laid::Resolution(record) = entry {
-            let name = hex_digest(record.key.0);
-            let bytes = hearth_protocol_tree::resolution::write(record, &limits::SHIPPED).expect("resolution record");
-            fs::write(store.join("resolutions").join(format!("{name}.record")), bytes).expect("laid resolution");
-            continue;
-        }
-        let (name, bytes) = match entry {
-            Laid::Resolution(_) => unreachable!("written above"),
-            Laid::File(name) => (*name, b"fixture".to_vec()),
+    entries
+        .iter()
+        .map(|entry| match entry {
+            Laid::Resolution(record) => (
+                format!("resolutions/{}.record", hex_digest(record.key.0)),
+                hearth_protocol_tree::resolution::write(record, &limits::SHIPPED)
+                    .expect("resolution record")
+                    .into_vec(),
+            ),
+            Laid::File(name) => ((*name).to_owned(), b"fixture".to_vec()),
             Laid::Record(name, digest) => (
-                *name,
+                (*name).to_owned(),
                 cache_file::write(
                     &CacheFile {
                         at: skein_lib::Wall::EPOCH,
@@ -457,10 +463,10 @@ pub fn lay(store: &Path, entries: &[Laid]) {
                 .expect("cache record")
                 .into_vec(),
             ),
-        };
-        fs::write(store.join(name), bytes).expect("laid file");
-    }
+        })
+        .collect()
 }
+
 #[must_use]
 pub fn names(directory: &Path) -> Vec<String> {
     let mut names: Vec<_> = fs::read_dir(directory)
@@ -770,3 +776,6 @@ pub mod part_changes;
 
 pub mod reserved;
 pub use reserved::{MOTD_DIFF_TEXT, MOTD_KIND};
+
+mod goldens;
+pub use goldens::*;

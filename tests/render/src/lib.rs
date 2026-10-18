@@ -9,3 +9,5 @@ pub mod schemas;
 pub mod templates;
 
 pub mod declarations;
+
+pub mod golden;

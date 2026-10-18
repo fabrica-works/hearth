@@ -1,0 +1,4 @@
+enabled=true
+label="fleet"
+limits={"cpu":3,"memory":2}
+ports=[]

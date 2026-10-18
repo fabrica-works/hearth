@@ -5,6 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 [dependencies]
+hearth-render-world.workspace = true
 hearth.workspace = true
 hearth-domain-builder.workspace = true
 hearth-domain-render.workspace = true

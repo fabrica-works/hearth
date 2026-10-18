@@ -1,0 +1,24 @@
+{
+  "settings": {
+    "limits": {
+      "type": {
+        "map": "int"
+      },
+      "doc": "Resource bounds."
+    },
+    "ports": {
+      "type": {
+        "list": "int"
+      },
+      "doc": "Port order."
+    },
+    "enabled": {
+      "type": "bool",
+      "doc": "Enabled."
+    },
+    "label": {
+      "type": "string",
+      "doc": "Layer label."
+    }
+  }
+}

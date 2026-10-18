@@ -639,3 +639,5 @@ pub fn on_error(on: &[u8], host: hearth_domain_render::errors::Host) -> hearth_d
         host,
     })
 }
+
+pub mod goldens;

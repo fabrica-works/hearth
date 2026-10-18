@@ -1,0 +1,7 @@
+{
+  "placement": {
+    "kind": "vm",
+    "firmware": "bios",
+    "hardware": "incus"
+  }
+}

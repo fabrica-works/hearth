@@ -1,5 +1,5 @@
 //! The common fake machine, repositories and calls of the builder's worlds.
-use super::{File, THIN};
+use super::{File, Laid, THIN};
 use core::cell::{Ref, RefCell, RefMut};
 use hearth_domain_builder::vocabulary::Call;
 use hearth_fake_git::{objects, repository::Repositories};
@@ -40,9 +40,9 @@ pub struct Shared(Rc<RefCell<Fake>>);
 impl Shared {
     #[must_use]
     pub fn new(files: &[File], seed: u64) -> Self {
-        Self::build(files, seed, WORLD_PIPE, None)
+        Self::build(files, &[], seed, WORLD_PIPE, None)
     }
-    fn build(files: &[File], seed: u64, pipe: u32, fault: Option<Fault>) -> Self {
+    fn build(files: &[File], laid: &[Laid], seed: u64, pipe: u32, fault: Option<Fault>) -> Self {
         let mut machine = hearth_fake_machine::Machine::new(
             seed,
             linux::Sizes { files: 4096, bytes: 16 << 20, processes: 32, pipe, ledger: 256 },
@@ -56,6 +56,10 @@ impl Shared {
             linux::Item::directory(b"/usr", 0o755),
             linux::Item::directory(b"/usr/bin", 0o755),
         ]);
+        for (name, bytes) in super::laid_files(laid) {
+            let path = [b"/srv/store/".as_slice(), name.as_bytes()].concat();
+            machine.linux_mut().lay(&[linux::Item::file(&path, 0o600, &bytes).owner(BUILDER)]);
+        }
         match fault {
             Some(Fault::NotInstalled { absent: true }) => {}
             Some(Fault::NotInstalled { absent: false }) => {
@@ -150,6 +154,7 @@ impl skein_world::Machine for Shared {
 #[derive(Clone, Debug)]
 pub struct Scenario<'a> {
     pub files: &'a [File],
+    pub laid: &'a [Laid],
     pub call: Call,
     pub form: hearth::Form,
     pub fault: Option<Fault>,
@@ -166,6 +171,7 @@ pub enum Fault {
 pub fn thin() -> Scenario<'static> {
     Scenario {
         files: THIN,
+        laid: &[],
         call: Call::Render {
             resolve: false,
             repository: GIT_DIR.into(),
@@ -309,7 +315,7 @@ fn commit(files: &[File], parents: Box<[objects::Oid]>) -> objects::Commit {
 impl Shared {
     #[must_use]
     pub fn for_scenario(scenario: &Scenario<'_>, seed: u64, pipe: u32) -> Self {
-        let shared = Self::build(scenario.files, seed, pipe, scenario.fault);
+        let shared = Self::build(scenario.files, scenario.laid, seed, pipe, scenario.fault);
         if let Call::Diff { resolve, .. } = scenario.call {
             let mut fake = shared.borrow_mut();
             let repository = fake.repositories.0.get_mut(GIT_DIR).expect("laid repository");

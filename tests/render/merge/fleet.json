@@ -1,0 +1,26 @@
+{
+  "debian": {
+    "suite": "forky",
+    "architecture": "amd64",
+    "snapshot": {
+      "archive": "20261001T030405Z"
+    },
+    "pockets": {
+      "updates": false,
+      "security": false
+    }
+  },
+  "probe": {
+    "limits": {
+      "cpu": 1,
+      "memory": 2
+    },
+    "ports": [
+      80,
+      443
+    ],
+    "enabled": true,
+    "label": "fleet"
+  },
+  "gone": {}
+}

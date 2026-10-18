@@ -94,6 +94,7 @@ dependencies = [
  "hearth-protocol-template",
  "hearth-protocol-tree",
  "hearth-recordings",
+ "hearth-render-world",
  "hearth-test-mirror",
  "skein-io",
  "skein-lib",
