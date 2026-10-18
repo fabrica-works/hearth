@@ -1310,6 +1310,12 @@ None yet.
      - Don't: one budget over both sides; keep a refusal; change a limit or
        `limits::worst_case`.
 
+199. **hearth 28.s3 and 28.s4 go on while a template's line offsets wait for the designer** (design gap, hearth 28's block of 2026-10-18T02:40:56Z).
+     One design question goes to the designer in question.md: how a compiled template's line offsets (`Template::lines`, `evaluate/template.rs:8`) count against the decoded 64 MiB, which render.md 2.3 counts as "the bytes of the text and names it holds, and 32 bytes for each instruction and operation (8.3)". Interim, until its answer reaches session 28:
+     1. 28.s2 is landed as hearth 654c6e8; the line-offset charge is not made before the answer, whose unblock says where it lands.
+     2. A fresh hearth 28 session takes 28.s3, then 28.s4, whose Files name neither a template's charge nor `limits::worst_case`'s `decoded` term (hearth/28.s-held-bounds.md); no test or memory case of theirs asserts a template's count or the decoded bound.
+     3. 28.s7 counts each kept template in its 64 MiB (its Shape), so it rests on the answer: it does not start before the answer's unblock, whatever the ledger says. A 28.s4 landed before that unblock ends the session's work, which reports and waits, kind design, naming this question.
+
 ## For the user
 
 The long-term choices the user may veto:
