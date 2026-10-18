@@ -995,6 +995,15 @@ None yet.
      **hearth 28.4's two worlds leave the same store but for each record's clock** (plan defect, hearth-28.4's block of 2026-10-18T01:06:42Z).
      28.4's Test shape asked for "cache names and record bytes equal", but a cache record holds its provenance and cost (store.md 6.5; `CacheFile { at: Wall, origin, sha256, size, took: Duration }`, `crates/hearth-domain-store/src/vocabulary.rs:124`), and `at` and `took` come from each world's clock: the protocol world's `Wall::EPOCH` and scheduled latency, the simulator's advancing wall and hosted `Pace`. The plan asked for more than the design makes equal; the report's proposal is taken. `the_protocol_and_simulated_worlds_leave_the_same_store` compares the cache names and each file's payload bytes, and decodes each record to compare its `origin`, `sha256` and `size`; it leaves out `at` and `took`, which the costs story (`Costs { fetched, took }`) and `git_and_mmdebstrap_take_the_time_their_work_takes` check in each world; no temporary is left. Neither world's clock is forced to the other's. A further field that holds a world's own clock or schedule is left out the same way, and the commit body names it.
 
+183. **hearth 21.4 goes on without the key scope until the designer answers** (design gap, interim, hearth-21.4's block of 2026-10-18T01:10:34Z).
+     **hearth 21.4 goes on without the key scope until the designer answers** (design gap, interim; hearth-21.4's block of 2026-10-18T01:10:34Z).
+
+     Whether an expanded key is unique within its entry map or across a task's maps is what a term of the design means: format.md 5.2 says "Keys are unique after expansion: two elements that make the same key are an error", without a scope, and 5.12's own `task.json`, which 21.4's Proof passes whole, names `hearth` in both `software` and `users`; the plan's 16.2 (`hearth/16-entries.md:138`) made it "across a task's maps". It goes to the designer (`question.md`, 2026-10-18T01:13Z). Until the answer's ruling (183 is the interim):
+
+     1. 21.4 goes on with all that does not rest on it: its other tests, the shared fixtures, clippy and the focused dependents.
+     2. It changes nothing in `entries.rs`'s key check (`:131`, `keys` across the task) or its tests (`tests/entries.rs:163`, `:177`), and it leaves `the_hearth_task_of_5_12_passes_every_reserved_rule` failing on the `hearth` key, as it is; it changes no key of 5.12's `task.json`.
+     3. It does not land before the answer's ruling: once all else is done, it reports and waits.
+
 ## For the user
 
 The long-term choices the user may veto:
