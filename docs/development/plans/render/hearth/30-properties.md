@@ -110,7 +110,9 @@ String)>`: each `spec` record's target and digest, client/README.md 3.2).
 Shape: the sketches. `generate` draws values, `_note`s and documents' text;
 `edit(Note | Reorder | Respace)` reprints with another order, whitespace or
 note and nothing else; `Collide` is 30.2's. `fixtures::repository_of(&[Leaf])`
-plays leaves as the world's repository; `fixtures::digests(&Run)` is its
+plays leaves as the world's repository, factored out of 29.1's
+`Golden::repository` (`tests/render/src/golden/repository.rs:16`), which
+calls it (`fixtures::files_of` is the builder world's, `Vec<File>`: ruling 190); `fixtures::digests(&Run)` is its
 `spec` digests by target.
 Test shape: world, 12 repositories, under 0.5 s:
 `a_generated_repository_renders_without_errors`,
@@ -118,7 +120,7 @@ Test shape: world, 12 repositories, under 0.5 s:
 `reformatted_whitespace_changes_no_digest`, `an_edited_note_changes_no_digest`,
 `every_seed_gives_the_same_digests`; process, under 0.5 s:
 `a_generated_repository_renders_the_worlds_digests_through_real_git` (two,
-`Form::Json`). The sweep, `fuzzy_properties.rs`:
+`Form::JsonLines`, `form.rs:12`: ruling 190). The sweep, `fuzzy_properties.rs`:
 `generated_repositories_and_edits_keep_every_property` (750 rounds, about
 1.5 s; each edit's changed set is `touched`'s; 30.2's edits and `mutate` join it).
 ```rust
@@ -183,7 +185,10 @@ lists); `json::value(&Json) -> revision::Value` (positions from a counter);
 -> Option<Json>` is format.md 4.1's pseudocode, recursive; a target is
 `merge(None, document)`, patches objects, scalars, lists and `{}`.
 `fixtures::merged(&[&Json]) -> Option<Json>` folds patches through render's
-`Merge` and `json::plain`.
+`Merge` and `json::plain`. The empty patch's targets are objects: `{}`
+over a scalar or a list gives `{}` (format.md 4.1: "result = target if
+target is an object, else {}"), which `merge_equals_format_md_4_1s_pseudocode`
+covers (ruling 190).
 Test shape: world, 200 seeds each, under 0.5 s:
 `an_empty_patch_leaves_the_target_as_it_was`,
 `merging_a_patch_twice_is_merging_it_once`,
@@ -207,7 +212,8 @@ fn merging_a_patch_twice_is_merging_it_once() {
 Proof: world, `merge_equals_format_md_4_1s_pseudocode`: render's `Merge` gives
 the reference's value at every depth drawn. Bound: 0.5 s. Not process: 12.1's
 real tests reach `Merge`; the laws need generated patches.
-Don't: compare provenance; derive `PartialEq` on `Composed` for the test.
+Don't: compare provenance, as `Composed`'s derived `PartialEq`
+(`compose.rs:204`) does, its `from: Provenance` included (ruling 190).
 Size: no counted lines; the world about 140 lines. Removes: nothing.
 
 ### 30.4 The oracle: expressions, and every difference listed
@@ -216,8 +222,12 @@ Needs: hearth 15.4 (`templates::run`, the world's `Roots`, `expressions::
 {roots, tree}`), hearth 30.3.
 Files: `tests/render/Cargo.toml` (dev-dependency), root `Cargo.lock`;
 new `tests/render/tests/oracle.rs`, `tests/render/tests/oracle/engine.rs`;
-`tests/render/src/{expressions, templates}.rs` (`Style`, `ORACLE`).
-Shape: the sketches. `context_of(&Roots)`: maps with their present entries
+`tests/render/src/{expressions, templates, declarations}.rs` (`Style`,
+`ORACLE`; `expressions::text` returns `Vec<u8>` on main, and its callers at
+`declarations.rs:53, 117, 152, 155`, `templates.rs:75, 87, 93, 104, 110` and
+`expressions.rs:318-326` take the new `String`: ruling 190).
+Shape: the sketches. `context_of(&Roots)`, `Roots.bindings` included
+(`expressions.rs:22`): maps with their present entries
 only (`None` is absent), integers, strings, booleans, lists.
 `expressions::text(&Tree, Style) -> String` writes 7.4 as 6 and 7 of the
 Choices need; `templates::output_of(&str) -> String` makes a case of it:
@@ -285,7 +295,7 @@ fn generated_templates_at_wide_shapes_render_as_the_oracle_renders_them() {
     let mut drawn = BTreeSet::new();
     for seed in 0..3_750_u64 {
         let (mut rng, roots) = fixtures::draw(0x0030_5000 + seed);
-        let tree = templates::tree(&mut rng, &roots, templates::WIDE_TEMPLATES); drawn.extend(templates::constructs(&tree));
+        let tree = templates::tree(&mut rng, &roots, templates::WIDE); drawn.extend(templates::constructs(&tree));
         if let Err(mismatch) = oracle.compare(&spacing::dressed(&mut rng, &tree), &roots) { panic!("seed {seed}: {mismatch}"); }
     }
     fixtures::assert_fell(&drawn, templates::CONSTRUCTS);
@@ -299,7 +309,9 @@ Size: no counted lines; the generator about 160 lines. Removes: nothing.
 ### 30.6 Every decoder fuzzed: the audit, the goldens, the rest
 Scope: 9.4 and decisions.md 10: an inventory of the sweeps, the goldens as
 corpora, and the decoders with no sweep: `rev_parse::decode` and
-`invocation::revision` (02.1), `names::shape` (23.2), `argv::{form,
+`invocation::revision` (02.1), `names::shape` (23.2; `pub(crate)` at
+`hearth-protocol-builder/src/store/names.rs:7`, the builder world's copy at
+`tests/builder/src/domain/store.rs:226`: ruling 190), `argv::{form,
 invocation}` (32.2).
 Needs: hearth 02, 23.2, 32.2, 38.2 (the recordings corpus), 39 (`fuzzy_tree`),
 hearth 29.
@@ -316,7 +328,9 @@ interpolated strings (`template`, `fuzzy_templates`, 06, 36); `ls-tree`,
 recordings (`mmdebstrap`, `fuzzy_mmdebstrap`, 07, 38); frames of kinds 1, 4,
 5 (`tree`, `fuzzy_tree`, 39); and this session's four. The goldens: each
 world reads `../render/<name>/` (`.json` outside `expected/` and
-`rendered/`; `*.j2`) and feeds its `generate::{cut, mutate}` and reference.
+`rendered/`; `*.j2`) and feeds its `generate::mutate`, its `generate::cut`
+where it has one (template; config has `mutate` alone,
+`tests/config/src/generate.rs:56`: ruling 190), and its reference.
 Revisions: `rev_parse::decode` on generated, cut, mutated output against a
 recursive reading of 02.1's rules; `revision` on bytes in and out of the
 alphabet. Names: 23.2's shapes, mutated by a byte, against a table. argv:
@@ -328,7 +342,8 @@ world, starts `fuzzy_` and holds a `#[test]`),
 references, exempt), `every_machine_crate_has_a_world_with_a_sweep` (the
 records' crate parses nothing: hearth 10; the builder's inputs are rows),
 `every_sweep_names_the_corpus_its_row_says` (its file names `golden::` or
-`hearth_recordings`; the git and mmdebstrap rows say `recordings`). Sweeps
+`recordings::`, as `fuzzy_mmdebstrap.rs:36` reads
+`hearth_mmdebstrap_world::recordings::all()`: ruling 190; the git and mmdebstrap rows say `recordings`). Sweeps
 (about 0.5 s each):
 `golden_documents_cut_and_mutated_read_as_the_reference_reads_them`,
 `golden_templates_cut_and_mutated_compile_as_the_reference_compiles_them`,
