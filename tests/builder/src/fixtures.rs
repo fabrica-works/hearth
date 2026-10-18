@@ -23,14 +23,11 @@ pub struct File {
 }
 pub const DEBIAN: &[u8] = br#"{"debian":{"suite":"forky","architecture":"amd64","snapshot":{"archive":"20261001T030405Z"},"pockets":{"updates":false,"security":false}}}"#;
 pub const THIN: &[File] = &[
-    File { path: "fleet.json", body: DEBIAN, mode: 0o644 },
-    File { path: "envs/prod.json", body: b"{}", mode: 0o644 },
+    reserved::EMPTY_HEARTH,
+    reserved::FLEET_JSON,
+    reserved::PROD_ENV,
     File { path: "hosts/x1/x1.json", body: b"{\"motd\":{}}", mode: 0o644 },
-    File {
-        path: "hosts/x1/x1-prod.json",
-        body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"}}",
-        mode: 0o644,
-    },
+    File { path: "hosts/x1/x1-prod.json", body: reserved::METAL_EFI, mode: 0o644 },
     File { path: "tasks/motd/task.json", body: b"{}", mode: 0o644 },
     File { path: "tasks/motd/tree/etc/motd", body: b"Welcome to x1.\n", mode: 0o644 },
     File { path: "tasks/motd/tree/usr/local/bin/motd", body: b"#!/bin/sh\nexec cat /etc/motd\n", mode: 0o755 },
@@ -43,7 +40,7 @@ pub struct Repository {
 impl Repository {
     #[must_use]
     pub fn make(label: &str, files: &[File]) -> Self {
-        let path = std::env::var_os("PATH").expect("git is required on PATH");
+        let path = reserved::git_path();
         Self::make_on(&path, label, files)
     }
     #[must_use]
@@ -72,7 +69,7 @@ impl Repository {
     }
     #[must_use]
     pub fn head(&self) -> String {
-        let path = std::env::var_os("PATH").expect("git is required on PATH");
+        let path = reserved::git_path();
         String::from_utf8(git_output(&self.work_tree, &path, &["rev-parse", "HEAD"]))
             .expect("commit id")
             .trim()
@@ -84,7 +81,7 @@ impl Repository {
         for path in removed {
             fs::remove_file(self.work_tree.join(path)).expect("removed file");
         }
-        let path = std::env::var_os("PATH").expect("git is required on PATH");
+        let path = reserved::git_path();
         git(&self.work_tree, &path, &["add", "-A"]);
         git(&self.work_tree, &path, &["commit", "--allow-empty", "-q", "-m", "next"]);
         self.head()
@@ -98,7 +95,7 @@ impl Repository {
     }
     #[must_use]
     pub fn git(&self, args: &[&str]) -> String {
-        let path = std::env::var_os("PATH").expect("git is required on PATH");
+        let path = reserved::git_path();
         String::from_utf8(git_output(&self.work_tree, &path, args)).expect("git text").trim().to_owned()
     }
     pub fn remove_object(&self, oid: &str) {
@@ -233,9 +230,10 @@ pub fn diff(repository: &Repository, asked: &Asked<'_>) -> Rendered {
     )
 }
 pub const MOTD: &[File] = &[
-    File { path: "fleet.json", body: DEBIAN, mode: 0o644 },
-    File { path: "envs/prod.json", body: b"{}", mode: 0o644 },
-    File { path: "envs/lab.json", body: b"{}", mode: 0o644 },
+    reserved::EMPTY_HEARTH,
+    reserved::FLEET_JSON,
+    reserved::PROD_ENV,
+    reserved::LAB_ENV,
     File { path: "hosts/ion/ion.json", body: b"{}", mode: 0o644 },
     File { path: "hosts/x1/x1.json", body: b"{}", mode: 0o644 },
     File {
@@ -248,28 +246,14 @@ pub const MOTD: &[File] = &[
         body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"},\"motd\":{}}",
         mode: 0o644,
     },
-    File {
-        path: "hosts/ion/ion-lab.json",
-        body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"}}",
-        mode: 0o644,
-    },
-    File {
-        path: "hosts/x1/x1-lab.json",
-        body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"}}",
-        mode: 0o644,
-    },
+    File { path: "hosts/ion/ion-lab.json", body: reserved::METAL_EFI, mode: 0o644 },
+    File { path: "hosts/x1/x1-lab.json", body: reserved::METAL_EFI, mode: 0o644 },
     File { path: "tasks/motd/task.json", body: b"{}", mode: 0o644 },
     File { path: "tasks/motd/tree/etc/motd", body: b"Welcome.\n", mode: 0o644 },
 ];
-pub const MOTD_KIND: File = File { path: "tasks/motd/tree/etc/motd", body: b"Welcome, and be kind.\n", mode: 0o644 };
-pub const MOTD_DIFF_TEXT: &str = "ion-prod                                            rebuild from config\n  config   ~ /etc/motd                              0644 root:root\n               @@ -1 +1 @@\n               -Welcome.\n               +Welcome, and be kind.\nx1-prod                                             rebuild from config\n  config   ~ /etc/motd                              0644 root:root\n               @@ -1 +1 @@\n               -Welcome.\n               +Welcome, and be kind.\n\n2 of 4 targets change; 2 are unchanged.\n";
 pub const BAD_ION_LAB: File = File { path: "hosts/ion/ion-lab.json", body: b"not JSON", mode: 0o644 };
 pub const BAD_X1_LAB: File = File { path: "hosts/x1/x1-lab.json", body: b"not JSON", mode: 0o644 };
-pub const FIXED_X1_LAB: File = File {
-    path: "hosts/x1/x1-lab.json",
-    body: b"{\"placement\":{\"kind\":\"metal\",\"firmware\":\"efi\",\"hardware\":\"7th-gen\"}}",
-    mode: 0o644,
-};
+pub const FIXED_X1_LAB: File = File { path: "hosts/x1/x1-lab.json", body: reserved::METAL_EFI, mode: 0o644 };
 
 #[must_use]
 pub fn with_store(store: hearth_domain_store::limits::Limits) -> hearth::Limits {
@@ -418,11 +402,7 @@ impl Host for Holding {
 
 pub const BROKEN_LAB: &[File] = &[
     File { path: "envs/lab.json", body: br#"{"motd": {}, "motd": {}}"#, mode: 0o644 },
-    File {
-        path: "hosts/x1/x1-lab.json",
-        body: br#"{"placement":{"kind":"vm","firmware":"efi","hardware":"incus"}}"#,
-        mode: 0o644,
-    },
+    File { path: "hosts/x1/x1-lab.json", body: reserved::INCUS, mode: 0o644 },
 ];
 /// THIN with a duplicate key in its task declaration.
 #[must_use]
@@ -494,7 +474,7 @@ pub fn names(directory: &Path) -> Vec<String> {
 /// A containing work tree whose configuration must not affect diff's cache files.
 pub fn work_tree(at: &Path, config: &[(&str, &str)]) {
     fs::create_dir(at).expect("containing work tree");
-    let path = std::env::var_os("PATH").expect("git is required on PATH");
+    let path = reserved::git_path();
     git(at, &path, &["init", "--quiet", "--initial-branch=main"]);
     for (name, value) in config {
         git(at, &path, &["config", name, value]);
@@ -511,7 +491,7 @@ pub fn diff_beneath_work_tree(label: &str, attributes: bool) -> Rendered {
     work_tree(&containing, &[("diff.interHunkContext", "10")]);
     if attributes {
         fs::write(containing.join(".gitattributes"), b"* -diff\n").expect("attributes");
-        let path = std::env::var_os("PATH").expect("git is required on PATH");
+        let path = reserved::git_path();
         git(&containing, &path, &["add", ".gitattributes"]);
         git(&containing, &path, &["commit", "-q", "-m", "attributes"]);
     }
@@ -619,12 +599,8 @@ pub const BROKEN_TEMPLATE: File =
     File { path: "tasks/motd/tree/etc/issue.j2", body: b"Host:\n{{ target.name\n", mode: 0o644 };
 
 pub const CLUSTER: &[File] = &[
-    File { path: "fleet.json", body: DEBIAN, mode: 0o644 },
-    File {
-        path: "envs/lab.json",
-        body: br#"{"placement":{"kind":"vm","firmware":"efi","hardware":"incus"}}"#,
-        mode: 0o644,
-    },
+    reserved::FLEET_JSON,
+    File { path: "envs/lab.json", body: reserved::INCUS, mode: 0o644 },
     File { path: "hosts/stoa/stoa.json", body: br#"{"motd":{},"members":{"1":{},"2":{},"3":{}}}"#, mode: 0o644 },
     File {
         path: "hosts/stoa/stoa-lab.json",
@@ -648,20 +624,17 @@ pub const USERS: &[File] = &[
 ];
 
 pub const CONTAINERS: &[File] = &[
-    File { path: "fleet.json", body: DEBIAN, mode: 0o644 },
-    File { path: "envs/prod.json", body: b"{}", mode: 0o644 },
-    File { path: "envs/lab.json", body: b"{}", mode: 0o644 },
+    reserved::EMPTY_HEARTH,
+    reserved::FLEET_JSON,
+    reserved::PROD_ENV,
+    reserved::LAB_ENV,
     File { path: "hosts/rhi/rhi.json", body: b"{}", mode: 0o644 },
     File {
         path: "hosts/rhi/rhi-prod.json",
         body: br#"{"placement":{"kind":"vm","firmware":"bios","hardware":"serverhino"}}"#,
         mode: 0o644,
     },
-    File {
-        path: "hosts/rhi/rhi-lab.json",
-        body: br#"{"placement":{"kind":"vm","firmware":"efi","hardware":"incus"}}"#,
-        mode: 0o644,
-    },
+    File { path: "hosts/rhi/rhi-lab.json", body: reserved::INCUS, mode: 0o644 },
     File { path: "hosts/chat/chat.json", body: b"{}", mode: 0o644 },
     File {
         path: "hosts/chat/chat-prod.json",
@@ -723,11 +696,11 @@ pub const TYPO_BRANCH: &[File] = &[
 ];
 
 pub const CONTAINED: &[File] = &[
-    File { path: "envs/prod.json", body: b"{}", mode: 0o644 },
-    File { path: "envs/lab.json", body: b"{}", mode: 0o644 },
+    reserved::PROD_ENV,
+    reserved::LAB_ENV,
     File { path: "hosts/rhi/rhi.json", body: br#"{"inventory":{}}"#, mode: 0o644 },
     File { path: "hosts/rhi/rhi-prod.json", body: br#"{"placement":{"kind":"vm","firmware":"bios","hardware":"serverhino"}}"#, mode: 0o644 },
-    File { path: "hosts/rhi/rhi-lab.json", body: br#"{"placement":{"kind":"vm","firmware":"efi","hardware":"incus"}}"#, mode: 0o644 },
+    File { path: "hosts/rhi/rhi-lab.json", body: reserved::INCUS, mode: 0o644 },
     File { path: "hosts/chat/chat.json", body: br#"{"inventory":{}}"#, mode: 0o644 },
     File { path: "hosts/chat/chat-prod.json", body: br#"{"placement":{"kind":"container","on":"rhi-prod"}}"#, mode: 0o644 },
     File { path: "hosts/mail/mail-prod.json", body: br#"{"placement":{"kind":"container","on":"rhi-prod"}}"#, mode: 0o644 },
@@ -796,3 +769,4 @@ pub mod collisions;
 pub mod part_changes;
 
 pub mod reserved;
+pub use reserved::{MOTD_DIFF_TEXT, MOTD_KIND};

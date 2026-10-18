@@ -87,14 +87,14 @@ fn condition<'c>(
         when.at,
     )
 }
-/// Expand keys once per selected element, sharing collision and count bounds across maps.
+/// Expand keys once per selected element, checking collisions per map and counting across maps.
 pub fn expand(
     declaration: &Declaration,
     context: &Context<'_>,
     limits: &Limits,
     left: &mut u64,
 ) -> Result<Expanded, Fault> {
-    let mut keys = Keys::<Box<[u8]>, Position>::with_capacity(limits.expansion);
+    let mut count = 0_u32;
     let mut groups = List::with_capacity(u32::try_from(declaration.entries.len()).expect("map count"));
     for map in &declaration.entries {
         let mut ordered = Keys::<Box<[u8]>, Concrete>::with_capacity(limits.expansion);
@@ -120,7 +120,7 @@ pub fn expand(
                     continue;
                 }
                 let at = entry.key.at();
-                if keys.len() == limits.expansion {
+                if count == limits.expansion {
                     let at = match &entry.for_each {
                         Some(when) => when.at,
                         None => at,
@@ -128,10 +128,10 @@ pub fn expand(
                     return Err(failure(FaultKind::Limit, at));
                 }
                 let key = interpolate(&entry.key, context, &bindings, limits, left)?;
-                if let Some(first) = keys.get(&key) {
-                    return Err(Fault { kind: Kind::Collision(Collision::Key { key }), at, also: Some(*first) });
+                if let Some(first) = ordered.get(&key) {
+                    return Err(Fault { kind: Kind::Collision(Collision::Key { key }), at, also: Some(first.at) });
                 }
-                keys.insert(key.clone(), at).expect("entry limit checked");
+                count = count.checked_add(1).expect("entry limit checked");
                 ordered
                     .insert(
                         key.clone(),
@@ -649,7 +649,7 @@ fn range<'c>(
     Ok(Fielded::Range { base: base.ok_or(wrong(Takes::Range, at))?, count: count.ok_or(wrong(Takes::Range, at))? })
 }
 
-/// The evaluator, bindings, collision index and expanded task at these bounds.
+/// The evaluator, bindings and expanded task at these bounds.
 /// Empty strings still need list slots; their source is bounded by decoded or made input.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
@@ -658,7 +658,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let input = limits.validated.checked_add(limits.made)?.checked_add(u64::from(limits.document))?;
     evaluate::worst_case(limits)?
         .checked_add(List::<Binding<'_>>::worst_case(2)?)?
-        .checked_add(Keys::<Box<[u8]>, Position>::worst_case(limits.expansion)?)?
         .checked_add(Keys::<Box<[u8]>, Concrete>::worst_case(limits.expansion)?)?
         .checked_add(List::<Concrete>::worst_case(limits.expansion)?)?
         .checked_add(List::<Group>::worst_case(14)?)?

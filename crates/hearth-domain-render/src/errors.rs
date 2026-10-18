@@ -451,6 +451,7 @@ pub enum Composition {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Host {
+    Unplaced,
     Unknown,
     Elsewhere { environment: Box<[u8]> },
     Container,

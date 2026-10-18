@@ -1,0 +1,53 @@
+{
+  "doc": "hearth itself: its binary, its activator's unit, its user, its tools and its alarms.",
+  "settings": {
+    "alarms": {
+      "type": { "map": { "object": {
+        "warning": { "type": "int", "optional": true, "doc": "The threshold of a warning." },
+        "critical": { "type": "int", "optional": true, "doc": "The threshold of a critical alarm." }
+      } } },
+      "default": {
+        "disk_free_percent": { "warning": 10, "critical": 5 },
+        "disk_free_gib": { "warning": 5, "critical": 1 },
+        "memory_available_percent": { "warning": 10, "critical": 5 },
+        "pressure_some_percent": { "warning": 20 },
+        "pressure_full_percent": { "critical": 10 }
+      },
+      "doc": "Resource alarms' thresholds (operating.md, section 4)."
+    },
+    "snapshots": {
+      "type": { "map": { "object": {
+        "every": { "type": "duration", "doc": "How often the class is snapshotted." },
+        "keep": { "type": { "map": "int" }, "doc": "How many to keep per bucket: hourly, daily, weekly, monthly." }
+      } } },
+      "default": {},
+      "doc": "Local snapshots of each class's subvolume, by class: core or data [M5] (operating.md, 7.1)."
+    },
+    "backups": {
+      "type": { "map": { "object": {
+        "every": { "type": "duration", "doc": "How often the class is sent to the backup peer." },
+        "keep": { "type": { "map": "int" }, "optional": true, "doc": "What the peer keeps, per bucket; the class's local keep if absent." }
+      } } },
+      "default": {},
+      "doc": "Backups of each class to the environment's backup peer, by class [M6] (operating.md, 7.2)."
+    }
+  },
+  "packages": { "git": {}, "mmdebstrap": {}, "uidmap": {}, "openssh-client": {} },
+  "software": {
+    "hearth": {
+      "url": "https://git.ekanayaka.io/ai/hearth/releases/download/v0.1.0/hearth-x86_64-linux",
+      "sha256": "ca2dff1617240ba417e8dc9aa1af98e5324e899243abcbc1dc7186391fc7fab9", "unpack": "file", "path": "/usr/local/bin/hearth", "mode": "0755"
+    }
+  },
+  "users": {
+    "hearth": {
+      "uid": 59999, "home": "/nonexistent", "groups": ["systemd-journal"],
+      "subordinate": { "base": 262144, "count": 65536 }
+    }
+  },
+  "presets": {
+    "hearth-activator.service": { "action": "enable" },
+    "systemd-sysext.service": { "action": "disable" },
+    "systemd-confext.service": { "action": "disable" }
+  }
+}

@@ -5,6 +5,8 @@ use crate::{
     revision::{Documents, Kind, Position, Value},
 };
 use alloc::boxed::Box;
+mod hearth;
+pub(crate) use hearth::reserved;
 use skein_lib::{List, Map, bytes};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Target {
@@ -353,6 +355,7 @@ pub struct Present {
     pub name: Box<[u8]>,
     pub from: Provenance,
     pub settings: Composed,
+    pub implicit: bool,
 }
 /// Presence uses host layers alone; settings include fleet and environment.
 pub fn compose(
@@ -361,13 +364,15 @@ pub fn compose(
     defaults: &crate::schema::Defaults,
     merge: &mut Merge,
 ) -> Settings {
-    let present = presence(target, documents, merge);
+    let (present, implicit) = presence(target, documents, merge);
     let origin = Provenance { layer: Layer::Defaults, document: 0, at: Position { line: 1, column: 1 } };
     let mut bottom = List::with_capacity(u32::try_from(present.len()).expect("task count"));
     for pair in &present {
-        if let Some(value) = defaults.layer(&pair.key) {
-            bottom.push(Pair { key: pair.key.clone(), from: pair.from, value: value.clone() }).expect("task count");
-        }
+        let value = defaults
+            .layer(&pair.key)
+            .cloned()
+            .unwrap_or(Composed { from: pair.from, kind: Composite::Map(Box::new([])) });
+        bottom.push(Pair { key: pair.key.clone(), from: pair.from, value }).expect("task count");
     }
     let mut settings = Some(Composed { from: origin, kind: Composite::Map(bottom.into_boxed()) });
     for (index, source, layer) in layers(target, documents).into_iter().flatten() {
@@ -387,7 +392,12 @@ pub fn compose(
         for settings in &settings {
             if pair.key == settings.key {
                 tasks
-                    .push(Present { name: pair.key.clone(), from: pair.from, settings: settings.value.clone() })
+                    .push(Present {
+                        name: pair.key.clone(),
+                        from: pair.from,
+                        settings: settings.value.clone(),
+                        implicit: implicit && pair.key.as_ref() == b"hearth",
+                    })
                     .expect("present count");
             }
         }
@@ -558,7 +568,7 @@ pub fn placement(target: &Target, documents: &Documents) -> Option<revision::Pla
     }
     placement
 }
-fn presence(target: &Target, documents: &Documents, merge: &mut Merge) -> Box<[Pair]> {
+fn presence(target: &Target, documents: &Documents, merge: &mut Merge) -> (Box<[Pair]>, bool) {
     let mut presence = None;
     for (index, source, layer) in layers(target, documents).into_iter().flatten() {
         if ![Layer::Base, Layer::Member, Layer::BaseEnv, Layer::BaseEnvMember].contains(&layer) {
@@ -574,11 +584,11 @@ fn presence(target: &Target, documents: &Documents, merge: &mut Merge) -> Box<[P
         presence = merge.merge(presence, &Value { at, kind: Kind::Map(pairs.into_boxed()) }, layer, index);
     }
     let origin = Provenance { layer: Layer::Base, document: 0, at: Position { line: 1, column: 1 } };
-    map_target(presence, origin).1
+    hearth::presence(target, documents, map_target(presence, origin).1)
 }
 #[must_use]
 pub fn present(target: &Target, documents: &Documents) -> Box<[Box<[u8]>]> {
-    let pairs = presence(target, documents, &mut Merge::new(&crate::limits::SHIPPED));
+    let (pairs, _) = presence(target, documents, &mut Merge::new(&crate::limits::SHIPPED));
     let mut names = List::with_capacity(u32::try_from(pairs.len()).expect("task count"));
     for pair in pairs {
         names.push(pair.key).expect("task count");
@@ -633,6 +643,10 @@ fn document_layer(
         refused = true;
     }
     for task in &source.tasks {
+        if default && task.name.as_ref() == b"hearth" && task.value.kind == Kind::Null {
+            errors.push(hearth::error(path, task.at, None, crate::errors::Rule::HearthNull));
+            refused = true;
+        }
         if default && task.name.as_ref() != b"hearth" && task.value.kind == Kind::Null {
             errors.push(error(path, Some(task.at), crate::errors::Composition::Null, None, Some(task.name.clone())));
             refused = true;
@@ -688,10 +702,12 @@ fn host(target: &Target, on: &[u8], documents: &Documents, targets: &[Target]) -
         if host.environment != target.environment {
             return Some(crate::errors::Host::Elsewhere { environment: host.environment.clone() });
         }
-        if let Some(placement) = placement(host, documents)
-            && placement.kind == revision::Runs::Container
-        {
-            return Some(crate::errors::Host::Container);
+        match placement(host, documents) {
+            None => return Some(crate::errors::Host::Unplaced),
+            Some(placement) if placement.kind == revision::Runs::Container => {
+                return Some(crate::errors::Host::Container);
+            }
+            Some(_) => {}
         }
         return None;
     }

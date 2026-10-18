@@ -72,3 +72,6 @@ fn reserved_secrets_and_live_entries_exit_2() {
         assert_eq!(f::rendered(file).exit, expected, "row {row}");
     }
 }
+
+#[path = "reserved/hearth.rs"]
+mod hearth;

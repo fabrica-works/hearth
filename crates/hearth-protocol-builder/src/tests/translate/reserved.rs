@@ -29,6 +29,8 @@ fn back(rule: source::Rule) -> target::Rule {
         source::Rule::LiveNone => target::Rule::LiveNone,
         source::Rule::NeverLiveUnit => target::Rule::NeverLiveUnit,
         source::Rule::NeverLivePath => target::Rule::NeverLivePath,
+        source::Rule::HearthContainer => target::Rule::HearthContainer,
+        source::Rule::HearthNull => target::Rule::HearthNull,
     }
 }
 #[test]

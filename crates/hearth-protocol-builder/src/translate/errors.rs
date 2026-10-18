@@ -598,6 +598,7 @@ pub fn composition(why: target::Composition) -> records::errors::Composition {
         target::Composition::On { on, host } => records::errors::Composition::On {
             on,
             host: match host {
+                target::Host::Unplaced => records::errors::Host::Unplaced,
                 target::Host::Unknown => records::errors::Host::Unknown,
                 target::Host::Container => records::errors::Host::Container,
                 target::Host::Elsewhere { environment } => records::errors::Host::Elsewhere { environment },

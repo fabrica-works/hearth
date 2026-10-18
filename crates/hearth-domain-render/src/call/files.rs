@@ -104,56 +104,6 @@ impl Side {
 }
 
 impl Side {
-    pub(super) fn files_valid(&self, settings: &crate::compose::Settings) -> bool {
-        for task in &settings.tasks {
-            let Some((_, Some(_))) = self.documents.declaration(&task.name) else {
-                return false;
-            };
-            if !self.defaults.sound(&task.name) {
-                return false;
-            }
-            for (index, entry) in self.entries.iter().enumerate() {
-                let (name, path) = match revision::class(&entry.path) {
-                    revision::Class::Tree { task, path } | revision::Class::Template { task, path } => (task, path),
-                    revision::Class::Script { task, name } => (task, name),
-                    revision::Class::Fleet
-                    | revision::Class::Environment { .. }
-                    | revision::Class::Host { .. }
-                    | revision::Class::Declaration { .. }
-                    | revision::Class::Readme { .. }
-                    | revision::Class::Refused { .. }
-                    | revision::Class::Other => continue,
-                };
-                if name != task.name.as_ref() {
-                    continue;
-                }
-                if self.invalid.get(index) == Some(&true) {
-                    return false;
-                }
-                if self.refused.contains_key(&entry.oid) {
-                    return false;
-                }
-                let present = match entry.mode {
-                    Mode::Link => self.links.contains_key(&entry.oid),
-                    Mode::Submodule => false,
-                    Mode::File | Mode::Executable => {
-                        if path.ends_with(b".j2") {
-                            self.templates.contains_key(&entry.oid)
-                        } else {
-                            self.cached.contains_key(&entry.oid)
-                        }
-                    }
-                };
-                if !present {
-                    return false;
-                }
-            }
-        }
-        true
-    }
-}
-
-impl Side {
     pub(super) fn compose_files(&mut self) {
         let invalid = crate::compose::rules(&self.documents, &mut self.errors);
         for (document, invalid) in self.documents.entries().iter().zip(invalid) {

@@ -1,6 +1,6 @@
 use crate::render;
 #[must_use]
-pub fn composition_kinds() -> [render::errors::Composition; 10] {
+pub fn composition_kinds() -> [render::errors::Composition; 11] {
     use crate::render::errors::{Composition, Host};
     [
         Composition::Duplicate,
@@ -11,6 +11,7 @@ pub fn composition_kinds() -> [render::errors::Composition; 10] {
         Composition::Null,
         Composition::Task,
         Composition::On { on: Box::from(b"host-lab".as_slice()), host: Host::Unknown },
+        Composition::On { on: Box::from(b"host-lab".as_slice()), host: Host::Unplaced },
         Composition::On { on: Box::from(b"host-lab".as_slice()), host: Host::Container },
         Composition::On {
             on: Box::from(b"host-lab".as_slice()),
@@ -48,6 +49,8 @@ pub const RESERVED_RULES: &[render::errors::Rule] = &[
     render::errors::Rule::LiveNone,
     render::errors::Rule::NeverLiveUnit,
     render::errors::Rule::NeverLivePath,
+    render::errors::Rule::HearthContainer,
+    render::errors::Rule::HearthNull,
 ];
 #[must_use]
 pub fn reserved_rules() -> &'static [render::errors::Rule] {

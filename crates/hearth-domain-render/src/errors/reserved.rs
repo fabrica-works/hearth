@@ -35,4 +35,6 @@ pub enum Rule {
     LiveNone,
     NeverLiveUnit,
     NeverLivePath,
+    HearthContainer,
+    HearthNull,
 }

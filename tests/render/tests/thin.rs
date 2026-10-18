@@ -10,7 +10,7 @@ use hearth_render_world::{
 
 #[test]
 fn a_targets_meta_is_its_names_and_the_base_envs_placement() {
-    for seed in 0..8 {
+    for seed in fixtures::COMPOSITION_SEEDS {
         let run = fixtures::render_seeded(&fixtures::x1_prod(), seed);
         let Answer::Spec(spec) = only(&run.answers) else { panic!("one spec: seed {seed}") };
         assert_eq!(spec.meta, fixtures::x1_prod_meta(), "render.md, 4.4: the target's meta");
@@ -25,7 +25,7 @@ fn a_targets_meta_is_its_names_and_the_base_envs_placement() {
 
 #[test]
 fn a_base_env_without_its_environment_is_a_repository_error() {
-    for seed in 0..8 {
+    for seed in fixtures::COMPOSITION_SEEDS {
         let mut repository = fixtures::x1_prod();
         repository.entries.retain(|entry| entry.path.as_ref() != b"envs/prod.json");
         let run = fixtures::render_seeded(&repository, seed);
@@ -46,7 +46,7 @@ fn a_base_env_without_its_environment_is_a_repository_error() {
 
 #[test]
 fn the_base_envs_placement_replaces_the_environments_whole() {
-    for seed in 0..8 {
+    for seed in fixtures::COMPOSITION_SEEDS {
         let mut repository = fixtures::x1_prod();
         let mut placement = fixtures::placement();
         placement.kind = Runs::Vm;
@@ -61,7 +61,7 @@ fn the_base_envs_placement_replaces_the_environments_whole() {
 
 #[test]
 fn a_named_target_not_discovered_ends_the_call_with_usage() {
-    for seed in 0..8 {
+    for seed in fixtures::COMPOSITION_SEEDS {
         let run = fixtures::render_targets(&fixtures::x1_prod(), &[b"unknown"], seed);
         assert_eq!(run.answers, [], "seed {seed}");
         assert_eq!(run.outcome, Outcome::Usage, "seed {seed}");
@@ -70,7 +70,7 @@ fn a_named_target_not_discovered_ends_the_call_with_usage() {
 
 #[test]
 fn a_refused_document_fails_its_targets_and_spares_the_rest() {
-    for seed in 0..8 {
+    for seed in fixtures::COMPOSITION_SEEDS {
         let mut repository = fixtures::two_targets();
         fixtures::set_document(
             &mut repository,
@@ -92,7 +92,7 @@ fn a_refused_document_fails_its_targets_and_spares_the_rest() {
 
 #[test]
 fn targets_are_answered_in_name_order_each_once() {
-    for seed in 0..8 {
+    for seed in fixtures::COMPOSITION_SEEDS {
         let run = fixtures::render_targets(&fixtures::two_targets(), &[b"x1-prod", b"a-b-prod", b"x1-prod"], seed);
         let names: Vec<&[u8]> = run
             .answers
@@ -106,7 +106,7 @@ fn targets_are_answered_in_name_order_each_once() {
         assert_eq!(names, [b"a-b-prod".as_slice(), b"x1-prod"], "prefix-based discovery, seed {seed}");
         assert_eq!(run.outcome, Outcome::Done, "seed {seed}");
         let blobs = fixtures::read_blobs(&run.requests);
-        assert_eq!(blobs.len(), 4, "shared environment read once, seed {seed}");
+        assert_eq!(blobs.len(), 5, "shared environment read once, seed {seed}");
     }
 }
 
@@ -124,7 +124,7 @@ fn a_document_above_its_limit_fails_only_its_targets_before_reading() {
     let blobs = fixtures::read_blobs(&run.requests);
     assert_eq!(
         blobs.iter().map(|b| b.oid.clone()).collect::<Vec<_>>(),
-        [fixtures::oid(b'1'), fixtures::oid(b'4'), fixtures::oid(b'2')]
+        [fixtures::oid(b'1'), fixtures::oid(b'4'), fixtures::oid(b'2'), fixtures::oid(b'h')]
     );
 }
 

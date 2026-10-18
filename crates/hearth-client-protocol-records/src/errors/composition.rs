@@ -12,6 +12,7 @@ pub enum Composition {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Host {
+    Unplaced,
     Unknown,
     Elsewhere { environment: Box<[u8]> },
     Container,
@@ -41,6 +42,7 @@ impl Composition {
                 lines.put(b"placement's on names ");
                 lines.put(on);
                 match host {
+                    Host::Unplaced => lines.put(b", a target with no placement"),
                     Host::Unknown => lines.put(b", no discovered target"),
                     Host::Container => lines.put(b", a container"),
                     Host::Elsewhere { environment } => {
@@ -58,6 +60,7 @@ impl Composition {
             field(json, b"on", on);
             json.key(b"host");
             match host {
+                Host::Unplaced => json.string(b"unplaced"),
                 Host::Unknown => json.string(b"unknown"),
                 Host::Container => json.string(b"container"),
                 Host::Elsewhere { environment } => {

@@ -117,60 +117,42 @@ impl Side {
         schema_errors(&mut self.errors, &self.documents, None, &faults);
     }
 
+    pub(super) fn placement_error(&mut self, error: errors::Error) {
+        if let errors::Kind::Composition(errors::Composition::On { on, host: errors::Host::Unplaced }) = &error.kind
+            && !self.host_valid(on)
+        {
+            self.outcome = self.outcome.worst(crate::vocabulary::Outcome::Failed);
+        } else {
+            self.errors.push(error);
+        }
+    }
+
     pub(super) fn needed(&self, target: &Target) -> bool {
-        if self.names.is_empty() || self.names.contains(&target.name) {
-            return true;
-        }
-        for selected in &self.targets {
-            if self.names.contains(&selected.name)
-                && let Some(placement) = compose::placement(selected, &self.documents)
-                && let Some(on) = placement.on
-                && on.target == target.name
-            {
-                return true;
-            }
-        }
-        false
+        self.names.is_empty() || self.names.contains(&target.name)
     }
 
     pub(super) fn host_valid(&self, name: &[u8]) -> bool {
-        for (index, target) in self.targets.iter().enumerate() {
+        for target in &self.targets {
             if target.name.as_ref() != name {
                 continue;
             }
-            if !self.dependencies_valid(target, index) || compose::placement(target, &self.documents).is_none() {
-                return false;
+            for index in [target.fleet, target.base_document, Some(target.environment_document), Some(target.base_env)]
+                .into_iter()
+                .flatten()
+            {
+                if self.documents.get(index).is_none() {
+                    return false;
+                }
+                for (entry, invalid) in self.entries.iter().zip(&self.invalid) {
+                    if *invalid && self.documents.path(index) == entry.path.as_ref() {
+                        return false;
+                    }
+                }
             }
-            return self.files_valid(self.settings.get(index).expect("host settings"));
+            return true;
         }
         false
     }
-}
-
-pub(super) fn host_schema(
-    name: &[u8],
-    targets: &[Target],
-    settings: &[compose::Settings],
-    revision: &crate::schema::Revision<'_>,
-    validator: &mut crate::schema::Validator,
-    mut left: u64,
-) -> bool {
-    for (target, settings) in targets.iter().zip(settings) {
-        if target.name.as_ref() == name {
-            let names = self::targets(targets, &target.environment);
-            let check = crate::schema::Check::Target { environment: &target.environment, targets: &names };
-            return crate::schema::validate(
-                settings,
-                revision,
-                &check,
-                validator,
-                &mut left,
-                &mut List::with_capacity(16),
-            )
-            .is_some();
-        }
-    }
-    false
 }
 
 pub(super) fn targets(targets: &[Target], environment: &[u8]) -> Box<[Box<[u8]>]> {

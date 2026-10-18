@@ -224,3 +224,18 @@ pub const UNDEFINED_FIELD: crate::entries::Fault = crate::entries::Fault {
     at: FIELD_AT,
     also: None,
 };
+
+/// Expand an ordinary declaration with the shipped target budget.
+pub fn expanded(declared: &Declaration) -> crate::entries::Expanded {
+    expansion(declared, &crate::limits::SHIPPED, crate::limits::SHIPPED.expanded).expect("expand")
+}
+pub fn evaluation_fault(kind: crate::evaluate::FaultKind, at: Position) -> crate::entries::Fault {
+    crate::entries::Fault { kind: crate::errors::Kind::Evaluation(kind), at, also: None }
+}
+pub fn key_collision(key: &[u8], at: Position, first: Position) -> crate::entries::Fault {
+    crate::entries::Fault {
+        kind: crate::errors::Kind::Collision(crate::errors::Collision::Key { key: copy_of(key) }),
+        at,
+        also: Some(first),
+    }
+}

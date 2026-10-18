@@ -35,6 +35,8 @@ pub enum Rule {
     LiveNone,
     NeverLiveUnit,
     NeverLivePath,
+    HearthContainer,
+    HearthNull,
 }
 use crate::form::{json::field, text::Lines};
 use skein_json::writer::Encoder;
@@ -69,6 +71,8 @@ impl Rule {
             Self::LiveNone => b"live_none",
             Self::NeverLiveUnit => b"never_live_unit",
             Self::NeverLivePath => b"never_live_path",
+            Self::HearthContainer => b"hearth_container",
+            Self::HearthNull => b"hearth_null",
         }
     }
 }
@@ -123,6 +127,8 @@ impl Reserved {
             Rule::LiveNone => lines.put(b"action none names no unit (format.md, 5.14)"),
             Rule::NeverLiveUnit => lines.put(b"this core service must not restart live (format.md, 5.14)"),
             Rule::NeverLivePath => lines.put(b"this path must not change live (format.md, 5.14)"),
+            Rule::HearthContainer => lines.put(b"a container has no hearth task (format.md, 5.12)"),
+            Rule::HearthNull => lines.put(b"the hearth task cannot be removed (format.md, 5.12)"),
         }
     }
     pub(super) fn json(&self, json: &mut Encoder) {

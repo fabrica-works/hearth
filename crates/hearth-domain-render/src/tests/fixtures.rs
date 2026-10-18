@@ -156,6 +156,12 @@ pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
     let host = Oid(bytes::copy_of(b"host"));
     call.entries = Box::new([
         crate::revision::Entry {
+            path: bytes::copy_of(b"tasks/hearth/task.json"),
+            mode: crate::revision::Mode::File,
+            oid: Oid(bytes::copy_of(b"hearth")),
+            size: 2,
+        },
+        crate::revision::Entry {
             path: bytes::copy_of(b"hosts/x1/x1.json"),
             mode: crate::revision::Mode::File,
             oid: base.clone(),
@@ -205,6 +211,14 @@ pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
                 tasks: Box::new([Task { name: bytes::copy_of(b"motd"), at, value: composition::null(at) }]),
             },
         },
+    );
+    call.documents.set_declaration(&Oid(bytes::copy_of(b"hearth")), declaration(&[], &[]));
+    call.defaults = crate::schema::declarations(
+        &call.documents,
+        &call.entries,
+        &mut call.validator,
+        &mut call.merge,
+        &mut skein_lib::List::with_capacity(SCHEMA_FAULTS),
     );
     let target = crate::compose::Target {
         name: bytes::copy_of(b"x1-prod"),
@@ -654,7 +668,7 @@ pub fn template_call(path: &[u8], mode: crate::revision::Mode, size: u64, limits
     call.targets = Box::new([target]);
     call.made = skein_lib::Map::with_capacity(limits.targets);
     call.commit = Some(crate::revision::Oid(bytes::copy_of(b"commit")));
-    let mut entries = skein_lib::List::with_capacity(4);
+    let mut entries = skein_lib::List::with_capacity(TEMPLATE_ENTRIES);
     for entry in call.entries {
         entries.push(entry).expect("four entries");
     }
@@ -679,7 +693,7 @@ pub fn template_call(path: &[u8], mode: crate::revision::Mode, size: u64, limits
 
 pub fn shared_template_call() -> crate::call::Side {
     let mut call = template_call(b"tasks/motd/tree/etc/issue.j2", crate::revision::Mode::File, 20, limits::SHIPPED);
-    let mut entries = skein_lib::List::with_capacity(5);
+    let mut entries = skein_lib::List::with_capacity(SHARED_TEMPLATE_ENTRIES);
     for entry in call.entries {
         entries.push(entry).expect("five entries");
     }
@@ -773,3 +787,6 @@ mod part_changes;
 pub use part_changes::*;
 
 pub mod reserved;
+
+mod hearth;
+pub use hearth::*;

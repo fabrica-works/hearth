@@ -5,6 +5,7 @@ use hearth_domain_render::{
 };
 use skein_lib::Rng;
 const DECLARATIONS: &[(&[u8], &[u8])] = &[
+    (b"tasks/hearth/task.json", b"{}"),
     (b"tasks/vpn/task.json", br#"{"settings":{"x":{"type":"int","doc":"X."}},"exports":{"port":{"type":"int","value":"{{ settings.x }}","doc":"Port."}}}"#),
     (b"tasks/reader/task.json", br#"{"reads":{"vpn":{"exports":true}}}"#),
 ];

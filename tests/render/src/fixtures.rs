@@ -42,11 +42,13 @@ pub fn x1_prod() -> Repository {
             entry(b"envs/prod.json", b'1'),
             entry(b"hosts/x1/x1.json", b'2'),
             entry(b"hosts/x1/x1-prod.json", b'3'),
+            entry(b"tasks/hearth/task.json", b'h'),
         ],
         documents: vec![
             (oid(b'1'), document(None)),
             (oid(b'2'), document(None)),
             (oid(b'3'), document(Some(placement()))),
+            (oid(b'h'), Decoded::Declaration(crate::declarations::decode(b"{}"))),
         ],
     }
 }
@@ -379,7 +381,7 @@ pub fn unused_object_typo() -> Repository {
 #[must_use]
 pub fn containers() -> Repository {
     let mut repository = two_targets();
-    container_on_host(&mut repository);
+    container_on_host(&mut repository, b"a-b-prod");
     repository
 }
 
@@ -387,7 +389,7 @@ pub fn containers() -> Repository {
 pub fn container_with_unsound_host() -> Repository {
     use hearth_domain_render::revision::Kind;
     let mut repository = with_int_setting();
-    container_on_host(&mut repository);
+    container_on_host(&mut repository, b"a-b-prod");
     repository.entries.push(entry(b"hosts/a-b/a-b-prod.json", b'5'));
     let Decoded::Document(mut host) = task_patch(b"motd", b"x", Kind::String(Box::from(b"bad".as_slice()))) else {
         panic!("document")
@@ -397,15 +399,13 @@ pub fn container_with_unsound_host() -> Repository {
     repository
 }
 
-fn container_on_host(repository: &mut Repository) {
+fn container_on_host(repository: &mut Repository, on: &[u8]) {
     let mut placed = placement();
     placed.kind = Runs::Container;
     placed.firmware = None;
     placed.hardware = None;
-    placed.on = Some(hearth_domain_render::revision::On {
-        target: Box::from(b"a-b-prod".as_slice()),
-        at: Position { line: 1, column: 43 },
-    });
+    placed.on =
+        Some(hearth_domain_render::revision::On { target: Box::from(on), at: Position { line: 1, column: 43 } });
     set_document(repository, b'3', document(Some(placed)));
 }
 
@@ -622,3 +622,20 @@ pub fn template_and_link() -> Repository {
 mod resolution;
 pub use resolution::configuration_requests;
 pub mod exports;
+
+/// Composition stories sample eight deterministic schedules.
+pub const COMPOSITION_SEEDS: core::ops::Range<u64> = 0..8;
+
+#[must_use]
+pub fn container_with_on(on: &[u8]) -> Repository {
+    let mut repository = two_targets();
+    container_on_host(&mut repository, on);
+    repository
+}
+#[must_use]
+pub fn on_error(on: &[u8], host: hearth_domain_render::errors::Host) -> hearth_domain_render::errors::Kind {
+    hearth_domain_render::errors::Kind::Composition(hearth_domain_render::errors::Composition::On {
+        on: Box::from(on),
+        host,
+    })
+}

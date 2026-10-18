@@ -457,3 +457,14 @@ mod part_changes;
 pub use part_changes::*;
 
 pub mod reserved;
+
+pub fn print(record: &crate::records::Record) -> Result<Box<[u8]>, crate::form::Refusal> {
+    crate::form::print(crate::form::Form::Text, record, Some(crate::records::Type::Error), &crate::limits::SHIPPED)
+}
+pub fn terminal(left_out: u32) -> crate::records::Record {
+    crate::records::Record::Terminal(crate::records::Terminal {
+        outcome: crate::outcome::Outcome::Failed,
+        diff: None,
+        left_out,
+    })
+}

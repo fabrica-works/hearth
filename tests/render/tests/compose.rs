@@ -8,12 +8,12 @@ use hearth_render_world::{
 };
 #[test]
 fn render_lists_once_then_reads_every_configuration_document_once() {
-    for seed in 0..8 {
+    for seed in fixtures::COMPOSITION_SEEDS {
         let mut repository = fixtures::two_targets();
         repository.entries.push(fixtures::entry(b"fleet.json", b'5'));
         repository.documents.push((fixtures::oid(b'5'), fixtures::document(None)));
         repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
-        let run = parent::run(&repository, &[b"x1-prod"], seed);
+        let run = fixtures::render_targets(&repository, &[b"x1-prod"], seed);
         let requests = fixtures::configuration_requests(&run.requests);
         let [Request::List { .. }, Request::Read { blobs, .. }, Request::Keep { .. }] = requests.as_slice() else {
             panic!("list, documents, then render-owned initramfs")
@@ -25,7 +25,8 @@ fn render_lists_once_then_reads_every_configuration_document_once() {
                 b"5555555555555555555555555555555555555555",
                 b"4444444444444444444444444444444444444444",
                 b"3333333333333333333333333333333333333333",
-                b"2222222222222222222222222222222222222222"
+                b"2222222222222222222222222222222222222222",
+                b"hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
             ],
             "seed {seed}"
         );
@@ -33,14 +34,14 @@ fn render_lists_once_then_reads_every_configuration_document_once() {
 }
 #[test]
 fn fleet_and_environment_keys_never_add_a_task() {
-    for seed in 0..8 {
+    for seed in fixtures::COMPOSITION_SEEDS {
         let mut repository = fixtures::with_task();
         fixtures::set_document(&mut repository, b'2', fixtures::document(None));
         repository.entries.push(fixtures::entry(b"fleet.json", b'5'));
         repository.documents.push((fixtures::oid(b'5'), fixtures::tasks(&[(b"motd", false)], None)));
         fixtures::set_document(&mut repository, b'1', fixtures::tasks(&[(b"motd", false)], None));
         repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
-        let run = parent::run(&repository, &[], seed);
+        let run = fixtures::render_seeded(&repository, seed);
         let Answer::Spec(spec) = only(&run.answers) else { panic!("spec") };
         let config = hearth_render_world::fixtures::config_part(&spec.parts);
         assert_eq!(config.tree.as_ref(), [], "seed {seed}");
@@ -50,7 +51,7 @@ fn fleet_and_environment_keys_never_add_a_task() {
 }
 #[test]
 fn documents_past_the_revision_s_budget_fail_the_call() {
-    for seed in 0..8 {
+    for seed in fixtures::COMPOSITION_SEEDS {
         let mut repository = fixtures::x1_prod();
         for entry in &mut repository.entries {
             entry.size = 24;
@@ -87,8 +88,8 @@ fn targets_are_discovered_from_every_base_s_members() {
     repository.entries.push(fixtures::entry(b"hosts/stoa/stoa.json", b'5'));
     repository.documents.push((fixtures::oid(b'4'), fixtures::document(Some(fixtures::placement()))));
     repository.documents.push((fixtures::oid(b'5'), fixtures::members(&[(b"a", false), (b"b", false)])));
-    for seed in 0..8 {
-        let run = parent::run(&repository, &[], seed);
+    for seed in fixtures::COMPOSITION_SEEDS {
+        let run = fixtures::render_seeded(&repository, seed);
         let names: Vec<_> = run
             .answers
             .iter()
@@ -130,8 +131,8 @@ fn a_container_whose_host_failed_is_left_out_without_an_error() {
         b'4',
         Decoded::Refused { at: Position { line: 1, column: 2 }, fault: Decode::Unexpected, also: None },
     );
-    for seed in 0..8 {
-        let run = parent::run(&repository, &[], seed);
+    for seed in fixtures::COMPOSITION_SEEDS {
+        let run = fixtures::render_seeded(&repository, seed);
         let Answer::Error(error) = only(&run.answers) else { panic!("host error") };
         assert_eq!(error.kind, hearth_domain_render::errors::Kind::Decode(Decode::Unexpected), "seed {seed}");
         assert_eq!(run.outcome, Outcome::Failed, "seed {seed}");
@@ -140,8 +141,8 @@ fn a_container_whose_host_failed_is_left_out_without_an_error() {
 #[test]
 fn a_selected_container_uses_its_unselected_host() {
     let repository = fixtures::containers();
-    for seed in 0..8 {
-        let run = parent::run(&repository, &[b"x1-prod"], seed);
+    for seed in fixtures::COMPOSITION_SEEDS {
+        let run = fixtures::render_targets(&repository, &[b"x1-prod"], seed);
         let Answer::Spec(spec) = only(&run.answers) else { panic!("selected container") };
         assert_eq!(spec.meta.target.as_ref(), b"x1-prod", "seed {seed}");
         assert_eq!(spec.meta.placement.on.as_deref(), Some(b"a-b-prod".as_slice()), "seed {seed}");
@@ -149,11 +150,47 @@ fn a_selected_container_uses_its_unselected_host() {
     }
 }
 #[test]
-fn a_container_whose_unselected_host_s_settings_failed_is_left_out_without_an_error() {
+fn a_container_renders_whatever_else_fails_on_its_host() {
     let repository = fixtures::container_with_unsound_host();
-    for seed in 0..8 {
-        let run = parent::run(&repository, &[b"x1-prod"], seed);
-        assert_eq!(run.answers, [], "seed {seed}");
+    for seed in fixtures::COMPOSITION_SEEDS {
+        let run = fixtures::render_targets(&repository, &[b"x1-prod"], seed);
+        let Answer::Spec(spec) = only(&run.answers) else { panic!("container") };
+        assert_eq!(spec.meta.target.as_ref(), b"x1-prod", "seed {seed}");
+        assert_eq!(run.outcome, Outcome::Done, "seed {seed}");
+    }
+}
+
+#[test]
+fn a_container_on_an_unplaced_host_errs_at_on() {
+    let mut repository = fixtures::containers();
+    fixtures::set_document(&mut repository, b'4', fixtures::document(None));
+    for seed in fixtures::COMPOSITION_SEEDS {
+        let run = fixtures::render_targets(&repository, &[b"x1-prod"], seed);
+        let Answer::Error(error) = only(&run.answers) else { panic!("on error") };
+        assert_eq!(
+            error.kind,
+            fixtures::on_error(b"a-b-prod", hearth_domain_render::errors::Host::Unplaced),
+            "seed {seed}"
+        );
+        assert_eq!(
+            error.at.as_ref().expect("on").position,
+            Some(hearth_domain_render::revision::Position { line: 1, column: 43 }),
+            "seed {seed}"
+        );
         assert_eq!(run.outcome, Outcome::Failed, "seed {seed}");
+    }
+}
+
+const HOST_ERRORS: &[(&[u8], hearth_domain_render::errors::Host)] = &[
+    (b"missing-prod", hearth_domain_render::errors::Host::Unknown),
+    (b"x1-prod", hearth_domain_render::errors::Host::Container),
+];
+#[test]
+fn host_document_checks_preserve_the_on_errors() {
+    for (row, (on, expected)) in HOST_ERRORS.iter().enumerate() {
+        let repository = fixtures::container_with_on(on);
+        let run = fixtures::render_targets(&repository, &[b"x1-prod"], 0);
+        let Answer::Error(error) = only(&run.answers) else { panic!("on error") };
+        assert_eq!(error.kind, fixtures::on_error(on, expected.clone()), "row {row}");
     }
 }

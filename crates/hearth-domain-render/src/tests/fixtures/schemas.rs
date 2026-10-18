@@ -62,7 +62,7 @@ pub fn defaults(declaration: &Declaration) -> (Defaults, DeclarationFaults) {
 }
 pub fn defaults_with_listing(declaration: &Declaration, listing: &[revision::Entry]) -> (Defaults, DeclarationFaults) {
     let documents = declarations(&[(b"task", Some(declaration.clone()))]);
-    let mut faults = skein_lib::List::with_capacity(16);
+    let mut faults = schema_faults();
     let defaults = schema::declarations(
         &documents,
         listing,
@@ -85,7 +85,7 @@ pub fn validate_with(
     let (defaults, errors) = defaults_with_listing(declaration, listing);
     assert_eq!(errors.as_ref(), &[], "fixture defaults are sound");
     let against = Against { declaration, defaults: defaults.of(b"task").expect("sound fixture"), listing };
-    let mut faults = skein_lib::List::with_capacity(16);
+    let mut faults = schema_faults();
     let mut left = u64::MAX;
     match Validator::new(limits).settings(value, &against, check, &mut left, &mut faults) {
         Some(value) => Ok(value),
@@ -161,7 +161,7 @@ pub fn target_schema(tasks: &[(&[u8], Declaration)], values: &[(&[u8], revision:
         declared.push((*name, Some(declaration.clone()))).expect("task count");
     }
     let documents = declarations(declared.as_slice());
-    let mut faults = skein_lib::List::with_capacity(16);
+    let mut faults = schema_faults();
     let defaults = schema::declarations(
         &documents,
         documents.entries(),
@@ -175,7 +175,7 @@ pub fn target_schema(tasks: &[(&[u8], Declaration)], values: &[(&[u8], revision:
         let settings = composed(value);
         let from = crate::compose::Provenance { at: at(2, 2), ..settings.from };
         present
-            .push(crate::compose::Present { name: skein_lib::bytes::copy_of(name), from, settings })
+            .push(crate::compose::Present { implicit: false, name: skein_lib::bytes::copy_of(name), from, settings })
             .expect("task count");
     }
     TargetSchema { documents, defaults, settings: crate::compose::Settings { tasks: present.into_boxed() } }
@@ -187,7 +187,7 @@ pub fn target_roots(
     let revision = schema::Revision { documents: &input.documents, defaults: &input.defaults, listing: &[] };
     let check = Check::Target { environment: b"prod", targets: &[] };
     let mut validator = Validator::new(limits);
-    let mut faults = skein_lib::List::with_capacity(16);
+    let mut faults = schema_faults();
     let mut left = limits.validated;
     let value = schema::validate(&input.settings, &revision, &check, &mut validator, &mut left, &mut faults);
     (value, faults.into_boxed(), validator.limited())
@@ -279,4 +279,8 @@ pub fn nulled_accounts() -> (Declaration, Layers) {
         declaration,
         Layers { fleet: map(at(2, 1), &[]), base: patch, environment: map(at(3, 1), &[]), overlay: map(at(4, 1), &[]) },
     )
+}
+
+fn schema_faults<T>() -> skein_lib::List<T> {
+    skein_lib::List::with_capacity(super::SCHEMA_FAULTS)
 }

@@ -1,18 +1,19 @@
-use super::fixtures::{
-    composition::{at, int, map, null, string},
-    only,
-};
+use super::fixtures;
 use crate::{
-    compose::{Composite, Layer, Merge, Provenance},
+    compose::{Composite, Layer, Provenance},
     limits,
     revision::{Kind, Value},
+};
+use fixtures::{
+    composition::{at, int, map, null, string},
+    only,
 };
 
 #[test]
 fn a_later_layer_s_scalar_replaces_and_keeps_its_own_place() {
     let fleet = map(at(1, 1), &[(b"port", at(1, 2), int(at(1, 10), 22))]);
     let base = map(at(3, 3), &[(b"port", at(3, 4), int(at(3, 12), 10_127))]);
-    let mut merge = Merge::new(&limits::SHIPPED);
+    let mut merge = fixtures::composition_merge();
     let composed = merge.merge(None, &fleet, Layer::Fleet, 0);
     let composed = merge.merge(composed, &base, Layer::Base, 2).expect("map");
     let Composite::Map(pairs) = &composed.kind else { panic!("map") };
@@ -37,7 +38,7 @@ fn null_removes_its_key_at_any_depth_and_never_stays() {
         at(2, 1),
         &[(b"a", at(2, 2), null(at(2, 5))), (b"b", at(2, 8), map(at(2, 12), &[(b"c", at(2, 13), null(at(2, 16)))]))],
     );
-    let mut merge = Merge::new(&limits::SHIPPED);
+    let mut merge = fixtures::composition_merge();
     let composed = merge.merge(None, &fleet, Layer::Fleet, 0);
     let composed = merge.merge(composed, &base, Layer::Base, 1).expect("map");
     let Composite::Map(pairs) = composed.kind else { panic!("map") };
@@ -48,7 +49,7 @@ const REPLACEMENTS: &[(Kind, Composite)] =
     &[(Kind::Bool(true), Composite::Bool(true)), (Kind::Int(42), Composite::Int(42))];
 #[test]
 fn a_list_or_a_scalar_patch_replaces_whole() {
-    let mut merge = Merge::new(&limits::SHIPPED);
+    let mut merge = fixtures::composition_merge();
     for (kind, expected) in REPLACEMENTS {
         let target = merge.merge(None, &map(at(1, 1), &[]), Layer::Fleet, 0);
         let composed =
@@ -58,7 +59,7 @@ fn a_list_or_a_scalar_patch_replaces_whole() {
 }
 #[test]
 fn a_list_patch_replaces_whole_and_keeps_its_elements_places() {
-    let mut merge = Merge::new(&limits::SHIPPED);
+    let mut merge = fixtures::composition_merge();
     let target = merge.merge(None, &string(at(1, 1), b"old"), Layer::Fleet, 0);
     let patch = Value { at: at(2, 1), kind: Kind::List(Box::new([int(at(2, 2), 7)])) };
     let composed = merge.merge(target, &patch, Layer::Base, 1).expect("list");
@@ -71,7 +72,7 @@ fn a_list_patch_replaces_whole_and_keeps_its_elements_places() {
 }
 #[test]
 fn an_object_patch_over_a_scalar_makes_a_new_object() {
-    let mut merge = Merge::new(&limits::SHIPPED);
+    let mut merge = fixtures::composition_merge();
     let target = merge.merge(None, &int(at(1, 1), 42), Layer::Fleet, 0);
     let patch = map(at(2, 1), &[(b"gone", at(2, 2), null(at(2, 10)))]);
     let composed = merge.merge(target, &patch, Layer::Base, 1).expect("map");
@@ -87,7 +88,7 @@ fn a_merge_at_the_shipped_depth_fits_its_stack() {
     for _ in 0..limits::SHIPPED.depth {
         patch = map(at(1, 1), &[(b"nested", at(1, 2), patch)]);
     }
-    let mut merge = Merge::new(&limits::SHIPPED);
+    let mut merge = fixtures::composition_merge();
     let composed = merge.merge(None, &patch, Layer::Fleet, 0).expect("deep map");
     let composed = merge.merge(Some(composed), &patch, Layer::Base, 1).expect("patched deep map");
     let mut value = &composed;
@@ -100,21 +101,17 @@ fn a_merge_at_the_shipped_depth_fits_its_stack() {
 
 #[test]
 fn a_base_with_members_makes_one_target_per_member() {
-    use super::fixtures;
     let documents = fixtures::member_documents(Some(fixtures::members(&[(b"2", false), (b"1", false)])), None);
-    let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
-    let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
+    let discovered = fixtures::discover(&documents);
     assert_eq!(discovered.names.as_ref(), &[Box::from(b"stoa-1-lab".as_slice()), Box::from(b"stoa-2-lab".as_slice())]);
 }
 #[test]
 fn a_base_env_adds_removes_and_changes_members() {
-    use super::fixtures;
     let documents = fixtures::member_documents(
         Some(fixtures::members(&[(b"1", false), (b"2", false), (b"3", true)])),
         Some(fixtures::members(&[(b"1", false), (b"2", true), (b"4", false)])),
     );
-    let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
-    let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
+    let discovered = fixtures::discover(&documents);
     assert_eq!(discovered.names.as_ref(), &[Box::from(b"stoa-1-lab".as_slice()), Box::from(b"stoa-4-lab".as_slice())]);
 }
 const MEMBER_LAYERS: &[([Option<i64>; 5], Composite)] = &[
@@ -126,18 +123,17 @@ const MEMBER_LAYERS: &[([Option<i64>; 5], Composite)] = &[
 ];
 #[test]
 fn a_member_s_layers_follow_its_base_s_and_base_env_s() {
-    use super::fixtures;
     for (row, (values, expected)) in MEMBER_LAYERS.iter().enumerate() {
         let documents = fixtures::member_layers(*values);
-        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+        let mut errors = fixtures::composition_collector();
         let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
         let settings = crate::compose::compose(
             only(&discovered.targets),
             &documents,
             &crate::schema::Defaults::new(),
-            &mut Merge::new(&limits::SHIPPED),
+            &mut fixtures::composition_merge(),
         );
-        let Composite::Map(pairs) = &only(&settings.tasks).settings.kind else { panic!("task settings") };
+        let Composite::Map(pairs) = &fixtures::task_of(&settings).settings.kind else { panic!("task settings") };
         assert_eq!(&only(pairs).value.kind, expected, "row {row}: member layer order");
     }
 }
@@ -147,11 +143,10 @@ const LONG_MEMBERS: &[&[u8]] = &[
 ];
 #[test]
 fn a_target_name_past_63_bytes_is_refused() {
-    use super::fixtures;
     for (row, &name) in LONG_MEMBERS.iter().enumerate() {
         let input = (name, false);
         let documents = fixtures::member_documents(Some(fixtures::members(core::slice::from_ref(&input))), None);
-        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+        let mut errors = fixtures::composition_collector();
         let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("bounded count");
         assert_eq!(discovered.targets.as_ref(), [], "row {row}");
         assert_eq!(
@@ -163,7 +158,6 @@ fn a_target_name_past_63_bytes_is_refused() {
 }
 #[test]
 fn two_targets_of_one_name_fail_both_with_one_error() {
-    use super::fixtures;
     use crate::{
         errors::{Class, Composition, Error, Kind, Place},
         revision::{Document, Layer, Position},
@@ -176,7 +170,7 @@ fn two_targets_of_one_name_fail_both_with_one_error() {
         b"hosts/stoa-1/stoa-1-lab.json",
         Document { at: at(1, 1), members: None, layer: Layer { debian: None, placement: None, tasks: Box::new([]) } },
     );
-    let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+    let mut errors = fixtures::composition_collector();
     assert_eq!(
         crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("bounded count").targets.as_ref(),
         []
@@ -200,7 +194,7 @@ fn two_targets_of_one_name_fail_both_with_one_error() {
 
 #[test]
 fn the_defaults_lie_under_every_document_of_a_target() {
-    use super::fixtures::schemas::{self, Layers};
+    use fixtures::schemas::{self, Layers};
     let mut declaration = schemas::typed_declaration(crate::revision::declaration::Form::Int);
     declaration.settings = Box::new([crate::revision::declaration::Spec {
         default: Some(int(at(1, 20), 1)),
@@ -215,8 +209,8 @@ fn the_defaults_lie_under_every_document_of_a_target() {
             overlay: map(at(5, 1), &[]),
         },
     );
-    let settings = crate::compose::compose(&target, &documents, &defaults, &mut Merge::new(&limits::SHIPPED));
-    let Composite::Map(entries) = &only(&settings.tasks).settings.kind else { panic!("settings") };
+    let settings = fixtures::composed_settings(&target, &documents, &defaults);
+    let Composite::Map(entries) = &fixtures::task_of(&settings).settings.kind else { panic!("settings") };
     assert_eq!(
         only(entries).value,
         crate::compose::Composed {
@@ -231,24 +225,24 @@ fn the_defaults_lie_under_every_document_of_a_target() {
 }
 #[test]
 fn null_removes_a_default_map_s_entry() {
-    use super::fixtures::schemas;
+    use fixtures::schemas;
     let (declaration, layers) = schemas::nulled_accounts();
     let (target, documents, defaults) = schemas::layers(&declaration, layers);
-    let settings = crate::compose::compose(&target, &documents, &defaults, &mut Merge::new(&limits::SHIPPED));
-    let Composite::Map(settings) = &only(&settings.tasks).settings.kind else { panic!("settings") };
+    let settings = fixtures::composed_settings(&target, &documents, &defaults);
+    let Composite::Map(settings) = &fixtures::task_of(&settings).settings.kind else { panic!("settings") };
     let Composite::Map(accounts) = &only(settings).value.kind else { panic!("accounts") };
     assert_eq!(only(accounts).key.as_ref(), b"bob");
 }
 #[test]
 fn a_nulled_field_gets_its_default_back() {
-    use super::fixtures::schemas;
     use crate::evaluate::Value as V;
+    use fixtures::schemas;
     let (declaration, layers) = schemas::nulled_accounts();
     let (target, documents, defaults) = schemas::layers(&declaration, layers);
-    let settings = crate::compose::compose(&target, &documents, &defaults, &mut Merge::new(&limits::SHIPPED));
+    let settings = fixtures::composed_settings(&target, &documents, &defaults);
     let value = schemas::validate(
         &declaration,
-        &only(&settings.tasks).settings,
+        &fixtures::task_of(&settings).settings,
         &crate::schema::Check::Target { environment: b"prod", targets: &[] },
     )
     .expect("valid accounts");
@@ -267,33 +261,21 @@ fn a_nulled_field_gets_its_default_back() {
 const DEFAULTS: &[&[u8]] = &[b"fleet.json", b"envs/lab.json"];
 #[test]
 fn null_for_a_task_in_a_default_is_refused_at_its_key() {
-    use super::fixtures;
     for (row, path) in DEFAULTS.iter().enumerate() {
         let documents = fixtures::rule_document(path, b"motd", true, false, false);
-        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
-        crate::compose::rules(&documents, &mut errors);
-        let errors = errors.finish().0;
+        let errors = fixtures::composition_rules(&documents);
         assert_eq!(only(&errors).kind, crate::errors::Kind::Composition(crate::errors::Composition::Null), "row {row}");
         assert_eq!(only(&errors).at.as_ref().expect("key").position, Some(at(1, 2)), "row {row}");
         assert_eq!(only(&errors).task.as_deref(), Some(b"motd".as_slice()), "row {row}");
     }
-}
-#[test]
-fn a_null_hearth_is_no_compose_error() {
-    let documents = super::fixtures::rule_document(b"fleet.json", b"hearth", true, false, false);
-    let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
-    crate::compose::rules(&documents, &mut errors);
-    assert_eq!(errors.finish().0.as_ref(), []);
 }
 const BASE_PLACEMENTS: &[(&[u8], bool)] =
     &[(b"fleet.json", false), (b"hosts/stoa/stoa.json", false), (b"hosts/stoa/stoa.json", true)];
 #[test]
 fn placement_in_fleet_json_or_a_base_is_refused() {
     for (row, &(path, member)) in BASE_PLACEMENTS.iter().enumerate() {
-        let documents = super::fixtures::rule_document(path, b"", false, true, member);
-        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
-        crate::compose::rules(&documents, &mut errors);
-        let errors = errors.finish().0;
+        let documents = fixtures::rule_document(path, b"", false, true, member);
+        let errors = fixtures::composition_rules(&documents);
         let error = only(&errors);
         assert_eq!(error.kind, crate::errors::Kind::Composition(crate::errors::Composition::Placement), "row {row}");
         assert_eq!(error.at.as_ref().expect("placement").position, Some(at(1, 2)), "row {row}");
@@ -302,10 +284,8 @@ fn placement_in_fleet_json_or_a_base_is_refused() {
 #[test]
 fn members_in_fleet_json_or_an_environment_is_refused() {
     for (row, path) in DEFAULTS.iter().enumerate() {
-        let documents = super::fixtures::rule_document(path, b"", false, false, true);
-        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
-        crate::compose::rules(&documents, &mut errors);
-        let errors = errors.finish().0;
+        let documents = fixtures::rule_document(path, b"", false, false, true);
+        let errors = fixtures::composition_rules(&documents);
         assert_eq!(
             only(&errors).kind,
             crate::errors::Kind::Composition(crate::errors::Composition::Members),
@@ -316,25 +296,18 @@ fn members_in_fleet_json_or_an_environment_is_refused() {
 }
 #[test]
 fn a_target_without_placement_fails_with_its_error() {
-    let documents = super::fixtures::member_documents(None, None);
-    let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
-    let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
+    let documents = fixtures::member_documents(None, None);
+    let discovered = fixtures::discover(&documents);
     let error =
         crate::compose::placed(only(&discovered.targets), &documents, &discovered.targets).expect_err("unplaced");
     assert_eq!(error.kind, crate::errors::Kind::Composition(crate::errors::Composition::Unplaced));
     assert_eq!(error.at.expect("base-env").path.as_ref(), b"hosts/stoa/stoa-lab.json");
 }
-type HostCase = (&'static [u8], (&'static str, Option<&'static [u8]>));
-const HOSTS: &[HostCase] = &[
-    (b"absent-lab", ("unknown", None)),
-    (b"rhi-prod", ("elsewhere", Some(b"prod"))),
-    (b"chat-lab", ("container", None)),
-];
 #[test]
 fn a_container_s_on_names_a_non_container_of_its_environment() {
-    for (row, (on, expected)) in HOSTS.iter().enumerate() {
-        let documents = super::fixtures::container_documents(on);
-        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
+    for (row, (on, expected)) in fixtures::host_cases().into_iter().enumerate() {
+        let documents = fixtures::container_documents(on);
+        let mut errors = fixtures::composition_collector();
         let discovered = crate::compose::targets(&documents, &limits::SHIPPED, &mut errors).expect("targets");
         let mut target = None;
         for each in &discovered.targets {
@@ -347,13 +320,8 @@ fn a_container_s_on_names_a_non_container_of_its_environment() {
         let crate::errors::Kind::Composition(crate::errors::Composition::On { on: name, host }) = &error.kind else {
             panic!("on error")
         };
-        assert_eq!(name.as_ref(), *on, "row {row}");
-        let host = match host {
-            crate::errors::Host::Unknown => ("unknown", None),
-            crate::errors::Host::Container => ("container", None),
-            crate::errors::Host::Elsewhere { environment } => ("elsewhere", Some(environment.as_ref())),
-        };
-        assert_eq!(&host, expected, "row {row}");
+        assert_eq!(name.as_ref(), on, "row {row}");
+        assert_eq!(*host, expected, "row {row}");
         assert_eq!(error.at.expect("on").position, Some(at(1, 43)), "row {row}");
     }
 }
@@ -366,17 +334,15 @@ const TASK_DOCUMENTS: &[(&[u8], bool)] = &[
 #[test]
 fn a_task_named_that_does_not_exist_is_refused_at_its_key() {
     for (row, &(path, member)) in TASK_DOCUMENTS.iter().enumerate() {
-        let documents = super::fixtures::rule_document(path, b"missing", false, false, member);
-        let mut errors = crate::errors::Collector::new(&limits::SHIPPED);
-        crate::compose::rules(&documents, &mut errors);
-        let errors = errors.finish().0;
+        let documents = fixtures::rule_document(path, b"missing", false, false, member);
+        let errors = fixtures::composition_rules(&documents);
         assert_eq!(only(&errors).kind, crate::errors::Kind::Composition(crate::errors::Composition::Task), "row {row}");
         assert_eq!(only(&errors).at.as_ref().expect("task").position, Some(at(1, 2)), "row {row}");
         assert_eq!(only(&errors).task.as_deref(), Some(b"missing".as_slice()), "row {row}");
     }
 }
 
-use super::fixtures::containers;
+use fixtures::containers;
 #[test]
 fn containers_are_the_targets_placed_on_a_host_in_name_order() {
     let mut fleet = containers::fleet();
@@ -415,7 +381,7 @@ fn a_containers_placement_map_leaves_absent_fields_out() {
 #[test]
 fn a_base_envs_placement_replaces_the_environments_for_containers() {
     let fleet = containers::fleet();
-    let documents = super::fixtures::with_document(
+    let documents = fixtures::with_document(
         &fleet.documents,
         b"envs/prod.json",
         containers::document(Some(containers::placement(Some(b"empty-prod")))),
@@ -426,7 +392,7 @@ fn a_base_envs_placement_replaces_the_environments_for_containers() {
 }
 #[test]
 fn a_container_with_a_refused_placement_fails_its_host() {
-    let fleet = containers::discovered(super::fixtures::container_documents(b"vm-lab"));
+    let fleet = containers::discovered(fixtures::container_documents(b"vm-lab"));
     let error = containers::on(&fleet, b"stoa-lab").expect_err("a container cannot host chat");
     assert_eq!(
         error.kind,
@@ -437,3 +403,5 @@ fn a_container_with_a_refused_placement_fails_its_host() {
     );
     assert_eq!(error.target.as_deref(), Some(b"stoa-lab".as_slice()));
 }
+
+mod hearth;

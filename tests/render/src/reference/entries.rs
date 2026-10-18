@@ -11,9 +11,10 @@ pub fn expand(tree: &Tree, roots: &Roots, limits: &Limits) -> Expansion {
     let mut roots = roots.clone();
     roots.bindings.clear();
     let mut groups = Vec::new();
-    let mut seen = BTreeSet::new();
+    let mut keys = Keys { seen: BTreeSet::new(), count: 0 };
     let mut left = limits.expanded;
     for declaration in &tree.0 {
+        keys.seen.clear();
         let mut entries = Vec::new();
         let mut contexts = Vec::new();
         match &declaration.each {
@@ -40,7 +41,7 @@ pub fn expand(tree: &Tree, roots: &Roots, limits: &Limits) -> Expansion {
             }
         }
         for context in &contexts {
-            entry(declaration, context, limits, &mut seen, &mut left, &mut entries)?;
+            entry(declaration, context, limits, &mut keys, &mut left, &mut entries)?;
         }
         entries.sort_by(|a, b| a.key.cmp(&b.key));
         groups.push(Group { map: declaration.map, entries });
@@ -50,11 +51,15 @@ pub fn expand(tree: &Tree, roots: &Roots, limits: &Limits) -> Expansion {
 fn evaluate(tree: &Expression, roots: &Roots, limits: &Limits) -> Result<Option<Value>, &'static str> {
     super::expression(tree, roots, limits, &mut { limits.made }).map(|made| made.value)
 }
+struct Keys {
+    seen: BTreeSet<Vec<u8>>,
+    count: u32,
+}
 fn entry(
     declaration: &Declaration,
     roots: &Roots,
     limits: &Limits,
-    seen: &mut BTreeSet<Vec<u8>>,
+    keys: &mut Keys,
     left: &mut u64,
     entries: &mut Vec<Concrete>,
 ) -> Result<(), &'static str> {
@@ -63,13 +68,14 @@ fn entry(
     {
         return Ok(());
     }
-    if seen.len() >= limits.expansion as usize {
+    if keys.count >= limits.expansion {
         return Err("limit");
     }
     let key = text(&declaration.key, roots, limits, left)?;
-    if !seen.insert(key.clone()) {
+    if !keys.seen.insert(key.clone()) {
         return Err("collision");
     }
+    keys.count += 1;
     let mut fields = Vec::new();
     for (name, value) in &declaration.fields {
         if let Some(value) = literal(value, name.takes(), roots, limits, left)? {

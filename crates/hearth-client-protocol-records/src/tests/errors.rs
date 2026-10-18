@@ -1,4 +1,4 @@
-use super::fixtures;
+use super::fixtures::{self, print, terminal};
 use crate::{
     errors::{Place, Position},
     form::{self, Form},
@@ -24,7 +24,7 @@ fn an_error_without_a_target_leaves_out_its_prefix() {
     error.target = None;
     assert_eq!(print(&Record::Error(error.clone())).as_deref(), Ok(WITHOUT_TARGET.as_bytes()));
 }
-const ALSO: [(Option<Position>, &str); 2] = [
+const ALSO: &[(Option<Position>, &str)] = &[
     (
         Some(Position { line: 9, column: 3 }),
         "tasks/boot/task.json:22:7: carbon-lab: boot: requires modules: no initramfs modules for this hardware (tasks/other/task.json:9:3)\n",
@@ -36,7 +36,7 @@ const ALSO: [(Option<Position>, &str); 2] = [
 ];
 #[test]
 fn a_second_place_prints_in_parentheses_last() {
-    for (position, expected) in ALSO {
+    for &(position, expected) in ALSO {
         let mut error = fixtures::modules_guard();
         error.also = Some(Place { path: copy_of(b"tasks/other/task.json"), position });
         assert_eq!(print(&Record::Error(error)).as_deref(), Ok(expected.as_bytes()), "{position:?}");
@@ -70,7 +70,7 @@ fn json_gives_an_error_with_its_class_and_place() {
         form::print(Form::JsonLines, &Record::Error(fixtures::modules_guard()), Some(Type::Error), &limits::SHIPPED);
     assert_eq!(printed.as_deref(), Ok(JSON_GUARD.as_bytes()));
 }
-const OPTION_REFUSAL: [(Form, &str); 2] = [
+const OPTION_REFUSAL: &[(Form, &str)] = &[
     (Form::Text, "hearth: unknown option: --bogus\n"),
     (
         Form::JsonLines,
@@ -84,12 +84,12 @@ const OPTION_REFUSAL: [(Form, &str); 2] = [
 ];
 #[test]
 fn a_startup_refusal_prints_its_line_or_its_record_after_the_version() {
-    for (form, expected) in OPTION_REFUSAL {
+    for &(form, expected) in OPTION_REFUSAL {
         let record = Record::Startup(Startup::Usage { misuse: Misuse::Option, word: copy_of(b"--bogus") });
         assert_eq!(form::print(form, &record, None, &limits::SHIPPED).as_deref(), Ok(expected.as_bytes()), "{form:?}");
     }
 }
-const UNOPENED: [(Opened, Option<&[u8]>, &str); 4] = [
+const UNOPENED: &[(Opened, Option<&[u8]>, &str)] = &[
     (Opened::Store, Some(b"/store"), "hearth: cannot open the store /store: permission denied\n"),
     (Opened::Repository, Some(b"/repo"), "hearth: cannot open the repository /repo: permission denied\n"),
     (Opened::Store, None, "hearth: cannot open the store: permission denied\n"),
@@ -97,7 +97,7 @@ const UNOPENED: [(Opened, Option<&[u8]>, &str); 4] = [
 ];
 #[test]
 fn a_startup_refusal_for_the_store_or_repository_prints_its_line() {
-    for (what, path, expected) in UNOPENED {
+    for &(what, path, expected) in UNOPENED {
         let startup = match path {
             Some(path) => Startup::Unopened { what, path: Some(copy_of(path)), error: copy_of(b"permission denied") },
             None => Startup::Unopened { what, path: None, error: copy_of(b"permission denied") },
@@ -106,14 +106,14 @@ fn a_startup_refusal_for_the_store_or_repository_prints_its_line() {
         assert_eq!(print(&record).as_deref(), Ok(expected.as_bytes()), "{what:?} {path:?}");
     }
 }
-const MISUSES: [(Misuse, &[u8], &str); 3] = [
+const MISUSES: &[(Misuse, &[u8], &str)] = &[
     (Misuse::Command, b"bogus", "hearth: unknown command: bogus\n"),
     (Misuse::Value, b"--store", "hearth: option needs a value: --store\n"),
     (Misuse::Revision, b"bad..rev", "hearth: malformed revision: bad..rev\n"),
 ];
 #[test]
 fn a_startup_refusal_for_a_command_value_or_revision_prints_its_line() {
-    for (misuse, word, expected) in MISUSES {
+    for &(misuse, word, expected) in MISUSES {
         assert_eq!(
             print(&Record::Startup(Startup::Usage { misuse, word: copy_of(word) })).as_deref(),
             Ok(expected.as_bytes()),
@@ -136,16 +136,16 @@ fn json_reports_the_omitted_error_count_last() {
         Ok(JSON_LEFT_OUT.as_bytes())
     );
 }
-const STARTUP_OUTCOMES: [(Opened, Outcome); 2] =
-    [(Opened::Store, Outcome::TryAgain), (Opened::Repository, Outcome::TryAgain)];
+const STARTUP_OUTCOMES: &[(Opened, Outcome)] =
+    &[(Opened::Store, Outcome::TryAgain), (Opened::Repository, Outcome::TryAgain)];
 #[test]
 fn an_unopened_resource_gives_try_again() {
-    for (what, expected) in STARTUP_OUTCOMES {
+    for &(what, expected) in STARTUP_OUTCOMES {
         let startup = Startup::Unopened { what, path: None, error: copy_of(b"denied") };
         assert_eq!(startup.outcome(), expected, "{what:?}");
     }
 }
-const USAGE_OUTCOMES: [(Misuse, Outcome); 4] = [
+const USAGE_OUTCOMES: &[(Misuse, Outcome)] = &[
     (Misuse::Command, Outcome::Usage),
     (Misuse::Option, Outcome::Usage),
     (Misuse::Value, Outcome::Usage),
@@ -153,15 +153,9 @@ const USAGE_OUTCOMES: [(Misuse, Outcome); 4] = [
 ];
 #[test]
 fn every_usage_refusal_gives_usage() {
-    for (misuse, expected) in USAGE_OUTCOMES {
+    for &(misuse, expected) in USAGE_OUTCOMES {
         assert_eq!(Startup::Usage { misuse, word: copy_of(b"bogus") }.outcome(), expected, "{misuse:?}");
     }
-}
-fn print(record: &Record) -> Result<Box<[u8]>, form::Refusal> {
-    form::print(Form::Text, record, Some(Type::Error), &limits::SHIPPED)
-}
-fn terminal(left_out: u32) -> Record {
-    Record::Terminal(Terminal { outcome: Outcome::Failed, diff: None, left_out })
 }
 
 #[test]
@@ -497,13 +491,7 @@ fn each_composition_error_prints_its_text() {
 fn each_composition_error_prints_its_json_fields() {
     for (row, (why, _, json)) in COMPOSITION_LINES.iter().enumerate() {
         assert_eq!(
-            form::print(
-                Form::JsonLines,
-                &Record::Error(fixtures::composition_error(why.clone())),
-                Some(Type::Error),
-                &limits::SHIPPED
-            )
-            .as_deref(),
+            fixtures::print_error(Form::JsonLines, fixtures::composition_error(why.clone())).as_deref(),
             Ok(*json),
             "row {row}"
         );
@@ -513,6 +501,7 @@ mod validation;
 const ON_LINES: &[(crate::errors::Host, &[u8], &[u8])] = &[
     (crate::errors::Host::Unknown, b"stoa-1-lab: placement's on names rhi-lab, no discovered target\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":{\"kind\":\"on\",\"on\":\"rhi-lab\",\"host\":\"unknown\"},\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
     (crate::errors::Host::Container, b"stoa-1-lab: placement's on names rhi-lab, a container\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":{\"kind\":\"on\",\"on\":\"rhi-lab\",\"host\":\"container\"},\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
+    (crate::errors::Host::Unplaced, b"stoa-1-lab: placement's on names rhi-lab, a target with no placement\n", b"{\"record\":\"error\",\"kind\":\"composition\",\"composition\":{\"kind\":\"on\",\"on\":\"rhi-lab\",\"host\":\"unplaced\"},\"class\":\"configuration\",\"target\":\"stoa-1-lab\"}\n"),
 ];
 #[test]
 fn an_on_error_prints_its_text() {
@@ -524,13 +513,7 @@ fn an_on_error_prints_its_text() {
 fn an_on_error_prints_its_json_fields() {
     for (row, (host, _, json)) in ON_LINES.iter().enumerate() {
         assert_eq!(
-            form::print(
-                Form::JsonLines,
-                &Record::Error(fixtures::composition_on(host.clone())),
-                Some(Type::Error),
-                &limits::SHIPPED
-            )
-            .as_deref(),
+            fixtures::print_error(Form::JsonLines, fixtures::composition_on(host.clone())).as_deref(),
             Ok(*json),
             "row {row}"
         );

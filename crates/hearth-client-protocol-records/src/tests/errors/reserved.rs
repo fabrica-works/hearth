@@ -32,6 +32,8 @@ const TEXT: &[(Rule, &[u8])] = &[
     (Rule::LiveNone, b"\"rootwait\" is reserved: action none names no unit (format.md, 5.14)\n"),
     (Rule::NeverLiveUnit, b"\"rootwait\" is reserved: this core service must not restart live (format.md, 5.14)\n"),
     (Rule::NeverLivePath, b"\"rootwait\" is reserved: this path must not change live (format.md, 5.14)\n"),
+    (Rule::HearthContainer, b"\"rootwait\" is reserved: a container has no hearth task (format.md, 5.12)\n"),
+    (Rule::HearthNull, b"\"rootwait\" is reserved: the hearth task cannot be removed (format.md, 5.12)\n"),
 ];
 #[test]
 fn a_reserved_error_prints_the_rules_words() {
@@ -58,6 +60,8 @@ const JSON: &[(Rule, &[u8])] = &[
     (Rule::LiveNone, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"live_none\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
     (Rule::NeverLiveUnit, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"never_live_unit\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
     (Rule::NeverLivePath, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"never_live_path\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
+    (Rule::HearthContainer, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"hearth_container\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
+    (Rule::HearthNull, b"{\"record\":\"error\",\"kind\":\"reserved\",\"reserved\":{\"rule\":\"hearth_null\",\"what\":\"rootwait\"},\"class\":\"configuration\"}\n"),
 ];
 #[test]
 fn json_gives_the_rule_and_what() {

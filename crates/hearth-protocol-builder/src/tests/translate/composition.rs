@@ -13,6 +13,7 @@ fn each_composition_kind_translates_and_back() {
             records::Composition::On { on, host } => render::Composition::On {
                 on,
                 host: match host {
+                    records::Host::Unplaced => render::Host::Unplaced,
                     records::Host::Unknown => render::Host::Unknown,
                     records::Host::Container => render::Host::Container,
                     records::Host::Elsewhere { environment } => render::Host::Elsewhere { environment },

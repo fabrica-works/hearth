@@ -408,17 +408,7 @@ impl Side {
     }
     fn placement_host_valid(&mut self, placement: &revision::Placement) -> bool {
         let Some(on) = &placement.on else { return true };
-        let revision =
-            crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
         self.host_valid(&on.target)
-            && validation::host_schema(
-                &on.target,
-                &self.targets,
-                &self.settings,
-                &revision,
-                &mut self.validator,
-                self.validated,
-            )
     }
     pub fn answer(&mut self) -> Option<Answer> {
         if self.rendering.is_some() {
@@ -431,20 +421,23 @@ impl Side {
             if !self.eligible(target) {
                 continue;
             }
+            if compose::reserved(target, &self.documents, &mut self.errors) {
+                continue;
+            }
             let (p, containers) = match self.placement(target) {
                 Ok(placement) => placement,
                 Err(error) => {
-                    self.errors.push(*error);
+                    self.placement_error(*error);
                     continue;
                 }
             };
-            if self.prime_exports(target) {
-                self.next = self.next.saturating_sub(1);
-                return None;
-            }
             if !self.placement_host_valid(&p) {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
+            }
+            if self.prime_exports(target) {
+                self.next = self.next.saturating_sub(1);
+                return None;
             }
             let meta = compose::metadata(target, p.clone());
             let meta_digest = meta::digest(&meta);
