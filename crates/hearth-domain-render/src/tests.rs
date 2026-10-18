@@ -45,3 +45,5 @@ mod reserved;
 
 mod decoded;
 mod settings;
+
+mod specs;

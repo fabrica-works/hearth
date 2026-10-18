@@ -7,9 +7,12 @@ impl Comparison {
         self.deadline = deadline;
     }
     fn swap_resolution_side(&mut self, side: &mut Side) {
+        let held = side.held_specs();
         let from = self.from.as_mut().expect("from side");
         core::mem::swap(&mut from.made, &mut side.made);
         core::mem::swap(&mut from.finding, &mut side.finding);
+        core::mem::swap(&mut from.sizes, &mut side.sizes);
+        side.specs_before = held;
         self.from_active = !self.from_active;
         side.errors.side(if self.from_active { crate::diff::Side::From } else { crate::diff::Side::To });
     }
@@ -51,6 +54,6 @@ pub(super) fn key(made: Option<&crate::diff::Made>) -> Option<hearth_lib::encode
     let crate::diff::Made::Spec(spec) = made? else { return None };
     Some(spec.resolution.as_ref()?.key())
 }
-pub(super) fn closure(record: Option<&crate::resolution::Record>) -> Option<&[crate::resolution::Package]> {
-    Some(&record?.closure)
+pub(super) fn closure(record: Option<&super::resolution::Known>) -> Option<&[crate::resolution::Package]> {
+    record?.closure.as_deref()
 }

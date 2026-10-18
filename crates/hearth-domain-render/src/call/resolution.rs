@@ -12,13 +12,23 @@ use skein_lib::{Map, Queue, Token};
 pub(crate) struct Finding {
     assembled: bool,
     next: u32,
-    asked: Map<Digest, Option<crate::resolution::Record>>,
+    asked: Map<Digest, Option<Known>>,
     pending: Option<Digest>,
     deadline: Option<skein_lib::Time>,
     attempted: Map<Digest, Option<(crate::vocabulary::Class, crate::errors::Kind)>>,
     closure: Option<crate::resolution::Closure>,
     fault: Option<crate::errors::Resolution>,
-    recording: Option<crate::resolution::Record>,
+    recording: Option<Known>,
+}
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+pub(crate) struct Known {
+    pub(crate) digest: Digest,
+    pub(crate) closure: Option<Box<[crate::resolution::Package]>>,
+}
+impl Known {
+    fn from_record(record: crate::resolution::Record, diff: bool) -> Self {
+        Self { digest: record.digest, closure: if diff { Some(record.closure) } else { None } }
+    }
 }
 impl Finding {
     pub fn resolve(&mut self, deadline: Option<skein_lib::Time>) {
@@ -59,7 +69,7 @@ impl Side {
                             spec.resolution = Some(Box::new(keys::Resolution::Needed { key }));
                         }
                     }
-                    self.made.insert(spec.meta.target.clone(), Made::Spec(Box::new(spec))).expect("target capacity");
+                    self.retain_spec(spec);
                     return None;
                 }
                 Some(Answer::Rendered { .. }) => self.finding.assembled = true,
@@ -150,7 +160,8 @@ impl Side {
                     digest,
                     made: crate::resolution::Made { at, tools, costs },
                 };
-                self.finding.recording = Some(record.clone());
+                self.finding.recording =
+                    Some(Known { digest, closure: if self.diff { Some(record.closure.clone()) } else { None } });
                 out.push(Output::Request(Request::Record { request: Token::new(7), resolution: record }));
             }
             Err(fault) => self.resolution_fault(key, Some(fault), None),
@@ -161,6 +172,7 @@ impl Side {
         let record = self.finding.recording.take().expect("record in flight");
         if failure.is_none() {
             *self.finding.asked.get_mut(&key).expect("asked key") = Some(record);
+            self.admit_finding(key);
             self.ready = true;
         } else {
             self.resolution_fault(key, None, failure);
@@ -207,7 +219,11 @@ impl Side {
     }
     pub(crate) fn found(&mut self, record: Option<crate::resolution::Record>, failed: bool) {
         let key = self.finding.pending.take().expect("one find in flight");
-        *self.finding.asked.get_mut(&key).expect("asked key") = record;
+        *self.finding.asked.get_mut(&key).expect("asked key") = match record {
+            Some(record) => Some(Known::from_record(record, self.diff)),
+            None => None,
+        };
+        self.admit_finding(key);
         if failed {
             self.outcome = self.outcome.worst(Outcome::TryAgain);
         }
@@ -284,15 +300,8 @@ fn inputs(made: &Map<Box<[u8]>, Made>, key: &Digest) -> parts::packages::Inputs 
 }
 
 impl Finding {
-    pub(super) fn record(&self, key: &Digest) -> Option<&crate::resolution::Record> {
+    pub(crate) fn record(&self, key: &Digest) -> Option<&Known> {
         self.asked.get(key)?.as_ref()
-    }
-    pub(super) fn inherit(&mut self, other: &Self) {
-        for (key, record) in &other.asked {
-            if record.is_some() && self.asked.get(key) == Some(&None) {
-                self.asked.insert(*key, record.clone()).expect("existing key");
-            }
-        }
     }
 }
 impl Side {
@@ -336,7 +345,12 @@ impl Side {
 
 impl Side {
     pub(super) fn inherit_finding(&mut self, other: &Finding) {
-        self.finding.inherit(other);
+        for (key, record) in &other.asked {
+            if record.is_some() && self.finding.asked.get(key) == Some(&None) {
+                self.finding.asked.insert(*key, record.clone()).expect("existing key");
+                self.admit_finding(*key);
+            }
+        }
         for (key, failure) in &other.attempted {
             if self.finding.asked.contains_key(key) && !self.finding.attempted.contains_key(key) {
                 if let Some((class, kind)) = failure {
@@ -362,6 +376,28 @@ impl Side {
                     task: None,
                 });
             }
+        }
+    }
+}
+
+impl Finding {
+    pub(super) fn held(&self, made: &Map<Box<[u8]>, Made>) -> u64 {
+        let mut bytes = 0_u64;
+        for (key, known) in &self.asked {
+            let Some(known) = known else { continue };
+            let mut retained = false;
+            for (_, made) in made {
+                retained |= super::comparison::key(Some(made)) == Some(*key);
+            }
+            if retained && let Some(closure) = &known.closure {
+                bytes = bytes.saturating_add(super::specs::closure(closure));
+            }
+        }
+        bytes
+    }
+    pub(super) fn discard_closure(&mut self, key: &Digest) {
+        if let Some(Some(known)) = self.asked.get_mut(key) {
+            known.closure = None;
         }
     }
 }

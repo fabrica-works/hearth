@@ -163,7 +163,7 @@ pub fn two_targets() -> Repository {
     let mut repository = x1_prod();
     repository.entries.push(entry(b"hosts/a-b/a-b-prod.json", b'4'));
     repository.documents.push((oid(b'4'), document(Some(placement()))));
-    repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
+    sort_entries(&mut repository);
     repository
 }
 pub fn set_document(repository: &mut Repository, byte: u8, document: Decoded) {
@@ -420,7 +420,7 @@ pub fn tree_templates(files: &[(&[u8], Mode, &[u8])]) -> Repository {
         repository.entries.push(entry);
         repository.blobs.push((oid(byte), body.into()));
     }
-    repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
+    sort_entries(&mut repository);
     repository
 }
 
@@ -437,7 +437,7 @@ pub fn templates_for_many_targets() -> Repository {
         repository.entries.push(entry(format!("hosts/{name}/{name}-prod.json").as_bytes(), byte));
         repository.documents.push((oid(byte), tasks(&[(b"motd", false)], Some(placement()))));
     }
-    repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
+    sort_entries(&mut repository);
     repository
 }
 
@@ -676,3 +676,9 @@ pub fn only_mut<T>(items: &mut [T]) -> &mut T {
     item
 }
 pub mod decoders;
+
+pub mod specs;
+
+fn sort_entries(repository: &mut Repository) {
+    repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
+}

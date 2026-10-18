@@ -8,10 +8,11 @@ pub(crate) mod guards;
 mod packages;
 mod references;
 mod reserved;
-mod resolution;
+pub(crate) mod resolution;
 pub(crate) mod scripts;
 mod secrets;
 mod selection;
+mod specs;
 pub(crate) mod templates;
 mod validation;
 use crate::{
@@ -59,6 +60,7 @@ pub(crate) struct Side {
     pub outcome: Outcome,
     pub made: Map<Box<[u8]>, crate::diff::Made>,
     pub diff: bool,
+    pub specs_before: u64,
     pub finding: resolution::Finding,
 }
 impl Side {
@@ -96,6 +98,7 @@ impl Side {
             outcome: Outcome::Done,
             made: Map::with_capacity(0),
             diff: false,
+            specs_before: 0,
             finding: resolution::Finding::new(limits.targets),
         }
     }
@@ -552,10 +555,7 @@ impl Call {
             match self.side.resolved_answer(out) {
                 None => return false,
                 Some(Answer::Spec(spec)) => {
-                    self.side
-                        .made
-                        .insert(spec.meta.target.clone(), crate::diff::Made::Spec(Box::new(spec)))
-                        .expect("target capacity");
+                    self.side.retain_spec(spec);
                     return false;
                 }
                 Some(Answer::Rendered { outcome, diff: _, left_out }) => {
@@ -577,7 +577,14 @@ impl Call {
                 let finding = core::mem::replace(&mut self.side.finding, resolution::Finding::new(limits.targets));
                 diff.from = Some(RenderedSide { commit, made, sizes, finding });
                 let errors = core::mem::replace(&mut self.side.errors, errors::Collector::new(&limits));
+                let held = specs::held(
+                    &diff.from.as_ref().expect("first side").made,
+                    &diff.from.as_ref().expect("first side").sizes,
+                    &diff.from.as_ref().expect("first side").finding,
+                    limits.specs,
+                );
                 self.side = Side::new(self.side.repository.clone(), self.side.names.clone(), &limits);
+                self.side.specs_before = held;
                 self.side.errors = errors;
                 self.side.errors.side(crate::diff::Side::To);
                 self.side.diff = true;

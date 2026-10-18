@@ -94,3 +94,20 @@ fn decoding_comment_only_templates_holds_no_more_than_the_worst_case() {
     let repository = fixtures::decoded_comments_repository();
     fixtures::checked_decoding(&repository, fixtures::decoded_bound(), &fixtures::comment_template());
 }
+
+#[test]
+fn rendering_specs_at_the_limits_holds_no_more_than_the_worst_case() {
+    let repository = fixtures::specs::repository();
+    let run = hearth_render_world::parent::checked(
+        &repository,
+        fixtures::specs::MEMORY_SEED,
+        fixtures::specs::LIMITS,
+        fixtures::specs::bound(),
+        skein_world::Memory::Checked,
+    );
+    assert_eq!(run.outcome, hearth_domain_render::vocabulary::Outcome::Failed);
+    assert!(
+        run.answers.iter().any(|answer| matches!(answer, hearth_domain_render::vocabulary::Answer::Spec(_))),
+        "the leading specs fit before the next target fails"
+    );
+}

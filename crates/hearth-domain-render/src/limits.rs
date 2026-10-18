@@ -9,6 +9,7 @@ pub struct Limits {
     pub tasks: u32,
     pub decoded: u64,
     pub composed: u64,
+    pub specs: u64,
     pub validated: u64,
     pub document: u32,
     pub template: u32,
@@ -35,6 +36,7 @@ pub const SHIPPED: Limits = Limits {
     tasks: 1_024,
     decoded: 67_108_864,
     composed: 67_108_864,
+    specs: 67_108_864,
     validated: 67_108_864,
     document: 1_048_576,
     template: 1_048_576,
@@ -86,15 +88,18 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                 .checked_mul(u64::try_from(size_of::<compose::Index>()).ok()?)?,
         )?
         .checked_add(Map::<Box<[u8]>, diff::Made>::worst_case(limits.targets)?)?;
-    // Cached resolutions retain one bounded record per distinct target key.
+    // A find or record arrival holds one full record transiently; retained
+    // specs, file sizes and diff closures share the command budget.
     // A frame byte can introduce one input item; package strings additionally
     // follow store.md, 6.1's fixed M1 name/path limits.
     let record = u64::from(4_194_304_u32)
         .checked_mul(u64::try_from(size_of::<hearth_lib::encode::Item>()).ok()?)?
         .checked_add(List::<crate::resolution::Package>::worst_case(limits.closure.max(8_192))?)?
         .checked_add(u64::from(limits.closure.max(8_192)).checked_mul(3 * 256 + 4_096)?)?;
-    let resolutions = Map::<hearth_lib::encode::Digest, Option<crate::resolution::Record>>::worst_case(limits.targets)?
-        .checked_add(record.checked_mul(u64::from(limits.targets).checked_add(1)?)?)?;
+    let resolutions =
+        Map::<hearth_lib::encode::Digest, Option<crate::call::resolution::Known>>::worst_case(limits.targets)?
+            .checked_add(record)?
+            .checked_add(limits.specs.checked_mul(4)?)?;
     let retained = listing
         .checked_add(decoded)?
         .checked_add(settings)?
