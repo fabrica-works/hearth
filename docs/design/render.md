@@ -166,9 +166,10 @@ defaults alone (client/README.md, 3.5).
 - **What is decoded counts as it is held,** not by its file's bytes: a
   document's or a declaration's values as values count, a key's bytes as
   a string's, and a template the bytes of the text and names it holds,
-  and 32 bytes for each instruction and operation (8.3). The document,
-  declaration or template whose count passes the 64 MiB fails the render
-  at its path.
+  32 bytes for each instruction and operation, and 4 bytes for each of
+  its lines, whose first bytes it keeps (8.3): every line, a comment's
+  among them. The document, declaration or template whose count passes
+  the 64 MiB fails the render at its path.
 - **What a limit fails** is what holds the excess. The listing's limits,
   the 64 MiB of decoded documents and templates, and the 1,025th target
   or task fail the render: no target renders, and the error is the
@@ -1238,7 +1239,10 @@ every request                                          Failed { request, class, 
   - a template is a flat sequence of instructions (emit text, emit an
     expression, branch, enter and advance a loop, assign), evaluated by a
     `for` over a range bounded by the iteration limit, with a
-    `lib::Stack` of loop frames bounded by the nesting limit;
+    `lib::Stack` of loop frames bounded by the nesting limit. Beside its
+    instructions, it keeps the offset of each line's first byte, which
+    places a fault at its own line and column (7.1) without reading the
+    blob again (3.10), and which its count includes (2.3);
   - merging walks two values with an explicit stack bounded by JSON's
     depth.
 
