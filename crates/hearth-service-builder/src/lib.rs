@@ -483,12 +483,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<Asked>::worst_case(limits.queue)?)?
         .checked_add(Queue::<Event>::worst_case(limits.queue)?)?
         .checked_add(Queue::<Request>::worst_case(limits.queue)?)?;
-    // A payload may be owned by either side during a pass; price every slot
-    // at the larger owner's bound rather than counting only the queue header.
+    // The layers price their returned records and forwarding payloads. Moving
+    // those allocations through a queue does not make another owned copy.
+    // Queue capacity reserves cells, not another complete layer per cell.
     domain
         .checked_add(protocol)?
         .checked_add(io::worst_case(&limits.io)?)?
         .checked_add(FileIo::worst_case(files.files, files.read, files.entries, files.whole)?)?
-        .checked_add(queues)?
-        .checked_add(domain.max(protocol).checked_mul(u64::from(limits.queue))?)
+        .checked_add(queues)
 }

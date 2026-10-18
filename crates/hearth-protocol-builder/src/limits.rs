@@ -35,14 +35,22 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     use git_machine::limits::{Decoder, worst_case as git};
     use hearth_protocol_template::limits::{Decoder as Template, worst_case as template};
     use skein_lib::{List, Queue};
+    let decode = config::declaration::worst_case(&limits.config)?.max(template(Template::Template, &limits.template)?);
+    // A read keeps Batch beside its decoder; listing and diff are other modes.
     let child = git(Decoder::Tail, &limits.git)?.checked_mul(2)?.checked_add(
         git(Decoder::Listing, &limits.git)?
-            .max(git(Decoder::Batch, &limits.git)?)
+            .max(git(Decoder::Batch, &limits.git)?.checked_add(decode)?)
             .max(git(Decoder::Diff, &limits.git)?),
     )?;
-    let decode = config::declaration::worst_case(&limits.config)?.max(template(Template::Template, &limits.template)?);
-    let records = crate::tree::limits::worst_case(crate::tree::frame::Kind::Resolution, &limits.tree)?
-        .checked_add(crate::tree::limits::held(crate::tree::frame::Kind::Resolution, &limits.tree)?)?;
+    let kind = crate::tree::frame::Kind::Resolution;
+    let held = crate::tree::limits::held(kind, &limits.tree)?;
+    // Read translation overlaps its returned record. A write keeps the
+    // request, its pending clone and the translated clone, with one more
+    // record envelope for the old/new list cells during translation.
+    // Encoding then overlaps its body and framed copy, without a tree reader.
+    let records = crate::tree::limits::worst_case(kind, &limits.tree)?
+        .checked_add(held)?
+        .max(held.checked_mul(4)?.checked_add(crate::tree::frame::largest(kind, &limits.tree).checked_mul(2)?)?);
     let resolve = hearth_protocol_mmdebstrap::output::worst_case(&limits.mmdebstrap)?
         .checked_mul(2)?
         .checked_add(hearth_protocol_mmdebstrap::packages::worst_case(&limits.mmdebstrap)?)?
@@ -58,8 +66,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.git.entries).checked_mul(64)?)?;
     let queues = Queue::<crate::Asked>::worst_case(4)?.checked_add(Queue::<Box<[u8]>>::worst_case(4)?)?;
     child
-        .checked_add(decode)?
-        .checked_add(records.checked_mul(4)?)?
+        .checked_add(records)?
         .checked_add(resolve)?
         .checked_add(walk)?
         .checked_add(listing)?

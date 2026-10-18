@@ -102,17 +102,17 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             .checked_add(limits.specs.checked_mul(4)?)?;
     let retained = listing
         .checked_add(decoded)?
-        .checked_add(settings)?
         .checked_add(targets)?
         .checked_add(resolutions)?
         .checked_add(limits.validated)?
         .checked_add(limits.exported)?
         .checked_add(crate::errors::Collector::worst_case(limits)?)?;
-    // A diff keeps the earlier made specs and resolution findings while the
-    // second side renders. Clone/boxing transitions can hold both allocations.
-    retained
-        .checked_mul(4)?
-        .checked_add(crate::entries::worst_case(limits)?)?
-        .checked_add(evaluate::worst_case(limits)?)?
-        .checked_add(evaluate::template::worst_case(limits)?)
+    // Both sides share the specs allowance and move successful decoded blobs.
+    // Expanded entries remain live during template execution. Composition
+    // finishes before expansion; each phase prices its own overlapping buffers.
+    let scratch = settings
+        .max(crate::entries::worst_case(limits)?)
+        .max(evaluate::worst_case(limits)?)
+        .max(evaluate::template::worst_case(limits)?.checked_add(crate::entries::held_worst_case(limits)?)?);
+    retained.checked_add(scratch)
 }

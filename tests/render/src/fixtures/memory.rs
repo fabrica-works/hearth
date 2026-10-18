@@ -51,3 +51,18 @@ fn compiled_template(source: &str) -> hearth_domain_render::evaluate::template::
             .expect("limit template compiles");
     hearth_protocol_builder::translate::instructions::template(compiled)
 }
+
+// Sixty-three one-MiB fields fit below the expanded 64-MiB allowance,
+// leaving space for their entry and field records and keys.
+const EXPANDED_COPIES: u64 =
+    hearth_domain_render::limits::SHIPPED.expanded / hearth_domain_render::limits::SHIPPED.document as u64 - 1;
+#[must_use]
+pub fn expanded_template()
+-> (hearth_domain_render::revision::declaration::Declaration, hearth_domain_render::evaluate::template::Template) {
+    let entries = (0..EXPANDED_COPIES)
+        .map(|index| format!(r#""g{index}":{{"from":"{{{{ settings.text }}}}"}}"#))
+        .collect::<Vec<_>>()
+        .join(",");
+    let declaration = crate::declarations::decode(format!(r#"{{"groups":{{{entries}}}}}"#).as_bytes());
+    (declaration, compiled_template("{{ settings.text }}"))
+}

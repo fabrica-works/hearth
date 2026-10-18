@@ -317,11 +317,24 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let events = Queue::<tk::Event>::worst_case(1)?;
     let maps = Map::<Box<[u8]>, Held>::worst_case(limits.keys)?.checked_mul(u64::from(limits.depth))?;
     let values = u64::from(limits.document).checked_div(2)?.checked_add(1)?;
-    // The tree, a doubling list's old and new storage, and object finishing's
-    // entry list may coexist; all have at most this many values/entries.
+    // A growing array holds its old capacity and twice that capacity; all
+    // other values share the same document, rather than adding a full tree.
+    // Object finishing moves values; its map storage is counted above.
     let records = u64::try_from(size_of::<Value>().max(size_of::<Entry>())).ok()?;
-    let storage = values.checked_mul(records)?.checked_mul(4)?;
+    let storage = values.checked_mul(records)?.checked_mul(3)?;
     // Decoded text, counted keys, pending keys and a finishing key's copy.
     let text = u64::from(limits.document).checked_mul(4)?;
     tokenizer.checked_add(frames)?.checked_add(events)?.checked_add(maps)?.checked_add(storage)?.checked_add(text)
+}
+
+/// The finished tree after the decoder's transient arrays and maps are gone.
+pub(crate) fn held(limits: &Limits) -> Option<u64> {
+    let values = u64::from(limits.document).checked_div(2)?.checked_add(1)?;
+    let record = u64::try_from(size_of::<Value>().max(size_of::<Entry>())).ok()?;
+    values
+        .checked_mul(record)?
+        .checked_add(u64::from(limits.document))?
+        .checked_add(tk::worst_case(&limits::tokenizer(limits))?)?
+        .checked_add(Stack::<Frame>::worst_case(limits.depth)?)?
+        .checked_add(Queue::<tk::Event>::worst_case(1)?)
 }

@@ -253,13 +253,12 @@ pub fn chaos() -> Config {
 /// Meter the shipped client over the paged-store scenario at the named limits.
 #[must_use]
 pub fn checked(seed: u64) -> Outcome<Proc, Shared> {
-    build(
-        &fixtures::thin(),
-        seed,
-        Config::calm(),
-        &Options { memory: Memory::Checked, limits: fixtures::small_limits(), ..Options::default() },
-    )
-    .run()
+    checked_with(&fixtures::thin(), seed, fixtures::small_limits())
+}
+/// Meter every iteration, including decoding and writing resolution records.
+#[must_use]
+pub fn checked_with(scenario: &Scenario<'_>, seed: u64, limits: hearth::Limits) -> Outcome<Proc, Shared> {
+    build(scenario, seed, Config::calm(), &Options { memory: Memory::Checked, limits, ..Options::default() }).run()
 }
 
 /// A killed client's children run on while its cold replacement starts

@@ -121,3 +121,21 @@ fn a_diff_keeping_the_first_sides_blobs_holds_no_more_than_the_worst_case() {
     assert_eq!(run.outcome, hearth_domain_render::vocabulary::Outcome::Done);
     assert_eq!(fixtures::reuse::second_reads(&run), []);
 }
+
+#[test]
+fn templates_keep_expanded_entries_within_the_bound() {
+    let limits = &fixtures::memory::TEMPLATE_LIMITS;
+    let bound = limits::worst_case(limits).expect("render peak");
+    let (declaration, template) = fixtures::memory::expanded_template();
+    let roots = fixtures::wide_roots();
+    fixtures::memory::peak(&Meter::new(), bound, &"expanded entries beside template output", || {
+        let expanded =
+            hearth_domain_render::entries::expand(&declaration, &roots.context(), limits, &mut { limits.expanded })
+                .expect("expanded fields fit");
+        let rendered =
+            evaluate::template::run(&template, &roots.context(), None, limits, u64::from(limits.rendered_file))
+                .expect("template output fits");
+        drop(rendered);
+        drop(expanded);
+    });
+}

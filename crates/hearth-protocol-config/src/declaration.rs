@@ -281,5 +281,6 @@ pub struct Number {
 /// Peak heap for declaration decoding, including the JSON value still held.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    crate::json::worst_case(limits)?.checked_add(crate::schema::worst_case(limits)?)
+    let converting = crate::json::held(limits)?.checked_add(crate::schema::worst_case(limits)?)?;
+    Some(crate::json::worst_case(limits)?.max(converting))
 }
