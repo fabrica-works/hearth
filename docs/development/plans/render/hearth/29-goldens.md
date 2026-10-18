@@ -302,7 +302,13 @@ targets, whose order is path, line, column, target (22.1). `tool` and
 spec of `ok-prod` then the errors; `expected/exit` is 2. `errors/tool` runs
 only through `protocol::run` with `Fault::KilledAt`, `errors/resolution`
 with `--resolve` and fake mmdebstrap asked for a package no index carries;
-each has `expected/output`; `expected/exit` is 75 for `tool`.
+each has `expected/output`; `expected/exit` is 75 for `tool` and 2 for
+`resolution`, whose output prints `ok-prod`'s spec first: apt that cannot
+locate a package is a configuration cause (render.md 7.1, client/README.md
+3.3). `errors/resolution`'s scenario is `fixtures::resolving(&files)`
+(`worlds.rs:195`, `resolve: true`), as `scenario_of` sets no `--resolve`.
+`ids`'s data path keeps format.md 5.11 (`/srv/<class>/<key>`, or outside
+`/srv`): a reserved fault hides its entry from the `ids` reader. Ruling 189.
 Test shape: process, under 0.15 s:
 `the_vpn_and_mail_golden_render_with_their_peers_per_environment`,
 `the_exports_golden_holds_hearth_20s_vpn_files`,
@@ -324,7 +330,8 @@ Size: no counted lines. Removes: nothing.
 Scope: render.md 5.7 and 9.2: a spec `needed`, and `known` with its keys.
 Needs: hearth 24.1 (keys, `Find`, `fixtures::lay`, `test_min_recorded`).
 Files: `tests/render/resolution/{expected,expected-known}/**`,
-`tests/builder/tests/goldens.rs`.
+`tests/builder/tests/goldens.rs`, `tests/builder/src/fixtures/goldens.rs`,
+`tests/builder/src/fixtures/resolution.rs` (ruling 189).
 Shape: no files of its own: the repository is `testing/repos/test` (hearth
 08.2: base `test`, targets `test-min` and `test-boot`), read in place
 (`golden::load_from`). Variant `""` renders against an empty store: each
@@ -338,7 +345,14 @@ Test shape: process, under 0.15 s:
 `an_empty_store_prints_every_resolution_needed`,
 `a_laid_record_prints_known_for_its_targets_alone`,
 `the_keys_line_is_the_one_hearth_24_pins` (the line equals
-`TEST_MIN_KEYS_LINE`, a literal).
+`TEST_MIN_KEYS_LINE`, a literal). `TEST_MIN_KEYS_LINE`
+(`fixtures/resolution.rs:10`, unused on main) predates cce697a's keys:
+29.5 refreshes it to the line `tests/builder/tests/resolution.rs:11` pins,
+`keys         packages d018a0eea488   software f60610453970   config
+8c9bf06f6262`. `fixtures::check_golden` (`goldens.rs:35`) loads by name:
+29.5 splits its body into a function over a loaded `Golden`, which
+`check_golden` calls, so that `load_from`'s golden takes the same checks
+(ruling 189).
 Proof: process, `a_laid_record_prints_known_for_its_targets_alone`: with
 the record laid, `test-min` is `known` with its keys and `test-boot`
 `needed`, exit 0. Bound: 0.15 s.
