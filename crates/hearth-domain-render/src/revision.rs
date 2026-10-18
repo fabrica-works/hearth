@@ -2,6 +2,7 @@
 use crate::errors::Repository;
 use alloc::boxed::Box;
 pub mod declaration;
+pub(crate) mod held;
 use skein_lib::bytes;
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Oid(pub Box<[u8]>);
@@ -274,9 +275,15 @@ impl Documents {
         self.decoded.get(usize::try_from(document).ok()?)?.as_ref()
     }
     pub fn set_declaration(&mut self, oid: &Oid, declaration: declaration::Declaration) {
-        for (entry, declared) in self.entries.iter().zip(self.declared.iter_mut()) {
-            if &entry.oid == oid {
-                *declared = Some(declaration.clone());
+        let mut source = Some(declaration);
+        let last = self.last_copy(oid, true);
+        for (index, (entry, declared)) in self.entries.iter().zip(self.declared.iter_mut()).enumerate() {
+            if &entry.oid == oid && task(&entry.path).is_some() {
+                *declared = if Some(index) == last {
+                    source.take()
+                } else {
+                    Some(source.as_ref().expect("last copy remains").clone())
+                };
             }
         }
     }
@@ -290,11 +297,26 @@ impl Documents {
         None
     }
     pub fn set(&mut self, oid: &Oid, document: Document) {
-        for (entry, decoded) in self.entries.iter().zip(self.decoded.iter_mut()) {
-            if &entry.oid == oid {
-                *decoded = Some(document.clone());
+        let mut source = Some(document);
+        let last = self.last_copy(oid, false);
+        for (index, (entry, decoded)) in self.entries.iter().zip(self.decoded.iter_mut()).enumerate() {
+            if &entry.oid == oid && task(&entry.path).is_none() {
+                *decoded = if Some(index) == last {
+                    source.take()
+                } else {
+                    Some(source.as_ref().expect("last copy remains").clone())
+                };
             }
         }
+    }
+    fn last_copy(&self, oid: &Oid, declared: bool) -> Option<usize> {
+        let mut last = None;
+        for (index, entry) in self.entries.iter().enumerate() {
+            if &entry.oid == oid && task(&entry.path).is_some() == declared {
+                last = Some(index);
+            }
+        }
+        last
     }
     #[must_use]
     pub fn entries(&self) -> &[Entry] {
@@ -310,23 +332,33 @@ impl Documents {
         None
     }
 }
-/// Listed bytes admitted before decoding a revision (render.md, 2.3).
+/// Retained decoded bytes admitted on arrival (render.md, 2.3).
 #[derive(Debug, Hash)]
 pub struct Budget {
     held: u64,
     max: u64,
+    exceeded: bool,
 }
 impl Budget {
     #[must_use]
     pub const fn new(limits: &crate::limits::Limits) -> Self {
-        Self { held: 0, max: limits.decoded }
+        Self { held: 0, max: limits.decoded, exceeded: false }
+    }
+    #[must_use]
+    pub const fn exceeded(&self) -> bool {
+        self.exceeded
     }
     #[must_use]
     pub fn take(&mut self, size: u64) -> bool {
+        if self.exceeded {
+            return false;
+        }
         let Some(held) = self.held.checked_add(size) else {
+            self.exceeded = true;
             return false;
         };
         if held > self.max {
+            self.exceeded = true;
             return false;
         }
         self.held = held;
@@ -346,4 +378,38 @@ pub fn task(path: &[u8]) -> Option<&[u8]> {
 #[must_use]
 pub fn base(path: &[u8]) -> Option<&[u8]> {
     Some(split(path.strip_prefix(b"hosts/")?)?.0)
+}
+
+/// Retained decoded storage, including template line offsets (render.md, 2.3).
+/// Each newline holds one text byte and a four-byte line offset; other decoded
+/// records fit within the largest record's ratio to a charged 32-byte element.
+#[must_use]
+pub fn decoded_worst_case(limits: &crate::limits::Limits) -> Option<u64> {
+    use crate::evaluate::{ELEMENT, Operation, template::Instruction};
+    let record = size_of::<Pair>()
+        .max(size_of::<Task>())
+        .max(size_of::<Member>())
+        .max(size_of::<declaration::Entry>())
+        .max(size_of::<declaration::Field>())
+        .max(size_of::<declaration::Type>())
+        .max(size_of::<declaration::Spec>())
+        .max(size_of::<declaration::Read>())
+        .max(size_of::<declaration::Guard>())
+        .max(size_of::<declaration::Export>())
+        .max(size_of::<declaration::Entries>())
+        .max(size_of::<Instruction>())
+        .max(size_of::<Operation>());
+    let ratio = u64::try_from(record).ok()?.div_ceil(ELEMENT).max(5);
+    limits.decoded.checked_mul(ratio)
+}
+
+/// The logical bytes retained from one decoded input (render.md, 2.3).
+#[must_use]
+pub fn decoded_size(read: &crate::vocabulary::Decoded, limits: &crate::limits::Limits) -> u64 {
+    match read {
+        crate::vocabulary::Decoded::Document(document) => held::document(document, limits),
+        crate::vocabulary::Decoded::Declaration(declaration) => held::declaration::declaration(declaration, limits),
+        crate::vocabulary::Decoded::Template(template) => held::template::template(template),
+        crate::vocabulary::Decoded::Link(_) | crate::vocabulary::Decoded::Refused { .. } => 0,
+    }
 }

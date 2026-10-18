@@ -73,7 +73,8 @@ fn a_document_past_its_limit_errs_at_its_path_and_fails_its_targets() {
 }
 #[test]
 fn the_budget_s_error_names_the_path_that_passed_it() {
-    let call = fixtures::error_call(&limits::Limits { decoded: fixtures::REVISION_BYTES, ..limits::SHIPPED });
+    let mut call = fixtures::error_call(&limits::Limits { decoded: fixtures::REVISION_BYTES, ..limits::SHIPPED });
+    fixtures::decode_empty_documents(&mut call);
     assert_eq!(
         fixtures::kept(&call).as_ref(),
         &[fixtures::decode_error(

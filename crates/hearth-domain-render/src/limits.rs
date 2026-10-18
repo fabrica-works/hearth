@@ -64,10 +64,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // Render's domain receives the listing at render.md, 8.4's bounds.
     const ENTRIES: u32 = 65_536;
     const PATHS: u64 = 16_777_216;
-    const NODE: usize = size_of::<revision::Value>()
-        + size_of::<revision::Pair>()
-        + 3 * size_of::<evaluate::Operation>()
-        + 3 * size_of::<evaluate::template::Instruction>();
     let listing = List::<revision::Entry>::worst_case(ENTRIES)?
         .checked_add(List::<vocabulary::Blob>::worst_case(ENTRIES)?)?
         .checked_add(Map::<revision::Oid, hearth_lib::encode::Digest>::worst_case(ENTRIES)?)?
@@ -76,10 +72,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<hearth_lib::encode::Digest, u64>::worst_case(ENTRIES)?)?
         .checked_add(PATHS.checked_mul(6)?)?
         .checked_add(u64::from(ENTRIES).checked_mul(64 * 5 + 1)?)?;
-    // A source byte can introduce a value/pair and three compiled operations;
-    // each listed path is charged separately by the decoded-input budget.
-    let node = u64::try_from(NODE).ok()?;
-    let decoded = limits.decoded.checked_mul(node.checked_add(1)?)?;
+    let decoded = revision::decoded_worst_case(limits)?;
     let settings = limits
         .decoded
         .checked_mul(u64::try_from(size_of::<compose::Pair>()).ok()?)?

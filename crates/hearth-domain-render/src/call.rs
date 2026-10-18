@@ -1,6 +1,7 @@
 //! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
 mod comparison;
 mod debian;
+mod decoded;
 mod exports;
 mod files;
 pub(crate) mod guards;
@@ -19,7 +20,7 @@ use crate::{
     limits::Limits,
     parts::{self, meta},
     revision::{self, Budget, Documents, Entry, Oid},
-    vocabulary::{Answer, As, Blob, Decoded, Outcome, Output, Request},
+    vocabulary::{Answer, As, Blob, Outcome, Output, Request},
 };
 use alloc::boxed::Box;
 use skein_lib::{List, Map, Queue, Token};
@@ -180,37 +181,12 @@ impl Side {
                     ),
                 );
                 self.outcome = self.outcome.worst(Outcome::Failed);
-            } else if !self.budget.take(entry.size) {
-                errors::push(
-                    &mut self.errors,
-                    errors::refused(
-                        &entry.path,
-                        None,
-                        Decode::TooLarge { limit: Limit::Decoded, max: limits.decoded },
-                        None,
-                    ),
-                );
-                self.fail(Outcome::Failed);
-                return;
             } else {
-                blobs
-                    .push(Blob {
-                        oid: entry.oid.clone(),
-                        size: entry.size,
-                        kind: match revision::class(&entry.path) {
-                            revision::Class::Declaration { .. } => As::Declaration,
-                            revision::Class::Fleet
-                            | revision::Class::Environment { .. }
-                            | revision::Class::Host { .. }
-                            | revision::Class::Tree { .. }
-                            | revision::Class::Template { .. }
-                            | revision::Class::Script { .. }
-                            | revision::Class::Readme { .. }
-                            | revision::Class::Refused { .. }
-                            | revision::Class::Other => As::Document,
-                        },
-                    })
-                    .expect("document count");
+                let kind = if revision::task(&entry.path).is_some() { As::Declaration } else { As::Document };
+                if contains(blobs.as_slice(), &entry.oid, kind) {
+                    continue;
+                }
+                blobs.push(Blob { oid: entry.oid.clone(), size: entry.size, kind }).expect("document count");
                 paths.push(entry.path.clone()).expect("document count");
             }
         }
@@ -226,57 +202,6 @@ impl Side {
                 blobs: self.pending.clone(),
             }));
         }
-    }
-    pub fn decoded(&mut self, oid: &Oid, read: Decoded) {
-        let expected = self
-            .pending
-            .get(usize::try_from(self.read).expect("bounded cursor"))
-            .expect("one event per requested blob");
-        assert_eq!(&expected.oid, oid, "blobs answer in request order");
-        match read {
-            Decoded::Link(target) => {
-                self.links.insert(oid.clone(), target).expect("listing capacity");
-            }
-            Decoded::Template(template) => {
-                self.check_template(oid, &template);
-                self.templates.insert(oid.clone(), template).expect("listing capacity");
-            }
-            Decoded::Document(document) => {
-                self.documents.set(oid, document);
-            }
-            Decoded::Declaration(declaration) => {
-                self.documents.set_declaration(oid, declaration);
-            }
-            Decoded::Refused { at, fault, also } => {
-                if expected.kind == As::Template {
-                    self.refused.insert(oid.clone(), ()).expect("listing capacity");
-                    for entry in &self.entries {
-                        let asked = match revision::class(&entry.path) {
-                            revision::Class::Tree { task, .. }
-                            | revision::Class::Template { task, .. }
-                            | revision::Class::Script { task, .. } => self.needs(task),
-                            revision::Class::Fleet
-                            | revision::Class::Environment { .. }
-                            | revision::Class::Host { .. }
-                            | revision::Class::Declaration { .. }
-                            | revision::Class::Readme { .. }
-                            | revision::Class::Refused { .. }
-                            | revision::Class::Other => false,
-                        };
-                        if asked && &entry.oid == oid && entry.path.ends_with(b".j2") {
-                            errors::push(&mut self.errors, errors::refused(&entry.path, Some(at), fault.clone(), also));
-                        }
-                    }
-                } else {
-                    let path =
-                        self.paths.get(usize::try_from(self.read).expect("bounded cursor")).expect("requested path");
-                    errors::push(&mut self.errors, errors::refused(path, Some(at), fault, also));
-                }
-                self.outcome = self.outcome.worst(Outcome::Failed);
-            }
-        }
-        self.read = self.read.saturating_add(1);
-        self.ready = usize::try_from(self.read).expect("bounded cursor") == self.pending.len();
     }
     pub fn cached(&mut self, oid: &Oid, size: u64, digest: hearth_lib::encode::Digest) {
         let expected =
@@ -350,18 +275,6 @@ impl Side {
                         errors::refused(&entry.path, None, Decode::TooLarge { limit, max: u64::from(max) }, None),
                     );
                     self.outcome = self.outcome.worst(Outcome::Failed);
-                } else if kind == As::Template && !self.budget.take(entry.size) {
-                    errors::push(
-                        &mut self.errors,
-                        errors::refused(
-                            &entry.path,
-                            None,
-                            Decode::TooLarge { limit: Limit::Decoded, max: limits.decoded },
-                            None,
-                        ),
-                    );
-                    self.fail(Outcome::Failed);
-                    return false;
                 } else if !contains(blobs.as_slice(), &entry.oid, kind) {
                     blobs.push(Blob { oid: entry.oid.clone(), size: entry.size, kind }).expect("listing capacity");
                     paths.push(entry.path.clone()).expect("listing capacity");

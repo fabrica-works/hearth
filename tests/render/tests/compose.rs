@@ -54,30 +54,23 @@ fn documents_past_the_revision_s_budget_fail_the_call() {
     for seed in fixtures::COMPOSITION_SEEDS {
         let mut repository = fixtures::x1_prod();
         for entry in &mut repository.entries {
-            entry.size = 24;
+            entry.size = fixtures::LISTED_CONFIGURATION_BYTES;
         }
-        let run = parent::run_with(&repository, &[], seed, limits::Limits { decoded: 64, ..limits::SHIPPED });
+        let run = parent::run_with(&repository, &[], seed, fixtures::SMALL_DECODED);
         assert_eq!(
             run.answers,
-            [Answer::Error(hearth_domain_render::errors::Error {
-                side: None,
-                kind: hearth_domain_render::errors::Kind::Decode(hearth_domain_render::errors::Decode::TooLarge {
+            [Answer::Error(fixtures::configuration_error(
+                hearth_domain_render::errors::Kind::Decode(hearth_domain_render::errors::Decode::TooLarge {
                     limit: hearth_domain_render::errors::Limit::Decoded,
-                    max: 64
+                    max: fixtures::SMALL_DECODED.decoded,
                 }),
-                class: hearth_domain_render::vocabulary::Class::Configuration,
-                at: Some(hearth_domain_render::errors::Place {
-                    path: Box::from(b"hosts/x1/x1.json".as_slice()),
-                    position: None
-                }),
-                also: None,
-                target: None,
-                task: None,
-            })],
+                b"envs/prod.json",
+                None,
+            ))],
             "seed {seed}"
         );
         assert_eq!(run.outcome, Outcome::Failed, "seed {seed}");
-        assert_eq!(run.requests.len(), 1, "budget checked before reading, seed {seed}");
+        assert_eq!(run.requests.len(), fixtures::DECODE_REQUESTS, "decoded bytes counted after reading, seed {seed}");
     }
 }
 
@@ -113,24 +106,15 @@ fn the_target_past_the_limit_errs_and_fails_the_call() {
 }
 #[test]
 fn a_named_target_a_refused_base_hides_is_no_usage() {
-    use hearth_domain_render::{errors::Decode, revision::Position, vocabulary::Decoded};
     let mut repository = fixtures::cluster();
-    fixtures::set_document(
-        &mut repository,
-        b'2',
-        Decoded::Refused { at: Position { line: 1, column: 2 }, fault: Decode::Unexpected, also: None },
-    );
+    fixtures::refuse_document(&mut repository, b'2');
     assert_eq!(parent::run(&repository, &[b"x1-1-prod"], 0).outcome, Outcome::Failed);
 }
 #[test]
 fn a_container_whose_host_failed_is_left_out_without_an_error() {
-    use hearth_domain_render::{errors::Decode, revision::Position, vocabulary::Decoded};
+    use hearth_domain_render::errors::Decode;
     let mut repository = fixtures::containers();
-    fixtures::set_document(
-        &mut repository,
-        b'4',
-        Decoded::Refused { at: Position { line: 1, column: 2 }, fault: Decode::Unexpected, also: None },
-    );
+    fixtures::refuse_document(&mut repository, b'4');
     for seed in fixtures::COMPOSITION_SEEDS {
         let run = fixtures::render_seeded(&repository, seed);
         let Answer::Error(error) = only(&run.answers) else { panic!("host error") };

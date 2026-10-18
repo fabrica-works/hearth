@@ -662,3 +662,10 @@ pub fn error_at_budget(bytes: usize) -> hearth_domain_render::errors::Error {
 pub mod properties;
 pub use crate::golden::repository_of;
 pub use properties::digests;
+mod decoded;
+pub use decoded::*;
+
+pub fn only_mut<T>(items: &mut [T]) -> &mut T {
+    let [item] = items else { panic!("one item") };
+    item
+}

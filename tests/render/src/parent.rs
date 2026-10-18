@@ -108,7 +108,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
     panic!("render settles: seed {seed}")
 }
 
-fn blob_event(
+pub(crate) fn blob_event(
     repository: &Repository,
     blob: &render::vocabulary::Blob,
     request: skein_lib::Token,

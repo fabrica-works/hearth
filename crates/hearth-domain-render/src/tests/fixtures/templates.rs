@@ -144,3 +144,7 @@ pub fn answer(call: &mut crate::call::Side) -> crate::vocabulary::Answer {
     }
     panic!("fixture answer bound")
 }
+
+pub fn charged_template(text: &[u8], name: &[u8]) -> Template {
+    template(&[], [self::text(0, text), set(0, name, expr(1, [super::name(0, name, crate::evaluate::Missing::Error)]))])
+}
