@@ -1013,6 +1013,48 @@ None yet.
      2. It changes no `worst_case` formula outside its Files (`hearth-protocol-config`'s `json.rs`, `schema.rs`, `declaration.rs`; render's `errors.rs` and `evaluate/template.rs`; the store's and the printer's stay as they are), and adds no test that asserts the sum against `1 << 30`, ignored or not.
      3. It lands when all else is done, as its session file says. Its report gives the sum `Client::worst_case` returns at the defaults, by layer, once, from one run of a unit test's output or a `dbg!` removed before the commit; nothing else is wanted. The answer's ruling names the step that adds the 1 GiB test and any tightening.
 
+185. **hearth 21.4: keys are unique within their declaration** (design answer, hearth-21.4's block of 2026-10-18T01:10:34Z).
+     **hearth 21.4: keys are unique within their declaration** (design answer, hearth-21.4's block of 2026-10-18T01:10:34Z).
+     The designer's answer, hearth 01ffde6 ("Answer render's question of 01:10: keys are unique within their declaration"), decides it; ruling 183's interim ends:
+
+
+     Within the map, the report's proposal. format.md 5.2 now reads:
+
+     > **Keys are unique after expansion, within their declaration:** two
+     > elements of one declaration that make the same key are an error. One
+     > key in two declarations makes an entry in each, as `hearth` does in
+     > 5.12's `software` and `users`. [...] The bound on entries counts every
+     > declaration of the task (render.md, 2.3).
+
+     render.md 7.2's `collision` row ("a key a declaration makes twice") and 2.3's
+     bound ("entries one `task.json`'s declarations expand to for one target")
+     already say this, and stay as written. 5.12's `task.json` stays as it is.
+
+     For hearth 21.4 (21-reserved.md, as landed):
+     - `entries::expand` (`entries.rs:91`): a key already in its map's `ordered`
+       (`:100`) is `Collision::Key` at the entry, with `also` set to that entry's `at`.
+     - `keys`, the index across a task's maps, goes (`:97`, `:123`, `:131` to
+       `:134`), and so does its term in `worst_case` (`:661`).
+     - A `u32` counts the keys made across the task's maps. It is checked where
+       `:123` checks `keys.len()`, and keeps `Limit` at `expansion`.
+     - The render world's reference (`tests/render/src/reference/entries.rs`)
+       keeps `seen` per declaration (`:14`) and counts keys across declarations for
+       `limit` (`:66`).
+     - Files gain render `src/entries.rs` and `src/tests/entries.rs`, and that
+       reference. Size: at most 280 lines (was 260).
+     - Tests gain `one_key_in_two_maps_makes_an_entry_in_each`: `entry_maps` of
+       `Map::Software` and `Map::Users`, each `[entry(plain(b"hearth"), None,
+       None)]`, gives two groups, each holding the one key `hearth`.
+     - Don't gains "change a key of 5.12's `task.json` in `HEARTH`".
+     - `the_hearth_task_of_5_12_passes_every_reserved_rule` stands as written.
+
+     What stays unchanged: `two_entries_making_one_key_collide` (`:170`),
+     `two_elements_making_one_key_are_a_collision_naming_the_first` (`:158`),
+     `the_entry_count_runs_across_a_tasks_maps` (`:207`); key order, the `if`-false
+     rule, the collision's message and JSON; 22's collisions.
+
+     Nothing is deferred, so `later.md` gains no row.
+
 ## For the user
 
 The long-term choices the user may veto:
