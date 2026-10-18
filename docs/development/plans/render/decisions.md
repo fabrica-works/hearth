@@ -1316,6 +1316,41 @@ None yet.
      2. A fresh hearth 28 session takes 28.s3, then 28.s4, whose Files name neither a template's charge nor `limits::worst_case`'s `decoded` term (hearth/28.s-held-bounds.md); no test or memory case of theirs asserts a template's count or the decoded bound.
      3. 28.s7 counts each kept template in its 64 MiB (its Shape), so it rests on the answer: it does not start before the answer's unblock, whatever the ledger says. A 28.s4 landed before that unblock ends the session's work, which reports and waits, kind design, naming this question.
 
+200. **hearth 28.s8: a template counts 4 bytes for each of its lines** (design gap, hearth 28's block of 2026-10-18T02:40:56Z).
+     The designer's answer, hearth a28817a; its line charge is hearth 28.s8, in `hearth/28.s-held-bounds.md`, in the 28.s session after 28.s3 and before 28.s4 (28.s4 and 28.s7 now need 28.s8, so 28.s7 counts a kept template's lines); it ends ruling 199's interim. 28.s8's Files add the memory fixture's derived counts: `tests/render/src/fixtures/decoded.rs`'s 1 MiB newline template counts 5,242,916 bytes, and 12 fit, not 63.
+
+
+     The implementer's proposal, and the supervisor's first reading. 2.3 now
+     counts "a template the bytes of the text and names it holds, 32 bytes for
+     each instruction and operation, and 4 bytes for each of its lines, whose
+     first bytes it keeps (8.3): every line, a comment's among them. The
+     document, declaration or template whose count passes the 64 MiB fails the
+     render at its path." 8.3 keeps the table: "Beside its instructions, it
+     keeps the offset of each line's first byte, which places a fault at its
+     own line and column (7.1) without reading the blob again (3.10), and
+     which its count includes (2.3)".
+
+     What stays: 2.3's limits; 7.1's place; `limits::worst_case`, and its
+     `decoded` term, `revision::decoded_worst_case` (`revision.rs:387`), whose
+     ratio is at least 5 (`:402`), because a line holds the 4 bytes it counts.
+     28.s5 is unchanged.
+
+     The charge, which the supervisor places (default: the 28 session's next
+     increment after the one in progress, before 28.s7, whose Needs now name
+     it). 28.s2's text, after its Don't:
+     - Shape: a template's charge (`revision/held/template.rs:7`) adds 4 bytes
+       for each of its `lines` (`evaluate/template.rs:8`).
+     - Test shape: unit `a_template_counts_4_bytes_for_each_line` (`{#`,
+       1,048,572 newlines and `#}` compile to no instruction and count
+       4,194,292 bytes: 1,048,573 lines × 4) and
+       `comment_only_templates_past_64_mib_fail_the_render_at_the_path_that_passes_it`
+       (distinct 1 MiB ones, beside `src/tests/decoded.rs`'s); memory
+       `decoding_comment_only_templates_holds_no_more_than_the_worst_case`.
+     - Don't: read the blob again to place a fault, or give up the line table;
+       change `revision::decoded_worst_case`.
+     - Proof: the focused tests, failing on main first, then hearth's gate
+       through `land`.
+
 ## For the user
 
 The long-term choices the user may veto:
