@@ -1055,6 +1055,16 @@ None yet.
 
      Nothing is deferred, so `later.md` gains no row.
 
+186. **hearth 28.5's chaos ends no operation for good: simulated::chaos()** (plan defect, hearth-28.5's block of 2026-10-18T01:15:23Z).
+     **hearth 28.5's chaos ends no operation for good: `simulated::chaos()`** (plan defect, hearth-28.5's block of 2026-10-18T01:15:23Z).
+
+     28's Choices list this world's faults: "a tool killed after n stdout bytes, a cache file gone before git reads it, git not installed, a stalled mmdebstrap (never git: no deadline in M1, render.md 2.2; fakes do not end their clients, testing-strategy.md, 6)", and 28.5's fuzzy story is named `random_seeds_under_chaos_settle_with_the_calm_runs_spec`. Yet 28.5's sketch ran the raw `Config::chaos()`, whose `Faults::CHAOS` hangs an `Open`, `Read`, `Write` or `Sync` (`hung: 5`, until a `Cancel`), and fails operations for good with `no_space`, `read_only`, `io_error` and `no_buffer`: seed 11 hung hosted git's `Open` of `usr/bin/git`, which no deadline ends in M1. The plan asked for chaos its own Choices exclude; the report's proposal is taken. No term of the design is in question.
+
+     1. `tests/builder/src/simulated.rs` gains `pub fn chaos() -> Config`: `Config::chaos()` (its 64-byte buffer and backlog 2 stay) with `faults: Faults { no_space: 0, read_only: 0, io_error: 0, hung: 0, no_buffer: 0, reset: 0, refuse: 0, timed_out: 0, ..Faults::CHAOS }`, keeping `CHAOS`'s latency, short reads, writes, receives and sends, cancel races, unsubmitted cancels and late resets.
+     2. `a_seed_replays_to_the_same_trace_machine_and_state_digests` and `random_seeds_under_chaos_settle_with_the_calm_runs_spec` run under `simulated::chaos()`; their assertions stay as the session file says (seed 11 twice equal, seed 12's trace differs; 64 seeds settle with the calm run's spec).
+     3. Unchanged: the Choices' faults and their sweep (`a_builder_killed_before_each_submission_restarts_cold_and_settles`, the stalled mmdebstrap), `Config::chaos()` itself (skein's), and every test that runs `Config::calm()`.
+     4. A further fault of `Faults::CHAOS` that ends a run whose calm run settles (an operation failed or stopped with no retry in M1) is set to 0 the same way; the commit body names it, with the seed and the log line that met it.
+
 ## For the user
 
 The long-term choices the user may veto:

@@ -325,7 +325,12 @@ is `Some(state_digest(domain))`. `worst_case` at each layer, as the echo's
 and `evaluate::template::worst_case`), the root's with render's and store's, the
 protocol layer's (each machine once: one git child, one decode, one resolution
 at a time, hearth 11 and 24, and tree's `limits::{worst_case, held}`, 39.1), the service's (io, `FileIo::worst_case`, protocol,
-domain, queues); `Client::worst_case` is the service's.
+domain, queues); `Client::worst_case` is the service's. `simulated::chaos()`
+(ruling 186): `Config::chaos()` with `faults` that keep `Faults::CHAOS`'s latency,
+short reads, writes, receives and sends, cancel races and late resets, and set
+to 0 the faults that end an operation for good: `no_space`, `read_only`,
+`io_error`, `hung` (a hung git has no deadline in M1, Choices), `no_buffer`,
+`reset`, `refuse`, `timed_out`; the replay and the fuzzy story run under it.
 Test shape: `tests/simulation.rs`, 0.5 s: ref below,
 `a_digested_run_traces_the_domain_and_machine_digests` (more than one distinct
 `Event::Digest` under the client's pid, the machine's under `Pid::MACHINE`, none
@@ -345,7 +350,7 @@ submission: the output ends with `THIN_TEXT`).
 #[test]
 fn a_seed_replays_to_the_same_trace_machine_and_state_digests() {
     let run = |seed| {
-        let mut world = simulated::world(&fixtures::thin(), seed, Config::chaos());
+        let mut world = simulated::world(&fixtures::thin(), seed, simulated::chaos());
         world.digests(Digests::Traced);
         let outcome = world.run();
         (outcome.trace.iter().map(|entry| format!("{entry:?}")).collect(), outcome.state_digests())
@@ -357,7 +362,8 @@ fn a_seed_replays_to_the_same_trace_machine_and_state_digests() {
 Proof: joint, that test: two runs of seed 11 under chaos end with the same trace,
 machine digest and domain digest; seed 12's trace differs. Bound: 0.5 s. The real
 loop does not replay (testing.md, 2): this is the highest layer that does.
-Don't: digest the protocol layer or an `Env`; raise the memory test's limits.
+Don't: digest the protocol layer or an `Env`; raise the memory test's limits;
+run the replay or the fuzzy story under the raw `Config::chaos()`.
 Size: at most 200 lines.
 Removes: hearth 11's `Client::worst_case` of `u64::MAX`.
 
