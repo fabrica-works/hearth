@@ -118,23 +118,27 @@ Test shape: world, 12 repositories, under 0.5 s:
 `a_generated_repository_renders_without_errors`,
 `a_reordered_object_changes_no_digest`,
 `reformatted_whitespace_changes_no_digest`, `an_edited_note_changes_no_digest`,
-`every_seed_gives_the_same_digests`; process, under 0.5 s:
+`every_seed_gives_the_same_digests_<k>`, k from 0 to 2, cases 4k to 4k + 3
+of the 12, under 0.5 s each (ruling 195); process, under 0.5 s:
 `a_generated_repository_renders_the_worlds_digests_through_real_git` (two,
 `Form::JsonLines`, `form.rs:12`: ruling 190). The sweep, `fuzzy_properties.rs`:
-`generated_repositories_and_edits_keep_every_property` (750 rounds, about
-1.5 s; each edit's changed set is `touched`'s; 30.2's edits and `mutate` join it).
+`generated_repositories_and_edits_keep_every_property_<k>`, k from 0 to 14,
+each rounds 50k to 50k + 49 of the 750, about 1 s each (ruling 195:
+hearth's workflow.md 2, "Split longer sweeps so the gate can share them
+across threads"); each edit's changed set is `touched`'s; 30.2's edits and
+`mutate` join each batch).
 ```rust
 // tests/render/tests/properties.rs
 #[test]
-fn every_seed_gives_the_same_digests() {
-    for case in 0..12_u64 {
+fn every_seed_gives_the_same_digests_0() {
+    for case in 0..4_u64 {
         let generated = repositories::generate(&mut Rng::new(0x0030_0000 + case), Shape::SMALL);
         let run = |seed| fixtures::digests(&parent::run(&fixtures::repository_of(&generated.leaves), &[], seed));
         for seed in 1..8 { assert_eq!(run(seed), run(0), "render.md, 9.3: case {case}, seed {seed}"); }
     }
 }
 ```
-Proof: world, `every_seed_gives_the_same_digests`: whatever the pace of
+Proof: world, `every_seed_gives_the_same_digests_<k>`: whatever the pace of
 answers, one digest a target; process, the real-git test: the same digests
 printed whole. Bound: 0.5 s; 0.5 s.
 Don't: compute a digest in the generator; read `expected/`.
@@ -414,6 +418,6 @@ None.
 1. `git -C ~/src/rust/hearth log origin/main --grep='^Plan: render$' --format='%(trailers:key=Step,valueonly)' | sort -u | grep -c -x -E 'hearth-30\.[1-6]'` prints 6.
 2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run
    -p hearth-render-world -p hearth-config-world -p hearth-template-world
-   -p hearth-git-world -p hearth-builder-world` passes, and `heavy cargo nextest run --workspace --profile fuzzy -E 'binary(/^fuzzy_(oracle|properties|goldens|revisions|inputs)$/)'` passes, its `Summary` naming 9
-   tests.
+   -p hearth-git-world -p hearth-builder-world` passes, and `heavy cargo nextest run --workspace --profile fuzzy -E 'binary(/^fuzzy_(oracle|properties|goldens|revisions|inputs)$/)'` passes, its `Summary` naming 23
+   tests (9, 30.1's sweep counted as its 15 batches: ruling 195).
 3. `git -C ~/src/rust/hearth grep -l -i minijinja origin/main -- crates testing tests ':!tests/render/tests/oracle/engine.rs' ':!tests/render/Cargo.toml' | wc -l` prints 0, and `git -C ~/src/rust/hearth grep -c '=2.20.0' origin/main -- tests/render/Cargo.toml | awk -F: '{print $NF}'` prints 1.

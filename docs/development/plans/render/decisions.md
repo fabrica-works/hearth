@@ -1217,6 +1217,34 @@ None yet.
      that let four fit, and give the count as the test computes it by 2.3's
      rule, a literal with its sum in a comment.
 
+195. **hearth 30.1's sweep runs as fifteen batches of 50 rounds** (plan defect, hearth-30.1's block of 2026-10-18T02:21:53Z).
+     Yes to both, as hearth's workflow.md 2 says: "Long runs are several tests.
+     [...] Split longer sweeps so the gate can share them across threads,
+     keeping their assertions and coverage."
+
+     1. **The sweep is fifteen tests,**
+        `generated_repositories_and_edits_keep_every_property_<k>`, k from 0 to
+        14: batch k runs rounds 50k to 50k + 49 of the 750, each round with the
+        seed it has in the one sweep, so that the 750 rounds and their
+        assertions stay. Every batch has its suffix, `_0` included: the names
+        show they are one sweep. Each is one call of a function that takes its
+        k. 30.2's edits and `mutate` join each batch.
+     2. **The determinism test is three,** `every_seed_gives_the_same_digests_<k>`,
+        k from 0 to 2: cases 4k to 4k + 3 of the 12.
+     3. **30's Done when 2 names 23 tests:** its 9, with the sweep counted as its
+        15 batches. A later step of 30 whose sweep passes workflow.md 2's 5 s
+        splits the same way, its report giving the new count, and the ruling
+        that allows it amends Done when 2.
+     4. **A batch above twice its ceiling** (10 s) is made cheaper before it
+        lands, as the implementer card says; 30.2 reports a batch its edits push
+        past it.
+     5. **The budget:** the suites' budgets are wall time through the gate on 8
+        threads (development.md 11.5). The sweep's 13.937 s of rounds, about
+        1.7 s of such wall time, is 30.1's share of decision 15's 30 s of fuzzy
+        growth (30.1's plan share: 1.5 s). The commit body gives the fuzzy
+        suite's wall time before and after; the hourly check reads it against
+        decision 15.
+
 ## For the user
 
 The long-term choices the user may veto:
