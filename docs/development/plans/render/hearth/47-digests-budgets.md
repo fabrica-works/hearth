@@ -14,7 +14,9 @@ cost facts, over what hearth 28 built. Split from hearth 30 (decisions.md,
 ## What the design asks
 
 - **9.3:** "one revision renders to the same digests in every world".
-  **9.8, 3.10:** a revision "decoded once"; each blob read once.
+  **9.8, 3.10:** a revision "decoded once"; each blob read once. **8.4:** "A
+  diff's second side decodes only the blobs that changed"; "It reads only
+  the others, a blob the first refused among them."
 
 ## Choices this plan makes
 
@@ -39,7 +41,9 @@ cost facts, over what hearth 28 built. Split from hearth 30 (decisions.md,
 
 ### 47.1 The digests in the joint worlds, and the budgets
 Scope: 9.3's "every world" past the process tier; 9.8 and 3.10.
-Needs: hearth 28.4 (28.2 to 28.4), hearth 25.1 (`Call::Diff`), hearth 30.1.
+Needs: hearth 28.4 (28.2 to 28.4), hearth 25.1 (`Call::Diff`), hearth 30.1,
+and the step that builds render.md 8.4's second side (the designer's answer
+of 2026-10-18T02:33:00Z's question).
 Files: `tests/builder/tests/properties.rs`, new `tests/builder/tests/
 budgets.rs`, `tests/builder/src/fixtures.rs`, `tests/builder/src/domain.rs`
 (`Run::new`, `:54`), `tests/builder/src/fixtures/worlds.rs` (`Shared::
@@ -76,8 +80,10 @@ repositories, 8 seeds),
 with a second file in one of its task trees holding another's body, as
 `DUPLICATE_BLOB`, `fixtures/worlds.rs:213`, is thin's: one `List`, no oid
 twice among the `Read`s, fewer oids than the listing's entries),
-`a_diff_reads_a_blob_the_two_revisions_share_once`,
-`a_diffs_second_revision_reads_only_the_blobs_that_changed`.
+`a_diff_reads_a_blob_the_two_revisions_share_once` (no oid twice among
+both sides' `Read`s),
+`a_diffs_second_revision_reads_only_the_blobs_that_changed` (the `Read`s
+after the second `List` name the edited file's oid alone; render.md 8.4).
 ```rust
 // tests/builder/tests/budgets.rs
 #[test]

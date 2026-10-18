@@ -1,6 +1,6 @@
 # Render
 
-Provisional, 2026-10-09, revised 2026-10-17. How hearth turns a revision
+Provisional, 2026-10-09, revised 2026-10-18. How hearth turns a revision
 of an IaC repository and a target into a spec: what render reads and how
 it reads it, its pipeline, the spec's parts and their digests, package
 resolution, the rendered diff of a change, its errors, its crates and
@@ -453,8 +453,9 @@ overwrote silently, in alphabetical order of task.
 
 - **A revision is decoded once** and shared by all its targets. Decoded
   documents, templates and static files' digests are kept by git object
-  id, so the next revision decodes only the blobs that changed. Object
-  ids name contents, so this memory changes no result.
+  id, so the next revision, a diff's second side among them (8.4),
+  decodes only the blobs that changed. Object ids name contents, so this
+  memory changes no result.
 - **A target's render** composes its layers, validates, evaluates and
   hashes its files: for the fleet's targets, milliseconds each.
   Rendering every target of two revisions, as a diff does (section 6), is
@@ -1258,7 +1259,19 @@ every request                                          Failed { request, class, 
   record, a render holds the closure's digest, which its layer keys take
   (4.5), and a diff the closures it compares (5.7, 6.1). A diff renders
   its sides in turn, and keeps of the first only its specs, closures and
-  errors.
+  errors, and, until the second's listing, its decoded blobs (below).
+- **A diff's second side decodes only the blobs that changed** (3.10).
+  When its listing arrives, it keeps of the first side's decoded
+  documents, declarations, templates and links' targets, and of its
+  static files' digests, those of the blobs that listing names, by object
+  id and as what they were read; the rest go. It reads only the others,
+  a blob the first refused among them. It gives what a render of its
+  revision alone gives, within the same 64 MiB: each document,
+  declaration and template counts in its own 64 MiB (2.3) in that
+  render's order, kept or read; when what it holds would pass the 64 MiB,
+  the kept blobs not yet counted go first, and one it then needs is read
+  again. So a diff's peak holds one revision's decoded data, as a
+  render's does.
 - **Each layer's formula is its peak:** what the layer holds at once at
   its limits, not the sum of every maximum it reaches in turn. The
   counting allocator holds the live heap within it at every iteration
