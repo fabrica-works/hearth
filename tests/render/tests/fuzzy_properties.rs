@@ -1,4 +1,16 @@
+use hearth_render_world::fixtures::laws;
 use hearth_render_world::fixtures::properties as inputs;
+#[test]
+fn generated_patches_obey_the_laws_and_the_reference() {
+    for seed in laws::ROUNDS {
+        let (target, patch) = laws::patches(seed, laws::WIDE_DEPTH);
+        laws::reference_agrees(&target, &patch, seed);
+        laws::idempotent(&target, &patch, seed);
+        let object = laws::object(target);
+        assert_eq!(laws::merged(&[&object, &laws::EMPTY]), laws::merged(&[&object]), "seed {seed}");
+        assert_eq!(laws::merged(&[&object, &patch]).as_ref().map(laws::has_null), Some(false), "seed {seed}");
+    }
+}
 #[test]
 fn generated_repositories_and_edits_keep_every_property_0() {
     inputs::sweep(0);

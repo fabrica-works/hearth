@@ -659,8 +659,10 @@ pub fn error_at_budget(bytes: usize) -> hearth_domain_render::errors::Error {
     error
 }
 
+pub mod laws;
 pub mod properties;
 pub use crate::golden::repository_of;
+pub use laws::merged;
 pub use properties::digests;
 mod decoded;
 pub use decoded::*;

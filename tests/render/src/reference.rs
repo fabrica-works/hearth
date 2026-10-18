@@ -1,9 +1,30 @@
-//! Recursive reference from format.md, 7.4 to 7.7; no use of evaluator operations.
+//! Recursive references from format.md, 4.1 and 7.4 to 7.7.
 use super::expressions::{Binary, Plain, Roots, Tree};
 use hearth_domain_render::{
     evaluate::{Filter, Missing, Value},
     limits::Limits,
 };
+/// Format.md, 4.1's recursive pseudocode; independent of render's merge.
+#[must_use]
+pub fn merge(target: Option<crate::json::Json>, patch: &crate::json::Json) -> Option<crate::json::Json> {
+    use crate::json::Json;
+    let Json::Map(patch) = patch else {
+        return if *patch == Json::Null { None } else { Some(patch.clone()) };
+    };
+    let mut result: std::collections::BTreeMap<_, _> = match target {
+        Some(Json::Map(entries)) => entries.into_iter().collect(),
+        Some(Json::Null | Json::Bool(_) | Json::Int(_) | Json::String(_) | Json::List(_)) | None => {
+            std::collections::BTreeMap::new()
+        }
+    };
+    for (key, value) in patch {
+        let previous = result.remove(key);
+        if let Some(value) = merge(previous, value) {
+            result.insert(key.clone(), value);
+        }
+    }
+    Some(Json::Map(result.into_iter().collect()))
+}
 #[derive(Clone, Debug)]
 struct Made {
     value: Option<Value>,
