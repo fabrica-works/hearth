@@ -1099,6 +1099,26 @@ None yet.
 190. **hearth 30's Shapes against main** (ready check of hearth-30.1).
      hearth 30's ready check (a read-only check at hearth 66a009e, its 29.1 names again at 57fa7d8, the skein pin fea416f) found ten places where 30-properties.md does not match main; it now says each. (1) 30.1: `fixtures::files_of` is the builder world's (`tests/builder/src/fixtures/goldens.rs:5`, `Vec<File>`); the render world's leaves-to-repository is `Golden::repository` (`tests/render/src/golden/repository.rs:16`), out of which `fixtures::repository_of(&[Leaf])` is factored, and which calls it. (2) 30.1: the JSON form is `Form::JsonLines` (`hearth-client-protocol-records/src/form.rs:12`). (3) 30.3: `an_empty_patch_leaves_the_target_as_it_was` failed on 157 of 200 seeds with scalar and list targets, as format.md 4.1 says ("result = target if target is an object, else {}"); its targets are objects, and passed so. (4) 30.3: `Composed` already derives `PartialEq` (`compose.rs:204`), `from: Provenance` included: the Don't now forbids comparing with it. (5) 30.4: `expressions::text` returns `Vec<u8>` (`tests/render/src/expressions.rs:195`); Files gain `declarations.rs`, whose four callers (`:53, 117, 152, 155`) join `templates.rs`'s five and `expressions.rs:318-326`'s in taking the new `String`. (6) 30.4: `context_of(&Roots)` carries `Roots.bindings` (`expressions.rs:22`). (7) 30.5: the render world's wide template shape is `templates::WIDE` (`templates.rs:11`); `WIDE_TEMPLATES` is the template world's (`tests/template/src/fixtures.rs:13`). (8) 30.6: `names::shape` is `pub(crate)` (`hearth-protocol-builder/src/store/names.rs:7`); the builder world has its copy (`tests/builder/src/domain/store.rs:226`). (9) 30.6: config's generator has `mutate` alone (`tests/config/src/generate.rs:56`); the golden sweeps feed `cut` where the world has one (template). (10) 30.6: `every_sweep_names_the_corpus_its_row_says` looks for `recordings::`, since `fuzzy_mmdebstrap.rs:36` reads `hearth_mmdebstrap_world::recordings::all()`; it failed for that row as written. Suites in the check's scratch tree at 66a009e, with corrections 3, 5 and 10, through heavy: fmt and clippy clean, nextest 1819 passed (7.5 s), fuzzy 21 passed (6.8 s); the 30.1, 30.3 and 30.6 sketches pass clippy. Not checked: 30.2 beyond its names, 30.5's `loop.*` generation, 30.4's Cargo.lock package list, each increment's time bound. Refresh any further copy of a corrected name, and list it in the commit body.
 
+191. **hearth 29.3's fleet declares 5.12's snapshots setting** (plan defect, hearth-29.3's block of 2026-10-18T01:43:03Z).
+     A plan defect, which the design answers: 29.3's `fleet` follows format.md
+     3.7, whose `fleet.json` sets `hearth.snapshots`, and format.md 5.12's
+     `hearth` task declares that setting ("snapshots": a map of objects of
+     `every`, a duration, and `keep`, a map of ints; "default": {}). Choices 6's
+     `{}` was written for the goldens that set nothing of `hearth`. The report's
+     proposal stands:
+
+     - `fleet`'s `tasks/hearth/task.json` is `{"settings": {"snapshots": …}}`,
+       the declaration format.md 5.12 writes, copied byte for byte from
+       `tests/builder/src/fixtures/reserved/hearth.json:18-25`, and nothing else
+       of 5.12 (no `alarms`, `backups`, entries).
+     - `fleet.json` keeps 3.7's `hearth.snapshots` as written (`core`: every
+       `1d`, keep daily 7; `data`: every `1h`, keep hourly 24, daily 14,
+       weekly 8).
+     - Every other golden keeps `tasks/hearth/task.json` `{}`.
+
+     If render refuses 3.7's values under 5.12's declaration, that is a design
+     gap: block on it, with the error printed.
+
 ## For the user
 
 The long-term choices the user may veto:

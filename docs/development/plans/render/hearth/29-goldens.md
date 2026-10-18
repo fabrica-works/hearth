@@ -66,7 +66,9 @@ planned: what a golden shows missing is fixed in the session that owns it
 5. **A golden's targets are all of its repository's** (no names given): the
    run is the one a user makes. `expected/<target>` is the stdout cut at
    each line starting `target ` and named by its second word.
-6. **Every repository has `tasks/hearth/task.json` `{}`** (hearth 21.4);
+6. **Every repository has `tasks/hearth/task.json` `{}`** (hearth 21.4),
+   but `fleet`'s, which declares format.md 5.12's `snapshots` setting alone,
+   so that 3.7's `hearth.snapshots` defaults pass (ruling 191);
    `fleet.json` has `debian` (hearth 17.1); neither is counted below.
 7. **A review, not a trust.** The first bless of each file is read against
    the design lines it cites (render.md 9.2 and 7.3's forms, the modes,
@@ -226,7 +228,10 @@ holds what the design says), hearth 19, hearth 21, hearth 18.
 Files: `tests/render/{fleet,cluster}/**`, `tests/builder/tests/goldens.rs`.
 Shape: `fleet`: `fleet.json` and tasks as format.md 3.7 gives x1-prod
 (forky, `20261001T030405Z`, contrib and non-free-firmware, no pockets;
-tasks core, host, locale, boot, users, wifi, desktop, firmware, `hearth`),
+tasks core, host, locale, boot, users, wifi, desktop, firmware, `hearth`;
+`fleet.json`'s `hearth.snapshots` as 3.7 writes it, and `tasks/hearth/task.json`
+`{"settings": {"snapshots": …}}`, the declaration 5.12 writes, copied from
+`tests/builder/src/fixtures/reserved/hearth.json:18-25`: ruling 191),
 each task a few entries, so that every part prints. Targets: `x1-prod`
 (metal, efi, 7th-gen); `rhi-prod` (metal, bios; secrets, a download, a
 unit that may fail, `live`); `ion-prod` (vm, bios, ionos; identity);
