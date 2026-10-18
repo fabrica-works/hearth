@@ -1351,6 +1351,13 @@ None yet.
      - Proof: the focused tests, failing on main first, then hearth's gate
        through `land`.
 
+201. **hearth 30.6: two sweeps split by behaviour, 25 fuzzy tests** (plan defect, hearth 30's block of 2026-10-18T03:18:04Z).
+     The implementer's proposal. code-organization.md 6: "No test that checks several behaviours under one name. A table test whose rows are cases of one behaviour is one behaviour." 30.6's Shape names two behaviours under each of two sweeps: "`rev_parse::decode` on generated, cut, mutated output against a recursive reading of 02.1's rules; `revision` on bytes in and out of the alphabet", and "drawn calls round-trip; mutated argv gives `Ok` or `Startup`, in `form`'s form".
+     1. Each of `revisions_and_rev_parse_answers_cut_and_mutated_decode_as_the_reference_does` and `argv_drawn_and_mutated_gives_an_invocation_or_the_form_json_asks` splits in two, one behaviour a name, with the same cases and assertions: 30.6 lands seven sweeps. The implementer names them, and lists the four names in the commit body.
+     2. Session 30's Done when 2 now reads "its `Summary` naming 25 tests (11, 30.1's sweep counted as its 15 batches: rulings 195 and 201)": the 18 tests of `fuzzy_oracle` and `fuzzy_properties` on main, and 30.6's seven.
+     3. Unchanged: 30.6's Test time (fuzzy 2.5 s, its whole line), its inventory's rows and its four world tests; the other sweeps' names.
+     4. A further count of the fuzzy tests that names 23, in the plan or the code, is refreshed to 25 and listed in the commit body.
+
 ## For the user
 
 The long-term choices the user may veto:

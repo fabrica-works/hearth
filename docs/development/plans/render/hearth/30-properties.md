@@ -359,7 +359,12 @@ records' crate parses nothing: hearth 10; the builder's inputs are rows),
 `golden_templates_cut_and_mutated_compile_as_the_reference_compiles_them`,
 `revisions_and_rev_parse_answers_cut_and_mutated_decode_as_the_reference_does`,
 `store_names_mutated_by_a_byte_shape_as_the_table_says`,
-`argv_drawn_and_mutated_gives_an_invocation_or_the_form_json_asks`.
+`argv_drawn_and_mutated_gives_an_invocation_or_the_form_json_asks`; the
+revisions' and argv's each split in two, one behaviour a name
+(code-organization.md 6: ruling 201): `revision`'s alphabet apart from
+`rev_parse::decode`'s answers, and drawn argv's round trip apart from
+mutated argv's `Ok` or `Startup`, with the same cases and assertions: seven
+sweeps.
 ```rust
 // tests/render/tests/decoders.rs
 #[test]
@@ -424,6 +429,6 @@ None.
 1. `git -C ~/src/rust/hearth log origin/main --grep='^Plan: render$' --format='%(trailers:key=Step,valueonly)' | sort -u | grep -c -x -E 'hearth-30\.[1-6]'` prints 6.
 2. Once, in a worktree of hearth at `origin/main`: `heavy cargo nextest run
    -p hearth-render-world -p hearth-config-world -p hearth-template-world
-   -p hearth-git-world -p hearth-builder-world` passes, and `heavy cargo nextest run --workspace --profile fuzzy -E 'binary(/^fuzzy_(oracle|properties|goldens|revisions|inputs)$/)'` passes, its `Summary` naming 23
-   tests (9, 30.1's sweep counted as its 15 batches: ruling 195).
+   -p hearth-git-world -p hearth-builder-world` passes, and `heavy cargo nextest run --workspace --profile fuzzy -E 'binary(/^fuzzy_(oracle|properties|goldens|revisions|inputs)$/)'` passes, its `Summary` naming 25
+   tests (11, 30.1's sweep counted as its 15 batches: rulings 195 and 201).
 3. `git -C ~/src/rust/hearth grep -l -i minijinja origin/main -- crates testing tests ':!tests/render/tests/oracle/engine.rs' ':!tests/render/Cargo.toml' | wc -l` prints 0, and `git -C ~/src/rust/hearth grep -c '=2.20.0' origin/main -- tests/render/Cargo.toml | awk -F: '{print $NF}'` prints 1.
