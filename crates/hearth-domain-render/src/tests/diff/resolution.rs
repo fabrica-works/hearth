@@ -1,9 +1,8 @@
 use crate::{
     diff::{self, Listed, Moved, ResolutionChange},
     tests::fixtures,
-    vocabulary::{Answer, Event, Output, Request},
+    vocabulary::{Answer, Event, Output},
 };
-use skein_lib::Token;
 #[test]
 fn equal_resolution_keys_are_the_same_resolution() {
     assert_eq!(diff::resolution(fixtures::KEY_A, fixtures::KEY_A, None, None), ResolutionChange::Same);
@@ -33,35 +32,31 @@ fn two_recorded_closures_list_packages_added_removed_and_moved() {
         }
     );
 }
-const RECORDED: &[(bool, bool)] = &[(false, false), (true, false), (false, true)];
+const RECORDED: &[(bool, bool, ResolutionChange)] = &[
+    (false, false, ResolutionChange::NewKey),
+    (true, false, ResolutionChange::NewKey),
+    (false, true, ResolutionChange::NewKey),
+];
 #[test]
 fn a_closure_unrecorded_on_either_side_is_a_new_key() {
-    for &(before, after) in RECORDED {
-        let (mut render, env, mut out) = fixtures::resolution_diff(before, after, false);
-        assert_eq!(
-            fixtures::diff_resolution(&mut render, &env, &mut out),
-            ResolutionChange::NewKey,
-            "{before}/{after}"
-        );
+    for (before, after, expected) in RECORDED {
+        let (mut render, env, mut out) = fixtures::resolution_diff(*before, *after, false);
+        assert_eq!(fixtures::diff_resolution(&mut render, &env, &mut out), *expected, "{before}/{after}");
     }
 }
 #[test]
 fn the_rebuild_from_packages_is_known_once_the_later_key_is_recorded() {
     let (mut render, env, mut out) = fixtures::resolution_diff(false, true, false);
-    let Output::Answer(Answer::Change(change)) = fixtures::next_diff_output(&mut render, &env, &mut out) else {
-        panic!("change")
-    };
+    let change = fixtures::next_diff_change(&mut render, &env, &mut out);
     let diff::TargetChange::Changed { rebuild, .. } = change.change else { panic!("changed") };
-    assert_eq!(rebuild, diff::Rebuild::FromPackages { resolution: diff::Needs::Known });
+    assert_eq!(rebuild, fixtures::KNOWN_PACKAGES_REBUILD);
 }
 #[test]
 fn a_failed_resolve_keeps_new_key_and_its_error_follows_the_changes() {
     let (mut render, env, mut out) = fixtures::resolution_diff(false, true, true);
-    let Output::Request(Request::Resolve { key, .. }) = fixtures::next_diff_output(&mut render, &env, &mut out) else {
-        panic!("resolve")
-    };
+    let (key, _) = fixtures::next_diff_resolve(&mut render, &env, &mut out);
     assert_eq!(key, fixtures::KEY_A);
-    fixtures::fail_diff_resolution(&mut render, &env, &mut out, fixtures::run_failure(fixtures::RunCause::Fetch));
+    fixtures::fail_diff_fetch(&mut render, &env, &mut out);
     assert_eq!(fixtures::diff_resolution(&mut render, &env, &mut out), ResolutionChange::NewKey);
     let Output::Answer(Answer::Error(error)) = fixtures::next_diff_output(&mut render, &env, &mut out) else {
         panic!("error after change")
@@ -73,74 +68,49 @@ const RESOLUTION_KEYS: &[hearth_lib::encode::Digest] = &[fixtures::KEY_A, fixtur
 fn changed_keys_are_resolved_once_from_then_to_and_recorded_before_the_changes() {
     let (mut render, env, mut out) = fixtures::crossed_resolution_diff();
     for key in RESOLUTION_KEYS {
-        let Output::Request(Request::Resolve { key: asked, names, .. }) =
-            fixtures::next_diff_output(&mut render, &env, &mut out)
-        else {
-            panic!("resolve before printing")
-        };
-        assert_eq!(asked, *key, "{key:?}");
-        fixtures::complete_diff_resolution(&mut render, &env, &mut out, &names);
-        let Output::Request(Request::Record { resolution, .. }) =
-            fixtures::next_diff_output(&mut render, &env, &mut out)
-        else {
-            panic!("record before next resolve or printing")
-        };
-        assert_eq!(resolution.key, *key, "{key:?}");
-        crate::step(&mut render, &env, Event::Recorded { request: Token::new(7) }, &mut out);
+        assert_eq!(fixtures::record_next_diff_resolution(&mut render, &env, &mut out), (*key, *key), "{key:?}");
     }
-    let Output::Answer(Answer::Change(change)) = fixtures::next_diff_output(&mut render, &env, &mut out) else {
-        panic!("change follows both records")
-    };
-    let Output::Answer(Answer::Change(next)) = fixtures::next_diff_output(&mut render, &env, &mut out) else {
-        panic!("shared keys need no second resolve")
-    };
+    let change = fixtures::next_diff_change(&mut render, &env, &mut out);
+    let next = fixtures::next_diff_change(&mut render, &env, &mut out);
     assert_eq!((change.target.as_ref(), next.target.as_ref()), (b"x1-prod".as_slice(), b"z1-prod".as_slice()));
 }
 #[test]
 fn a_shared_failed_key_is_each_holders_error_on_both_sides() {
     let (mut render, env, mut out) = fixtures::crossed_resolution_diff();
     for key in RESOLUTION_KEYS {
-        let Output::Request(Request::Resolve { key: asked, .. }) =
-            fixtures::next_diff_output(&mut render, &env, &mut out)
-        else {
-            panic!("one resolve per key")
-        };
+        let (asked, _) = fixtures::next_diff_resolve(&mut render, &env, &mut out);
         assert_eq!(asked, *key, "{key:?}");
-        fixtures::fail_diff_resolution(&mut render, &env, &mut out, fixtures::run_failure(fixtures::RunCause::Fetch));
+        fixtures::fail_diff_fetch(&mut render, &env, &mut out);
     }
     let answers = fixtures::finish_render(&mut render, &env, &mut out);
     let mut errors = skein_lib::List::with_capacity(env.limits.errors);
     for answer in &answers {
         if let Answer::Error(error) = answer {
-            errors.push((error.side == Some(diff::Side::To), error.target.as_deref())).expect("bounded errors");
+            errors.push((error.side, error.target.as_deref())).expect("bounded errors");
         }
     }
-    let mut errors = errors.into_boxed();
-    errors.sort();
+    let errors = errors.into_boxed();
     assert_eq!(
         errors.as_ref(),
         &[
-            (false, Some(b"x1-prod".as_slice())),
-            (false, Some(b"z1-prod".as_slice())),
-            (true, Some(b"x1-prod".as_slice())),
-            (true, Some(b"z1-prod".as_slice()))
+            (Some(diff::Side::From), Some(b"x1-prod".as_slice())),
+            (Some(diff::Side::To), Some(b"x1-prod".as_slice())),
+            (Some(diff::Side::To), Some(b"z1-prod".as_slice())),
+            (Some(diff::Side::From), Some(b"z1-prod".as_slice()))
         ]
     );
 }
 #[test]
 fn a_declined_record_makes_the_diff_try_again() {
     let (mut render, env, mut out) = fixtures::resolution_diff(false, true, true);
-    let Output::Request(Request::Resolve { names, .. }) = fixtures::next_diff_output(&mut render, &env, &mut out)
-    else {
-        panic!("resolve")
-    };
+    let (_, names) = fixtures::next_diff_resolve(&mut render, &env, &mut out);
     fixtures::complete_diff_resolution(&mut render, &env, &mut out, &names);
     drop(out.pop());
     crate::step(
         &mut render,
         &env,
         Event::Failed {
-            request: Token::new(7),
+            request: fixtures::RECORD_REQUEST,
             class: crate::vocabulary::Class::Operational,
             at: None,
             failure: crate::vocabulary::Failure::Store,
@@ -148,11 +118,31 @@ fn a_declined_record_makes_the_diff_try_again() {
         &mut out,
     );
     let answers = fixtures::finish_render(&mut render, &env, &mut out);
-    let mut outcomes = skein_lib::List::with_capacity(1);
+    let mut outcomes = skein_lib::List::with_capacity(fixtures::DIFF_TERMINALS);
     for answer in &answers {
         if let Answer::Rendered { outcome, .. } = answer {
             outcomes.push(*outcome).expect("one terminal");
         }
     }
     assert_eq!(*fixtures::only(outcomes.as_slice()), crate::vocabulary::Outcome::TryAgain);
+}
+
+const DISJOINT_KEYS: &[hearth_lib::encode::Digest] =
+    &[fixtures::KEY_A, fixtures::KEY_B, fixtures::KEY_C, fixtures::KEY_D];
+#[test]
+fn every_changed_targets_keys_are_recorded_before_the_first_change() {
+    let (mut render, env, mut out) = fixtures::disjoint_resolution_diff();
+    for key in DISJOINT_KEYS {
+        assert_eq!(fixtures::record_next_diff_resolution(&mut render, &env, &mut out), (*key, *key), "{key:?}");
+    }
+    assert_eq!(
+        [
+            fixtures::next_diff_rebuild(&mut render, &env, &mut out),
+            fixtures::next_diff_rebuild(&mut render, &env, &mut out),
+        ],
+        [
+            (b"x1-prod".as_slice().into(), fixtures::KNOWN_PACKAGES_REBUILD),
+            (b"z1-prod".as_slice().into(), fixtures::KNOWN_PACKAGES_REBUILD),
+        ]
+    );
 }

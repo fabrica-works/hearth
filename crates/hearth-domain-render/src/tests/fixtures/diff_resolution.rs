@@ -4,7 +4,20 @@ use crate::{
     vocabulary::{Output, Request},
 };
 use hearth_lib::encode::Digest;
-use skein_lib::{Queue, Token};
+use skein_lib::Queue;
+// Request tags are the render vocabulary's fixed Find, Resolve and Record requests.
+pub const RECORD_REQUEST: skein_lib::Token = skein_lib::Token::new(7);
+const FIND_REQUEST: skein_lib::Token = skein_lib::Token::new(5);
+const RESOLVE_REQUEST: skein_lib::Token = skein_lib::Token::new(6);
+const LIST_REQUEST: skein_lib::Token = skein_lib::Token::new(1);
+// One terminal answer, one single-target side, and two crossed/disjoint targets.
+pub const DIFF_TERMINALS: u32 = 1;
+pub const KNOWN_PACKAGES_REBUILD: crate::diff::Rebuild =
+    crate::diff::Rebuild::FromPackages { resolution: crate::diff::Needs::Known };
+const SINGLE_TARGET: u32 = 1;
+const PAIRED_TARGETS: u32 = 2;
+// Each target needs Find/Resolve/Record and answers; 32 resumes cover the fixture.
+const DIFF_RESUMES: u32 = 32;
 pub struct Closures {
     pub before: Box<[Package]>,
     pub after: Box<[Package]>,
@@ -51,14 +64,14 @@ pub fn diff_record(key: Digest, closure: Box<[Package]>) -> crate::resolution::R
 }
 fn diff_side(key: Digest, recorded: bool, closure: Box<[Package]>) -> crate::call::Side {
     let mut side = crate::call::Side::new(b"/repo".as_slice().into(), Box::new([]), &crate::limits::SHIPPED);
-    side.made = skein_lib::Map::with_capacity(1);
+    side.made = skein_lib::Map::with_capacity(SINGLE_TARGET);
     side.diff = true;
     side.files = true;
     side.ready = true;
     side.commit = Some(crate::revision::Oid(b"commit".as_slice().into()));
     let spec = diff_spec(b"x1-prod", key);
     side.made.insert(b"x1-prod".as_slice().into(), Made::Spec(Box::new(spec))).expect("one target");
-    assert_eq!(super::next_resolution(&mut side), Some(Request::Find { request: Token::new(5), key }));
+    assert_eq!(super::next_resolution(&mut side), Some(Request::Find { request: FIND_REQUEST, key }));
     side.found(if recorded { Some(diff_record(key, closure)) } else { None }, false);
     side
 }
@@ -82,7 +95,7 @@ fn diff_from_sides(
     assert_eq!(
         request,
         Output::Request(Request::List {
-            request: Token::new(1),
+            request: LIST_REQUEST,
             repository: b"/repo".as_slice().into(),
             revision: b"after".as_slice().into()
         })
@@ -98,7 +111,7 @@ pub fn next_diff_output(
     env: &skein_lib::Env<crate::limits::Limits>,
     out: &mut Queue<Output>,
 ) -> Output {
-    for _ in 0_u32..32 {
+    for _ in 0_u32..DIFF_RESUMES {
         if let Some(output) = out.pop() {
             return output;
         }
@@ -111,9 +124,7 @@ pub fn diff_resolution(
     env: &skein_lib::Env<crate::limits::Limits>,
     out: &mut Queue<Output>,
 ) -> crate::diff::ResolutionChange {
-    let Output::Answer(crate::vocabulary::Answer::Change(change)) = next_diff_output(render, env, out) else {
-        panic!("change")
-    };
+    let change = next_diff_change(render, env, out);
     let crate::diff::TargetChange::Changed { parts, .. } = change.change else { panic!("changed") };
     let crate::diff::PartChange::Packages(packages) = super::only(&parts) else { panic!("packages") };
     packages.resolution.clone()
@@ -129,13 +140,13 @@ pub fn complete_diff_resolution(
         crate::step(
             render,
             env,
-            Event::Inst { request: Token::new(6), inst: super::resolution_inst(name, b"amd64") },
+            Event::Inst { request: RESOLVE_REQUEST, inst: super::resolution_inst(name, b"amd64") },
             out,
         );
         crate::step(
             render,
             env,
-            Event::Stanza { request: Token::new(6), line: 0, stanza: super::resolution_stanza(name, b"amd64") },
+            Event::Stanza { request: RESOLVE_REQUEST, line: 0, stanza: super::resolution_stanza(name, b"amd64") },
             out,
         );
     }
@@ -161,7 +172,7 @@ fn diff_spec(name: &[u8], key: Digest) -> crate::parts::Spec {
 
 fn crossed_side(first: Digest, second: Digest) -> crate::call::Side {
     let mut side = diff_side(first, false, Box::new([]));
-    let mut made = skein_lib::Map::with_capacity(2);
+    let mut made = skein_lib::Map::with_capacity(PAIRED_TARGETS);
     made.insert(b"x1-prod".as_slice().into(), Made::Spec(Box::new(diff_spec(b"x1-prod", first))))
         .expect("first target");
     made.insert(b"z1-prod".as_slice().into(), Made::Spec(Box::new(diff_spec(b"z1-prod", second))))
@@ -184,7 +195,62 @@ pub fn fail_diff_resolution(
     crate::step(
         render,
         env,
-        crate::vocabulary::Event::Failed { request: Token::new(6), class, at: None, failure },
+        crate::vocabulary::Event::Failed { request: RESOLVE_REQUEST, class, at: None, failure },
         out,
     );
+}
+
+pub fn disjoint_resolution_diff() -> (crate::Render, skein_lib::Env<crate::limits::Limits>, Queue<Output>) {
+    diff_from_sides(crossed_side(super::KEY_A, super::KEY_C), crossed_side(super::KEY_B, super::KEY_D), true)
+}
+/// Drive one resolve and record exchange, returning the two requested keys.
+pub fn record_next_diff_resolution(
+    render: &mut crate::Render,
+    env: &skein_lib::Env<crate::limits::Limits>,
+    out: &mut Queue<Output>,
+) -> (Digest, Digest) {
+    let (key, names) = next_diff_resolve(render, env, out);
+    complete_diff_resolution(render, env, out, &names);
+    let Output::Request(Request::Record { resolution, request }) = next_diff_output(render, env, out) else {
+        panic!("record before next resolve or printing")
+    };
+    crate::step(render, env, crate::vocabulary::Event::Recorded { request }, out);
+    (key, resolution.key)
+}
+pub fn next_diff_change(
+    render: &mut crate::Render,
+    env: &skein_lib::Env<crate::limits::Limits>,
+    out: &mut Queue<Output>,
+) -> crate::diff::Change {
+    let Output::Answer(crate::vocabulary::Answer::Change(change)) = next_diff_output(render, env, out) else {
+        panic!("change")
+    };
+    change
+}
+pub fn next_diff_rebuild(
+    render: &mut crate::Render,
+    env: &skein_lib::Env<crate::limits::Limits>,
+    out: &mut Queue<Output>,
+) -> (Box<[u8]>, crate::diff::Rebuild) {
+    let change = next_diff_change(render, env, out);
+    let crate::diff::TargetChange::Changed { rebuild, .. } = change.change else { panic!("changed") };
+    (change.target, rebuild)
+}
+
+pub fn next_diff_resolve(
+    render: &mut crate::Render,
+    env: &skein_lib::Env<crate::limits::Limits>,
+    out: &mut Queue<Output>,
+) -> (Digest, Box<[Box<[u8]>]>) {
+    let Output::Request(Request::Resolve { key, names, .. }) = next_diff_output(render, env, out) else {
+        panic!("resolve before printing")
+    };
+    (key, names)
+}
+pub fn fail_diff_fetch(
+    render: &mut crate::Render,
+    env: &skein_lib::Env<crate::limits::Limits>,
+    out: &mut Queue<Output>,
+) {
+    fail_diff_resolution(render, env, out, super::run_failure(super::RunCause::Fetch));
 }

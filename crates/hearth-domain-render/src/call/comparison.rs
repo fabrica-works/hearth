@@ -22,20 +22,27 @@ impl Comparison {
         side.inherit_finding(&self.from.as_ref().expect("other side").finding);
         self.swap_resolution_side(side);
         side.inherit_finding(&self.from.as_ref().expect("other side").finding);
-        let Some(target) = self.names.get(self.next).cloned() else { return false };
-        let from = self.from.as_mut().expect("from side");
-        let (Some(before), Some(after)) = (key(from.made.get(&target)), key(side.made.get(&target))) else {
-            return false;
-        };
-        if before == after {
-            return false;
+        for index in self.resolving..self.names.len() {
+            self.resolving = index;
+            let target = self.names.get(index).expect("resolution cursor").clone();
+            let from = self.from.as_mut().expect("from side");
+            let (Some(before), Some(after)) = (key(from.made.get(&target)), key(side.made.get(&target))) else {
+                continue;
+            };
+            if before == after {
+                continue;
+            }
+            self.swap_resolution_side(side);
+            if side.resolve_target(&target, deadline, out) {
+                return true;
+            }
+            self.swap_resolution_side(side);
+            if side.resolve_target(&target, deadline, out) {
+                return true;
+            }
         }
-        self.swap_resolution_side(side);
-        if side.resolve_target(&target, deadline, out) {
-            return true;
-        }
-        self.swap_resolution_side(side);
-        side.resolve_target(&target, deadline, out)
+        self.resolving = self.names.len();
+        false
     }
 }
 

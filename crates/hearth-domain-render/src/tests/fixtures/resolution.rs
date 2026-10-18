@@ -1,11 +1,20 @@
 use alloc::boxed::Box;
+// One output is consumed before the fixture resumes again.
+const RESOLUTION_OUTPUTS: u32 = 1;
+// finding_side contains a, b and c, with the two distinct keys A and B.
+const FINDING_TARGETS: u32 = 3;
+const DISTINCT_FINDINGS: u32 = 2;
+// Two sides may each emit three specs plus progress and a terminal answer.
+const ANSWER_HEADROOM: u32 = 2 * (FINDING_TARGETS + 2);
+// Allow one empty resume between each of those answers.
+const RESUME_HEADROOM: u32 = 2 * ANSWER_HEADROOM;
 pub fn finish_render(
     render: &mut crate::Render,
     env: &skein_lib::Env<crate::limits::Limits>,
     out: &mut skein_lib::Queue<crate::vocabulary::Output>,
 ) -> Box<[crate::vocabulary::Answer]> {
-    let mut answers = skein_lib::List::with_capacity(env.limits.errors.saturating_add(10));
-    for _ in 0..env.limits.errors.saturating_add(20) {
+    let mut answers = skein_lib::List::with_capacity(env.limits.errors.saturating_add(ANSWER_HEADROOM));
+    for _ in 0..env.limits.errors.saturating_add(RESUME_HEADROOM) {
         if !render.work_pending() {
             break;
         }
@@ -25,12 +34,14 @@ pub fn finish_render(
 
 pub const KEY_A: hearth_lib::encode::Digest = hearth_lib::encode::Digest([1; 32]);
 pub const KEY_B: hearth_lib::encode::Digest = hearth_lib::encode::Digest([2; 32]);
+pub const KEY_C: hearth_lib::encode::Digest = hearth_lib::encode::Digest([3; 32]);
+pub const KEY_D: hearth_lib::encode::Digest = hearth_lib::encode::Digest([4; 32]);
 pub fn finding_side() -> crate::call::Side {
     use crate::{diff::Made, keys::Resolution};
     let mut side = crate::call::Side::new(b"/repo".as_slice().into(), Box::new([]), &crate::limits::SHIPPED);
     side.ready = true;
     side.files = true;
-    side.made = skein_lib::Map::with_capacity(3);
+    side.made = skein_lib::Map::with_capacity(FINDING_TARGETS);
     for (name, key) in [(b"c".as_slice(), KEY_A), (b"a", KEY_A), (b"b", KEY_B)] {
         let mut spec = super::spec(name, &[]);
         spec.resolution = Some(Box::new(Resolution::Needed { key }));
@@ -49,7 +60,7 @@ pub fn key_inputs() -> crate::parts::packages::Inputs {
 }
 fn packages_side(variant: crate::parts::packages::Variant) -> crate::call::Side {
     let mut side = finding_side();
-    let mut made = skein_lib::Map::with_capacity(3);
+    let mut made = skein_lib::Map::with_capacity(FINDING_TARGETS);
     for (name, spec) in &side.made {
         let crate::diff::Made::Spec(spec) = spec else { panic!("fixture spec") };
         let mut spec = spec.as_ref().clone();
@@ -68,8 +79,8 @@ fn packages_side(variant: crate::parts::packages::Variant) -> crate::call::Side 
 }
 pub fn resolving_side() -> crate::call::Side {
     let mut side = packages_side(crate::parts::packages::Variant::Apt);
-    let mut out = skein_lib::Queue::with_capacity(1);
-    for _ in 0_u32..2 {
+    let mut out = skein_lib::Queue::with_capacity(RESOLUTION_OUTPUTS);
+    for _ in 0_u32..DISTINCT_FINDINGS {
         drop(side.resolved_answer(&mut out));
         drop(out.pop());
         side.found(None, false);
@@ -80,7 +91,7 @@ pub fn container_resolving_side() -> crate::call::Side {
     packages_side(crate::parts::packages::Variant::Container)
 }
 pub fn next_resolution(side: &mut crate::call::Side) -> Option<crate::vocabulary::Request> {
-    let mut out = skein_lib::Queue::with_capacity(1);
+    let mut out = skein_lib::Queue::with_capacity(RESOLUTION_OUTPUTS);
     drop(side.resolved_answer(&mut out));
     match out.pop() {
         Some(crate::vocabulary::Output::Request(request)) => Some(request),
@@ -136,7 +147,7 @@ pub fn resolving_side_at(now: skein_lib::Time) -> crate::call::Side {
     use crate::vocabulary::Event;
     let env = skein_lib::Env { now, wall: skein_lib::Wall::EPOCH, limits: crate::limits::SHIPPED };
     let mut render = crate::Render::new(&env.limits);
-    let mut out = skein_lib::Queue::with_capacity(1);
+    let mut out = skein_lib::Queue::with_capacity(RESOLUTION_OUTPUTS);
     crate::step(
         &mut render,
         &env,
@@ -153,7 +164,7 @@ pub fn resolving_side_at(now: skein_lib::Time) -> crate::call::Side {
     side.made = packages_side(crate::parts::packages::Variant::Apt).made;
     side.ready = true;
     side.files = true;
-    for _ in 0_u32..2 {
+    for _ in 0_u32..DISTINCT_FINDINGS {
         drop(side.resolved_answer(&mut out));
         drop(out.pop());
         side.found(None, false);
@@ -204,7 +215,7 @@ pub fn first_resolving_side() -> crate::call::Side {
     side
 }
 pub fn record_side(side: &mut crate::call::Side) -> Option<crate::vocabulary::Request> {
-    let mut out = skein_lib::Queue::with_capacity(1);
+    let mut out = skein_lib::Queue::with_capacity(RESOLUTION_OUTPUTS);
     side.record(
         Box::new([]),
         crate::resolution::Tools { apt: Box::new([]), mmdebstrap: Box::new([]) },
