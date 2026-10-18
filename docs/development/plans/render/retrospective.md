@@ -870,18 +870,39 @@ The kit's, for skein:
 
 For the user, or the director.
 
+2026-10-18. The director, acting for the user (skein's development.md,
+2.7), adopted all thirteen proposals. The designer applied their text in
+skein b1d2276, and built the kit parts that were small through the kit's
+gate: 3 in b9c4b96, 7 in 171ca57, 8 in 094a27c, 9's unread session
+trailers in 114db4d and its new session ids in 0cfe3b5, 10 in e4a754f,
+and 12 in 1dfc098. Two parts go to the next kit batch: 9's design inputs
+found by file name, and 11's restore cost and sub-agents in the
+`supervisor` metric; until then, the metrics keep the bootstrap share.
+Two kit fixes came with them, found by the gate on x1: `land` reads git
+2.53's refused push on a locked ref as main moving (441c41a), and
+`test-plan` snapshots pueue in UTC (867095d).
+
+The runs in flight, temper's client-api (kit 841f487) and forge-setup
+(kit c0268a8), keep their kits (development.md, section 12). Each takes
+1, 6, 8 and 13 through its supervisor's rulings and checks, and 2, 3 and
+12 as steers to its coordinator. Each takes 10: client-api's supervisor
+ignores its watch's word to hand over at the second compaction, and
+forge-setup's kit, older than skein 71f6c38, hands over by context as
+before. Each keeps its process for 4, 5, 7, 9 and 11. The commits'
+bodies say so.
+
 | Proposal | Decision | Where |
 |---|---|---|
-| 1 | open | |
-| 2 | open | |
-| 3 | open | |
-| 4 | open | |
-| 5 | open | |
-| 6 | open | |
-| 7 | open | |
-| 8 | open | |
-| 9 | open | |
-| 10 | open | |
-| 11 | open | |
-| 12 | open | |
-| 13 | open | |
+| 1 | adopted | skein b1d2276: development.md, 5.7 and 10.3; supervisor.md, 3 |
+| 2 | adopted | skein b1d2276: development.md, 7.4 and 7.6; supervisor.md, 8 |
+| 3 | adopted | skein b1d2276: development.md, 3.6, 6, 7.1, 7.5 and 10.4; supervisor.md, 1 and 6; implementer.md; skein b9c4b96: the roles' prompts (`plan-roles.sh`) |
+| 4 | adopted | skein b1d2276: development.md, 4.5, 5.3 and 5.4 |
+| 5 | adopted | skein b1d2276: development.md, 5.2 and 5.3; implementer.md, 8.6 |
+| 6 | adopted | skein b1d2276: development.md, 10.3 and 14.4; testing-strategy.md, 10 |
+| 7 | adopted: an `aims:` line for each repository | skein b1d2276: development.md, 5.2 and 14.2; skein 171ca57: `plan pulse` (`numbers.sh`) |
+| 8 | adopted: an older index is a warning in `plan check` | skein b1d2276: development.md, 3.1, 3.6, 6 and 14.1; supervisor.md, 1; implementer.md; the workspace `AGENTS.md`; skein 094a27c: `plan check` and `plan pulse` |
+| 9 | adopted; the design inputs by file name in the next kit batch | skein b1d2276: development.md, 3.5, 5.4, 9.1 and 15.2; skein 114db4d: `land`; skein 0cfe3b5: `record_jobs` (`plan-roles.sh`) |
+| 10 | adopted | skein b1d2276: development.md, 1, 2.1, 2.2, 2.4, 2.5, 3.6, 10.4, 10.5 and 13; supervisor.md, 1, 2, 4, 5 and 7; skein e4a754f: `plan context`, `plan watch` and `plan wake` |
+| 11 | adopted; the metric's kit part in the next kit batch | skein b1d2276: development.md, 13 and 15.2 |
+| 12 | adopted | skein b1d2276: development.md, 1, 2.4, 3.6, 5.3, 7.3 and 10.3; implementer.md, 8.6; skein 1dfc098: `PLAN_CONTEXT_LIMIT` (`numbers.sh`) |
+| 13 | adopted | skein b1d2276: development.md, 5.2 and 5.6; supervisor.md, 5 |
