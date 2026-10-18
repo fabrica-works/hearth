@@ -658,3 +658,7 @@ pub fn error_at_budget(bytes: usize) -> hearth_domain_render::errors::Error {
     error.also = Some(Place { path: Box::from(b"a".as_slice()), position: None });
     error
 }
+
+pub mod properties;
+pub use crate::golden::repository_of;
+pub use properties::digests;

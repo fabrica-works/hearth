@@ -65,7 +65,7 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
                         }],
                         Request::Hunks { .. } => unreachable!("render worlds do not diff"),
                         Request::Read { request, blobs, .. } => {
-                            blobs.iter().map(|blob| blob_event(repository, blob, *request)).collect()
+                            blobs.iter().map(|blob| blob_event(repository, blob, *request, &limits)).collect()
                         }
                     };
                     let token = match &request {
@@ -108,7 +108,12 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
     panic!("render settles: seed {seed}")
 }
 
-fn blob_event(repository: &Repository, blob: &render::vocabulary::Blob, request: skein_lib::Token) -> Event {
+fn blob_event(
+    repository: &Repository,
+    blob: &render::vocabulary::Blob,
+    request: skein_lib::Token,
+    limits: &limits::Limits,
+) -> Event {
     if blob.kind == render::vocabulary::As::Cached {
         let body = repository.blobs.iter().find(|(oid, _)| *oid == blob.oid).expect("scripted blob");
         let mut hash = skein_lib::sha256::Sha256::new();
@@ -124,7 +129,15 @@ fn blob_event(repository: &Repository, blob: &render::vocabulary::Blob, request:
         Event::Read { request, oid: blob.oid.clone(), read: render::vocabulary::Decoded::Link(body.clone()) }
     } else if blob.kind == render::vocabulary::As::Template {
         let body = &repository.blobs.iter().find(|(oid, _)| *oid == blob.oid).expect("scripted template").1;
-        let read = match hearth_protocol_template::template::compile(body, &hearth_protocol_template::limits::SHIPPED) {
+        let read = match hearth_protocol_template::template::compile(
+            body,
+            &hearth_protocol_template::limits::Limits {
+                template: limits.template,
+                expression: limits.expression,
+                statements: limits.statements,
+                nesting: limits.nesting,
+            },
+        ) {
             Ok(template) => render::vocabulary::Decoded::Template(
                 hearth_protocol_builder::translate::instructions::template(template),
             ),

@@ -237,6 +237,7 @@ pub fn mask12(text: &str) -> String {
     out
 }
 mod repository;
+pub use repository::repository_of;
 
 /// A file witness names its path and exactly twelve digest digits.
 #[must_use]

@@ -144,3 +144,18 @@ pub fn resolution_golden() -> golden::Golden {
     let files = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/repos/test");
     golden::load_from("resolution", &files)
 }
+
+/// Whole digests from client JSON-lines spec records (client/README.md, 3.2).
+#[must_use]
+pub fn digests_of(text: &str) -> Vec<(String, String)> {
+    let mut digests = Vec::new();
+    for line in text.lines().filter(|line| line.contains("\"record\":\"spec\"")) {
+        let field = |name| {
+            let prefix = format!("\"{name}\":\"");
+            line.split_once(&prefix).expect("spec field").1.split('"').next().expect("field value").to_owned()
+        };
+        digests.push((field("target"), field("digest")));
+    }
+    digests.sort();
+    digests
+}

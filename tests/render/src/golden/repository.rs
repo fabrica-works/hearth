@@ -14,32 +14,40 @@ use skein_lib::{
 impl Golden {
     #[must_use]
     pub fn repository(&self) -> crate::fixtures::Repository {
-        let mut repository =
-            crate::fixtures::Repository { entries: Vec::new(), documents: Vec::new(), blobs: Vec::new() };
-        for leaf in &self.tree {
-            let oid = Oid(leaf.path.clone().into_boxed_slice());
-            let mode = match leaf.kind {
-                super::Kind::File => Mode::File,
-                super::Kind::Executable => Mode::Executable,
-                super::Kind::Link => Mode::Link,
-            };
-            repository.entries.push(Entry {
-                path: leaf.path.clone().into_boxed_slice(),
-                mode,
-                oid: oid.clone(),
-                size: u64::try_from(leaf.bytes.len()).expect("file size"),
-            });
-            if leaf.path.ends_with(b".json") {
-                repository.documents.push((oid.clone(), decoded(&leaf.bytes, leaf.path.ends_with(b"/task.json"))));
-            }
-            repository.blobs.push((oid, leaf.bytes.clone().into_boxed_slice()));
-        }
-        repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
-        repository
+        repository_of(&self.tree)
     }
 }
+#[must_use]
+pub fn repository_of(leaves: &[super::Leaf]) -> crate::fixtures::Repository {
+    let mut repository = crate::fixtures::Repository { entries: Vec::new(), documents: Vec::new(), blobs: Vec::new() };
+    for leaf in leaves {
+        let oid = Oid(leaf.path.clone().into_boxed_slice());
+        let mode = match leaf.kind {
+            super::Kind::File => Mode::File,
+            super::Kind::Executable => Mode::Executable,
+            super::Kind::Link => Mode::Link,
+        };
+        repository.entries.push(Entry {
+            path: leaf.path.clone().into_boxed_slice(),
+            mode,
+            oid: oid.clone(),
+            size: u64::try_from(leaf.bytes.len()).expect("file size"),
+        });
+        if leaf.path.ends_with(b".json") {
+            repository.documents.push((oid.clone(), decoded(&leaf.bytes, leaf.path.ends_with(b"/task.json"))));
+        }
+        repository.blobs.push((oid, leaf.bytes.clone().into_boxed_slice()));
+    }
+    repository.entries.sort_by(|a, b| a.path.cmp(&b.path));
+    repository
+}
+
 fn decoded(bytes: &[u8], declaration: bool) -> Decoded {
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config::limits::SHIPPED };
+    // Each key consumes at least four source bytes; keep shipped acceptance bounds.
+    let length = u32::try_from(bytes.len()).expect("document size");
+    let limits =
+        config::limits::Limits { keys: config::limits::SHIPPED.keys.min(length / 4 + 1), ..config::limits::SHIPPED };
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut decoder = json::Decoder::new(&env.limits);
     let (mut above, mut below) = (Queue::with_capacity(JSON_QUEUE), Queue::with_capacity(JSON_QUEUE));
     let mut held = Held::new(bytes.into());

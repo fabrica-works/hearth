@@ -11,3 +11,6 @@ pub mod templates;
 pub mod declarations;
 
 pub mod golden;
+
+pub mod json;
+pub mod repositories;
