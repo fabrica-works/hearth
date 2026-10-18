@@ -156,9 +156,15 @@ of its environment (its readers, itself included: 8.2); `Task` (`node`'s
 `task.json` or tree) every target that has it; `Env` (`envs/<env>.json`)
 every target of that environment; `Unread` and 30.1's three none.
 `mutate(rng, &Generated) -> Generated` breaks one file of one base by
-`generate::mutate`; the healthy targets are the other bases'. `Collide` adds
-tasks `dup-a` and `dup-b`, each with a tree file `/etc/dup` (22.3's error
-names both: `dup-a` at `at`, `dup-b` at `also`, render.md 9.3, Order). Order: `targets` reversed and shuffled; arrival is the seed's.
+`generate::mutate`. The mutation property renders the copy and its original
+without `peers.j2` (ruling 197): with it every target of an environment reads
+every export, so a broken base fails each reader with an `exported` error
+(render.md 3.4), as 29.4's `errors/exported` golden holds; without it the
+healthy targets, from the model, are those that compose no broken file (the
+other bases' four at least), their digests as before. Locality and order keep
+`peers.j2`. `Collide` adds
+tasks `dup_a` and `dup_b` (format.md 2.4), each with a tree file `/etc/dup` (22.3's error
+names both: `dup_a` at `at`, `dup_b` at `also`, render.md 9.3, Order). Order: `targets` reversed and shuffled; arrival is the seed's.
 Test shape: world, 12 repositories, under 0.5 s:
 `a_setting_only_its_own_template_reads_changes_its_target_alone`,
 `an_unread_setting_changes_no_digest`,

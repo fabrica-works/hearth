@@ -1248,6 +1248,26 @@ None yet.
 196. **hearth 47's Shapes against main** (ready check of hearth-47.1).
      hearth 47's ready check (a read-only check at hearth 183c6a9, skein b11ce40) found nine places where 47-digests-budgets.md does not match main, and one design gap; 47.1 now says each of the nine. (1) The form is `Form::JsonLines` (`crates/hearth-client-protocol-records/src/form.rs:12`), and `fixtures::thin()` (`fixtures/worlds.rs:179`) already renders: the scenarios drop `call:` and give `form:` alone. (2) The builder's requests wrap render's: `Request::Render(RenderRequest::List { .. })` and `Request::Render(RenderRequest::Read { blobs, .. })` (`hearth-domain-render/src/vocabulary.rs:113-123`; imports as `tests/builder/tests/domain.rs:2-6`), and a `Read` batches its `blobs`, whose `Oid` is cloned. (3) A diff in the domain world needs its second revision: `domain::Run::new` (`tests/builder/src/domain.rs:54`) builds `Shared::new`, one revision, and `Shared::for_scenario` (`fixtures/worlds.rs:325`) edits only `MOTD_KIND`'s path, which the fleet has not, or `x1-prod`'s with `resolve`; Files add `domain.rs` and `fixtures/worlds.rs`, and each user of a changed `Scenario` or `domain::Run` the compiler names (`simulated.rs`; `crates/hearth/tests/{refusals,end_to_end}.rs`, through `crates/hearth/Cargo.toml:16`). (4) git's spawns are `rev-parse`, `ls-tree` and one `cat-file --batch` per `Read` (render.md 2.2, "one process per `Read` (8.2)"): thin and the fleet spawn 4, so the test counts two plus the `Read`s, and is named for it. (5) A known resolution with no mmdebstrap is the `resolution` golden with `test_min_recorded()` (`fixtures/resolution.rs:29`) laid and `targets: ["test-min"]`. (6) The fleet's 35 entries have 35 oids, so "no oid twice" needs a shared blob, as `DUPLICATE_BLOB` (`fixtures/worlds.rs:213`) is thin's. (7) `domain::Run::requests()` has landed (`domain.rs:195`). (8) The protocol world takes 1.66 s over 8 seeds on the fleet and 148 ms on thin: the joint tests' repositories are 30.1's `Shape::SMALL`. The gap, a diff's second side reading only the blobs that changed (render.md 3.10) against 8.4's "keeps of the first only its specs, closures and errors", is the designer's question of 2026-10-18T02:33:00Z; the two diff tests stand until its answer. Refresh any further copy of a name changed here, and list it in the commit body.
 
+197. **hearth 30.2's mutation property renders without peers.j2** (plan defect, hearth-30.2's block of 2026-10-18T02:36:29Z).
+     Your proposal, a plan defect: the plan's "the healthy targets are the other
+     bases'" contradicts render.md 3.4, which answers the block in its own words:
+     "When they cannot be computed (a document the exporter composes is broken
+     [...]), each reader fails with an `exported` error (7.2)". With `peers.j2`
+     every target of an environment reads every export (30's Choice 2: "all do"),
+     so a broken base leaves no target healthy.
+
+     1. **The mutation property renders the copy and its original without
+        `peers.j2`;** the locality and order properties keep it. Its healthy
+        targets come from the model (Choice 2, never from render): those that
+        compose no broken file, the other bases' four at least; their digests
+        are the original's, and the errors are sorted and bounded (22.1), as the
+        plan says.
+     2. **3.4's readers' failure stays tested** by 29.4's `errors/exported`
+        golden (`hosts/ion/ion-prod.json:1:92: carbon-prod: vpn: exports.vpn of
+        ion-prod: not a string`), so the property need not repeat it.
+     3. **`Collide`'s tasks are `dup_a` and `dup_b`,** as you named them: format.md
+        2.4 gives a task `[a-z]`, then `[a-z0-9_]`.
+
 ## For the user
 
 The long-term choices the user may veto:
