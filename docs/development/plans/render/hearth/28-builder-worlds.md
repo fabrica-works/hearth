@@ -249,14 +249,14 @@ Removes: nothing.
 Scope: testing.md, 2.6: `Client` as a process on skein's simulator over `Behind`;
 fake git and mmdebstrap as hosted `Host`s that take their time; `diff
 --resolve`; the files compared with the protocol world's.
-Needs: hearth 45.2; 28.1 and 28.3.
+Needs: hearth 45.2; 28.1 and 28.3; skein-03.s1 (ruling 177), by a repin commit (Rules, "Upstream first").
 Files: `crates/hearth/src/lib.rs` (shared: `Client::with_roots`); `tests/builder/`:
 new `src/{simulated,pace,hosted}.rs`, `src/hosted/{git,mmdebstrap}.rs`,
 `src/fixtures.rs` (shared: `Scenario::pace`, `FAKE_WORST_CASE`), new `tests/simulation.rs`.
 Shape: `Client::with_roots` (a test constructor: a seed and the roots, 23.1's
 `Roots`) is 11.3's `open` after the shell made and opened the
 directories (`open` calls it with its own seed). `simulated::run`: `World::new_controlled`,
-`with_machine(Shared)`, the client by `spawn_restartable` over startup roots
+`with_machine(Shared)`, the client by `spawn_restartable_startup` (skein-03.s1) over startup roots
 `store`, `cache`, `resolutions`, `staging` and an output
 `StartupAppend`, the tools by `host_roots` at `/usr/bin/git` and
 `/usr/bin/mmdebstrap` (roots `/` and the store as `cwd`; instances 1), the
