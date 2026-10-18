@@ -116,7 +116,7 @@ render.md. Open questions are in section 13.
 - **No document is a template.** Values in `fleet.json`, `envs/` and
   `hosts/` are data, taken literally. Only the declarations of a
   `task.json` (5.2) and `*.j2` files are evaluated.
-- **Bounds** are render's limits (render.md, 2.3): 1 MiB a document,
+- **Bounds** are render's limits (render.md, 2.3): 256 KiB a document,
   depth 32, 4,096 keys an object. They count the document as written: a
   `_note` is one of its object's keys.
 - **What a later milestone adds is refused before it.** A key or value

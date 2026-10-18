@@ -136,19 +136,19 @@ defaults alone (client/README.md, 3.5).
 
 | Limit | Default |
 |---|---|
-| entries in a revision's listing; the bytes of all its paths | 65,536; 16 MiB |
+| entries in a revision's listing; the bytes of all its paths | 16,384; 4 MiB |
 | a path | 4,096 bytes |
-| a JSON document; its depth; keys in an object | 1 MiB; 32; 4,096 |
-| a template; an expression, wherever it stands (a `task.json` string, a template's tag or `{{ }}`, an interpolation) | 1 MiB; 4 KiB |
+| a JSON document; its depth; keys in an object | 256 KiB; 32; 4,096 |
+| a template; an expression, wherever it stands (a `task.json` string, a template's tag or `{{ }}`, an interpolation) | 256 KiB; 4 KiB |
 | a static file, or a `file` setting's target: streamed to the cache, never held | 64 MiB |
-| JSON documents, declarations and templates decoded from one revision, counted as they are held | 64 MiB |
+| JSON documents, declarations and templates decoded from one revision, counted as they are held | 16 MiB |
 | targets in a revision; tasks; settings in a task | 1,024; 1,024; 512 |
 | nesting of statements in a template; of an expression | 32; 64 |
 | entries one `task.json`'s declarations expand to for one target, an `if` that is false making none | 65,536 |
 | loop iterations in one evaluation | 1,048,576 |
-| values one evaluation makes; the exports of one environment | 16 MiB; 64 MiB |
-| one target's composed settings; its validated settings; its expanded entries | 64 MiB each |
-| the specs one command holds, with the sizes of the files they name and their resolutions' closures, a diff's two sides together | 64 MiB |
+| values one evaluation makes; the exports of one environment | 16 MiB; 16 MiB |
+| one target's composed settings; its validated settings; its expanded entries | 16 MiB each |
+| the specs one command holds, with the sizes of the files they name and their resolutions' closures, a diff's two sides together | 16 MiB |
 | a rendered file, held until it is in the cache; bytes rendered for one target | 16 MiB; 256 MiB |
 | errors kept from one command, a diff's two sides together | 256, and 16 MiB of the bytes they carry; then a count |
 
@@ -169,9 +169,9 @@ defaults alone (client/README.md, 3.5).
   32 bytes for each instruction and operation, and 4 bytes for each of
   its lines, whose first bytes it keeps (8.3): every line, a comment's
   among them. The document, declaration or template whose count passes
-  the 64 MiB fails the render at its path.
+  the 16 MiB fails the render at its path.
 - **What a limit fails** is what holds the excess. The listing's limits,
-  the 64 MiB of decoded documents and templates, and the 1,025th target
+  the 16 MiB of decoded documents and templates, and the 1,025th target
   or task fail the render: no target renders, and the error is the
   revision's, at the path at fault. A document, a template, an
   expression or a static file past its limit, or a task past its
@@ -1250,14 +1250,14 @@ every request                                          Failed { request, class, 
 
 - **Render's limits are 2.3's,** and its worst case
   (`programming-model.md`, 6.3) is what it holds at once at those
-  limits: the revision's listing (65,536 entries, 16 MiB of paths), with
+  limits: the revision's listing (16,384 entries, 4 MiB of paths), with
   an object id, size and digest per static file; its decoded documents,
-  declarations and templates (64 MiB, counted as they are held); the
+  declarations and templates (16 MiB, counted as they are held); the
   tasks each target has, by index; the exports of one environment
-  (64 MiB); one target's composed settings, validated settings and
-  expanded entries (64 MiB each); one evaluation's values (16 MiB); one
+  (16 MiB); one target's composed settings, validated settings and
+  expanded entries (16 MiB each); one evaluation's values (16 MiB); one
   rendered file (16 MiB); the command's specs, with their files' sizes
-  and their closures (64 MiB); and the errors it keeps (256, and 16 MiB
+  and their closures (16 MiB); and the errors it keeps (256, and 16 MiB
   of the bytes they carry).
 - **It holds no other target's settings** (section 3). Of a resolution
   record, a render holds the closure's digest, which its layer keys take
@@ -1270,9 +1270,9 @@ every request                                          Failed { request, class, 
   static files' digests, those of the blobs that listing names, by object
   id and as what they were read; the rest go. It reads only the others,
   a blob the first refused among them. It gives what a render of its
-  revision alone gives, within the same 64 MiB: each document,
-  declaration and template counts in its own 64 MiB (2.3) in that
-  render's order, kept or read; when what it holds would pass the 64 MiB,
+  revision alone gives, within the same 16 MiB: each document,
+  declaration and template counts in its own 16 MiB (2.3) in that
+  render's order, kept or read; when what it holds would pass the 16 MiB,
   the kept blobs not yet counted go first, and one it then needs is read
   again. So a diff's peak holds one revision's decoded data, as a
   render's does.
@@ -1281,10 +1281,15 @@ every request                                          Failed { request, class, 
   counting allocator holds the live heap within it at every iteration
   (`programming-model.md`, 6.3).
 - **The builder's worst case is 6.3's sum** over its layers at their
-  limits, and the defaults keep it within 1 GiB, which a test holds. In
-  M1 nothing configures the client's memory (client/README.md, 3.5), so
-  its shell checks the sum against none; the daemon's builder checks it
-  against its share of its ceiling (steward.md, 5.3) [M3].
+  limits, and the defaults keep it within 1 GiB, which a test holds. The
+  protocol's machines take 2.3's limits, the listing's, a document's and
+  a template's among them, and the store's bounds (store.md, 6.1); the
+  client's printer (client/README.md, 3.2) prints a record of at most
+  16 MiB, its line endings included, and refuses a longer one, which
+  fails the command. In M1 nothing configures the client's memory
+  (client/README.md, 3.5), so its shell checks the sum against none; the
+  daemon's builder checks it against its share of its ceiling
+  (steward.md, 5.3) [M3].
   Static files and rendered files live in the store's cache, never in
   the domain, so a small VM's builder renders what a large one does.
 
