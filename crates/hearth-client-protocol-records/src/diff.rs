@@ -42,6 +42,10 @@ pub enum Needs {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PartChange {
+    Secrets(crate::parts::secrets::Change),
+    Software(crate::parts::software::Change),
+    Live(crate::parts::live::Change),
+
     Data(crate::parts::data::DataChange),
     Meta(MetaChange),
     Config(ConfigChange),
@@ -161,6 +165,9 @@ impl Change {
                         PartChange::Packages(packages) => packages.text(lines),
                         PartChange::Boot(boot) => boot.text(lines),
                         PartChange::Exports(exports) => exports.text(lines),
+                        PartChange::Secrets(value) => value.text(lines),
+                        PartChange::Software(value) => value.text(lines),
+                        PartChange::Live(value) => value.text(lines),
                         PartChange::Data(data) => data.text(lines),
                     }
                 }
@@ -202,6 +209,9 @@ impl Change {
                         PartChange::Packages(packages) => packages.json(json),
                         PartChange::Boot(boot) => boot.json(json),
                         PartChange::Exports(exports) => exports.json(json),
+                        PartChange::Secrets(value) => value.json(json),
+                        PartChange::Software(value) => value.json(json),
+                        PartChange::Live(value) => value.json(json),
                         PartChange::Data(data) => data.json(json),
                     }
                 }
@@ -672,3 +682,5 @@ pub struct Moved {
     pub before: Box<[u8]>,
     pub after: Box<[u8]>,
 }
+
+pub(crate) mod placed;

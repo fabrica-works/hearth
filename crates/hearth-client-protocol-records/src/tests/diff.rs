@@ -207,3 +207,5 @@ fn meta_json_keeps_each_before_and_after_and_omits_unchanged_fields() {
 
 mod exports;
 mod packages;
+
+mod part_changes;

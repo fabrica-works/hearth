@@ -96,3 +96,39 @@ pub fn digest(software: &Software) -> Digest {
     super::config::encode_scripts(&software.scripts, record);
     hash.finish()
 }
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Change {
+    pub downloads: Box<[DownloadKeyed]>,
+    pub scripts: Option<super::config::ScriptsChange>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum DownloadKeyed {
+    Added { key: Box<[u8]>, value: Download },
+    Removed { key: Box<[u8]>, value: Download },
+    Changed { key: Box<[u8]>, before: Download, after: Download },
+}
+
+#[must_use]
+pub fn change(before: &Software, after: &Software) -> Change {
+    Change {
+        downloads: super::secrets::changed(
+            &before.downloads,
+            &after.downloads,
+            |row| &row.path,
+            |key, before, after| match (before, after) {
+                (None, Some(value)) => DownloadKeyed::Added { key, value: value.clone() },
+                (Some(value), None) => DownloadKeyed::Removed { key, value: value.clone() },
+                (Some(before), Some(after)) => {
+                    DownloadKeyed::Changed { key, before: before.clone(), after: after.clone() }
+                }
+                (None, None) => unreachable!("union entry"),
+            },
+        ),
+        scripts: if before.scripts == after.scripts {
+            None
+        } else {
+            Some(super::config::ScriptsChange { before: before.scripts.clone(), after: after.scripts.clone() })
+        },
+    }
+}

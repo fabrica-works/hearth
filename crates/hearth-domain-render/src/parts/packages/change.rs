@@ -4,6 +4,7 @@ use super::{Apt, Box, Initramfs, List, Packages, Preseed, Sources, Variant};
 pub struct Change {
     pub resolution: crate::diff::ResolutionChange,
     pub request: Names,
+    pub seeds: SeedsChange,
     pub sources: Option<SourcesPair>,
     pub variant: Option<VariantPair>,
     pub preseeds: Option<PreseedsPair>,
@@ -50,6 +51,7 @@ pub fn change(before: &Packages, after: &Packages) -> Change {
             None,
             None,
         ),
+        seeds: seeds(&before.seeds, &after.seeds),
         request: Names {
             added: difference(&after.request, &before.request),
             removed: difference(&before.request, &after.request),
@@ -91,4 +93,60 @@ fn difference(names: &[Box<[u8]>], other: &[Box<[u8]>]) -> Box<[Box<[u8]>]> {
     let mut changed = changed.into_boxed();
     changed.sort();
     changed
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct SeedsChange {
+    pub users: Box<[SeedUserKeyed]>,
+    pub groups: Box<[SeedGroupKeyed]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct SeedIds {
+    pub uid: u32,
+    pub gid: Option<u32>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum SeedUserKeyed {
+    Added { key: Box<[u8]>, value: SeedIds },
+    Removed { key: Box<[u8]>, value: SeedIds },
+    Changed { key: Box<[u8]>, before: SeedIds, after: SeedIds },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum SeedGroupKeyed {
+    Added { key: Box<[u8]>, value: u32 },
+    Removed { key: Box<[u8]>, value: u32 },
+    Changed { key: Box<[u8]>, before: u32, after: u32 },
+}
+
+fn seeds(before: &super::Seeds, after: &super::Seeds) -> SeedsChange {
+    SeedsChange {
+        users: crate::parts::secrets::changed(
+            &before.users,
+            &after.users,
+            |row| &row.name,
+            |key, before, after| match (before, after) {
+                (None, Some(value)) => SeedUserKeyed::Added { key, value: SeedIds { uid: value.uid, gid: value.gid } },
+                (Some(value), None) => {
+                    SeedUserKeyed::Removed { key, value: SeedIds { uid: value.uid, gid: value.gid } }
+                }
+                (Some(before), Some(after)) => SeedUserKeyed::Changed {
+                    key,
+                    before: SeedIds { uid: before.uid, gid: before.gid },
+                    after: SeedIds { uid: after.uid, gid: after.gid },
+                },
+                (None, None) => unreachable!("union entry"),
+            },
+        ),
+        groups: crate::parts::secrets::changed(
+            &before.groups,
+            &after.groups,
+            |row| &row.name,
+            |key, before, after| match (before, after) {
+                (None, Some(value)) => SeedGroupKeyed::Added { key, value: value.gid },
+                (Some(value), None) => SeedGroupKeyed::Removed { key, value: value.gid },
+                (Some(before), Some(after)) => SeedGroupKeyed::Changed { key, before: before.gid, after: after.gid },
+                (None, None) => unreachable!("union entry"),
+            },
+        ),
+    }
 }

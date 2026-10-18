@@ -81,11 +81,12 @@ fn optional_initramfs(value: Option<source::Initramfs>) -> Option<target::Initra
 
 #[must_use]
 pub fn packages_change_back(value: source::Change) -> target::Change {
-    let source::Change { resolution, request, sources, variant, preseeds, initramfs, apt } = value;
+    let source::Change { resolution, request, sources, variant, preseeds, initramfs, apt, seeds } = value;
     let source::Names { added, removed } = request;
     target::Change {
         resolution: super::resolution_change_back(resolution),
         request: target::Names { added, removed },
+        seeds: super::seeds_change_back(seeds),
         sources: sources_pair(sources),
         variant: variant_pair(variant),
         preseeds: preseeds_pair(preseeds),
@@ -175,6 +176,7 @@ pub fn boot_records() -> [crate::render::parts::boot::Boot; 2] {
 pub fn package_changes() -> [crate::render::parts::packages::Change; 2] {
     use crate::render::parts::packages::*;
     package_records().map(|packages| Change {
+        seeds: seed_changes(),
         resolution: crate::render::diff::ResolutionChange::NewKey,
         request: Names { added: packages.request.clone(), removed: Box::new([]) },
         sources: Some(SourcesPair { before: packages.sources.clone(), after: packages.sources }),
@@ -213,4 +215,25 @@ fn seeds(value: source::Seeds) -> target::Seeds {
         fixed_groups.push(target::SeedGroup { name, gid }).expect("group count");
     }
     target::Seeds { users: fixed_users.into_boxed(), groups: fixed_groups.into_boxed() }
+}
+
+fn seed_changes() -> target::SeedsChange {
+    use skein_lib::bytes::copy_of;
+    use target::{SeedGroupKeyed, SeedIds, SeedUserKeyed, SeedsChange};
+    SeedsChange {
+        users: Box::new([
+            SeedUserKeyed::Added { key: copy_of(b"a"), value: SeedIds { uid: 120, gid: None } },
+            SeedUserKeyed::Removed { key: copy_of(b"b"), value: SeedIds { uid: 120, gid: Some(121) } },
+            SeedUserKeyed::Changed {
+                key: copy_of(b"c"),
+                before: SeedIds { uid: 120, gid: None },
+                after: SeedIds { uid: 122, gid: Some(123) },
+            },
+        ]),
+        groups: Box::new([
+            SeedGroupKeyed::Added { key: copy_of(b"a"), value: 120 },
+            SeedGroupKeyed::Removed { key: copy_of(b"b"), value: 121 },
+            SeedGroupKeyed::Changed { key: copy_of(b"c"), before: 122, after: 123 },
+        ]),
+    }
 }

@@ -103,3 +103,33 @@ pub fn digest(live: &Live) -> Digest {
     }
     hash.finish()
 }
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Change {
+    pub paths: Box<[ConsumersKeyed]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum ConsumersKeyed {
+    Added { key: Box<[u8]>, value: Box<[Consumer]> },
+    Removed { key: Box<[u8]>, value: Box<[Consumer]> },
+    Changed { key: Box<[u8]>, before: Box<[Consumer]>, after: Box<[Consumer]> },
+}
+
+#[must_use]
+pub fn change(before: &Live, after: &Live) -> Change {
+    Change {
+        paths: super::secrets::changed(
+            &before.paths,
+            &after.paths,
+            |row| &row.path,
+            |key, before, after| match (before, after) {
+                (None, Some(value)) => ConsumersKeyed::Added { key, value: value.consumers.clone() },
+                (Some(value), None) => ConsumersKeyed::Removed { key, value: value.consumers.clone() },
+                (Some(before), Some(after)) => {
+                    ConsumersKeyed::Changed { key, before: before.consumers.clone(), after: after.consumers.clone() }
+                }
+                (None, None) => unreachable!("union entry"),
+            },
+        ),
+    }
+}

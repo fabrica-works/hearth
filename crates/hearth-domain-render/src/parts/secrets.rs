@@ -165,3 +165,60 @@ fn encode(secrets: &Secrets, record: &mut Encoder) {
         record.bytes(&password.secret);
     }
 }
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Change {
+    pub files: Box<[Named]>,
+    pub passwords: Box<[Named]>,
+    pub identity: Box<[Named]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Named {
+    Added(Box<[u8]>),
+    Removed(Box<[u8]>),
+    Changed(Box<[u8]>),
+}
+
+#[must_use]
+pub fn change(before: &Secrets, after: &Secrets) -> Change {
+    Change {
+        files: named(&before.files, &after.files, |row| &row.name),
+        passwords: named(&before.passwords, &after.passwords, |row| &row.user),
+        identity: named(&before.identity, &after.identity, |row| &row.name),
+    }
+}
+fn named<T: PartialEq + core::fmt::Debug>(before: &[T], after: &[T], key: fn(&T) -> &[u8]) -> Box<[Named]> {
+    changed(before, after, key, |key, before, after| match (before, after) {
+        (None, Some(_)) => Named::Added(key),
+        (Some(_), None) => Named::Removed(key),
+        (Some(_), Some(_)) => Named::Changed(key),
+        (None, None) => unreachable!("union entry"),
+    })
+}
+type Make<T, C> = fn(Box<[u8]>, Option<&T>, Option<&T>) -> C;
+pub(crate) fn changed<T: PartialEq + core::fmt::Debug, C: core::fmt::Debug>(
+    before: &[T],
+    after: &[T],
+    key: fn(&T) -> &[u8],
+    make: Make<T, C>,
+) -> Box<[C]> {
+    let capacity = u32::try_from(before.len().saturating_add(after.len())).expect("bounded entries");
+    let mut pairs = skein_lib::Map::with_capacity(capacity);
+    for row in before {
+        pairs.insert(Box::<[u8]>::from(key(row)), (Some(row), None)).expect("entry count");
+    }
+    for row in after {
+        if let Some((_, value)) = pairs.get_mut(key(row)) {
+            *value = Some(row);
+        } else {
+            pairs.insert(Box::<[u8]>::from(key(row)), (None, Some(row))).expect("entry count");
+        }
+    }
+    let mut changes = List::with_capacity(capacity);
+    for (key, (before, after)) in &pairs {
+        if before != after {
+            changes.push(make(key.clone(), *before, *after)).expect("entry count");
+        }
+    }
+    changes.into_boxed()
+}

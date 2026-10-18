@@ -82,11 +82,12 @@ fn optional_initramfs(value: Option<source::Initramfs>) -> Option<target::Initra
 
 #[must_use]
 pub fn change(value: source::Change) -> target::Change {
-    let source::Change { resolution, request, sources, variant, preseeds, initramfs, apt } = value;
+    let source::Change { resolution, request, sources, variant, preseeds, initramfs, apt, seeds } = value;
     let source::Names { added, removed } = request;
     target::Change {
         resolution: crate::translate::changes::resolution(resolution),
         request: target::Names { added, removed },
+        seeds: seed_changes(seeds),
         sources: sources_pair(sources),
         variant: variant_pair(variant),
         preseeds: preseeds_pair(preseeds),
@@ -130,4 +131,49 @@ fn seeds(value: source::Seeds) -> target::Seeds {
         fixed_groups.push(target::SeedGroup { name, gid }).expect("group count");
     }
     target::Seeds { users: fixed_users.into_boxed(), groups: fixed_groups.into_boxed() }
+}
+
+fn seed_changes(value: source::SeedsChange) -> target::SeedsChange {
+    target::SeedsChange { users: user_changes(value.users), groups: group_changes(value.groups) }
+}
+fn seed_ids(value: source::SeedIds) -> target::SeedIds {
+    let source::SeedIds { uid, gid } = value;
+    target::SeedIds { uid, gid }
+}
+fn group_id(value: u32) -> u32 {
+    value
+}
+fn user_changes(values: Box<[source::SeedUserKeyed]>) -> Box<[target::SeedUserKeyed]> {
+    let mut rows = List::with_capacity(u32::try_from(values.len()).expect("entry count"));
+    for value in values {
+        rows.push(match value {
+            source::SeedUserKeyed::Added { key, value } => target::SeedUserKeyed::Added { key, value: seed_ids(value) },
+            source::SeedUserKeyed::Removed { key, value } => {
+                target::SeedUserKeyed::Removed { key, value: seed_ids(value) }
+            }
+            source::SeedUserKeyed::Changed { key, before, after } => {
+                target::SeedUserKeyed::Changed { key, before: seed_ids(before), after: seed_ids(after) }
+            }
+        })
+        .expect("entry count");
+    }
+    rows.into_boxed()
+}
+fn group_changes(values: Box<[source::SeedGroupKeyed]>) -> Box<[target::SeedGroupKeyed]> {
+    let mut rows = List::with_capacity(u32::try_from(values.len()).expect("entry count"));
+    for value in values {
+        rows.push(match value {
+            source::SeedGroupKeyed::Added { key, value } => {
+                target::SeedGroupKeyed::Added { key, value: group_id(value) }
+            }
+            source::SeedGroupKeyed::Removed { key, value } => {
+                target::SeedGroupKeyed::Removed { key, value: group_id(value) }
+            }
+            source::SeedGroupKeyed::Changed { key, before, after } => {
+                target::SeedGroupKeyed::Changed { key, before: group_id(before), after: group_id(after) }
+            }
+        })
+        .expect("entry count");
+    }
+    rows.into_boxed()
 }

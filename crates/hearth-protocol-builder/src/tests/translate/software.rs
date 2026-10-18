@@ -4,13 +4,8 @@ use crate::{records::parts::software as source, render::parts::software as targe
 pub(super) fn back(software: source::Software) -> target::Software {
     let source::Software { downloads, scripts, fetch } = software;
     let mut rows = skein_lib::List::with_capacity(u32::try_from(downloads.len()).expect("entry bound"));
-    for source::Download { path, sha256, owner, group, how } in downloads {
-        let how = match how {
-            source::How::File { mode } => target::How::File { mode },
-            source::How::Tar { strip } => target::How::Tar { strip },
-        };
-        rows.push(target::Download { path, sha256: hearth_lib::encode::Digest(sha256), owner, group, how })
-            .expect("entry bound");
+    for row in downloads {
+        rows.push(crate::tests::fixtures::download_back(row)).expect("entry bound");
     }
     let mut hints = skein_lib::List::with_capacity(u32::try_from(fetch.len()).expect("entry bound"));
     for source::Fetch { sha256, url } in fetch {

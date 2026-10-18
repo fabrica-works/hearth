@@ -4,6 +4,7 @@ use super::{Apt, Box, Initramfs, Lines, Preseed, Sources, Variant, apt, initramf
 pub struct Change {
     pub resolution: crate::diff::ResolutionChange,
     pub request: Names,
+    pub seeds: SeedsChange,
     pub sources: Option<SourcesPair>,
     pub variant: Option<VariantPair>,
     pub preseeds: Option<PreseedsPair>,
@@ -65,6 +66,8 @@ impl Change {
             names(json, &self.request.removed);
             json.object_end();
         }
+        json.key(b"seeds");
+        self.seeds.json(json);
         json.key(b"resolution");
         self.resolution.json(json);
         if let Some(pair) = &self.sources {
@@ -78,6 +81,7 @@ impl Change {
     }
     pub(crate) fn text(&self, lines: &mut Lines) {
         self.resolution.text(lines);
+        self.seeds.text(lines);
         for (sign, names) in [(b"+".as_slice(), &self.request.added), (b"-", &self.request.removed)] {
             if !names.is_empty() {
                 lines.put(b"  packages ");
@@ -144,3 +148,28 @@ pub(crate) fn value_text<T: Copy>(lines: &mut Lines, value: T, encode: fn(&mut s
     encode(&mut json, value);
     lines.put(&json.finish());
 }
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct SeedsChange {
+    pub users: Box<[SeedUserKeyed]>,
+    pub groups: Box<[SeedGroupKeyed]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct SeedIds {
+    pub uid: u32,
+    pub gid: Option<u32>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum SeedUserKeyed {
+    Added { key: Box<[u8]>, value: SeedIds },
+    Removed { key: Box<[u8]>, value: SeedIds },
+    Changed { key: Box<[u8]>, before: SeedIds, after: SeedIds },
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum SeedGroupKeyed {
+    Added { key: Box<[u8]>, value: u32 },
+    Removed { key: Box<[u8]>, value: u32 },
+    Changed { key: Box<[u8]>, before: u32, after: u32 },
+}
+
+mod fixed;

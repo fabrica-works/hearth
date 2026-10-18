@@ -793,3 +793,4 @@ pub use diff_resolution::*;
 pub mod ids;
 
 pub mod collisions;
+pub mod part_changes;

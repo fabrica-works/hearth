@@ -1,7 +1,7 @@
 //! Typed differences and the lowest changed layer (render.md, 6.1, 6.2).
 mod resolution;
 use crate::{
-    parts::{PartRecord, Spec, boot, config, data, exports, packages},
+    parts::{PartRecord, Spec, boot, config, data, exports, live, packages, secrets, software},
     revision::Oid,
     vocabulary::Class,
 };
@@ -34,6 +34,10 @@ pub enum Made {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PartChange {
+    Secrets(secrets::Change),
+    Software(software::Change),
+    Live(live::Change),
+
     Meta(crate::parts::meta::Change),
     Config(config::Change),
     Data(data::DataChange),
@@ -104,11 +108,11 @@ pub fn compare(from: Option<&Made>, to: Option<&Made>, resolution: Needs) -> Tar
             }
             let from = config_part(before);
             let to = config_part(after);
-            let mut parts = skein_lib::List::with_capacity(6);
+            let mut parts = skein_lib::List::with_capacity(9);
             if let Some(meta) = crate::parts::meta::change(&before.meta, &after.meta) {
                 parts.push(PartChange::Meta(meta)).expect("one meta change");
             }
-            let mut layers = skein_lib::List::with_capacity(4);
+            let mut layers = skein_lib::List::with_capacity(7);
             let old = package_and_boot(before);
             let new = package_and_boot(after);
             if let (Some((from, before)), Some((to, after))) = (old.packages, new.packages)
@@ -139,6 +143,7 @@ pub fn compare(from: Option<&Made>, to: Option<&Made>, resolution: Needs) -> Tar
                 parts.push(PartChange::Data(data)).expect("one data");
                 layers.push(Layer::Slot).expect("four layers");
             }
+            additional(before, after, &mut parts, &mut layers);
             let exports = exports::change(exports_part(before), exports_part(after));
             if !exports.entries.is_empty() {
                 parts.push(PartChange::Exports(exports)).expect("one exports");
@@ -163,7 +168,7 @@ fn config_part(spec: &Spec) -> Option<(&Digest, &config::Config)> {
             | PartRecord::Live(_)
             | PartRecord::Packages(_)
             | PartRecord::Boot(_)
-            | PartRecord::Exports(_) => {} // transitional: hearth 19.5
+            | PartRecord::Exports(_) => {}
         }
     }
     found
@@ -200,6 +205,9 @@ pub(crate) fn tree(change: &mut TargetChange) -> &mut [config::EntryChange] {
                 | PartChange::Meta(_)
                 | PartChange::Packages(_)
                 | PartChange::Boot(_)
+                | PartChange::Secrets(_)
+                | PartChange::Software(_)
+                | PartChange::Live(_)
                 | PartChange::Exports(_) => {}
             }
         }
@@ -253,4 +261,48 @@ fn data_part(spec: &Spec) -> Option<&data::Data> {
         }
     }
     found
+}
+
+fn additional(
+    before: &Spec,
+    after: &Spec,
+    changes: &mut skein_lib::List<PartChange>,
+    layers: &mut skein_lib::List<Layer>,
+) {
+    for old in &before.parts {
+        for new in &after.parts {
+            if old.digest == new.digest {
+                continue;
+            }
+            let change = match (&old.record, &new.record) {
+                (PartRecord::Secrets(before), PartRecord::Secrets(after)) => {
+                    PartChange::Secrets(secrets::change(before, after))
+                }
+                (PartRecord::Software(before), PartRecord::Software(after)) => {
+                    PartChange::Software(software::change(before, after))
+                }
+                (PartRecord::Live(before), PartRecord::Live(after)) => PartChange::Live(live::change(before, after)),
+                (
+                    PartRecord::Config(_)
+                    | PartRecord::Data(_)
+                    | PartRecord::Packages(_)
+                    | PartRecord::Boot(_)
+                    | PartRecord::Exports(_)
+                    | PartRecord::Secrets(_)
+                    | PartRecord::Software(_)
+                    | PartRecord::Live(_),
+                    PartRecord::Config(_)
+                    | PartRecord::Data(_)
+                    | PartRecord::Packages(_)
+                    | PartRecord::Boot(_)
+                    | PartRecord::Exports(_)
+                    | PartRecord::Secrets(_)
+                    | PartRecord::Software(_)
+                    | PartRecord::Live(_),
+                ) => continue,
+            };
+            changes.push(change).expect("one change per part");
+            layers.push(layer(&new.record)).expect("one layer per part");
+        }
+    }
 }

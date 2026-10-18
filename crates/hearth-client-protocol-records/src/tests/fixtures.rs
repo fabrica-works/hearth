@@ -452,3 +452,6 @@ mod ids;
 pub use ids::*;
 mod collisions;
 pub use collisions::*;
+
+mod part_changes;
+pub use part_changes::*;

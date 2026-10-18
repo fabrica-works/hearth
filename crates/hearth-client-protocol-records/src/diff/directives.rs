@@ -93,10 +93,11 @@ impl LineKeyed {
     }
 }
 impl ScriptsChange {
-    fn text(&self, lines: &mut Lines) {
+    pub(crate) fn text(&self, lines: &mut Lines, part: &[u8]) {
         for row in &self.before {
             if script(&self.after, &row.task).is_none() {
-                header(lines, b"-", b"scripts", b"");
+                crate::diff::placed::header(lines, part, b"scripts", true, false);
+                lines.pad_to(52);
                 row.text(lines);
                 lines.put(b"\n");
             }
@@ -107,12 +108,13 @@ impl ScriptsChange {
                 Some(_) => b"~",
                 None => b"+",
             };
-            header(lines, mark, b"scripts", b"");
+            crate::diff::placed::header(lines, part, b"scripts", mark != b"+", true);
+            lines.pad_to(52);
             row.text(lines);
             lines.put(b"\n");
         }
     }
-    fn json(&self, json: &mut Encoder) {
+    pub(crate) fn json(&self, json: &mut Encoder) {
         json.object_start();
         json.key(b"after");
         scripts_json(&self.after, json);
@@ -146,7 +148,7 @@ impl ConfigChange {
             row.text(lines);
         }
         if let Some(scripts) = &self.scripts {
-            scripts.text(lines);
+            scripts.text(lines, b"config");
         }
     }
     pub(super) fn directives_json(&self, json: &mut Encoder) {

@@ -1,5 +1,6 @@
 //! Secret records translated exhaustively (render.md, 4.3).
 use crate::{records::parts::secrets as target, render::parts::secrets as source};
+use alloc::boxed::Box;
 #[must_use]
 pub fn secrets(secrets: source::Secrets) -> target::Secrets {
     let source::Secrets { files, passwords, identity } = secrets;
@@ -31,4 +32,21 @@ pub fn secrets(secrets: source::Secrets) -> target::Secrets {
         .expect("entry count");
     }
     target::Secrets { files: translated.into_boxed(), passwords: users.into_boxed(), identity: keys.into_boxed() }
+}
+
+#[must_use]
+pub fn change(value: source::Change) -> target::Change {
+    target::Change { files: named(value.files), passwords: named(value.passwords), identity: named(value.identity) }
+}
+fn named(values: Box<[source::Named]>) -> Box<[target::Named]> {
+    let mut rows = skein_lib::List::with_capacity(u32::try_from(values.len()).expect("entry count"));
+    for value in values {
+        rows.push(match value {
+            source::Named::Added(key) => target::Named::Added(key),
+            source::Named::Removed(key) => target::Named::Removed(key),
+            source::Named::Changed(key) => target::Named::Changed(key),
+        })
+        .expect("entry count");
+    }
+    rows.into_boxed()
 }

@@ -41,7 +41,7 @@ pub(super) fn tmpfiles_back(entries: Box<[source::Tmpfile]>) -> Box<[target::Tmp
     }
     rows.into_boxed()
 }
-pub(super) fn scripts_back(entries: Box<[source::Script]>) -> Box<[target::Script]> {
+pub(crate) fn scripts_back(entries: Box<[source::Script]>) -> Box<[target::Script]> {
     let mut rows = List::with_capacity(u32::try_from(entries.len()).expect("fixture count"));
     for source::Script { task, order, content_digest } in entries {
         rows.push(target::Script { task, order, content_digest: hearth_lib::encode::Digest(content_digest) })

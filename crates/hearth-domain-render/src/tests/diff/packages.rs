@@ -24,6 +24,7 @@ fn a_field_equal_on_both_sides_is_left_out() {
     assert_eq!(
         change(&packages, &packages),
         Change {
+            seeds: SeedsChange { users: Box::new([]), groups: Box::new([]) },
             resolution: diff::ResolutionChange::Same,
             request: Names { added: Box::new([]), removed: Box::new([]) },
             sources: None,
@@ -36,8 +37,7 @@ fn a_field_equal_on_both_sides_is_left_out() {
 }
 #[test]
 fn a_changed_architecture_is_a_sources_pair() {
-    let before = fixtures::thin_packages();
-    let mut after = before.clone();
+    let (before, mut after) = fixtures::package_pair();
     after.sources.architecture = copy_of(b"arm64");
     assert_eq!(
         change(&before, &after).sources,
@@ -80,8 +80,7 @@ fn the_boot_part_is_a_slot_layer_and_packages_the_lowest() {
 }
 #[test]
 fn a_preseed_only_change_rebuilds_from_packages() {
-    let before = fixtures::thin_packages();
-    let mut after = before.clone();
+    let (before, mut after) = fixtures::package_pair();
     after.preseeds = Box::new([fixtures::preseed_answer()]);
     assert_eq!(inputs(&before), inputs(&after));
     let TargetChange::Changed { rebuild, .. } =
@@ -93,8 +92,7 @@ fn a_preseed_only_change_rebuilds_from_packages() {
 }
 #[test]
 fn an_initramfs_only_change_rebuilds_from_packages() {
-    let before = fixtures::thin_packages();
-    let mut after = before.clone();
+    let (before, mut after) = fixtures::package_pair();
     after.initramfs.as_mut().expect("metal").modules = Box::new([copy_of(b"nvme")]);
     assert_eq!(inputs(&before), inputs(&after));
     let TargetChange::Changed { rebuild, .. } =
@@ -107,15 +105,13 @@ fn an_initramfs_only_change_rebuilds_from_packages() {
 
 #[test]
 fn a_changed_variant_keeps_its_before_and_after() {
-    let before = fixtures::thin_packages();
-    let mut after = before.clone();
+    let (before, mut after) = fixtures::package_pair();
     after.variant = Variant::Container;
     assert_eq!(change(&before, &after).variant, Some(VariantPair { before: Variant::Apt, after: Variant::Container }));
 }
 #[test]
 fn a_changed_apt_option_keeps_its_before_and_after() {
-    let before = fixtures::thin_packages();
-    let mut after = before.clone();
+    let (before, mut after) = fixtures::package_pair();
     after.apt.install_recommends = true;
     assert_eq!(
         change(&before, &after).apt,
@@ -124,8 +120,7 @@ fn a_changed_apt_option_keeps_its_before_and_after() {
 }
 #[test]
 fn a_changed_initramfs_keeps_its_before_and_after() {
-    let before = fixtures::thin_packages();
-    let mut after = before.clone();
+    let (before, mut after) = fixtures::package_pair();
     after.initramfs = None;
     assert_eq!(
         change(&before, &after).initramfs,

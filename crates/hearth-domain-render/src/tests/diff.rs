@@ -25,11 +25,7 @@ fn equal_spec_digests_are_same_whatever_the_commits() {
     let before = fixtures::spec(b"x1-prod", &[]);
     let mut after = before.clone();
     after.commit = crate::revision::Oid(bytes::copy_of(b"abcdef0123456789abcdef0123456789abcdef01"));
-    assert_eq!(
-        diff::compare(Some(&Made::Spec(Box::new(before))), Some(&Made::Spec(Box::new(after))), Needs::Needed),
-        TargetChange::Same,
-        "commit outside digest"
-    );
+    assert_eq!(fixtures::compared_specs(before, after), TargetChange::Same, "commit outside digest");
 }
 const ONE_SIDE: &[(bool, TargetChange)] =
     &[(true, TargetChange::Removed), (false, TargetChange::Added { spec_digest: Digest([2; 32]) })];
@@ -96,7 +92,7 @@ fn tree_entries_are_added_removed_or_changed_by_path() {
 fn changed_parts_are_compared_by_digest_and_rebuild_from_config() {
     let (before, after) = fixtures::changed_specs();
     assert_eq!(
-        diff::compare(Some(&Made::Spec(Box::new(before))), Some(&Made::Spec(Box::new(after))), Needs::Needed),
+        fixtures::compared_specs(before, after),
         TargetChange::Changed {
             rebuild: Rebuild::FromConfig,
             parts: Box::new([diff::PartChange::Config(config::Change {
@@ -205,8 +201,7 @@ fn added_or_removed_files_never_request_hunks() {
 #[test]
 fn a_failed_hunks_request_leaves_the_file_bare_and_the_call_try_again() {
     use crate::vocabulary::{Answer, Output};
-    let (mut render, env, mut out) = fixtures::hunk_call();
-    crate::step(&mut render, &env, fixtures::hunk_failure(), &mut out);
+    let (mut render, env, mut out) = fixtures::failed_hunk_call();
     crate::resume(&mut render, &env, &mut out);
     let Some(Output::Answer(Answer::Change(change))) = out.pop() else { panic!("change stands") };
     let mut target_change = change.change;
@@ -235,8 +230,7 @@ fn a_failed_hunks_request_leaves_the_file_bare_and_the_call_try_again() {
 #[test]
 fn a_failed_hunks_request_ends_the_call_try_again() {
     use crate::vocabulary::{Answer, Outcome, Output};
-    let (mut render, env, mut out) = fixtures::hunk_call();
-    crate::step(&mut render, &env, fixtures::hunk_failure(), &mut out);
+    let (mut render, env, mut out) = fixtures::failed_hunk_call();
     crate::resume(&mut render, &env, &mut out);
     drop(out.pop());
     crate::resume(&mut render, &env, &mut out);
@@ -271,7 +265,7 @@ fn a_member_changed_alone_is_a_meta_change_rebuilding_nothing() {
     after.digest = Digest([3; 32]);
     after.meta.member = Some(bytes::copy_of(b"a"));
     assert_eq!(
-        diff::compare(Some(&Made::Spec(Box::new(before))), Some(&Made::Spec(Box::new(after))), Needs::Needed),
+        fixtures::compared_specs(before, after),
         TargetChange::Changed {
             parts: Box::new([diff::PartChange::Meta(Change {
                 base: None,
@@ -328,8 +322,7 @@ fn a_failed_hunks_request_leaves_its_file_bare_then_a_tool_error() {
         errors::{Command, Ended, Error, Kind, Tool},
         vocabulary::{Answer, Class},
     };
-    let (mut render, env, mut out) = fixtures::hunk_call();
-    crate::step(&mut render, &env, fixtures::hunk_failure(), &mut out);
+    let (mut render, env, mut out) = fixtures::failed_hunk_call();
     let answers = fixtures::finish_render(&mut render, &env, &mut out);
     let mut error = None;
     for answer in &answers {
@@ -396,3 +389,5 @@ mod exports;
 mod packages;
 
 mod resolution;
+
+mod part_changes;

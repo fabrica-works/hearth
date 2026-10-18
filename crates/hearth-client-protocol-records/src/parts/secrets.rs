@@ -147,3 +147,72 @@ fn json_place(json: &mut skein_json::writer::Encoder, path: &[u8], mode: u16, ow
     json.key(b"path");
     json.string(path);
 }
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Change {
+    pub files: Box<[Named]>,
+    pub passwords: Box<[Named]>,
+    pub identity: Box<[Named]>,
+}
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Named {
+    Added(Box<[u8]>),
+    Removed(Box<[u8]>),
+    Changed(Box<[u8]>),
+}
+
+impl Change {
+    pub(crate) fn text(&self, lines: &mut Lines) {
+        for (list, entries) in
+            [(b"secret".as_slice(), &self.files), (b"password", &self.passwords), (b"identity", &self.identity)]
+        {
+            for entry in entries {
+                let (key, before, after) = entry.sides();
+                crate::diff::placed::header(lines, b"secrets", list, before, after);
+                lines.put(b" ");
+                lines.put(key);
+                lines.put(b"\n");
+            }
+        }
+    }
+    pub(crate) fn json(&self, json: &mut skein_json::writer::Encoder) {
+        json.object_start();
+        crate::form::json::field(json, b"kind", b"secrets");
+        json.key(b"secrets");
+        json.object_start();
+        for (list, entries) in
+            [(b"files".as_slice(), &self.files), (b"passwords", &self.passwords), (b"identity", &self.identity)]
+        {
+            json.key(list);
+            json.array_start();
+            for entry in entries {
+                let (key, before, after) = entry.sides();
+                json.object_start();
+                crate::form::json::field(json, b"key", key);
+                crate::form::json::field(
+                    json,
+                    b"kind",
+                    match (before, after) {
+                        (false, true) => b"added",
+                        (true, false) => b"removed",
+                        (true, true) => b"changed",
+                        (false, false) => unreachable!("change has a side"),
+                    },
+                );
+                json.object_end();
+            }
+            json.array_end();
+        }
+        json.object_end();
+        json.object_end();
+    }
+}
+impl Named {
+    fn sides(&self) -> (&[u8], bool, bool) {
+        match self {
+            Self::Added(key) => (key, false, true),
+            Self::Removed(key) => (key, true, false),
+            Self::Changed(key) => (key, true, true),
+        }
+    }
+}

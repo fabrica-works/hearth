@@ -326,6 +326,21 @@ fn change_back(change: client_diff::TargetChange) -> diff::TargetChange {
             let mut translated = skein_lib::List::with_capacity(u32::try_from(parts.len()).expect("bounded parts"));
             for part in parts {
                 match part {
+                    client_diff::PartChange::Secrets(value) => {
+                        translated
+                            .push(diff::PartChange::Secrets(crate::tests::fixtures::secrets_change_back(value)))
+                            .expect("parts");
+                    }
+                    client_diff::PartChange::Software(value) => {
+                        translated
+                            .push(diff::PartChange::Software(crate::tests::fixtures::software_change_back(value)))
+                            .expect("parts");
+                    }
+                    client_diff::PartChange::Live(value) => {
+                        translated
+                            .push(diff::PartChange::Live(crate::tests::fixtures::live_change_back(value)))
+                            .expect("parts");
+                    }
                     client_diff::PartChange::Data(value) => {
                         translated.push(diff::PartChange::Data(data::change_back(value))).expect("parts");
                     }
@@ -773,8 +788,10 @@ mod export_changes;
 mod resolve;
 
 mod data;
-mod directives;
+pub(super) mod directives;
 mod record_store;
 
 mod diff_resolution;
 mod ids;
+
+mod part_changes;

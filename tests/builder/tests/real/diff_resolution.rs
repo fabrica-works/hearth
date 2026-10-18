@@ -7,7 +7,7 @@ fn two_recorded_resolutions_show_the_packages_a_change_moves() {
     assert_eq!(
         fixtures::lines_starting(&rendered.stdout, &["{\"record\":\"change\""]),
         concat!(
-            r#"{"record":"change","target":"test-min","kind":"changed","changed":{"parts":[{"kind":"packages","packages":{"request":{"added":["vim"],"removed":[]},"resolution":{"added":[{"architecture":"amd64","name":"vim","version":"9"}],"kind":"resolved","removed":[{"architecture":"amd64","name":"nano","version":"8"}],"versions_changed":[{"after":"3","architecture":"amd64","before":"2","name":"apt"}]}}}],"rebuild":{"kind":"from_packages","resolution":"known"}}}"#,
+            r#"{"record":"change","target":"test-min","kind":"changed","changed":{"parts":[{"kind":"packages","packages":{"request":{"added":["vim"],"removed":[]},"seeds":{"groups":[],"users":[]},"resolution":{"added":[{"architecture":"amd64","name":"vim","version":"9"}],"kind":"resolved","removed":[{"architecture":"amd64","name":"nano","version":"8"}],"versions_changed":[{"after":"3","architecture":"amd64","before":"2","name":"apt"}]}}}],"rebuild":{"kind":"from_packages","resolution":"known"}}}"#,
             "\n"
         )
     );
