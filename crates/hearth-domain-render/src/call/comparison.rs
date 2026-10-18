@@ -22,9 +22,10 @@ impl Comparison {
         side.inherit_finding(&self.from.as_ref().expect("other side").finding);
         self.swap_resolution_side(side);
         side.inherit_finding(&self.from.as_ref().expect("other side").finding);
-        for index in self.resolving..self.names.len() {
+        for index in self.resolving..u32::try_from(self.names.len()).expect("bounded names") {
             self.resolving = index;
-            let target = self.names.get(index).expect("resolution cursor").clone();
+            let target =
+                self.names.get(usize::try_from(index).expect("bounded cursor")).expect("resolution cursor").clone();
             let from = self.from.as_mut().expect("from side");
             let (Some(before), Some(after)) = (key(from.made.get(&target)), key(side.made.get(&target))) else {
                 continue;
@@ -41,7 +42,7 @@ impl Comparison {
                 return true;
             }
         }
-        self.resolving = self.names.len();
+        self.resolving = u32::try_from(self.names.len()).expect("bounded names");
         false
     }
 }

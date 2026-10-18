@@ -251,3 +251,63 @@ pub const STALL_AFTER: u64 = 0;
 /// One target changes its package request; the other target is unchanged.
 pub const KNOWN_REBUILDS: usize = 1;
 pub const BUSY: linux::Refusal = linux::Refusal::Busy;
+
+/// The replay proof's seed and a neighbouring independent seed.
+pub const REPLAY_SEED: u64 = 11;
+pub const OTHER_REPLAY_SEED: u64 = REPLAY_SEED + 1;
+/// Admission gives the builder the world's first process id.
+pub const CLIENT_PID: u32 = 0;
+#[must_use]
+pub fn digested(seed: u64, config: skein_sim::Config) -> skein_world::Outcome<crate::simulated::Proc, Shared> {
+    let mut world = crate::simulated::world(&thin(), seed, config);
+    world.digests(skein_world::Digests::Traced);
+    world.run()
+}
+#[must_use]
+pub fn replay(seed: u64) -> (Vec<String>, skein_world::StateDigests) {
+    let outcome = digested(seed, crate::simulated::chaos());
+    (outcome.trace.iter().map(|entry| format!("{entry:?}")).collect(), outcome.state_digests())
+}
+
+/// The store's shipped page and one additional file force a subsequent page.
+pub const STORE_PAGE: u32 = hearth::limits().domain.store.page;
+pub const CACHE_FILES: u32 = STORE_PAGE + 1;
+/// The calm client's submission count, checked by the cut sweep (ruling 188).
+pub const CUTS: u32 = 143;
+pub const BUILDER_SLOT: usize = 0;
+pub const FUZZY_SEEDS: u64 = 64;
+#[must_use]
+pub fn small_limits() -> hearth::Limits {
+    let mut limits = hearth::limits();
+    limits.protocol.git.entries = 64;
+    limits.protocol.git.path = 256;
+    limits.protocol.git.paths_total = limits.protocol.git.entries * limits.protocol.git.path;
+    limits
+}
+pub fn lay_cache_pages(shared: &Shared) {
+    let mut fake = shared.borrow_mut();
+    for file in 0..CACHE_FILES {
+        let path = format!("/srv/store/cache/{file:064x}");
+        fake.behind.machine_mut().linux_mut().lay(&[linux::Item::file(path.as_bytes(), 0o600, b"").owner(BUILDER)]);
+    }
+}
+#[must_use]
+pub fn lists(shared: &Shared) -> u32 {
+    shared.borrow().lists
+}
+
+/// The thin call's literal output, shared by the simulator's stories.
+pub const THIN_OUTPUT: Option<&[u8]> = Some(super::super::THIN_TEXT.as_bytes());
+
+/// One original tool and one cold replacement after the single cut.
+pub const CUT_INSTANCES: u32 = 1 + 1;
+#[must_use]
+pub fn client_submissions(outcome: &skein_world::Outcome<crate::simulated::Proc, Shared>) -> u32 {
+    let counts: Vec<_> = outcome
+        .procs
+        .iter()
+        .zip(&outcome.submissions)
+        .filter_map(|(proc, count)| matches!(proc, crate::simulated::Proc::Client(_)).then_some(*count))
+        .collect();
+    *super::only(&counts)
+}

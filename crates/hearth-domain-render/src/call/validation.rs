@@ -52,7 +52,10 @@ impl Side {
     pub(super) fn validated_target(&mut self, target: &Target) -> Option<crate::schema::Validated> {
         let revision =
             crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
-        let settings = self.settings.get(self.next.saturating_sub(1)).expect("target settings");
+        let settings = self
+            .settings
+            .get(usize::try_from(self.next.saturating_sub(1)).expect("bounded cursor"))
+            .expect("target settings");
         checked(settings, &revision, target, &self.targets, &mut self.validator, self.validated, &mut self.errors)
     }
 

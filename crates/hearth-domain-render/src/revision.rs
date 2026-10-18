@@ -226,7 +226,7 @@ pub struct Pair {
     pub value: Value,
 }
 /// Documents in listing path order, including refused documents.
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Documents {
     entries: Box<[Entry]>,
     decoded: Box<[Option<Document>]>,
@@ -311,7 +311,7 @@ impl Documents {
     }
 }
 /// Listed bytes admitted before decoding a revision (render.md, 2.3).
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Budget {
     held: u64,
     max: u64,

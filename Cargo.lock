@@ -96,6 +96,7 @@ dependencies = [
  "hearth-recordings",
  "hearth-render-world",
  "hearth-test-mirror",
+ "skein-heap",
  "skein-io",
  "skein-lib",
  "skein-scratch",

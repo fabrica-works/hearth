@@ -1,20 +1,23 @@
 mod fixtures;
-use skein_io::kernel::Fd;
+mod memory;
 #[test]
 fn a_second_output_is_refused_and_stays_with_its_caller() {
     let mut service = fixtures::service();
-    assert_eq!(service.adopt_output_file(Fd::new(4)), Ok(()), "one client output");
-    assert_eq!(service.adopt_output_pipe(Fd::new(5)), Err(Fd::new(5)), "a second descriptor stays with its caller");
+    assert_eq!(service.adopt_output_file(fixtures::OUTPUT), Ok(()), "one client output");
+    assert_eq!(
+        service.adopt_output_pipe(fixtures::OTHER_OUTPUT),
+        Err(fixtures::OTHER_OUTPUT),
+        "a second descriptor stays with its caller"
+    );
 }
 
 #[test]
 fn a_beneath_request_reaches_io_with_its_roots_descriptor() {
     use crate::protocol::{Asked, Beneath};
-    use skein_lib::{Token, bytes};
-    let mut service = fixtures::service();
-    let root = service.files.adopt_root(Fd::new(47)).expect("directory token");
+    use skein_lib::bytes;
+    let (mut service, root) = fixtures::with_source_root();
     service.asked.push(Asked::Beneath(Beneath::OpenDirectory {
-        owner: Token::new(20),
+        owner: fixtures::OWNER,
         root,
         name: bytes::copy_of(b"child"),
         no_follow: true,
@@ -24,7 +27,7 @@ fn a_beneath_request_reaches_io_with_its_roots_descriptor() {
     assert_eq!(
         submit.kind,
         skein_io::kernel::Op::Open {
-            root: Fd::new(47),
+            root: fixtures::SOURCE_ROOT,
             path: bytes::copy_of(b"child"),
             how: skein_io::kernel::OpenHow::DirectoryNoFollow
         }
@@ -34,23 +37,22 @@ fn a_beneath_request_reaches_io_with_its_roots_descriptor() {
 #[test]
 fn a_beneath_rename_reaches_io_with_both_descriptors() {
     use crate::protocol::{Asked, Beneath};
-    use skein_lib::{Token, bytes};
-    let mut service = fixtures::service();
-    let from_root = service.files.adopt_root(Fd::new(47)).expect("lists token");
+    use skein_lib::bytes;
+    let (mut service, from_root) = fixtures::with_source_root();
     service.asked.push(Asked::Beneath(Beneath::Rename {
-        owner: Token::new(20),
+        owner: fixtures::OWNER,
         from_root,
         from: bytes::copy_of(b"index"),
-        to_root: Fd::new(4),
+        to_root: fixtures::OUTPUT,
         to: bytes::copy_of(b"digest"),
     }));
     crate::io_down(&mut service);
     assert_eq!(
         service.file_submissions.pop().expect("rename").kind,
         skein_io::kernel::Op::Rename {
-            from_dir: Fd::new(47),
+            from_dir: fixtures::SOURCE_ROOT,
             from: bytes::copy_of(b"index"),
-            to_dir: Fd::new(4),
+            to_dir: fixtures::OUTPUT,
             to: bytes::copy_of(b"digest")
         }
     );

@@ -220,24 +220,24 @@ pub struct Pair {
     pub from: Provenance,
     pub value: Composed,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 enum Frame {
     Map {
         from: Provenance,
         target: Map<Box<[u8]>, Pair>,
         patch: Box<[revision::Pair]>,
-        next: usize,
+        next: u32,
         key: Option<(Box<[u8]>, Provenance)>,
     },
     List {
         from: Provenance,
         patch: Box<[Value]>,
-        next: usize,
+        next: u32,
         out: List<Composed>,
     },
 }
 /// RFC 7386 on a stack bounded by JSON nesting (render.md, 8.3).
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Merge {
     stack: skein_lib::Stack<Frame>,
     steps: u64,
@@ -298,7 +298,7 @@ impl Merge {
                     {
                         target.insert(name.clone(), Pair { key: name, from: origin, value }).expect("pair capacity");
                     }
-                    if let Some(pair) = patch.get_mut(*next) {
+                    if let Some(pair) = patch.get_mut(usize::try_from(*next).expect("bounded cursor")) {
                         *next = next.saturating_add(1);
                         let value = core::mem::replace(&mut pair.value, Value { at: pair.at, kind: Kind::Null });
                         let previous = target.remove(pair.key.as_ref());
@@ -321,7 +321,7 @@ impl Merge {
                     if let Some(value) = finished.take() {
                         out.push(value).expect("list count");
                     }
-                    if let Some(value) = patch.get_mut(*next) {
+                    if let Some(value) = patch.get_mut(usize::try_from(*next).expect("bounded cursor")) {
                         *next = next.saturating_add(1);
                         pending = Some((None, core::mem::replace(value, Value { at: value.at, kind: Kind::Null })));
                     } else {

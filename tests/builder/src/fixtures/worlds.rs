@@ -27,6 +27,7 @@ pub struct Rename {
 }
 #[derive(Debug)]
 pub struct Fake {
+    pub(super) lists: u32,
     pub behind: Behind,
     pub repositories: Repositories,
     pub universe: Universe,
@@ -83,6 +84,7 @@ impl Shared {
             renames: Vec::new(),
             locks: BTreeSet::new(),
             served_bytes: 0,
+            lists: 0,
         })))
     }
     #[must_use]
@@ -110,8 +112,12 @@ impl Shared {
         let lock = if let Ask::Lock { file } = &ask { Some(*file) } else { None };
         let close = if let Ask::Close { file } = &ask { Some(*file) } else { None };
         let mut fake = self.borrow_mut();
+        let listing = matches!(ask, Ask::List { .. });
         let result = behind::answer(&mut fake.behind, ask);
         let entries: Vec<_> = fake.behind.machine_mut().linux_mut().ledger().collect();
+        if listing {
+            fake.lists = fake.lists.saturating_add(u32::try_from(entries.len()).expect("bounded ledger"));
+        }
         fake.ledger.extend(entries);
         if result.is_ok() {
             if let Some(rename) = rename {
@@ -145,7 +151,9 @@ impl skein_world::Machine for Shared {
         self.borrow_mut().behind.close_append(file);
     }
     fn cut(&mut self, cut: skein_world::Cut, held: &[Handle], seed: u64) {
-        self.borrow_mut().behind.cut(cut, held, seed);
+        let mut fake = self.borrow_mut();
+        fake.behind.cut(cut, held, seed);
+        fake.locks.retain(|file| !held.contains(file));
     }
     fn step(&mut self, call: skein_sim::Call, answers: &mut Queue<skein_sim::Answer>) {
         answers.push(skein_sim::Answer { ticket: call.ticket, result: self.answer(call.ask) });

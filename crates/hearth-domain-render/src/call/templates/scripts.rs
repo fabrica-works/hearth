@@ -47,10 +47,12 @@ impl Target {
     }
     pub(super) fn script(&mut self, side: &mut Side, task: &[u8]) -> bool {
         let mut source = None;
-        for (index, script) in self.scripts.iter().enumerate().skip(self.script) {
+        for (index, script) in
+            self.scripts.iter().enumerate().skip(usize::try_from(self.script).expect("bounded cursor"))
+        {
             if script.task.as_ref() == task {
                 source = Some(script.clone());
-                self.script = index.saturating_add(1);
+                self.script = u32::try_from(index).expect("bounded script").saturating_add(1);
                 break;
             }
         }

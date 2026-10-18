@@ -17,17 +17,17 @@ pub struct Fault {
     pub document: u32,
     pub at: Position,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct TaskDefaults {
     layer: Composed,
     values: Box<[DefaultValue]>,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 struct DefaultValue {
     spec: Spec,
     value: Option<Composed>,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Defaults {
     tasks: Map<Box<[u8]>, TaskDefaults>,
 }
@@ -177,19 +177,19 @@ enum Wanted {
     Spec(Spec),
     Settings(Box<[Spec]>),
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 enum Frame {
-    List { items: Box<[Composed]>, next: usize, ty: u32, made: List<Evaluated> },
+    List { items: Box<[Composed]>, next: u32, ty: u32, made: List<Evaluated> },
     Map(MapFrame),
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 struct MapFrame {
     from: Provenance,
     root: bool,
     pairs: Box<[crate::compose::Pair]>,
-    next: usize,
+    next: u32,
     fields: Option<Box<[Spec]>>,
-    field: usize,
+    field: u32,
     ty: u32,
     key: Option<Box<[u8]>>,
     made: List<EvaluatedEntry>,
@@ -199,7 +199,7 @@ enum Advance {
     Next(Composed, Wanted),
     Done,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Validator {
     stack: Stack<Frame>,
     steps: u64,
@@ -388,7 +388,7 @@ impl Frame {
                 if let Some(value) = value {
                     made.push(value).expect("element count");
                 }
-                if let Some(item) = items.get(*next) {
+                if let Some(item) = items.get(usize::try_from(*next).expect("bounded cursor")) {
                     *next = next.saturating_add(1);
                     Advance::Next(item.clone(), Wanted::Type(*ty))
                 } else {
@@ -420,9 +420,9 @@ impl MapFrame {
         if let Some(key) = key.take() {
             made.push(EvaluatedEntry { key, value }).expect("field count");
         }
-        let pair = pairs.get(*next);
+        let pair = pairs.get(usize::try_from(*next).expect("bounded cursor"));
         let spec = match fields {
-            Some(fields) => fields.get(*field),
+            Some(fields) => fields.get(usize::try_from(*field).expect("bounded cursor")),
             None => None,
         };
         match (pair, spec) {

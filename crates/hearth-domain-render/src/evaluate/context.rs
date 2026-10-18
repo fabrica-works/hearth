@@ -113,7 +113,7 @@ pub fn target(meta: &Meta, containers: &[crate::compose::Container]) -> Value {
 use alloc::boxed::Box;
 
 /// One task's owned context roots (format.md, 7.7).
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Roots {
     pub target: Value,
     pub debian: Value,

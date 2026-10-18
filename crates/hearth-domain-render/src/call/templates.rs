@@ -28,7 +28,7 @@ pub(crate) struct Prepared {
     pub exports: parts::exports::Exports,
     pub export_roots: Value,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub(crate) struct Target {
     data: parts::data::Data,
     meta: Meta,
@@ -44,9 +44,9 @@ pub(crate) struct Target {
     packages: parts::packages::Packages,
     live: parts::live::Live,
     boot: parts::boot::Boot,
-    task: usize,
+    task: u32,
     rendered: u64,
-    entry: usize,
+    entry: u32,
     roots: Option<Roots>,
     tree: Map<Box<[u8]>, TreeEntry>,
     accounts: crate::kinds::users::Accounts,
@@ -57,7 +57,7 @@ pub(crate) struct Target {
     tmpfiles: Box<[parts::config::Tmpfile]>,
     scripts: Box<[crate::kinds::scripts::Source]>,
     script_rows: Map<(u16, Box<[u8]>), parts::config::Script>,
-    script: usize,
+    script: u32,
     software_rows: Map<(u16, Box<[u8]>), parts::config::Script>,
     request: Option<Request>,
     addition: u8,
@@ -157,7 +157,7 @@ impl Target {
             return true;
         }
         for _ in 0..=self.tasks.len() {
-            let Some(task) = self.tasks.get_mut(self.task) else { break };
+            let Some(task) = self.tasks.get_mut(usize::try_from(self.task).expect("bounded cursor")) else { break };
             if self.roots.is_none() {
                 self.roots = Some(Roots {
                     target: context::target(&self.meta, &self.containers),
@@ -168,10 +168,17 @@ impl Target {
                 });
             }
             let task_name = task.name.clone();
-            let count = self.plans.get(self.task).expect("task plan").installs.len();
-            for index in self.entry..count {
-                let install =
-                    self.plans.get(self.task).expect("task plan").installs.get(index).expect("plan cursor").clone();
+            let count =
+                self.plans.get(usize::try_from(self.task).expect("bounded cursor")).expect("task plan").installs.len();
+            for index in self.entry..u32::try_from(count).expect("bounded entries") {
+                let install = self
+                    .plans
+                    .get(usize::try_from(self.task).expect("bounded cursor"))
+                    .expect("task plan")
+                    .installs
+                    .get(usize::try_from(index).expect("bounded cursor"))
+                    .expect("plan cursor")
+                    .clone();
                 self.entry = self.entry.saturating_add(1);
                 let (path, via, mode) = match &install.make {
                     Make::Rendered { template, via, mode } => (template, via, *mode),
@@ -417,7 +424,7 @@ fn copied(side: &Side, install: &crate::kinds::files::Install, source: &[u8], mo
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 enum Keeping {
     File(TreeEntry),
     Script(parts::config::Script),

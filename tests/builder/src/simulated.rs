@@ -33,6 +33,9 @@ impl Proc {
     }
 }
 impl Host for Proc {
+    fn state_digest(&self) -> Option<[u8; 32]> {
+        self.host().state_digest()
+    }
     fn iterate(&mut self, now: Time, wall: Wall) {
         self.host_mut().iterate(now, wall);
     }
@@ -69,6 +72,7 @@ struct Context {
     scenario: Scenario<'static>,
     shared: Shared,
     seed: u64,
+    limits: hearth::Limits,
 }
 thread_local! { static CONTEXT: RefCell<Option<Context>> = const { RefCell::new(None) }; }
 fn context() -> Context {
@@ -77,7 +81,7 @@ fn context() -> Context {
 #[must_use]
 pub fn client(inherited: &Inherited) -> Proc {
     let context = context();
-    Proc::Client(Box::new(Client::new(inherited, &context.scenario, context.seed)))
+    Proc::Client(Box::new(Client::new(inherited, &context.scenario, context.seed, context.limits)))
 }
 #[must_use]
 pub fn git(spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Proc {
@@ -99,13 +103,30 @@ pub fn mmdebstrap(spawn: &skein_io::kernel::Spawn, inherited: &Inherited) -> Pro
 /// Build a restartable client over the scenario's machine and installed tools.
 #[must_use]
 pub fn world(scenario: &Scenario<'_>, seed: u64, config: Config) -> World<Proc, Referee, Shared> {
-    build(scenario, seed, config, None)
+    build(scenario, seed, config, &Options::default())
 }
-fn build(scenario: &Scenario<'_>, seed: u64, config: Config, release: Option<Time>) -> World<Proc, Referee, Shared> {
+#[derive(Clone, Copy, Debug)]
+struct Options {
+    release: Option<Time>,
+    memory: Memory,
+    limits: hearth::Limits,
+    instances: u32,
+}
+impl Default for Options {
+    fn default() -> Self {
+        Self { release: None, memory: Memory::Unchecked, limits: hearth::limits(), instances: 1 }
+    }
+}
+fn build(scenario: &Scenario<'_>, seed: u64, config: Config, options: &Options) -> World<Proc, Referee, Shared> {
     let shared = Shared::for_scenario(scenario, seed, fixtures::WORLD_PIPE);
-    fixtures::serve(&shared);
+    if matches!(scenario.call, hearth::Call::Render { resolve: true, .. } | hearth::Call::Diff { resolve: true, .. }) {
+        fixtures::serve(&shared);
+    }
     fixtures::lay_calls(&shared);
-    let lock = release.map(|at| (fixtures::HeldLock::new(&shared), at));
+    if options.memory == Memory::Checked {
+        fixtures::lay_cache_pages(&shared);
+    }
+    let lock = options.release.map(|at| (fixtures::HeldLock::new(&shared), at));
     CONTEXT.with(|context| {
         *context.borrow_mut() = Some(Context {
             scenario: Scenario {
@@ -118,9 +139,10 @@ fn build(scenario: &Scenario<'_>, seed: u64, config: Config, release: Option<Tim
             },
             shared: shared.clone(),
             seed,
+            limits: options.limits,
         });
     });
-    let mut world = World::new_controlled(seed, config, Memory::Unchecked, |_| Referee {
+    let mut world = World::new_controlled(seed, config, options.memory, |_| Referee {
         shared: shared.clone(),
         done: false,
         lock,
@@ -131,7 +153,7 @@ fn build(scenario: &Scenario<'_>, seed: u64, config: Config, release: Option<Tim
         HostedProgram {
             program: b"/usr/bin/git".as_slice().into(),
             make: git,
-            instances: 1,
+            instances: options.instances,
             operations: fixtures::HOST_OPERATIONS,
         },
         fixtures::tool_roots,
@@ -140,7 +162,7 @@ fn build(scenario: &Scenario<'_>, seed: u64, config: Config, release: Option<Tim
         HostedProgram {
             program: b"/usr/bin/mmdebstrap".as_slice().into(),
             make: mmdebstrap,
-            instances: 1,
+            instances: options.instances,
             operations: fixtures::HOST_OPERATIONS,
         },
         fixtures::tool_roots,
@@ -160,7 +182,7 @@ pub fn two(scenario: &Scenario<'_>, seed: u64, config: Config) -> Outcome<Proc, 
 }
 #[must_use]
 pub fn with_lock(scenario: &Scenario<'_>, seed: u64, config: Config, release: Time) -> Outcome<Proc, Shared> {
-    build(scenario, seed, config, Some(release)).run()
+    build(scenario, seed, config, &Options { release: Some(release), ..Options::default() }).run()
 }
 #[derive(Debug)]
 pub struct Referee {
@@ -206,4 +228,43 @@ impl skein_world::Referee<Proc> for Referee {
     fn passed(&self) -> bool {
         self.done
     }
+}
+
+/// Builder chaos preserves progress while varying transport and cancellation
+/// races: M1 gives git no deadline (ruling 186).
+#[must_use]
+pub fn chaos() -> Config {
+    use skein_sim::Faults;
+    Config {
+        faults: Faults {
+            no_space: 0,
+            read_only: 0,
+            io_error: 0,
+            hung: 0,
+            no_buffer: 0,
+            reset: 0,
+            refuse: 0,
+            timed_out: 0,
+            ..Faults::CHAOS
+        },
+        ..Config::chaos()
+    }
+}
+/// Meter the shipped client over the paged-store scenario at the named limits.
+#[must_use]
+pub fn checked(seed: u64) -> Outcome<Proc, Shared> {
+    build(
+        &fixtures::thin(),
+        seed,
+        Config::calm(),
+        &Options { memory: Memory::Checked, limits: fixtures::small_limits(), ..Options::default() },
+    )
+    .run()
+}
+
+/// A killed client's children run on while its cold replacement starts
+/// another instance at the same pace (ruling 187).
+#[must_use]
+pub fn for_cut(scenario: &Scenario<'_>, seed: u64) -> World<Proc, Referee, Shared> {
+    build(scenario, seed, Config::calm(), &Options { instances: fixtures::CUT_INSTANCES, ..Options::default() })
 }

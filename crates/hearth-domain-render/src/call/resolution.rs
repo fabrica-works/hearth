@@ -8,10 +8,10 @@ use crate::{
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
 use skein_lib::{Map, Queue, Token};
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub(crate) struct Finding {
     assembled: bool,
-    next: usize,
+    next: u32,
     asked: Map<Digest, Option<crate::resolution::Record>>,
     pending: Option<Digest>,
     deadline: Option<skein_lib::Time>,
@@ -105,7 +105,7 @@ impl Side {
                 }
             }
         }
-        for (_, made) in self.made.into_iter().skip(self.finding.next) {
+        for (_, made) in self.made.into_iter().skip(usize::try_from(self.finding.next).expect("bounded cursor")) {
             self.finding.next = self.finding.next.saturating_add(1);
             let Made::Spec(spec) = made else { continue };
             let mut spec = spec.as_ref().clone();

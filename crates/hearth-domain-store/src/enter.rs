@@ -6,7 +6,7 @@ use crate::{
 };
 use hearth_lib::encode::Digest;
 use skein_lib::{Env, Queue, Token};
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub(super) struct Entering {
     arrival: Token,
     sha256: Digest,

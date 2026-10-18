@@ -16,8 +16,7 @@ pub struct Client {
 }
 impl Client {
     #[must_use]
-    pub fn new(inherited: &Inherited, scenario: &fixtures::Scenario<'_>, seed: u64) -> Self {
-        let limits = hearth::limits();
+    pub fn new(inherited: &Inherited, scenario: &fixtures::Scenario<'_>, seed: u64, limits: hearth::Limits) -> Self {
         let mut client = hearth::Client::with_roots(
             Configuration { proxy: None, limits, uid: fixtures::BUILDER.user, store: fixtures::STORE.into() },
             Roots {
@@ -42,6 +41,9 @@ impl Client {
     }
 }
 impl Host for Client {
+    fn state_digest(&self) -> Option<[u8; 32]> {
+        self.inner.state_digest()
+    }
     fn iterate(&mut self, now: Time, wall: Wall) {
         while let Some(complete) = self.completions.pop() {
             if complete.op == fixtures::STARTUP_CLOSE {

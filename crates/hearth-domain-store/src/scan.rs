@@ -8,7 +8,7 @@ use crate::{
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
 use skein_lib::{Env, Map, Queue};
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 enum Pass {
     Top,
     Resolutions,
@@ -18,7 +18,7 @@ enum Pass {
     Settle,
     Closing,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub(super) struct Scan {
     pass: Pass,
     pub(super) index: index::Index,

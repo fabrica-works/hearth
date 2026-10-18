@@ -8,7 +8,7 @@ fn hearth_render_through_the_simulator_prints_the_thin_spec() {
     let outcome = fixtures::simulated_thin();
     assert_eq!(
         outcome.machine.contents(fixtures::OUTPUT).as_deref(),
-        Some(fixtures::THIN_TEXT.as_bytes()),
+        fixtures::THIN_OUTPUT,
         "the shipped client, io and printer"
     );
 }
@@ -82,8 +82,8 @@ fn two_builders_over_one_store_take_the_lock_in_turn() {
         outcome.machine.borrow().ledger.iter().any(|entry| entry.refused == Some(hearth_builder_world::fixtures::BUSY)),
         "the second builder's lock was busy"
     );
-    assert_eq!(outcome.machine.contents(fixtures::OUTPUT).as_deref(), Some(fixtures::THIN_TEXT.as_bytes()));
-    assert_eq!(outcome.machine.contents(fixtures::SECOND_OUTPUT).as_deref(), Some(fixtures::THIN_TEXT.as_bytes()));
+    assert_eq!(outcome.machine.contents(fixtures::OUTPUT).as_deref(), fixtures::THIN_OUTPUT);
+    assert_eq!(outcome.machine.contents(fixtures::SECOND_OUTPUT).as_deref(), fixtures::THIN_OUTPUT);
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn a_lock_held_past_the_resolve_limit_is_waited_out_then_the_call_renders() {
         Some(fixtures::WAITING_TEXT),
         "busy is reported once"
     );
-    assert_eq!(outcome.machine.contents(fixtures::OUTPUT).as_deref(), Some(fixtures::THIN_TEXT.as_bytes()));
+    assert_eq!(outcome.machine.contents(fixtures::OUTPUT).as_deref(), fixtures::THIN_OUTPUT);
 }
 
 #[test]
@@ -108,4 +108,35 @@ fn the_protocol_and_simulated_worlds_leave_the_same_store() {
         fixtures::store_files(&protocol.shared),
         "ruling 182: cache names, payloads and record identities; no temporary file"
     );
+}
+
+#[test]
+fn a_seed_replays_to_the_same_trace_machine_and_state_digests() {
+    let trace =
+        skein_world::domain::assert_replays(fixtures::REPLAY_SEED, fixtures::OTHER_REPLAY_SEED, fixtures::replay);
+    assert!(trace.iter().any(|line| line.contains("Digest")), "digests were traced");
+}
+
+#[test]
+fn a_digested_run_traces_the_domain_and_machine_digests() {
+    use skein_sim::{Event, Pid};
+    use std::collections::BTreeSet;
+    let outcome = fixtures::digested(fixtures::REPLAY_SEED, Config::calm());
+    let mut domain = BTreeSet::new();
+    let mut machine = BTreeSet::new();
+    let mut hosted = BTreeSet::new();
+    for entry in &outcome.trace {
+        if let Event::Digest(digest) = entry.event {
+            if entry.pid.raw() == fixtures::CLIENT_PID {
+                domain.insert(digest);
+            } else if entry.pid == Pid::MACHINE {
+                machine.insert(digest);
+            } else {
+                hosted.insert(digest);
+            }
+        }
+    }
+    assert!(domain.len() > 1, "the client's domain changes during the call");
+    assert!(!machine.is_empty(), "the fake machine is digested");
+    assert_eq!(hosted, BTreeSet::new(), "hosted fakes have no state digest");
 }

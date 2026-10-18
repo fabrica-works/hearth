@@ -129,7 +129,7 @@ pub struct Order {
     arrival: u64,
 }
 /// The first configured number of errors, with the rest counted (render.md, 7.1).
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Collector {
     kept: skein_lib::Map<Order, Error>,
     left_out: u32,

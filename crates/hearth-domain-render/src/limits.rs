@@ -51,3 +51,63 @@ pub const SHIPPED: Limits = Limits {
 
 /// A literal that is five bytes cannot fit, for budget refusal tests.
 pub const FOUR_MADE: Limits = Limits { made: 4, ..SHIPPED };
+
+/// Retained revision, targets and resolution records, plus one evaluation's
+/// scratch space (render.md, 8.4; programming-model.md, 6.3).
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    use crate::{compose, diff, evaluate, revision, vocabulary};
+    use alloc::boxed::Box;
+    use skein_lib::{List, Map};
+    // Render's domain receives the listing at render.md, 8.4's bounds.
+    const ENTRIES: u32 = 65_536;
+    const PATHS: u64 = 16_777_216;
+    const NODE: usize = size_of::<revision::Value>()
+        + size_of::<revision::Pair>()
+        + 3 * size_of::<evaluate::Operation>()
+        + 3 * size_of::<evaluate::template::Instruction>();
+    let listing = List::<revision::Entry>::worst_case(ENTRIES)?
+        .checked_add(List::<vocabulary::Blob>::worst_case(ENTRIES)?)?
+        .checked_add(Map::<revision::Oid, hearth_lib::encode::Digest>::worst_case(ENTRIES)?)?
+        .checked_add(Map::<revision::Oid, Box<[u8]>>::worst_case(ENTRIES)?)?
+        .checked_add(Map::<revision::Oid, ()>::worst_case(ENTRIES)?)?
+        .checked_add(Map::<hearth_lib::encode::Digest, u64>::worst_case(ENTRIES)?)?
+        .checked_add(PATHS.checked_mul(6)?)?
+        .checked_add(u64::from(ENTRIES).checked_mul(64 * 5 + 1)?)?;
+    // A source byte can introduce a value/pair and three compiled operations;
+    // each listed path is charged separately by the decoded-input budget.
+    let node = u64::try_from(NODE).ok()?;
+    let decoded = limits.decoded.checked_mul(node.checked_add(1)?)?;
+    let settings = limits
+        .decoded
+        .checked_mul(u64::try_from(size_of::<compose::Pair>()).ok()?)?
+        .checked_mul(u64::from(limits.targets).checked_add(1)?)?;
+    let targets = List::<compose::Target>::worst_case(limits.targets)?
+        .checked_add(List::<compose::Settings>::worst_case(limits.targets)?)?
+        .checked_add(Map::<Box<[u8]>, diff::Made>::worst_case(limits.targets)?)?
+        .checked_add(limits.expanded.checked_mul(u64::from(limits.targets))?)?;
+    // Cached resolutions retain one bounded record per distinct target key.
+    // A frame byte can introduce one input item; package strings additionally
+    // follow store.md, 6.1's fixed M1 name/path limits.
+    let record = u64::from(4_194_304_u32)
+        .checked_mul(u64::try_from(size_of::<hearth_lib::encode::Item>()).ok()?)?
+        .checked_add(List::<crate::resolution::Package>::worst_case(limits.closure.max(8_192))?)?
+        .checked_add(u64::from(limits.closure.max(8_192)).checked_mul(3 * 256 + 4_096)?)?;
+    let resolutions = Map::<hearth_lib::encode::Digest, Option<crate::resolution::Record>>::worst_case(limits.targets)?
+        .checked_add(record.checked_mul(u64::from(limits.targets).checked_add(1)?)?)?;
+    let retained = listing
+        .checked_add(decoded)?
+        .checked_add(settings)?
+        .checked_add(targets)?
+        .checked_add(resolutions)?
+        .checked_add(limits.validated)?
+        .checked_add(limits.exported)?
+        .checked_add(crate::errors::Collector::worst_case(limits)?)?;
+    // A diff keeps the earlier made specs and resolution findings while the
+    // second side renders. Clone/boxing transitions can hold both allocations.
+    retained
+        .checked_mul(4)?
+        .checked_add(crate::entries::worst_case(limits)?)?
+        .checked_add(evaluate::worst_case(limits)?)?
+        .checked_add(evaluate::template::worst_case(limits)?)
+}

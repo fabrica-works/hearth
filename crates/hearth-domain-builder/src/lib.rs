@@ -19,7 +19,7 @@ pub struct Limits {
     pub render: render::limits::Limits,
     pub store: store::limits::Limits,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Builder {
     render: render::Render,
     store: store::Store,
@@ -30,7 +30,7 @@ pub struct Builder {
     arrival: Option<(Token, render::revision::Oid, u64, bool, render::vocabulary::Digest)>,
     produced: Option<(Token, render::vocabulary::Digest)>,
     refused: Option<Token>,
-    remaining: usize,
+    remaining: u32,
     store_error: bool,
     finding: Option<Token>,
     resolving: Option<render::vocabulary::Request>,
@@ -91,7 +91,7 @@ impl Builder {
             out.push(match output {
                 Output::Request(request) => {
                     if let render::vocabulary::Request::Read { blobs, .. } = &request {
-                        self.remaining = blobs.len();
+                        self.remaining = u32::try_from(blobs.len()).expect("bounded blobs");
                     }
                     Request::Render(request)
                 }
@@ -369,4 +369,13 @@ fn store_error(builder: &mut Builder, answer: &store::vocabulary::Answer, out: &
         target: None,
         task: None,
     })));
+}
+
+/// The root owns render, store, and two bounded forwarding queues.
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    render::limits::worst_case(&limits.render)?
+        .checked_add(store::limits::worst_case(&limits.store)?)?
+        .checked_add(Queue::<store::vocabulary::Output>::worst_case(2)?)?
+        .checked_add(Queue::<Output>::worst_case(2)?)
 }

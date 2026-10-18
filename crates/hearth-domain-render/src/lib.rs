@@ -26,7 +26,7 @@ use skein_lib::{Env, Queue, Token};
 use vocabulary::{Class, Event, Outcome, Output, Request};
 pub const MAX_OUT: u32 = 1;
 pub const MAX_OUT_RESUME: u32 = 1;
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Render {
     call: Option<call::Call>,
 }

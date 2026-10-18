@@ -16,6 +16,7 @@ hearth-fake-git.workspace = true
 hearth-fake-machine.workspace = true
 hearth-fake-mmdebstrap.workspace = true
 skein-sim.workspace = true
+skein-heap.workspace = true
 hearth-lib.workspace = true
 hearth-protocol-tree.workspace = true
 hearth-domain-store.workspace = true

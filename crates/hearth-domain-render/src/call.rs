@@ -10,6 +10,7 @@ mod reserved;
 mod resolution;
 pub(crate) mod scripts;
 mod secrets;
+mod selection;
 pub(crate) mod templates;
 mod validation;
 use crate::{
@@ -23,7 +24,7 @@ use crate::{
 use alloc::boxed::Box;
 use skein_lib::{List, Map, Queue, Token};
 pub(crate) type Sizes = Map<hearth_lib::encode::Digest, u64>;
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub(crate) struct Side {
     pub repository: Box<[u8]>,
     pub names: Box<[Box<[u8]>]>,
@@ -51,8 +52,8 @@ pub(crate) struct Side {
     pub limits: Limits,
     pub sizes: Sizes,
     pub files: bool,
-    pub read: usize,
-    pub next: usize,
+    pub read: u32,
+    pub next: u32,
     pub ready: bool,
     pub outcome: Outcome,
     pub made: Map<Box<[u8]>, crate::diff::Made>,
@@ -227,7 +228,10 @@ impl Side {
         }
     }
     pub fn decoded(&mut self, oid: &Oid, read: Decoded) {
-        let expected = self.pending.get(self.read).expect("one event per requested blob");
+        let expected = self
+            .pending
+            .get(usize::try_from(self.read).expect("bounded cursor"))
+            .expect("one event per requested blob");
         assert_eq!(&expected.oid, oid, "blobs answer in request order");
         match read {
             Decoded::Link(target) => {
@@ -264,22 +268,24 @@ impl Side {
                         }
                     }
                 } else {
-                    let path = self.paths.get(self.read).expect("requested path");
+                    let path =
+                        self.paths.get(usize::try_from(self.read).expect("bounded cursor")).expect("requested path");
                     errors::push(&mut self.errors, errors::refused(path, Some(at), fault, also));
                 }
                 self.outcome = self.outcome.worst(Outcome::Failed);
             }
         }
         self.read = self.read.saturating_add(1);
-        self.ready = self.read == self.pending.len();
+        self.ready = usize::try_from(self.read).expect("bounded cursor") == self.pending.len();
     }
     pub fn cached(&mut self, oid: &Oid, size: u64, digest: hearth_lib::encode::Digest) {
-        let expected = self.pending.get(self.read).expect("one event per blob");
+        let expected =
+            self.pending.get(usize::try_from(self.read).expect("bounded cursor")).expect("one event per blob");
         assert_eq!((&expected.oid, expected.size, expected.kind), (oid, size, As::Cached), "cached blob");
         self.cached.insert(oid.clone(), digest).expect("listing capacity");
         self.sizes.insert(digest, size).expect("listing capacity");
         self.read = self.read.saturating_add(1);
-        self.ready = self.read == self.pending.len();
+        self.ready = usize::try_from(self.read).expect("bounded cursor") == self.pending.len();
     }
     fn needs(&self, name: &[u8]) -> bool {
         for (target, settings) in self.targets.iter().zip(&self.settings) {
@@ -404,7 +410,7 @@ impl Side {
     }
     fn eligible(&self, target: &Target) -> bool {
         (self.names.is_empty() || self.names.contains(&target.name))
-            && self.dependencies_valid(target, self.next.saturating_sub(1))
+            && self.dependencies_valid(target, usize::try_from(self.next.saturating_sub(1)).expect("bounded cursor"))
     }
     fn placement_host_valid(&mut self, placement: &revision::Placement) -> bool {
         let Some(on) = &placement.on else { return true };
@@ -414,8 +420,8 @@ impl Side {
         if self.rendering.is_some() {
             return self.template();
         }
-        for index in self.next..self.targets.len() {
-            let target = self.targets.get(index).expect("answer cursor within targets").clone();
+        for index in self.next..u32::try_from(self.targets.len()).expect("bounded targets") {
+            let target = self.answer_target(index);
             let target = &target;
             self.next = self.next.saturating_add(1);
             if !self.eligible(target) {
@@ -534,12 +540,12 @@ fn contains(blobs: &[Blob], oid: &Oid, kind: As) -> bool {
 }
 
 /// A render streams one side; a diff renders from, then to, before comparing.
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub(crate) struct Call {
     pub side: Side,
     pub diff: Option<Comparison>,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 struct RenderedSide {
     commit: Oid,
     made: Map<Box<[u8]>, crate::diff::Made>,
@@ -547,17 +553,17 @@ struct RenderedSide {
     finding: resolution::Finding,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub(crate) struct Comparison {
     revision: Option<Box<[u8]>>,
     from: Option<RenderedSide>,
     names: Box<[Box<[u8]>]>,
-    next: usize,
-    resolving: usize,
+    next: u32,
+    resolving: u32,
     tally: Option<crate::diff::Tally>,
     outcome: Outcome,
     pending: Option<crate::diff::Change>,
-    entry: usize,
+    entry: u32,
     left_out: u32,
     deadline: Option<skein_lib::Time>,
     from_active: bool,
@@ -604,8 +610,9 @@ impl Call {
     pub fn hunks(&mut self, hunks: Option<crate::diff::Hunks>) {
         let diff = self.diff.as_mut().expect("diff hunks");
         let change = diff.pending.as_mut().expect("pending change");
-        let entry =
-            crate::diff::tree(&mut change.change).get_mut(diff.entry.saturating_sub(1)).expect("requested file");
+        let entry = crate::diff::tree(&mut change.change)
+            .get_mut(usize::try_from(diff.entry.saturating_sub(1)).expect("bounded cursor"))
+            .expect("requested file");
         if hunks.is_none() {
             diff.outcome = diff.outcome.worst(Outcome::TryAgain);
         }
@@ -708,7 +715,7 @@ impl Comparison {
         if self.resolve_changed(side, out) {
             return false;
         }
-        if let Some(target) = self.names.get(self.next) {
+        if let Some(target) = self.names.get(usize::try_from(self.next).expect("bounded cursor")) {
             self.next = self.next.saturating_add(1);
             let RenderedSide { made: from, .. } = self.from.as_ref().expect("from side");
             let before = from.get(target);
@@ -770,7 +777,10 @@ impl Comparison {
     fn resume_hunks(&mut self, sizes: &Sizes, max: u32) -> (Output, bool) {
         let change = self.pending.as_mut().expect("pending change");
         let from = self.from.as_ref().expect("from rendered");
-        for entry in crate::diff::tree(&mut change.change).get_mut(self.entry..).expect("entry cursor") {
+        for entry in crate::diff::tree(&mut change.change)
+            .get_mut(usize::try_from(self.entry).expect("bounded cursor")..)
+            .expect("entry cursor")
+        {
             self.entry = self.entry.saturating_add(1);
             if let Some((before, after)) = entry.pair(&from.sizes, sizes, max) {
                 return (Output::Request(Request::Hunks { request: Token::new(3), before, after }), false);

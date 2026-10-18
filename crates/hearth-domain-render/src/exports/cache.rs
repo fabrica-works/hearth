@@ -18,7 +18,7 @@ pub(crate) struct Fleet<'a> {
     pub limits: &'a Limits,
 }
 type Pair = (Box<[u8]>, Box<[u8]>);
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub(crate) struct Cache {
     pairs: Map<Pair, Result<Exported, Box<Error>>>,
     left: u64,

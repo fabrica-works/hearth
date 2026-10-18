@@ -52,6 +52,11 @@ pub struct Service {
     answers: Queue<Request>,
 }
 impl Service {
+    /// The domain state, excluding protocol machinery and environments.
+    #[must_use]
+    pub const fn domain(&self) -> &Builder {
+        &self.domain
+    }
     #[must_use]
     pub fn new(configuration: &Configuration, roots: Roots, call: Call, form: protocol::Form, seed: u64) -> Self {
         let limits = &configuration.limits;
@@ -462,4 +467,28 @@ fn configured_proxy(configuration: &Configuration) -> Option<protocol::Proxy> {
         protocol::Proxy::new(configuration.proxy.as_deref()?, &configuration.limits.protocol.mmdebstrap)
             .expect("validated proxy"),
     )
+}
+
+/// Sum the owned layers, queue storage, and payloads between the layers.
+/// Returns `None` if the bound overflows (programming-model.md, 6.3).
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    let domain = domain::worst_case(&limits.domain)?;
+    let protocol = protocol::limits::worst_case(&limits.protocol)?;
+    let files = &limits.files;
+    let queues = Queue::<file::Event>::worst_case(limits.queue)?
+        .checked_add(Queue::<Submit>::worst_case(limits.queue)?.checked_mul(3)?)?
+        .checked_add(Queue::<Complete>::worst_case(limits.queue)?)?
+        .checked_add(Queue::<io::Event>::worst_case(limits.queue)?)?
+        .checked_add(Queue::<Asked>::worst_case(limits.queue)?)?
+        .checked_add(Queue::<Event>::worst_case(limits.queue)?)?
+        .checked_add(Queue::<Request>::worst_case(limits.queue)?)?;
+    // A payload may be owned by either side during a pass; price every slot
+    // at the larger owner's bound rather than counting only the queue header.
+    domain
+        .checked_add(protocol)?
+        .checked_add(io::worst_case(&limits.io)?)?
+        .checked_add(FileIo::worst_case(files.files, files.read, files.entries, files.whole)?)?
+        .checked_add(queues)?
+        .checked_add(domain.max(protocol).checked_mul(u64::from(limits.queue))?)
 }

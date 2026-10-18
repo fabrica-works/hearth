@@ -70,14 +70,14 @@ pub struct Package {
     pub size: u64,
     pub sha256: hearth_lib::encode::Digest,
 }
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Triple {
     name: Box<[u8]>,
     architecture: Box<[u8]>,
     version: Box<[u8]>,
 }
 /// Only installed triples are retained; indices may contain unrelated stanzas.
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Closure {
     packages: Map<Triple, Option<Package>>,
     max: u32,

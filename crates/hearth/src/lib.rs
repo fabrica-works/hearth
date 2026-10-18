@@ -133,6 +133,9 @@ impl Client {
     }
 }
 impl Host for Client {
+    fn state_digest(&self) -> Option<[u8; 32]> {
+        Some(skein_lib::state_digest(self.service.domain()))
+    }
     fn iterate(&mut self, now: Time, wall: Wall) {
         service::iterate(&mut self.service, now, wall);
     }
@@ -165,8 +168,8 @@ impl Host for Client {
         service::operations(&self.limits).expect("shipped io operation count fits")
     }
     fn worst_case(&self) -> u64 {
-        0
-    } // No heap claim until hearth 28.
+        service::worst_case(&self.limits).expect("configured builder worst case fits")
+    }
     fn drain(&mut self) {
         if let Some(bytes) = self.service.take_startup() {
             let _written = std::io::stderr().lock().write_all(&bytes);

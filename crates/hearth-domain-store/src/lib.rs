@@ -14,12 +14,12 @@ use skein_lib::{Deadlines, Env, Queue, Time};
 use vocabulary::{Event, Output, Request};
 /// Strays and readiness, or a failure and its refused arrival.
 pub const MAX_OUT: u32 = 2;
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 enum Timer {
     Retry,
     Said,
 }
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 enum Phase {
     Closed,
     Locking,
@@ -28,7 +28,7 @@ enum Phase {
     Scanning,
     Ready,
 }
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct Store {
     phase: Phase,
     uid: u32,
