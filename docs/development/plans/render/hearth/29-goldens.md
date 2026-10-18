@@ -86,7 +86,9 @@ planned: what a golden shows missing is fixed in the session that owns it
    closure", printed with its `keys` line).
 10. **Time:** 18 renders (merge, templates, fleet, cluster, exports; resolution's
    two variants; 11 error cases) at 0.15 s each is 2.7 s of the 3 s; a case's
-   process, joint and world legs share its 0.15 s.
+   process, joint and world legs share its 0.15 s. `errors/tool` and
+   `errors/resolution` (29.4) render through `protocol::run` alone, no
+   process: their two joint legs share the 0.3 s left.
 
 ## Rules that bind it
 
@@ -105,18 +107,31 @@ Scope: `golden` (load a directory, compare, bless) in both worlds; `merge`
 Needs: hearth 21 (21.4: every repository has `tasks/hearth`), hearth 15,
 hearth 28.3 (`protocol::run`).
 Files: new `tests/render/src/golden.rs`, `src/lib.rs`,
-`tests/render/tests/goldens.rs`, `tests/render/merge/**`; `tests/builder/
-{Cargo.toml (dev: hearth-render-world), src/fixtures.rs}`, new
-`tests/builder/tests/goldens.rs`.
+`tests/render/tests/goldens.rs`, `tests/render/merge/**`; the root
+`Cargo.toml` (`hearth-render-world = { path = "tests/render" }` in
+`[workspace.dependencies]`); `tests/builder/Cargo.toml` (hearth-render-world
+in `[dependencies]`, not dev: `src/fixtures.rs`'s `files_of` names
+`golden::Leaf`), `tests/builder/src/fixtures.rs`,
+`tests/builder/src/fixtures/worlds.rs` (`Scenario`, `thin`, `Shared::build`,
+`for_scenario`; its literals at :160 and :174),
+`tests/builder/src/fixtures/worlds/protocol_world.rs` (the literal at :21),
+new `tests/builder/tests/goldens.rs`.
 Shape: the sketches. `golden::load(name) -> Golden` reads the directory
 (`std::fs` is allowed in tests; symbolic links kept as links, the execute
 bit as `Kind::Executable`); `check` and `bless` as the sketch read
 `expected` (`expected-<variant>` for a variant). The fixtures' helpers
-(builder's `src/fixtures.rs`): `exit_code(&Output) -> Option<u8>`, the
-process's code; `Laid::Resolution(..)`, a record laid in the store (24.1's
+(builder's `src/fixtures.rs`): `exit_code(&Rendered) -> Option<u8>`, the
+process's code (`fixtures::render`, :147, returns `Rendered`); `Laid::Resolution(..)`, a record laid in the store (24.1's
 `fixtures::lay`); `files_of`, a golden's leaves as 11.3's `File`s;
-`scenario_of(&Repository, &[Laid], Option<Fault>) -> Scenario`, the call of
-a golden through 28.3; `text(&protocol::Run) -> String`, its stdout.
+`scenario_of(&[File], &[Laid], Option<Fault>) -> Scenario` (a `Scenario`
+borrows its files, so it takes them, not the `Repository`), the call of
+a golden through 28.3; `text(&protocol::Run) -> String`, its stdout. The
+joint leg sees the laid records: `Scenario` gains `laid: &'a [Laid]`
+(`&[]` in `thin()` and each literal without `..`), and `Shared::build`
+takes it after `files` and lays each entry into the fake machine's
+`/srv/store/<name>`, by a `laid_files` that `lay` (`:448`) shares;
+`Shared::new` passes `&[]`, `for_scenario` `scenario.laid`. A witness's hex digits fold into a `String` with `write!`, not
+`map` and `collect::<String>()` (clippy's `format_collect`).
 `merge`: base `m`, environments `a`, `b`, `c`; `fleet.json`
 holds defaults of the task `probe` (a map `limits` of two ints, a list
 `ports`, a bool, a string) and a task `gone`; `hosts/m/m.json` overrides one
@@ -144,13 +159,17 @@ fn merge_renders_what_its_expected_files_and_witnesses_say() {
 }
 fn check(name: &str, variant: &str, laid: &[Laid]) {
     let golden = golden::load(name);
-    let repository = Repository::make(name, &fixtures::files_of(&golden.tree));
-    fixtures::lay(&repository.scratch().join("store"), laid);
+    let files = fixtures::files_of(&golden.tree);
+    let repository = Repository::make(name, &files);
+    fixtures::lay(&repository.scratch().path().join("store"), laid);
     let out = fixtures::render(&repository, &[], Form::Text);
     let stdout = String::from_utf8_lossy(&out.stdout);
     let verdict = golden.check(variant, &stdout, exit_code(&out));
-    if golden::bless() { golden.bless(variant, &stdout, exit_code(&out)); panic!("blessed: {}", verdict.changed()); }
-    let joint = protocol::run(&fixtures::scenario_of(&repository, laid, None), 0); // 28.3: its text equals `expected/`
+    if golden::bless() {
+        golden.bless(variant, &stdout, exit_code(&out));
+        panic!("blessed: {}", verdict.changed());
+    }
+    let joint = protocol::run(&fixtures::scenario_of(&files, laid, None), 0); // 28.3: its text equals `expected/`
     assert!(golden.check(variant, &fixtures::text(&joint), joint.code).is_clean(), "joint");
     assert!(verdict.is_clean(), "{}", verdict.report());
 }
@@ -350,7 +369,7 @@ impl Golden {
     #[must_use] pub fn spec_digest(&self, variant: &str, target: &str) -> Option<[u8; 6]>; // for the world's cross-check
 }
 impl Verdict { #[must_use] pub fn is_clean(&self) -> bool; #[must_use] pub fn report(&self) -> String; #[must_use] pub fn changed(&self) -> String; }
-// tests/builder/src/fixtures.rs (29.1): `files_of(&[Leaf]) -> Vec<File>` by 11.3's `File` (hearth 18's `link`); `exit_code(&Output) -> Option<u8>`; `scenario_of(&Repository, &[Laid], Option<Fault>) -> Scenario`; `text(&protocol::Run) -> String`; `ERROR_CASES: &[&str]` (29.4)
+// tests/builder/src/fixtures.rs (29.1): `files_of(&[Leaf]) -> Vec<File>` by 11.3's `File` (hearth 18's `link`); `exit_code(&Rendered) -> Option<u8>`; `scenario_of(&[File], &[Laid], Option<Fault>) -> Scenario`; `text(&protocol::Run) -> String`; `ERROR_CASES: &[&str]` (29.4)
 ```
 
 ## Questions to raise when reached
