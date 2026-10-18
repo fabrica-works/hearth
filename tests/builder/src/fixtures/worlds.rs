@@ -39,9 +39,12 @@ pub struct Shared(Rc<RefCell<Fake>>);
 impl Shared {
     #[must_use]
     pub fn new(files: &[File], seed: u64) -> Self {
+        Self::build(files, seed, WORLD_PIPE, None)
+    }
+    fn build(files: &[File], seed: u64, pipe: u32, fault: Option<Fault>) -> Self {
         let mut machine = hearth_fake_machine::Machine::new(
             seed,
-            linux::Sizes { files: 4096, bytes: 16 << 20, processes: 32, pipe: 4096, ledger: 256 },
+            linux::Sizes { files: 4096, bytes: 16 << 20, processes: 32, pipe, ledger: 256 },
         );
         machine.linux_mut().lay(&[
             linux::Item::directory(b"/srv", 0o755),
@@ -52,31 +55,18 @@ impl Shared {
             linux::Item::directory(b"/usr", 0o755),
             linux::Item::directory(b"/usr/bin", 0o755),
         ]);
-        machine.install(b"/usr/bin/git", hearth_fake_machine::hearth::Tool::Git);
-        machine.install(b"/usr/bin/mmdebstrap", hearth_fake_machine::hearth::Tool::Mmdebstrap);
-        let mut tree = objects::Tree::new();
-        for file in files {
-            let mode = match file.mode {
-                0o120_000 => objects::Mode::Link,
-                0o755 => objects::Mode::Executable,
-                _ => objects::Mode::File,
-            };
-            tree.insert(file.path.as_bytes(), objects::Entry::Blob { mode, bytes: file.body.into() });
+        match fault {
+            Some(Fault::NotInstalled { absent: true }) => {}
+            Some(Fault::NotInstalled { absent: false }) => {
+                machine.linux_mut().lay(&[linux::Item::file(b"/usr/bin/git", 0o644, b"")]);
+            }
+            _ => {
+                machine.install(b"/usr/bin/git", hearth_fake_machine::hearth::Tool::Git);
+            }
         }
-        let signature = objects::Signature {
-            name: b"hearth".as_slice().into(),
-            email: b"hearth@hearth.invalid".as_slice().into(),
-            seconds: 1_700_000_000,
-            zone: *b"+0000",
-        };
+        machine.install(b"/usr/bin/mmdebstrap", hearth_fake_machine::hearth::Tool::Mmdebstrap);
         let mut repository = hearth_fake_git::repository::Repository::new(b"refs/heads/main");
-        repository.commit(&objects::Commit {
-            tree,
-            parents: Box::default(),
-            author: signature.clone(),
-            committer: signature,
-            message: b"thin\n".as_slice().into(),
-        });
+        repository.commit(&commit(files, Box::default()));
         let mut repositories = Repositories::default();
         repositories.lay(machine.linux_mut(), GIT_DIR, BUILDER, repository);
         let universe = Universe::draw(&mut Rng::new(seed), &Draw { packages: WORLD_PACKAGES, names: &[] });
@@ -259,3 +249,82 @@ pub fn each_settled(scenario: &Scenario<'_>, mut test: impl FnMut(crate::domain:
 }
 
 pub const THIN_MOTD_SHA256_HEX: &str = "775324fcea7f2cdcbf11df25550e362669caceb6e69c8370374d2d436bb63123";
+
+/// Pipe capacity normally shipped by the fake machine, and the named small-pipe exception.
+pub const WORLD_PIPE: u32 = 4096;
+/// Store, cache, resolutions and staging remain open until the world exits.
+pub const WORLD_ROOTS: usize = 4;
+/// The plan's pipe exception forces ls-tree to stop before its next entry.
+pub const SMALL_PIPE: u32 = 64;
+/// Eight two-record domain output groups fit before the next service pass.
+pub const PROTOCOL_QUEUE: u32 = 16;
+/// Output identities live above file tokens and below child/pipe identities.
+pub const PROTOCOL_OUTPUT: skein_lib::Token = skein_lib::Token::new(10_000);
+/// The next output identity is stderr's independent stream.
+pub const PROTOCOL_ERROR: skein_lib::Token = skein_lib::Token::new(10_001);
+/// Child and pipe identities start above the two output streams.
+pub const PROTOCOL_ENTITY: u64 = 20_000;
+/// Fail fast after twenty thousand iterations if the world cannot settle.
+pub const PROTOCOL_TURNS: u32 = 20_000;
+/// The plan's Wire grain bounds each machine Take to thirty bytes.
+pub const PIPE_GRAIN: u64 = 30;
+/// File and io terminals use the domain world's one-to-twenty-ms span.
+pub const PROTOCOL_LATENCY: skein_world::domain::Span = skein_world::domain::Span::millis(1, 20);
+/// One millisecond advances a live child between its bounded turns.
+pub const PROTOCOL_TICK: skein_lib::Duration = skein_lib::Duration::from_millis(1);
+
+fn commit(files: &[File], parents: Box<[objects::Oid]>) -> objects::Commit {
+    let mut tree = objects::Tree::new();
+    for file in files {
+        let mode = match file.mode {
+            0o120_000 => objects::Mode::Link,
+            0o755 => objects::Mode::Executable,
+            _ => objects::Mode::File,
+        };
+        tree.insert(file.path.as_bytes(), objects::Entry::Blob { mode, bytes: file.body.into() });
+    }
+    let signature = objects::Signature {
+        name: b"hearth".as_slice().into(),
+        email: b"hearth@hearth.invalid".as_slice().into(),
+        seconds: 1_700_000_000,
+        zone: *b"+0000",
+    };
+    objects::Commit {
+        tree,
+        parents,
+        author: signature.clone(),
+        committer: signature,
+        message: b"thin\n".as_slice().into(),
+    }
+}
+
+impl Shared {
+    #[must_use]
+    pub fn for_scenario(scenario: &Scenario<'_>, seed: u64, pipe: u32) -> Self {
+        let shared = Self::build(scenario.files, seed, pipe, scenario.fault);
+        if let Call::Diff { .. } = scenario.call {
+            let mut fake = shared.borrow_mut();
+            let repository = fake.repositories.0.get_mut(GIT_DIR).expect("laid repository");
+            let hearth_fake_git::repository::Resolved::Commit(before) = repository.resolve(b"HEAD") else {
+                unreachable!("initial commit")
+            };
+            repository.set_ref(b"refs/heads/before", before);
+            let files: Vec<_> = scenario
+                .files
+                .iter()
+                .map(|file| if file.path == super::MOTD_KIND.path { super::MOTD_KIND } else { *file })
+                .collect();
+            repository.commit(&commit(&files, Box::new([before])));
+        }
+        shared
+    }
+    /// Preserve the machine ledger after every pure fake turn as after every file record.
+    pub fn drain_ledger(&self) {
+        let mut fake = self.borrow_mut();
+        let entries: Vec<_> = fake.behind.machine_mut().linux_mut().ledger().collect();
+        fake.ledger.extend(entries);
+    }
+}
+
+mod protocol_world;
+pub use protocol_world::*;

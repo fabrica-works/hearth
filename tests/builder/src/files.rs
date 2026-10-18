@@ -272,6 +272,10 @@ impl Files {
         Ok(Event::Stored { owner, digest: digest::digest(bytes) })
     }
     #[must_use]
+    pub fn open_files(&self) -> usize {
+        self.handles.len()
+    }
+    #[must_use]
     pub fn names(&self, root: Root) -> Vec<file::Entry> {
         let file = self.open(self.handle(root.token), b".", OpenHow::Directory).expect("directory");
         let entries = self.list(file, 4096).expect("directory entries");
