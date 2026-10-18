@@ -8,7 +8,7 @@ development.md, section 3.3).
 
 | Plan | State | Takes the design to | Where |
 |---|---|---|---|
-| render | active on debian-8gb-hel1-1 since 2026-10-17 | M1, render (README.md, section 3): `format.md` but for checks and artifacts; `render.md`; the client's `render` and `diff`, with `hearth-client-protocol-records`'s printer; `hearth-lib`; the store without layers; the builder's root, protocol layer and service; the fake machine's M1 parts and the fakes of git and mmdebstrap; with skein's part of M1 (skein's `STATUS.md`, "hearth's render") | `docs/development/plans/render/` |
+| render | done 2026-10-18 | M1, render (README.md, section 3): `format.md` but for checks and artifacts; `render.md`; the client's `render` and `diff`, with `hearth-client-protocol-records`'s printer; `hearth-lib`; the store without layers; the builder's root, protocol layer and service; the fake machine's M1 parts and the fakes of git and mmdebstrap; with skein's part of M1 (skein's `STATUS.md`, "hearth's render") | `docs/development/plans/render/` |
 
 ## 2. The design
 
