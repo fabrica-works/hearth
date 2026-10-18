@@ -143,3 +143,4 @@ fn a_module_or_a_boot_parameter_on_a_container_is_refused_and_on_a_vm_is_not() {
         assert_eq!(f::word_rules(map, b"btrfs", &[], container).as_ref(), expected, "row {row}");
     }
 }
+mod paths;

@@ -19,6 +19,17 @@ pub enum Rule {
     TmpfilesPath,
     ContainerModule,
     ContainerParam,
+    ActivatorFile,
+    Dropin,
+    Accounts,
+    SecretPath,
+    HearthState,
+    PackagesLayer,
+    ClassMount,
+    DataRoot,
+    Runtime,
+    LogFile,
+    InitramfsConf,
 }
 use crate::form::{json::field, text::Lines};
 use skein_json::writer::Encoder;
@@ -37,11 +48,27 @@ impl Rule {
             Self::TmpfilesPath => b"tmpfiles_path",
             Self::ContainerModule => b"container_module",
             Self::ContainerParam => b"container_param",
+            Self::ActivatorFile => b"activator_file",
+            Self::Dropin => b"dropin",
+            Self::Accounts => b"accounts",
+            Self::SecretPath => b"secret_path",
+            Self::HearthState => b"hearth_state",
+            Self::PackagesLayer => b"packages_layer",
+            Self::ClassMount => b"class_mount",
+            Self::DataRoot => b"data_root",
+            Self::Runtime => b"runtime",
+            Self::LogFile => b"log_file",
+            Self::InitramfsConf => b"initramfs_conf",
         }
     }
 }
 impl Reserved {
     pub(super) fn text(&self, lines: &mut Lines) {
+        if self.rule == Rule::SecretPath {
+            lines.put(&self.what);
+            lines.put(b" is a secret's path; declare it under secrets (format.md, 9.1)");
+            return;
+        }
         lines.quote(&self.what);
         lines.put(b" is reserved: ");
         match self.rule {
@@ -64,6 +91,19 @@ impl Reserved {
             Rule::TmpfilesPath => lines.put(b"a tmpfiles path holds no glob or specifier (format.md, 5.11)"),
             Rule::ContainerModule => lines.put(b"a container has no initramfs module (render.md, 4.2)"),
             Rule::ContainerParam => lines.put(b"a container has no boot parameter (render.md, 4.2)"),
+            Rule::ActivatorFile => lines.put(b"the activator writes this path at prepare (format.md, 5.11)"),
+            Rule::Dropin => lines.put(b"the watchdog's drop-in must sort last (slots.md, 5.5)"),
+            Rule::Accounts => lines.put(b"accounts and machine identity are written at prepare (format.md, 5.11)"),
+            Rule::SecretPath => lines.put(b""),
+            Rule::HearthState => lines.put(b"hearth owns its state and store (machine.md, 3.4)"),
+            Rule::PackagesLayer => lines.put(b"the packages layer owns /usr outside /usr/local (format.md, 5.5)"),
+            Rule::ClassMount => lines.put(b"the class mount hides this path (format.md, 5.7)"),
+            Rule::DataRoot => lines.put(b"a data path must be strictly beneath /srv, /var or /home (format.md, 5.7)"),
+            Rule::Runtime => lines.put(b"runtime, noise and history are not task files (format.md, 5.11)"),
+            Rule::LogFile => lines.put(b"a file beneath /var/log must be empty (format.md, 5.11)"),
+            Rule::InitramfsConf => {
+                lines.put(b"the packages part writes tiny-initramfs configuration (machine.md, 7.1)");
+            }
         }
     }
     pub(super) fn json(&self, json: &mut Encoder) {

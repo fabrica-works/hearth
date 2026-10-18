@@ -32,6 +32,17 @@ pub const RESERVED_RULES: &[render::errors::Rule] = &[
     render::errors::Rule::TmpfilesPath,
     render::errors::Rule::ContainerModule,
     render::errors::Rule::ContainerParam,
+    render::errors::Rule::ActivatorFile,
+    render::errors::Rule::Dropin,
+    render::errors::Rule::Accounts,
+    render::errors::Rule::SecretPath,
+    render::errors::Rule::HearthState,
+    render::errors::Rule::PackagesLayer,
+    render::errors::Rule::ClassMount,
+    render::errors::Rule::DataRoot,
+    render::errors::Rule::Runtime,
+    render::errors::Rule::LogFile,
+    render::errors::Rule::InitramfsConf,
 ];
 #[must_use]
 pub fn reserved_rules() -> &'static [render::errors::Rule] {

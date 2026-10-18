@@ -13,6 +13,17 @@ fn back(rule: source::Rule) -> target::Rule {
         source::Rule::TmpfilesPath => target::Rule::TmpfilesPath,
         source::Rule::ContainerModule => target::Rule::ContainerModule,
         source::Rule::ContainerParam => target::Rule::ContainerParam,
+        source::Rule::ActivatorFile => target::Rule::ActivatorFile,
+        source::Rule::Dropin => target::Rule::Dropin,
+        source::Rule::Accounts => target::Rule::Accounts,
+        source::Rule::SecretPath => target::Rule::SecretPath,
+        source::Rule::HearthState => target::Rule::HearthState,
+        source::Rule::PackagesLayer => target::Rule::PackagesLayer,
+        source::Rule::ClassMount => target::Rule::ClassMount,
+        source::Rule::DataRoot => target::Rule::DataRoot,
+        source::Rule::Runtime => target::Rule::Runtime,
+        source::Rule::LogFile => target::Rule::LogFile,
+        source::Rule::InitramfsConf => target::Rule::InitramfsConf,
     }
 }
 #[test]

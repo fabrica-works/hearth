@@ -6,7 +6,7 @@ fn a_reserved_command_line_key_prints_as_render_md_shows() {
 }
 #[test]
 fn a_reserved_command_line_key_exits_2() {
-    assert_eq!(f::rendered(&f::WAIT).exit, Exit::Code(2));
+    assert_eq!(f::rendered(&f::WAIT).exit, f::CONFIGURATION_EXIT);
 }
 #[test]
 fn a_password_preseed_prints_reserved_and_not_an_unlisted_type() {
@@ -14,7 +14,7 @@ fn a_password_preseed_prints_reserved_and_not_an_unlisted_type() {
 }
 #[test]
 fn a_password_preseed_exits_2() {
-    assert_eq!(f::rendered(&f::PASSWORD).exit, Exit::Code(2));
+    assert_eq!(f::rendered(&f::PASSWORD).exit, f::CONFIGURATION_EXIT);
 }
 #[test]
 fn a_line_past_2048_bytes_names_the_parameter_that_crosses_it() {
@@ -24,5 +24,28 @@ fn a_line_past_2048_bytes_names_the_parameter_that_crosses_it() {
 }
 #[test]
 fn a_line_past_2048_bytes_exits_2() {
-    assert_eq!(f::long_line().exit, Exit::Code(2));
+    assert_eq!(f::long_line().exit, f::CONFIGURATION_EXIT);
+}
+#[test]
+fn hearth_render_refuses_a_secrets_path_in_the_tree() {
+    assert_eq!(f::rendered_files(f::KEY_IN_TREE).stdout, b"tasks/motd/task.json:1:12: x1-prod: motd: /etc/ssl/private/mx1.key is a secret's path; declare it under secrets (format.md, 9.1)\n");
+}
+#[test]
+fn a_file_only_the_tree_gives_is_refused_at_its_path() {
+    assert_eq!(f::rendered(&f::FSTAB).stdout, b"tasks/motd/tree/etc/fstab: x1-prod: motd: \"/etc/fstab\" is reserved: the activator writes this path at prepare (format.md, 5.11)\n");
+}
+#[test]
+fn a_data_path_beside_its_class_mount_is_refused_at_its_path() {
+    assert_eq!(f::rendered(&f::DATA_PATH).stdout, b"tasks/motd/task.json:1:20: x1-prod: motd: \"/srv/data/spool\" is reserved: the class mount hides this path (format.md, 5.7)\n");
+}
+const PATH_EXITS: &[(&[hearth_builder_world::fixtures::File], Exit)] = &[
+    (f::KEY_IN_TREE, f::CONFIGURATION_EXIT),
+    (core::slice::from_ref(&f::FSTAB), f::CONFIGURATION_EXIT),
+    (core::slice::from_ref(&f::DATA_PATH), f::CONFIGURATION_EXIT),
+];
+#[test]
+fn reserved_paths_exit_2() {
+    for (row, &(files, expected)) in PATH_EXITS.iter().enumerate() {
+        assert_eq!(f::rendered_files(files).exit, expected, "row {row}");
+    }
 }

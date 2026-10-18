@@ -35,3 +35,23 @@ pub fn command(param: &[u8]) -> Expansion {
 pub fn word_rules(map: Map, key: &[u8], fields: &[(Name, &[u8])], container: bool) -> Box<[Rule]> {
     rules(&refused(map, key, fields, container))
 }
+pub fn installed<'a>(
+    task: &'a [u8],
+    path: &'a [u8],
+    at: Option<crate::revision::Position>,
+    shape: reserved::Shape,
+) -> reserved::Installed<'a> {
+    reserved::Installed { task, path, at, shape }
+}
+pub fn tree(path: &[u8], shape: reserved::Shape, at: Option<crate::revision::Position>) -> Box<[Refused]> {
+    reserved::tree(core::slice::from_ref(&installed(b"motd", path, at, shape)))
+}
+pub fn tree_rules(path: &[u8], shape: reserved::Shape) -> Box<[Rule]> {
+    rules(&tree(path, shape, None))
+}
+pub type EntryPathCase<'a> = (Map, &'a [u8], &'a [u8], &'a [Rule]);
+pub type DataPathCase<'a> = (&'a [u8], &'a [u8], &'a [u8], &'a [Rule]);
+pub type TmpfilePathCase<'a> = (&'a [u8], &'a [(Name, &'a [u8])], &'a [Rule]);
+pub fn data_rules(key: &[u8], class: &[u8], path: &[u8]) -> Box<[Rule]> {
+    word_rules(Map::Data, key, &[(Name::Class, class), (Name::Path, path)], false)
+}

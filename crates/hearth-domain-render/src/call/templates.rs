@@ -309,6 +309,9 @@ impl Side {
             self.outcome = self.outcome.worst(target.outcome);
             return None;
         }
+        if !target.reserved(self) {
+            return None;
+        }
         let mut files = List::with_capacity(target.tree.len());
         for (_, file) in &target.tree {
             files.push(file.clone()).expect("tree count");
@@ -422,4 +425,5 @@ enum Keeping {
     Initramfs(Digest),
 }
 mod additions;
+mod reserved;
 mod scripts;
