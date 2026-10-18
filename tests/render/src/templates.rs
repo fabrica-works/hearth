@@ -72,7 +72,7 @@ fn leaf(rng: &mut Rng, roots: &Roots) -> Tree {
             let expression = expressions::tree(rng, &roots, expressions::SMALL);
             let maximum =
                 usize::try_from(hearth_protocol_template::limits::SHIPPED.expression).expect("expression bound");
-            if expressions::text(&expression).len() > maximum {
+            if expressions::text(&expression, expressions::Style::Hearth).len() > maximum {
                 Tree::Output(Expression::Int(1))
             } else {
                 Tree::Output(expression)
@@ -84,13 +84,15 @@ fn leaf(rng: &mut Rng, roots: &Roots) -> Tree {
 pub fn text(tree: &Tree) -> Vec<u8> {
     match tree {
         Tree::Text(bytes) => bytes.clone(),
-        Tree::Output(value) => [b"{{ ".as_slice(), &expressions::text(value), b" }}"].concat(),
+        Tree::Output(value) => {
+            [b"{{ ".as_slice(), expressions::text(value, expressions::Style::Hearth).as_bytes(), b" }}"].concat()
+        }
         Tree::Sequence(children) => children.iter().flat_map(text).collect(),
         Tree::Branch { arms, otherwise } => {
             let mut bytes = vec![];
             for (index, (condition, body)) in arms.iter().enumerate() {
                 bytes.extend_from_slice(if index == 0 { b"{% if " } else { b"{% elif " });
-                bytes.extend(expressions::text(condition));
+                bytes.extend(expressions::text(condition, expressions::Style::Hearth).bytes());
                 bytes.extend_from_slice(b" %}");
                 bytes.extend(text(body));
             }
@@ -101,14 +103,21 @@ pub fn text(tree: &Tree) -> Vec<u8> {
         }
         Tree::For { pair, iterable, body } => [
             if *pair { b"{% for x, y in ".as_slice() } else { b"{% for x in ".as_slice() },
-            &expressions::text(iterable),
+            expressions::text(iterable, expressions::Style::Hearth).as_bytes(),
             b" %}",
             &text(body),
             b"{% endfor %}",
         ]
         .concat(),
-        Tree::Set { value } => [b"{% set x = ".as_slice(), &expressions::text(value), b" %}"].concat(),
+        Tree::Set { value } => {
+            [b"{% set x = ".as_slice(), expressions::text(value, expressions::Style::Hearth).as_bytes(), b" %}"]
+                .concat()
+        }
     }
+}
+#[must_use]
+pub fn output_of(expression: &str) -> String {
+    format!("{{{{ {expression} }}}}")
 }
 /// # Errors
 /// Returns the first rendered fault, by kind.

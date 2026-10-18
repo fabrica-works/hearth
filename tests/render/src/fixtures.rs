@@ -660,6 +660,8 @@ pub fn error_at_budget(bytes: usize) -> hearth_domain_render::errors::Error {
 }
 
 pub mod laws;
+pub mod oracle;
+pub use oracle::draw;
 pub mod properties;
 pub use crate::golden::repository_of;
 pub use laws::merged;

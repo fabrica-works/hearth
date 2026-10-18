@@ -48,9 +48,11 @@ pub struct Group {
 }
 pub type Expansion = Result<Vec<Group>, &'static str>;
 fn expression(rng: &mut Rng, roots: &Roots) -> Expression {
-    let tree = expressions::tree(rng, roots, expressions::Shape { depth: 1, width: 2 });
+    let tree = expressions::tree(rng, roots, expressions::Shape { depth: 1, width: 2, ..expressions::SMALL });
     let tree = if let Expression::Output(tree) = tree { *tree } else { tree };
-    if expressions::text(&tree).len() > hearth_protocol_template::limits::SHIPPED.expression as usize {
+    if expressions::text(&tree, expressions::Style::Hearth).len()
+        > hearth_protocol_template::limits::SHIPPED.expression as usize
+    {
         Expression::Int(42)
     } else {
         tree
@@ -114,7 +116,7 @@ pub fn tree(rng: &mut Rng, roots: &Roots) -> Tree {
     ])
 }
 fn tag(expression: &Expression) -> String {
-    format!("{{{{ {} }}}}", String::from_utf8(expressions::text(expression)).expect("UTF-8 expression"))
+    format!("{{{{ {} }}}}", expressions::text(expression, expressions::Style::Hearth))
 }
 fn string(text: &Text) -> String {
     text.0
@@ -149,10 +151,10 @@ pub fn source(tree: &Tree) -> Vec<u8> {
             })
             .collect();
         if let Some(each) = &declaration.each {
-            fields.push(format!("\"for_each\":{:?}", String::from_utf8(expressions::text(each)).expect("expression")));
+            fields.push(format!("\"for_each\":{:?}", expressions::text(each, expressions::Style::Hearth)));
         }
         if let Some(when) = &declaration.when {
-            fields.push(format!("\"if\":{:?}", String::from_utf8(expressions::text(when)).expect("expression")));
+            fields.push(format!("\"if\":{:?}", expressions::text(when, expressions::Style::Hearth)));
         }
         let map = match declaration.map {
             Map::Files => "files",

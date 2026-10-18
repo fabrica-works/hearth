@@ -16,6 +16,7 @@ hearth-lib.workspace = true
 skein-world.workspace = true
 
 [dev-dependencies]
+minijinja = { version = "=2.20.0", features = ["json"] }
 skein-heap.workspace = true
 
 [lints.rust]

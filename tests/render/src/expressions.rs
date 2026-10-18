@@ -6,11 +6,19 @@ use hearth_domain_render::{
 use skein_lib::Rng;
 #[derive(Clone, Copy, Debug)]
 pub struct Shape {
+    pub style: Style,
     pub depth: u32,
     pub width: u32,
 }
-pub const SMALL: Shape = Shape { depth: 3, width: 3 };
-pub const WIDE: Shape = Shape { depth: 6, width: 6 };
+pub const SMALL: Shape = Shape { style: Style::Hearth, depth: 3, width: 3 };
+pub const WIDE: Shape = Shape { depth: 6, width: 6, ..SMALL };
+pub const ORACLE: Shape = Shape { style: Style::Oracle, ..SMALL };
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Style {
+    Hearth,
+    Oracle,
+}
+mod oracle;
 pub const KINDS: &[&str] =
     &["unknown", "key", "index", "undefined", "type", "limit", "overflow", "output", "empty", "path"];
 #[derive(Clone, Debug)]
@@ -123,6 +131,9 @@ fn context_value(rng: &mut Rng, depth: u32) -> Value {
 }
 #[must_use]
 pub fn tree(rng: &mut Rng, roots: &Roots, shape: Shape) -> Tree {
+    if shape.style == Style::Oracle {
+        return oracle::tree(rng, roots, shape);
+    }
     let tree = grow(rng, roots, shape);
     if rng.chance(500) { Tree::Output(Box::new(tree)) } else { tree }
 }
@@ -192,8 +203,11 @@ fn leaf(rng: &mut Rng) -> Tree {
 }
 /// A generated tree as source for the real expression compiler.
 #[must_use]
-pub fn text(tree: &Tree) -> Vec<u8> {
-    printed(tree).into_bytes()
+pub fn text(tree: &Tree, style: Style) -> String {
+    match style {
+        Style::Hearth => printed(tree),
+        Style::Oracle => format!("({})", printed(tree)),
+    }
 }
 fn wrapped(tree: &Tree) -> String {
     match tree {
@@ -309,15 +323,15 @@ fn printed(tree: &Tree) -> String {
 /// # Errors
 /// Returns the first evaluation fault kind.
 pub fn evaluate(tree: &Tree, roots: &Roots, limits: &Limits) -> Result<Option<Plain>, &'static str> {
-    let text = text(tree);
+    let text = text(tree, Style::Hearth);
     let compiled = hearth_protocol_template::expression::compile(
-        &text,
+        text.as_bytes(),
         &hearth_protocol_template::limits::Limits {
             expression: u32::try_from(text.len()).expect("generated text fits"),
             ..hearth_protocol_template::limits::SHIPPED
         },
     )
-    .unwrap_or_else(|error| panic!("generated expression {}: {error:?}", String::from_utf8_lossy(&text)));
+    .unwrap_or_else(|error| panic!("generated expression {text}: {error:?}"));
     let expression = hearth_protocol_builder::translate::operations::expression(compiled);
     let mut bindings = Bindings::with_capacity(u32::try_from(roots.bindings.len()).expect("small"));
     for (name, value) in &roots.bindings {
