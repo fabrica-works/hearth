@@ -42,8 +42,8 @@ cost facts, over what hearth 28 built. Split from hearth 30 (decisions.md,
 ### 47.1 The digests in the joint worlds, and the budgets
 Scope: 9.3's "every world" past the process tier; 9.8 and 3.10.
 Needs: hearth 28.4 (28.2 to 28.4), hearth 25.1 (`Call::Diff`), hearth 30.1,
-and the step that builds render.md 8.4's second side (the designer's answer
-of 2026-10-18T02:33:00Z's question).
+and hearth 28.s7 (render.md 8.4's second side, the designer's answer of
+2026-10-18T02:33:00Z's question; ruling 198).
 Files: `tests/builder/tests/properties.rs`, new `tests/builder/tests/
 budgets.rs`, `tests/builder/src/fixtures.rs`, `tests/builder/src/domain.rs`
 (`Run::new`, `:54`), `tests/builder/src/fixtures/worlds.rs` (`Shared::

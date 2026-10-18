@@ -1268,6 +1268,48 @@ None yet.
      3. **`Collide`'s tasks are `dup_a` and `dup_b`,** as you named them: format.md
         2.4 gives a task `[a-z]`, then `[a-z0-9_]`.
 
+198. **hearth 28.s7: a diff's second side decodes only the blobs that changed** (design gap, hearth-47.1's ready check of 2026-10-18T02:33:00Z).
+     The designer's answer, hearth 9a639f6; the step it asks for is hearth 28.s7, in `hearth/28.s-held-bounds.md`, in the 28.s session after 28.s4 and before 28.s5 (28.s5 now needs 28.s7), and hearth 47.1 needs it.
+
+
+     (a), 3.10's reading, but not with one budget over both sides. 3.10 now: "so
+     the next revision, a diff's second side among them (8.4), decodes only the
+     blobs that changed. Object ids name contents, so this memory changes no
+     result." 8.4's diff now keeps of the first side "its specs, closures and
+     errors, and, until the second's listing, its decoded blobs (below)", and
+     adds: "**A diff's second side decodes only the blobs that changed** (3.10).
+     When its listing arrives, it keeps of the first side's decoded documents,
+     declarations, templates and links' targets, and of its static files'
+     digests, those of the blobs that listing names, by object id and as what
+     they were read; the rest go. It reads only the others, a blob the first
+     refused among them. It gives what a render of its revision alone gives,
+     within the same 64 MiB: each document, declaration and template counts in
+     its own 64 MiB (2.3) in that render's order, kept or read; when what it
+     holds would pass the 64 MiB, the kept blobs not yet counted go first, and
+     one it then needs is read again. So a diff's peak holds one revision's
+     decoded data, as a render's does." 2.3's limits, 8.4's worst case and
+     28.s2's charge (654c6e8) stay; 28.s5 keeps `decoded` one revision's.
+
+     The step, which the supervisor names and places (default: the 28.s session,
+     after 28.s4). 47.1 needs it, as its Needs now say, and its two diff tests stand.
+     - Files, at 9a639f6: render `src/call.rs` (`Side`'s maps `:48` to `:51`;
+       `Call::resume`'s `Side::new`, `:582`; `read_documents`, `:169`; `files`,
+       `:237`), `src/call/decoded.rs` (`admit_decoded`, `:69`), `src/revision.rs`
+       (`Documents`, `Budget`), `src/call/references.rs` (`check_template`, for a
+       kept template), render's `src/tests/diff.rs`, `tests/render/tests/memory.rs`.
+     - Test shape: unit `a_diffs_second_side_reads_only_the_blobs_that_changed`
+       (and a refused document's again);
+       `a_diffs_second_side_errs_as_a_render_of_its_revision_alone` (the second
+       revision moves a refused document, a template and a static file to new
+       paths, unchanged, and changes the declaration a kept template's references
+       check: its errors, by path, are a lone render's);
+       `a_diffs_second_side_past_64_mib_fails_at_the_path_a_render_alone_names`
+       (28.s2's `fixtures/decoded.rs`: four documents in the first revision; the
+       second adds one listed before them, and fails at the last); memory
+       `a_diff_keeping_the_first_sides_blobs_holds_no_more_than_the_worst_case`.
+     - Don't: one budget over both sides; keep a refusal; change a limit or
+       `limits::worst_case`.
+
 ## For the user
 
 The long-term choices the user may veto:
