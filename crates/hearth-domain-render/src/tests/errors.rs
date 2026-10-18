@@ -173,13 +173,14 @@ fn a_smaller_error_displaces_the_last_kept_one() {
 }
 #[test]
 fn a_left_out_operational_error_still_makes_the_call_try_again() {
-    let mut call = crate::call::Side::new(copy_of(b"/repo"), Box::new([]), &fixtures::limits_with_errors(0));
+    let mut call =
+        crate::call::Side::new(copy_of(b"/repo"), Box::new([]), &fixtures::limits_with_errors(fixtures::NO_ERRORS));
     let mut error = fixtures::unplaced(b"t");
     error.class = Class::Operational;
     call.errors.push(error);
     assert_eq!(fixtures::answer(&mut call), Answer::Rendered { outcome: Outcome::TryAgain, diff: None, left_out: 1 });
 }
-const BOUNDS: &[u32] = &[0, 1, fixtures::THREE_ERRORS, fixtures::EIGHT_ERRORS];
+const BOUNDS: &[u32] = &[fixtures::NO_ERRORS, fixtures::SINGLE_REQUEST, fixtures::THREE_ERRORS, fixtures::EIGHT_ERRORS];
 #[test]
 fn the_collector_never_holds_more_than_its_bound() {
     for &bound in BOUNDS {
@@ -188,5 +189,23 @@ fn the_collector_never_holds_more_than_its_bound() {
             collector.push(fixtures::error_at(b"a", line, 1, b"t"));
             assert!(collector.errors().len() <= usize::try_from(bound).expect("small bound"), "bound {bound}");
         }
+    }
+}
+
+#[test]
+fn errors_past_16_mib_are_counted_not_kept() {
+    let (kept, left_out) = fixtures::byte_limited_errors().finish();
+    assert_eq!(fixtures::places(&kept).as_ref(), &[(b"a".as_slice(), 1, 1, b"".as_slice()), (b"b", 1, 1, b"")]);
+    assert_eq!(left_out, 2);
+}
+
+const ERROR_BOUNDS: &[(usize, usize, u32)] = &[(fixtures::ERROR_BYTES, 1, 0), (fixtures::ERROR_BYTES + 1, 0, 1)];
+#[test]
+fn the_error_byte_bound_keeps_its_exact_prefix() {
+    for &(bytes, count, omitted) in ERROR_BOUNDS {
+        let mut collector = fixtures::composition_collector();
+        collector.push(fixtures::large_error(b"a", bytes));
+        let (kept, left_out) = collector.finish();
+        assert_eq!((kept.len(), left_out), (count, omitted), "{bytes} bytes");
     }
 }

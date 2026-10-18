@@ -61,3 +61,24 @@ fn expanding_at_the_limits_holds_no_more_than_the_worst_case() {
         meter.check(step, bound, &what);
     }
 }
+
+#[test]
+fn collecting_errors_at_the_limits_holds_no_more_than_the_worst_case() {
+    use hearth_domain_render::errors::Collector;
+    let bound = Collector::worst_case(&limits::SHIPPED).expect("the shipped collector has a worst case");
+    let meter = Meter::new();
+    meter.start();
+    let mut collector = Collector::new(&limits::SHIPPED);
+    let step = meter.end();
+    meter.check(step, bound, &"empty collector");
+    for index in 0..limits::SHIPPED.errors {
+        meter.start();
+        collector.push(fixtures::error_at_budget(fixtures::ERROR_RECORD_BYTES));
+        let step = meter.end();
+        meter.check(step, bound, &index);
+    }
+    meter.start();
+    collector.push(fixtures::error_at_budget(fixtures::ERROR_FIELDS_BYTES));
+    let step = meter.end();
+    meter.check(step, bound, &"first excluded error");
+}

@@ -641,3 +641,20 @@ pub fn on_error(on: &[u8], host: hearth_domain_render::errors::Host) -> hearth_d
 }
 
 pub mod goldens;
+
+// render.md, 7.1: divide the retained 16 MiB among its 256 records.
+pub const ERROR_RECORD_BYTES: usize = 16_777_216 / 256;
+// at, also, target, task and guard name each contribute one byte.
+pub const ERROR_FIELDS_BYTES: usize = 5;
+#[must_use]
+pub fn error_at_budget(bytes: usize) -> hearth_domain_render::errors::Error {
+    use hearth_domain_render::errors::{Guard, Kind, Place};
+    let mut error = configuration_error(
+        Kind::Guard(Guard { name: Box::from(b"n".as_slice()), message: vec![b'x'; bytes - ERROR_FIELDS_BYTES].into() }),
+        b"a",
+        Some(b"s"),
+    );
+    error.target = Some(Box::from(b"t".as_slice()));
+    error.also = Some(Place { path: Box::from(b"a".as_slice()), position: None });
+    error
+}

@@ -119,40 +119,42 @@ pub(crate) fn refused(path: &[u8], position: Option<Position>, fault: Decode, al
 fn second(path: &[u8], position: Option<Position>) -> Option<Place> {
     Some(Place { path: skein_lib::bytes::copy_of(path), position: Some(position?) })
 }
-/// Placed errors precede unplaced ones; equal places retain arrival order (7.1).
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct Order {
+mod held;
+
+/// The key of the first error excluded from the ordered prefix (7.1).
+#[derive(Debug, Hash)]
+struct Order {
     unplaced: bool,
     path: Box<[u8]>,
     position: (u32, u32),
     target: Option<Box<[u8]>>,
-    arrival: u64,
 }
-/// The first configured number of errors, with the rest counted (render.md, 7.1).
+/// The longest ordered prefix within both of render.md, 7.1's bounds.
 #[derive(Debug, Hash)]
 pub struct Collector {
-    kept: skein_lib::Map<Order, Error>,
+    kept: skein_lib::List<Error>,
+    cut: Option<Order>,
+    bytes: u64,
     left_out: u32,
-    arrival: u64,
     outcome: crate::vocabulary::Outcome,
     side: Option<crate::diff::Side>,
 }
 impl Collector {
     #[must_use]
     pub fn new(limits: &crate::limits::Limits) -> Self {
-        let left_out = 0;
         Self {
-            kept: skein_lib::Map::with_capacity(limits.errors),
-            left_out,
-            arrival: 0,
+            kept: skein_lib::List::with_capacity(limits.errors),
+            cut: None,
+            bytes: limits.error_bytes,
+            left_out: 0,
             outcome: crate::vocabulary::Outcome::Done,
             side: None,
         }
     }
-    /// Counts every error's class, including errors beyond the bound.
     pub(crate) fn side(&mut self, side: crate::diff::Side) {
         self.side = Some(side);
     }
+    /// Counts every class, including errors beyond either prefix bound.
     pub fn push(&mut self, mut error: Error) {
         use crate::vocabulary::Outcome;
         error.side = self.side;
@@ -160,29 +162,35 @@ impl Collector {
             Class::Configuration => Outcome::Failed,
             Class::Operational => Outcome::TryAgain,
         });
-        let (path, position) = match &error.at {
-            Some(place) => (
-                place.path.clone(),
-                match place.position {
-                    Some(position) => (position.line, position.column),
-                    None => (0, 0),
-                },
-            ),
-            None => (skein_lib::bytes::copy_of(b""), (0, 0)),
-        };
-        let order =
-            Order { unplaced: error.at.is_none(), path, position, target: error.target.clone(), arrival: self.arrival };
-        self.arrival = self.arrival.checked_add(1).expect("a bounded call has fewer than u64 errors");
-        if let Err((order, error)) = self.kept.insert(order, error) {
+        if let Some(cut) = &self.cut
+            && held::past(&error, cut)
+        {
             self.left_out = self.left_out.saturating_add(1);
-            if let Some((last, _)) = self.kept.last()
-                && order < *last
-            {
-                let last = last.clone();
-                drop(self.kept.remove(&last));
-                self.kept.insert(order, error).expect("displaced one error");
+            return;
+        }
+        // Insertion is stable: equal places retain their arrival order.
+        for index in 0..self.kept.len() {
+            let kept = self.kept.get_mut(index).expect("kept index");
+            if held::compare(&error, kept).is_lt() {
+                core::mem::swap(&mut error, kept);
             }
         }
+        if let Err(error) = self.kept.push(error) {
+            self.cut = Some(held::order(&error));
+            self.left_out = self.left_out.saturating_add(1);
+        }
+        let mut bytes = 0_u64;
+        let mut count = 0_u32;
+        for error in &self.kept {
+            bytes = bytes.saturating_add(held::bytes(error));
+            if bytes > self.bytes {
+                self.cut = Some(held::order(error));
+                break;
+            }
+            count = count.saturating_add(1);
+        }
+        self.left_out = self.left_out.saturating_add(self.kept.len().saturating_sub(count));
+        self.kept.truncate(count);
     }
     pub(crate) fn extend(&mut self, errors: Box<[Error]>) {
         for error in errors {
@@ -190,33 +198,20 @@ impl Collector {
         }
     }
     #[must_use]
-    pub fn finish(mut self) -> (Box<[Error]>, u32) {
-        let mut errors = skein_lib::List::with_capacity(self.kept.len());
-        for _ in 0..self.kept.len() {
-            let order = self.kept.first().expect("remaining error").0.clone();
-            let error = self.kept.remove(&order).expect("first error");
-            errors.push(error).expect("kept bound");
-        }
-        (errors.into_boxed(), self.left_out)
+    pub fn finish(self) -> (Box<[Error]>, u32) {
+        (self.kept.into_boxed(), self.left_out)
     }
-    /// Includes owned bytes: three paths, target twice, task, and a decoded key.
+    /// Error records and their owned bytes, plus the excluded error's key.
     #[must_use]
     pub fn worst_case(limits: &crate::limits::Limits) -> Option<u64> {
-        let bytes = u64::from(limits.document).checked_add(12_288)?.checked_add(189)?;
-        skein_lib::Map::<Order, Error>::worst_case(limits.errors)?
-            .checked_add(bytes.checked_mul(u64::from(limits.errors))?)
+        skein_lib::List::<Error>::worst_case(limits.errors)?.checked_add(limits.error_bytes)?.checked_add(4_096 + 63)
     }
     #[cfg(test)]
     pub(crate) fn errors(&self) -> Box<[Error]> {
-        let mut errors = skein_lib::List::with_capacity(self.kept.len());
-        for (_, error) in &self.kept {
-            errors.push(error.clone()).expect("kept bound");
-        }
-        errors.into_boxed()
+        self.kept.to_boxed()
     }
     pub(crate) fn get(&self, index: u32) -> Option<&Error> {
-        let (_, error) = self.kept.iter().nth(usize::try_from(index).expect("u32 fits usize"))?;
-        Some(error)
+        self.kept.get(index)
     }
     pub(crate) const fn left_out(&self) -> u32 {
         self.left_out
