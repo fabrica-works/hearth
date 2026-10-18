@@ -134,11 +134,12 @@ false (the entry is absent, no error). With it, a context or made list (each
 element in turn, `key` the index) or a context map (its present entries in key
 order) is walked; undefined is `Undefined`, anything else `Type`, at the
 `for_each`. Per element: bind `key`, `value` (14's `Bindings`), `if`
-(`truthy`), the key's `interpolate`; a key already made (a `skein_lib::Map`
-of `Box<[u8]>` to `Position`, capacity `expansion`, across a task's maps) is
-`Collision::Key` at the entry, `also` the first's; an `if`-false element makes
-no key and counts nothing; past `expansion` entries, `Limit` at the `for_each`
-(exactly `expansion` passes). `Concrete::element` is the `for_each` index;
+(`truthy`), the key's `interpolate`; a key already made in its map (format.md
+5.2: "within their declaration"; 21.4 moves main's index across a task's maps
+to the map's own) is `Collision::Key` at the entry, `also` the first's; an
+`if`-false element makes no key and counts nothing; past `expansion` entries,
+counted across a task's maps, `Limit` at the `for_each` (exactly `expansion`
+passes). `Concrete::element` is the `for_each` index;
 `entries::element` rebinds `key`, `value` from it, for a kind that runs a
 template per element (hearth 18). Message `the key "ops" is made twice
 (path:line:col)`; JSON `"collision":{"key":"ops","kind":"key"}`.

@@ -313,14 +313,15 @@ Removes: nothing.
 
 ### 21.4 The `hearth` task: present, declared, and passing every rule
 Scope: format.md 5.12; render.md 3.2, and 3.4's container on its host;
-hearth 12's presence; log 68.
+hearth 12's presence; log 68; format.md 5.2's keys, unique within their
+declaration (the designer's answer of 2026-10-18).
 Needs: nothing beyond 21.3; hearth 42.3 (`Composition::Task`, `CONTAINERS`).
-Files: render `src/{compose, call, errors}.rs`, `src/errors/reserved.rs`, `src/call/validation.rs`,
-`src/tests/{compose, fixtures, errors}.rs`, `src/tests/fixtures/schemas.rs`;
+Files: render `src/{compose, call, errors, entries}.rs`, `src/errors/reserved.rs`, `src/call/validation.rs`,
+`src/tests/{compose, fixtures, errors, entries}.rs`, `src/tests/fixtures/schemas.rs`;
 protocol, records and `tests/builder` as 21.1's, and the `Host` arms:
 records `src/errors/composition.rs`, `src/tests/errors.rs`; protocol
 `src/translate/errors.rs`, `src/tests/translate/composition.rs`;
-`tests/render/{src/fixtures.rs, tests/compose.rs}`; `tests/render/src/fixtures/exports.rs`
+`tests/render/{src/fixtures.rs, src/reference/entries.rs, tests/compose.rs}`; `tests/render/src/fixtures/exports.rs`
 (`fleet()`, `:12`, gains the `tasks/hearth/task.json` entry: without it
 `tests/render/tests/exports.rs:43` sees 0 answers, not 2); both fixtures modules: `THIN`
 and the scripted `x1_prod` gain `tasks/hearth/task.json` `{}` (a ripple past
@@ -376,6 +377,18 @@ designer's answer of 2026-10-17). `compose::placed` reports the `on` as now
 `validation::host_schema` goes, with its call at `call.rs:413`; `needed` is
 the asked targets alone, so that a container asked reads none of its host's
 files and prints none of their errors.
+Keys are unique within their declaration (format.md 5.2: "two elements of one
+declaration that make the same key are an error"), so 5.12's `hearth` in
+`software` and in `users` is an entry in each. In `entries::expand`
+(`entries.rs:91`), a key already in its map's `ordered` (`:100`) is
+`Collision::Key` at the entry, `also` that entry's `at`. The index across a
+task's maps goes: `keys` (`:97`, `:123`, `:131` to `:134`), and its term in
+`worst_case` (`:661`). A `u32` of the keys made across the task's maps, checked
+where `:123` checks `keys.len()`, keeps `Limit` at `expansion` (render.md, 2.3).
+The render world's reference (`tests/render/src/reference/entries.rs`) makes
+`seen` per declaration (`:14`; its trees hold one entry a map) and counts keys
+across them for `limit` (`:66`). Key order, the `if`-false rule and the
+collision's message stand.
 Test shape: unit, `src/tests/compose.rs`, under 20 ms:
 `the_hearth_task_is_present_in_every_target_but_a_container`,
 `a_fleet_key_for_hearth_reaches_the_implicit_task_as_settings`,
@@ -386,7 +399,11 @@ present_task_not_implicit`, `a_fleet_or_env_key_for_hearth_on_a_container_is_
 dropped_silently`, on a pair from `fixtures::target_with(placement: &str,
 layers: [Option<&str>; 6]) -> (Documents, Target)` (17.1's `debian_layers`
 form; metal, container): names are `hearth` for the first and none for the
-second (format.md, 5.12).
+second (format.md, 5.12). Unit, `src/tests/entries.rs`:
+`one_key_in_two_maps_makes_an_entry_in_each` (`entry_maps` of `Map::Software`
+and `Map::Users`, each `[entry(plain(b"hearth"), None, None)]`: two groups,
+each of the one key `hearth`); `two_entries_making_one_key_collide` (`:170`)
+and `the_entry_count_runs_across_a_tasks_maps` (`:207`) hold unchanged.
 Proof: process, bound 0.5 s each. `the_hearth_task_of_5_12_passes_every_
 reserved_rule` on `HEARTH` (THIN's files but `tasks/hearth/`: 5.12's `task.json`
 whole, its `sha256` `ca2dff16…fc7fab9`, the digest of `hearth 0.1.0` LF;
@@ -432,13 +449,14 @@ JSON. `a_container_naming_hearth_is_refused_at_the_key` (`chat-prod.json`
 `hosts/` line begins `hosts/chat/chat-prod.json:1:56: chat-prod: hearth: `.
 Don't: write the data part's `snapshots` and `backups` policies (M5, M6);
 check `hearth`'s uid or range; refuse the task's own files; leave a container
-out for what fails on its host but its documents and placement.
-Size: at most 260 lines.
+out for what fails on its host but its documents and placement; change a key
+of 5.12's `task.json` in `HEARTH`.
+Size: at most 280 lines.
 Removes: 12.1's "Don't ... add the `hearth` task (hearth 21)"; 42.3's leaving
 out of a container whose host's tasks, settings or files fail, or a stray
 file under its base (`validation::host_schema`; in `host_valid`,
 `repository_valid`'s task and base halves and `files_valid`; `needed`'s
-host clause).
+host clause); 16.2's key index across a task's maps (`entries.rs:97`).
 
 ## Interface sketches
 

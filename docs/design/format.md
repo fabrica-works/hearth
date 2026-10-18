@@ -625,8 +625,13 @@ nothing.
   absent when its value is undefined (7.6), so the field's default
   applies: `shell` below. Beside text, in a key and in a list's string,
   undefined is an evaluation error.
-- **Keys are unique after expansion:** two elements that make the same
-  key are an error.
+- **Keys are unique after expansion, within their declaration:** two
+  elements of one declaration that make the same key are an error. One
+  key in two declarations makes an entry in each, as `hearth` does in
+  5.12's `software` and `users`. What two such entries claim together,
+  a `groups` entry of a user's own name (5.6) or one path, is compared as
+  render.md 3.7 says. The bound on entries counts every declaration of
+  the task (render.md, 2.3).
 - **Across tasks,** a file path, a data name and a secret's or identity's
   path belong to one task. Users, groups, presets, tmpfiles lines,
   preseeds and boot parameters may be declared by several tasks only
