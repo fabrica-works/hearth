@@ -1,0 +1,27 @@
+target       carbon-lab   base carbon   environment lab
+placement    vm efi incus
+spec         6cf3ab436a5d
+boot         part 8657d6b627dc
+  params     console=ttyS0,115200n8
+  mutable    false
+packages     part d77bd9addc29   resolution 4cccfe9577cf needed
+  sources    trixie amd64 main 20261001T030405Z updates security 20261001T031522Z
+  request    btrfs-progs ca-certificates dbus efibootmgr linux-image-amd64 tiny-initramfs
+  variant    apt
+  initramfs  btrfs sd_mod virtio_pci virtio_scsi
+  microcode  none
+  apt        install_recommends false
+  seed       group systemd-journal 999
+software     part 656d135b92c3
+config       part c21c1bdb5412
+  groups     systemd-journal package
+  tmpfiles   /var/log/journal d 2755 root systemd-journal
+  /etc/golden/empty        file 0644 root:root e3b0c44298fc
+  /etc/golden/enabled      file 0644 root:root e056a35db086
+  /etc/hostname            file 0644 root:root f6f93b8e03c6
+data         part ac29d83fe256
+  journal    /var/log/journal
+secrets      part ac870b5c968e
+live         part 6f1b7fda0c21
+exports      part 970579fd41be
+

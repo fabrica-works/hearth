@@ -1,0 +1,1 @@
+{"identity":{"ssh-ed25519":{"kind":"ssh-host-key","algorithm":"ed25519","path":"/etc/ssh/ssh_host_ed25519_key","public_path":"/etc/ssh/ssh_host_ed25519_key.pub","mode":"0600"}}}

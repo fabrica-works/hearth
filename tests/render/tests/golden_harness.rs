@@ -41,3 +41,15 @@ fn a_golden_without_an_expected_file_is_a_failure_naming_it() {
     let verdict = golden::load("merge").check("missing", "target m-a\nspec 111111111111\n", Some(0));
     assert!(verdict.report().contains("merge/expected-missing/m-a missing"), "{}", verdict.report());
 }
+const LINKS: &[(&str, bool)] = &[
+    ("  /etc/localtime          link root:root /zone/with space", true),
+    ("  /etc/localtime          link root:root /zone/with", false),
+    ("  /etc/other              link root:root /zone/with space", false),
+    ("  /etc/localtime          file 0644 root:root /zone/with space", false),
+];
+#[test]
+fn a_link_witness_matches_its_target_text() {
+    for &(line, expected) in LINKS {
+        assert_eq!(golden::link_witness_line(line, "/etc/localtime", "/zone/with space"), expected, "{line}");
+    }
+}

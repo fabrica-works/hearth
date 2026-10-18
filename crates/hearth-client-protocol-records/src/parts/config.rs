@@ -37,11 +37,11 @@ impl Config {
             match &entry.node {
                 Node::Link { target, owner, group } => {
                     lines.put(b"link ");
-                    lines.put(target);
-                    lines.put(b" ");
                     lines.put(owner);
                     lines.put(b":");
                     lines.put(group);
+                    lines.put(b" ");
+                    lines.put(target);
                 }
                 Node::Directory { mode, owner, group } => {
                     lines.put(b"directory ");

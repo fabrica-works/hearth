@@ -59,3 +59,77 @@ fn templates_cover_every_statement_and_filter_format_md_names() {
         assert!(source.contains(needle), "missing {name}");
     }
 }
+#[test]
+fn the_fleet_renders_its_six_targets_as_expected() {
+    fixtures::check_golden("fleet", "", &[]);
+}
+const X1_FIELDS: &[&str] = &[
+    "target ",
+    "placement ",
+    "spec ",
+    "packages ",
+    "  sources ",
+    "  request ",
+    "  variant ",
+    "  preseed    locales/default_environment_locale ",
+    "  initramfs ",
+    "config ",
+    "  tmpfiles   /var/log/journal ",
+    "  /etc/hostname ",
+    "  /etc/localtime ",
+    "data ",
+    "  journal ",
+];
+const X1_RENDER_LINES: &str = concat!(
+    "target       x1-prod   base x1   environment prod\n",
+    "placement    metal efi 7th-gen\n",
+    "spec         ............\n",
+    "packages     part ............   resolution ............ needed\n",
+    "  sources    forky amd64 main contrib non-free-firmware 20261001T030405Z\n",
+    "  request    btrfs-progs ca-certificates dbus efibootmgr firmware-intel-sound iwd linux-image-amd64 locales sway tiny-initramfs tzdata\n",
+    "  variant    apt\n",
+    "  preseed    locales/default_environment_locale select en_US.UTF-8\n",
+    "  initramfs  btrfs nvme\n",
+    "config       part ............\n",
+    "  tmpfiles   /var/log/journal d 2755 root systemd-journal\n",
+    "  /etc/hostname                file 0644 root:root ............\n",
+    "  /etc/localtime               link root:root /usr/share/zoneinfo/Europe/Lisbon\n",
+    "data         part ............\n",
+    "  journal    /var/log/journal\n",
+);
+#[test]
+fn x1_prod_prints_render_md_9_2s_lines() {
+    let text = include_bytes!("../../render/fleet/expected/x1-prod");
+    assert_eq!(golden::mask12(&fixtures::lines_starting(text, X1_FIELDS)), X1_RENDER_LINES);
+}
+#[test]
+fn a_lab_spec_does_not_change_when_a_production_file_does() {
+    let repository = fixtures::golden_repository("fleet");
+    let input = fixtures::render(&repository, &[b"carbon-lab"], hearth::Form::Text);
+    drop(repository.next(&[fixtures::CARBON_PRODUCTION_EDIT], &[]));
+    let after = fixtures::render(&repository, &[b"carbon-lab"], hearth::Form::Text);
+    assert_eq!(after.stdout, input.stdout);
+}
+#[test]
+fn the_container_has_no_hearth_task_and_its_host_has_one() {
+    let repository = fixtures::golden_repository("fleet");
+    drop(repository.next(&[], &["tasks/hearth/task.json"]));
+    let rendered = fixtures::render(&repository, &[b"carbon-prod", b"chat-prod"], hearth::Form::Text);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["target ", "tasks/"]),
+        "target       chat-prod   base chat   environment prod\n\
+tasks/hearth/task.json: carbon-prod: no task hearth under tasks/\n"
+    );
+}
+#[test]
+fn the_cluster_renders_its_members_with_their_names() {
+    fixtures::check_golden("cluster", "", &[]);
+}
+#[test]
+fn a_base_env_file_removes_a_member_from_its_environment() {
+    let targets = golden::Golden::targets(&fixtures::golden_output("cluster"));
+    assert_eq!(
+        targets.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>(),
+        ["stoa-1-lab", "stoa-1-prod", "stoa-2-lab", "stoa-2-prod", "stoa-3-lab"]
+    );
+}

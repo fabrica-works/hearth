@@ -17,7 +17,7 @@ fn a_spec_prints_its_meta_and_config_as_render_md_shows() {
 fn a_digest_prints_its_first_twelve_lowercase_hex_digits() {
     let mut spec = fixtures::x1_prod();
     spec.digest = fixtures::digest([0xab, 0xcd, 0xef, 0x01, 0x23, 0x45]);
-    let printed = form::print(Form::Text, &Record::Spec(spec), None, &limits::SHIPPED).expect("valid spec");
+    let printed = fixtures::packages_text(spec);
     assert!(skein_lib::bytes::find(&printed, b"spec         abcdef012345\n").is_some(), "twelve lowercase digits");
 }
 #[test]
@@ -29,7 +29,7 @@ fn a_mode_prints_as_four_octal_digits() {
             panic!("file fixture")
         };
         *value = mode;
-        let printed = form::print(Form::Text, &Record::Spec(spec), None, &limits::SHIPPED).expect("valid spec");
+        let printed = fixtures::packages_text(spec);
         assert!(skein_lib::bytes::find(&printed, expected).is_some(), "four octal digits for {mode:o}");
     }
 }
@@ -42,7 +42,7 @@ fn a_path_past_the_column_widens_it_for_every_entry() {
         TreeEntry { path: copy_of(b"/a"), node: node.clone() },
         TreeEntry { path: copy_of(b"/a/very/long/path/past/column"), node },
     ]);
-    let printed = form::print(Form::Text, &Record::Spec(spec), None, &limits::SHIPPED).expect("valid spec");
+    let printed = fixtures::packages_text(spec);
     let expected = concat!(
         "target       x1-prod   base x1   environment prod\n",
         "placement    metal efi 7th-gen\n",
@@ -88,7 +88,7 @@ fn a_record_past_its_limit_is_refused_too_long() {
 #[test]
 fn a_known_resolution_prints_the_keys_line_last() {
     let spec = fixtures::with_resolution(fixtures::x1_prod(), fixtures::known());
-    let printed = form::print(Form::Text, &Record::Spec(spec), None, &limits::SHIPPED).expect("valid spec");
+    let printed = fixtures::packages_text(spec);
     let expected = concat!(
         "target       x1-prod   base x1   environment prod\n",
         "placement    metal efi 7th-gen\n",
@@ -120,7 +120,7 @@ fn a_link_and_a_directory_print_after_the_files_columns() {
             "placement    metal efi 7th-gen\n",
             "spec         9a0c5e1f2b3d\n",
             "config       part e7c2a0d95b13\n",
-            "  /etc/mtab                link /proc/self/mounts root:root\n",
+            "  /etc/mtab                link root:root /proc/self/mounts\n",
             "  /var/lib/motd            directory 0750 root:adm\n"
         )
         .as_bytes()

@@ -1,0 +1,1 @@
+{"settings":{"port":{"type":"int","doc":"Golden input."},"index":{"type":"int","doc":"Golden input."}},"reads":{"stoa":{"exports":true}},"exports":{"address":{"type":"string","value":"{{ 'stoa-' ~ target.member ~ '.' ~ target.environment }}","doc":"Member address."},"index":{"type":"int","value":"{{ settings.index }}","doc":"Member index."}}}

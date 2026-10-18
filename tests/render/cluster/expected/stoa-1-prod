@@ -1,0 +1,20 @@
+target       stoa-1-prod   base stoa   member 1   environment prod
+placement    vm bios incus
+spec         ede13f1722d0
+boot         part bc6cab417252
+  mutable    false
+packages     part 9194c2fefb9f   resolution 65064d1c74ed needed
+  sources    trixie amd64 main 20261001T030405Z updates security 20261001T031522Z
+  variant    apt
+  microcode  none
+  apt        install_recommends false
+software     part 656d135b92c3
+config       part 95a880e4f0ae
+  /etc/stoa/peers          file 0644 root:root 8bf9f02a76df
+data         part 2d4765200bab
+secrets      part ac870b5c968e
+live         part 6f1b7fda0c21
+exports      part 95975721978b
+  stoa.address   "stoa-1.prod"
+  stoa.index     1
+

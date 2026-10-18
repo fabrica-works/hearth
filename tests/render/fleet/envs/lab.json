@@ -1,0 +1,1 @@
+{"placement":{"kind":"vm","firmware":"efi","hardware":"incus"},"core":{"domain":"lab.ekanayaka.io"},"boot":{"modules":{"incus":["btrfs","virtio_pci","virtio_scsi","sd_mod"]},"params":{"console":{"param":"console=ttyS0,115200n8","order":900}}}}

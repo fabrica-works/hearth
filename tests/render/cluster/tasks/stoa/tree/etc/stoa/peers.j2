@@ -1,0 +1,4 @@
+member={{ target.member }}
+{% for name, peer in exports.stoa | items %}
+{{ name }} {{ peer.address }} {{ peer.index }}
+{% endfor %}

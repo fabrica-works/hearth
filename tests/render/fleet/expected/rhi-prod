@@ -1,0 +1,38 @@
+target       rhi-prod   base rhi   environment prod
+placement    metal bios serverhino
+spec         48b42958096c
+boot         part bc6cab417252
+  mutable    false
+packages     part c3028524479a   resolution 6a6b6f669f96 needed
+  sources    trixie amd64 main 20261001T030405Z updates security 20261001T031522Z
+  request    btrfs-progs ca-certificates dbus linux-image-amd64 locales tiny-initramfs tzdata
+  variant    apt
+  preseed    locales/default_environment_locale select en_US.UTF-8
+  preseed    locales/locales_to_be_generated multiselect en_US.UTF-8 UTF-8
+  preseed    tzdata/Areas select Europe
+  preseed    tzdata/Zones/Europe select Lisbon
+  initramfs  btrfs scsi_mod sd_mod virtio_mmio virtio_pci virtio_scsi
+  microcode  generic
+  apt        install_recommends false
+  seed       group systemd-journal 999
+software     part 5db02a1979b4
+  download   /opt/probe/bin/probe file 0755 root:root ba7816bf8f01
+  scripts    service 500 16bddf2f1fbe
+  fetch      ba7816bf8f01 https://example.test/probe
+config       part 53fd85635e3c
+  groups     systemd-journal package
+  presets    probe.service enable
+  tmpfiles   /var/log/journal d 2755 root systemd-journal
+  /etc/golden/empty        file 0644 root:root e3b0c44298fc
+  /etc/golden/enabled      file 0644 root:root e056a35db086
+  /etc/hostname            file 0644 root:root 526f661d26ce
+  /etc/localtime           link root:root /usr/share/zoneinfo/Europe/Lisbon
+  /etc/probe/probe.conf    file 0644 root:root 77326c7bd90b
+data         part ac29d83fe256
+  journal    /var/log/journal
+secrets      part 35b5d346cded
+  secret     rhi/service.key /etc/probe/private.key 0640 root:root
+live         part 75fb04dd4746
+  path       /etc/probe/ service probe.service reload
+exports      part 970579fd41be
+

@@ -9,7 +9,7 @@ fn hearth_render_lists_a_link_a_directory_and_a_files_new_mode() {
         fixtures::lines_starting(&rendered.stdout, &["  /"]),
         concat!(
             "  /etc/motd                file 0600 root:adm 775324fcea7f\n",
-            "  /etc/mtab                link /proc/self/mounts root:root\n",
+            "  /etc/mtab                link root:root /proc/self/mounts\n",
             "  /usr/local/bin/motd      file 0755 root:root f487088ec8b1\n",
             "  /var/lib/motd            directory 0750 root:root\n"
         )
@@ -20,7 +20,7 @@ fn hearth_diff_shows_a_moved_link_and_a_directory_s_new_mode() {
     assert_eq!(
         fixtures::lines_starting(&files::diff_links().stdout, &["  config "]),
         concat!(
-            "  config   ~ /etc/mtab                              link /proc/mounts root:root\n",
+            "  config   ~ /etc/mtab                              link root:root /proc/mounts\n",
             "  config   ~ /var/lib/motd                          directory 0755 root:root\n"
         )
     );

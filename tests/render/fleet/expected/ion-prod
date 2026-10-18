@@ -1,0 +1,27 @@
+target       ion-prod   base ion   environment prod
+placement    vm bios ionos
+spec         4c2923589453
+boot         part bc6cab417252
+  mutable    false
+packages     part ce96aeddb3ab   resolution f2b5b718fe7b needed
+  sources    trixie amd64 main 20261001T030405Z updates security 20261001T031522Z
+  request    btrfs-progs ca-certificates dbus linux-image-amd64 tiny-initramfs
+  variant    apt
+  initramfs  btrfs scsi_mod virtio virtio_blk virtio_pci virtio_rng vmw_pvscsi
+  microcode  none
+  apt        install_recommends false
+  seed       group systemd-journal 999
+software     part 656d135b92c3
+config       part 77d6ad7732e3
+  groups     systemd-journal package
+  tmpfiles   /var/log/journal d 2755 root systemd-journal
+  /etc/golden/empty        file 0644 root:root e3b0c44298fc
+  /etc/golden/enabled      file 0644 root:root e056a35db086
+  /etc/hostname            file 0644 root:root 703caf1fc1dd
+data         part ac29d83fe256
+  journal    /var/log/journal
+secrets      part 7c03f61cea98
+  identity   ssh-ed25519 ssh-host-key ed25519 /etc/ssh/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key.pub 0600 root:root
+live         part 6f1b7fda0c21
+exports      part 970579fd41be
+

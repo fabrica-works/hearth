@@ -1,0 +1,1 @@
+{"settings":{"user":{"type":"string","doc":"Golden input."}},"packages":{"sway":{}},"scripts":{"customize.sh":{"order":300}}}

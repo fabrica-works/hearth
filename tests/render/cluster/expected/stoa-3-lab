@@ -1,0 +1,19 @@
+target       stoa-3-lab   base stoa   member 3   environment lab
+placement    vm bios incus
+spec         8170769698b8
+boot         part bc6cab417252
+  mutable    false
+packages     part 9194c2fefb9f   resolution 65064d1c74ed needed
+  sources    trixie amd64 main 20261001T030405Z updates security 20261001T031522Z
+  variant    apt
+  microcode  none
+  apt        install_recommends false
+software     part 656d135b92c3
+config       part e67200685354
+  /etc/stoa/peers          file 0644 root:root 22dddda595c4
+data         part 2d4765200bab
+secrets      part ac870b5c968e
+live         part 6f1b7fda0c21
+exports      part 902179ed12c9
+  stoa.address   "stoa-3.lab"
+  stoa.index     3

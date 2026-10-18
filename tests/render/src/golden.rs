@@ -175,6 +175,13 @@ impl Golden {
             let (target, path) = name.split_once('/').expect("witness target/path");
             let path = format!("/{path}");
             let text = targets.iter().find(|(name, _)| name == target).map_or("", |(_, text)| text.as_str());
+            if leaf.kind == Kind::Link {
+                let target = std::str::from_utf8(&leaf.bytes).expect("link witness text");
+                if !text.lines().any(|line| link_witness_line(line, &path, target)) {
+                    verdict.differences.push(format!("rendered/{name}: no link line targeting {target}"));
+                }
+                continue;
+            }
             let mut digest = String::new();
             for byte in skein_lib::sha256::digest(&leaf.bytes).iter().take(6) {
                 write!(digest, "{byte:02x}").expect("hex");
@@ -236,4 +243,17 @@ mod repository;
 pub fn witness_line(line: &str, path: &str, digest: &str) -> bool {
     let mut words = line.split_whitespace();
     words.next() == Some(path) && words.last() == Some(digest) && digest.len() == 12
+}
+/// A link witness carries the target text, including its spaces.
+#[must_use]
+pub fn link_witness_line(line: &str, path: &str, target: &str) -> bool {
+    let Some(fields) = line
+        .trim_start()
+        .strip_prefix(path)
+        .and_then(|tail| tail.strip_prefix(' '))
+        .and_then(|tail| tail.trim_start().strip_prefix("link "))
+    else {
+        return false;
+    };
+    fields.split_once(' ').is_some_and(|(_, written)| written == target)
 }

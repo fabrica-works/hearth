@@ -53,7 +53,16 @@ pub fn check_golden(name: &str, variant: &str, laid: &[Laid]) {
 pub const GOLDEN_SEED: u64 = 0;
 #[must_use]
 pub fn golden_output(name: &str) -> String {
-    let golden = golden::load(name);
-    let repository = Repository::make(name, &files_of(&golden.tree));
+    let repository = golden_repository(name);
     String::from_utf8(super::render(&repository, &[], hearth::Form::Text).stdout).expect("client text")
 }
+#[must_use]
+pub fn golden_repository(name: &str) -> Repository {
+    Repository::make(name, &files_of(&golden::load(name).tree))
+}
+/// A production-only hostname edit, leaving the shared carbon base intact.
+pub const CARBON_PRODUCTION_EDIT: File = File {
+    path: "hosts/carbon/carbon-prod.json",
+    body: br#"{"placement":{"kind":"metal","firmware":"efi","hardware":"serverhino"},"core":{"hostname":"carbon-production"}}"#,
+    mode: 0o644,
+};

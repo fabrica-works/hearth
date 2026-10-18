@@ -1,0 +1,12 @@
+{
+  "settings": {
+    "snapshots": {
+      "type": { "map": { "object": {
+        "every": { "type": "duration", "doc": "How often the class is snapshotted." },
+        "keep": { "type": { "map": "int" }, "doc": "How many to keep per bucket: hourly, daily, weekly, monthly." }
+      } } },
+      "default": {},
+      "doc": "Local snapshots of each class's subvolume, by class: core or data [M5] (operating.md, 7.1)."
+    }
+  }
+}

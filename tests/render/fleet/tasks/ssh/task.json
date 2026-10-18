@@ -1,0 +1,1 @@
+{"settings":{"port":{"type":"int","doc":"SSH port."},"authorized":{"type":{"map":{"map":"string"}},"doc":"Public authorized keys."}}}

@@ -1,0 +1,1 @@
+{"debian":{"suite":"forky","pockets":{"updates":false,"security":false},"components":{"contrib":true}},"core":{"hostname":"x1"},"host":{},"locale":{},"boot":{"params":{"audit":{"param":"audit=0"}}},"users":{"accounts":{"free":{"uid":1000,"groups":["sudo"],"password":"users/free.passwd"}}},"wifi":{},"desktop":{"user":"free"}}
