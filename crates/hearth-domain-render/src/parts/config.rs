@@ -230,8 +230,8 @@ pub enum MemberChange {
 mod changes;
 
 mod directives;
+pub(crate) use directives::encode_scripts;
 pub use directives::{Action, Line, LineKind, Preset, Script, Tmpfile};
-pub(crate) use directives::{Lists as Directives, build as directives, encode_scripts};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PresetKeyed {

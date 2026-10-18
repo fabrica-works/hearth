@@ -1,5 +1,7 @@
 //! Claims meet before templates run (render.md, 3.7).
 mod claims;
+mod declarations;
+mod ids;
 use crate::{
     entries::Expansion,
     errors::{Class, Collector, Collision, Error, Kind, Subject},
@@ -8,6 +10,8 @@ use crate::{
 };
 use alloc::boxed::Box;
 use claims::Claim;
+pub use declarations::{Survivors, declarations};
+pub use ids::ids;
 use skein_lib::{Map, bytes::copy_of};
 /// Everything the target's tasks declared.
 #[derive(Debug)]

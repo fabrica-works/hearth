@@ -475,28 +475,22 @@ impl Side {
                 self.outcome = self.outcome.worst(Outcome::Failed);
                 continue;
             };
-            let Some((mut packages, boot)) =
+            let Some((mut packages, mut boot)) =
                 packages::build(&debian, &p, &expansion, set.as_ref(), &meta, &mut self.errors)
             else {
                 continue;
             };
-            let Some((secrets, live, software, accounts)) =
-                secrets::build(&expansion, &mut packages, &meta, &mut self.errors, &mut self.outcome)
+            let Some((secrets, live, software, mut accounts)) =
+                secrets::build(&expansion, &meta, &mut self.errors, &mut self.outcome)
             else {
                 continue;
             };
-            let data = match parts::data::build(&expansion) {
-                Ok(data) => data,
-                Err(faults) => {
-                    for mut fault in faults {
-                        fault.target = Some(meta.target.clone());
-                        self.errors.push(fault);
-                    }
-                    self.outcome = self.outcome.worst(Outcome::Failed);
-                    continue;
-                }
+            let Some(data) = self.data(&expansion, &meta) else { continue };
+            let Some(installation) =
+                self.installation(&meta, &checked, &expansion, &mut accounts, &mut packages, &mut boot)
+            else {
+                continue;
             };
-            let Some(installation) = self.installation(&meta, &checked, &expansion, &accounts) else { continue };
             self.prepare_rendering(
                 meta,
                 containers,

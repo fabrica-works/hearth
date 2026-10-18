@@ -122,3 +122,72 @@ pub const ONE_COLLISION: usize = 1;
 pub const EMPTY_CLAIMS: crate::limits::Limits = crate::limits::Limits { expansion: 0, ..SHIPPED };
 // An empty fixture has no claims or faults.
 const EMPTY_CLAIM_COUNT: u32 = 0;
+
+pub fn agreeing(expansion: &Expansion) -> Result<collisions::Survivors, Box<[Error]>> {
+    let accounts = crate::parts::config::accounts(expansion).expect("valid fixture accounts");
+    let mut errors = Collector::new(&SHIPPED);
+    let survivors = collisions::declarations(
+        &Declared { target: b"x1-prod", expansion, plans: &[], accounts: &accounts },
+        &SHIPPED,
+        &mut errors,
+    );
+    match survivors {
+        Some(rows) => Ok(rows),
+        None => Err(errors.finish().0),
+    }
+}
+pub fn account_names(accounts: &crate::kinds::users::Accounts) -> Box<[&[u8]]> {
+    let mut names = List::with_capacity(u32::try_from(accounts.users.len()).expect("fixture count"));
+    for user in &accounts.users {
+        names.push(user.name.as_ref()).expect("fixture count");
+    }
+    names.into_boxed()
+}
+pub fn user_rows(first: &[crate::entries::Made], second: &[crate::entries::Made]) -> Expansion {
+    kinds::account_expansion(&[
+        (b"a", Map::Users, &[crate::entries::Concrete { fields: first.into(), ..kinds::file(b"free", []) }]),
+        (b"b", Map::Users, &[crate::entries::Concrete { fields: second.into(), ..kinds::file(b"free", []) }]),
+    ])
+}
+pub fn group_with_user(gid: i64) -> Expansion {
+    joined(&[
+        kinds::account_expansion(&[(
+            b"a",
+            Map::Users,
+            &[kinds::file(b"free", [kinds::integer(Name::Uid, ACCOUNT_ID)])],
+        )]),
+        kinds::account_expansion(&[(b"b", Map::Groups, &[kinds::file(b"free", [kinds::integer(Name::Gid, gid)])])]),
+    ])
+}
+pub fn id_collisions(accounts: &crate::kinds::users::Accounts) -> Box<[Error]> {
+    let mut errors = Collector::new(&SHIPPED);
+    let _valid = collisions::ids(accounts, b"x1-prod", &SHIPPED, &mut errors);
+    errors.finish().0
+}
+pub fn named_user(name: &[u8], task: &[u8], uid: Option<u32>) -> crate::kinds::users::User {
+    let mut user = super::sysusers(name, uid);
+    user.task = skein_lib::bytes::copy_of(task);
+    user
+}
+pub fn ranged(name: &[u8], task: &[u8], base: i64, count: i64) -> crate::kinds::users::User {
+    let mut user = named_user(name, task, None);
+    let crate::kinds::users::UserKind::Sysusers { subordinate, .. } = &mut user.kind else { panic!("sysusers") };
+    *subordinate = Some((u32::try_from(base).expect("fixture base"), u32::try_from(count).expect("fixture count")));
+    user
+}
+// An account id inside format.md 5.6's bounds; its neighbour is the second account's id.
+pub const ACCOUNT_ID: i64 = 1_000;
+pub const ACCOUNT_UID: u32 = 1_000;
+// Ranges begin at format.md 5.6's lower bound and span one ordinary subuid block.
+pub const RANGE_BASE: i64 = kinds::MIN_SUBORDINATE;
+pub const RANGE_COUNT: i64 = RANGE_BASE;
+
+pub fn equal_users() -> Expansion {
+    user_rows(&[kinds::integer(Name::Uid, ACCOUNT_ID)], &[kinds::integer(Name::Uid, ACCOUNT_ID)])
+}
+// The smallest count format.md 5.6 permits for a subordinate range.
+pub const MIN_RANGE_COUNT: i64 = 1;
+
+pub fn first_range() -> crate::kinds::users::User {
+    ranged(b"free", b"a", RANGE_BASE, RANGE_COUNT)
+}

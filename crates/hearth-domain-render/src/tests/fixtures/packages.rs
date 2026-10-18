@@ -208,3 +208,14 @@ pub fn seeded_packages() -> Packages {
     packages.seeds.groups = Box::new([SeedGroup { name: copy_of(b"opendkim"), gid: 120 }]);
     packages
 }
+
+// Every malformed param reports the param field's place.
+pub const BAD_CMDLINE_PARAMETER: (crate::errors::Schema, crate::revision::Position) =
+    (crate::errors::Schema::Malformed { format: crate::errors::Format::Param }, super::FIELD_AT);
+pub fn parameter_values(parameters: &[crate::kinds::cmdline::Parameter]) -> Box<[&[u8]]> {
+    let mut values = List::with_capacity(u32::try_from(parameters.len()).expect("fixture count"));
+    for parameter in parameters {
+        values.push(parameter.param.as_ref()).expect("fixture count");
+    }
+    values.into_boxed()
+}

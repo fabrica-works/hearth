@@ -47,16 +47,10 @@ pub(crate) fn rows(accounts: &users::Accounts, tree: Box<[super::TreeEntry]>) ->
     }
     let mut members = Ordered::with_capacity(capacity);
     for group in &accounts.groups {
-        if !groups.contains_key(&group.name) {
-            // transitional: hearth 22
-            let kind = if group.package { GroupKind::Package } else { GroupKind::Sysusers { gid: group.gid } };
-            groups.insert(group.name.clone(), Group { name: group.name.clone(), kind }).expect("entry count");
-        }
+        let kind = if group.package { GroupKind::Package } else { GroupKind::Sysusers { gid: group.gid } };
+        groups.insert(group.name.clone(), Group { name: group.name.clone(), kind }).expect("entry count");
     }
     for user in &accounts.users {
-        if users.contains_key(&user.name) {
-            continue;
-        } // transitional: hearth 22
         let kind = match &user.kind {
             users::UserKind::Package { .. } => UserKind::Package,
             users::UserKind::Sysusers { uid, group, gecos, home, shell, member_of, .. } => {

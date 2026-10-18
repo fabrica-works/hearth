@@ -467,6 +467,8 @@ pub struct Guard {
 pub enum Collision {
     Key { key: Box<[u8]> },
     Given { subject: Subject, name: Box<[u8]>, first: Box<[u8]>, second: Box<[u8]> },
+    Differs { subject: Subject, name: Box<[u8]>, first: Box<[u8]>, second: Box<[u8]> },
+    Shared { id: Id, value: u32, first: Box<[u8]>, second: Box<[u8]> },
     Hidden { path: Box<[u8]>, data: Box<[u8]>, first: Box<[u8]>, second: Box<[u8]> },
     Overlap { subject: Subject, first: Box<[u8]>, second: Box<[u8]> },
 }
@@ -480,6 +482,19 @@ pub enum Subject {
     Secret,
     Identity,
     Download,
+    User,
+    Group,
+    Preset,
+    Tmpfiles,
+    Preseed,
+    Parameter,
+    Range,
+}
+/// The account id namespace (format.md, 5.6).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Id {
+    Uid,
+    Gid,
 }
 
 /// Reference roots restricted to literal names (format.md, 6.4).

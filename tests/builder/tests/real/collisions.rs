@@ -24,3 +24,27 @@ fn hearth_render_refuses_a_file_under_a_data_path() {
 fn a_hidden_path_exits_with_a_configuration_error() {
     assert_eq!(collisions::render("hidden-exit", collisions::HIDDEN).exit, Exit::Code(2));
 }
+#[test]
+fn hearth_render_names_the_two_tasks_of_a_differing_user() {
+    let rendered = collisions::render("differing-user", collisions::CLASH);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["tasks/a/"]),
+        "tasks/a/task.json:1:12: x1-prod: user \"free\" differs between a and b (tasks/b/task.json:1:12)\n"
+    );
+}
+#[test]
+fn hearth_render_names_the_two_users_sharing_a_uid() {
+    let rendered = collisions::render("shared-uid", collisions::SHARED);
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["tasks/a/"]),
+        "tasks/a/task.json:1:12: x1-prod: uid 1000 is shared by free and ci (tasks/b/task.json:1:12)\n"
+    );
+}
+#[test]
+fn differing_users_exit_with_a_configuration_error() {
+    assert_eq!(collisions::render("differing-user-exit", collisions::CLASH).exit, Exit::Code(2));
+}
+#[test]
+fn a_shared_uid_exits_with_a_configuration_error() {
+    assert_eq!(collisions::render("shared-uid-exit", collisions::SHARED).exit, Exit::Code(2));
+}

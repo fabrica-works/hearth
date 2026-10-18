@@ -14,10 +14,9 @@ pub(super) fn build(expansion: &Expansion, initramfs: bool) -> Result<Declaratio
     for located in &entries {
         match crate::kinds::preseeds::entry(located.entry) {
             Ok(preseed) => {
-                // transitional: hearth 22
-                if preseeds.get(&preseed.question).is_none() {
-                    preseeds.insert(preseed.question.clone(), preseed).expect("entry count");
-                }
+                preseeds
+                    .insert((preseed.question.clone(), skein_lib::bytes::copy_of(located.task)), preseed)
+                    .expect("entry count");
             }
             Err((schema, at)) => {
                 faults.push(super::build::error(schema, Some(located.task), Some(at), None)).expect("entry count");

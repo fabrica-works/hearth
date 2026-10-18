@@ -696,7 +696,7 @@ mod composition;
 pub use composition::{Composition, Host};
 
 mod collisions;
-pub use collisions::{Collision, Subject};
+pub use collisions::{Collision, Id, Subject};
 
 /// Reference roots restricted to literal names (format.md, 6.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

@@ -364,3 +364,5 @@ fn an_identitys_public_and_private_paths_collide_when_equal() {
         )]
     );
 }
+
+mod declarations;

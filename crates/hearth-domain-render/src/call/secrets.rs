@@ -3,12 +3,11 @@ use crate::{entries::Expansion, errors, parts, parts::meta, vocabulary::Outcome}
 use alloc::boxed::Box;
 pub(crate) fn build(
     expansion: &Expansion,
-    packages: &mut parts::packages::Packages,
     meta: &meta::Meta,
     errors: &mut errors::Collector,
     outcome: &mut Outcome,
 ) -> Option<(parts::secrets::Secrets, parts::live::Live, parts::software::Software, crate::kinds::users::Accounts)> {
-    match built(expansion, packages) {
+    match built(expansion) {
         Ok(parts) => Some(parts),
         Err(faults) => {
             for mut fault in faults {
@@ -22,13 +21,11 @@ pub(crate) fn build(
 }
 fn built(
     expansion: &Expansion,
-    packages: &mut parts::packages::Packages,
 ) -> Result<
     (parts::secrets::Secrets, parts::live::Live, parts::software::Software, crate::kinds::users::Accounts),
     Box<[errors::Error]>,
 > {
     let accounts = parts::config::accounts(expansion)?;
-    packages.seeds = crate::ids::expanded(&accounts, expansion)?;
     Ok((
         parts::secrets::build(expansion)?,
         parts::live::build(expansion)?,

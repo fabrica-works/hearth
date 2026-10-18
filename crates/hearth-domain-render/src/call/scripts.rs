@@ -1,4 +1,5 @@
 //! Validate declared scripts and gather the config lists before rendering.
+mod collisions;
 use super::{Side, files};
 use crate::{
     entries::Expansion,
@@ -8,7 +9,7 @@ use crate::{
         scripts::{self, Source},
     },
     parts::{
-        config::{self, Preset, Tmpfile},
+        config::{Preset, Tmpfile},
         meta::Meta,
     },
     schema::Validated,
@@ -28,19 +29,10 @@ impl Side {
         meta: &Meta,
         checked: &Validated,
         expansion: &Expansion,
-        accounts: &crate::kinds::users::Accounts,
+        accounts: &mut crate::kinds::users::Accounts,
+        packages: &mut crate::parts::packages::Packages,
+        boot: &mut crate::parts::boot::Boot,
     ) -> Option<Installation> {
-        let config::Directives { presets, tmpfiles } = match config::directives(expansion) {
-            Ok(directives) => directives,
-            Err(faults) => {
-                for mut fault in faults {
-                    fault.target = Some(meta.target.clone());
-                    self.errors.push(fault);
-                }
-                self.outcome = self.outcome.worst(Outcome::Failed);
-                return None;
-            }
-        };
         let mut capacity = files::fault_capacity(expansion, self.entries.len());
         for task in &checked.tasks {
             let (_, Some(declaration)) = self.documents.declaration(&task.name)? else { return None };
@@ -66,14 +58,18 @@ impl Side {
             return None;
         }
         let plans = plans?;
-        if !crate::collisions::paths(
-            &crate::collisions::Declared { target: &meta.target, expansion, plans: &plans, accounts },
-            &self.limits,
-            &mut self.errors,
-        ) {
-            self.outcome = self.outcome.worst(Outcome::Failed);
-            return None;
+        let (survivors, seeds) = self.agreement(meta, expansion, &plans, accounts)?;
+        *accounts = survivors.accounts;
+        packages.preseeds = survivors.preseeds;
+        packages.seeds = seeds;
+        if meta.placement.kind != crate::revision::Runs::Container {
+            boot.params = collisions::parameters(survivors.parameters);
         }
-        Some(Installation { plans, presets, tmpfiles, scripts: sources.into_boxed() })
+        Some(Installation {
+            plans,
+            presets: survivors.presets,
+            tmpfiles: survivors.tmpfiles,
+            scripts: sources.into_boxed(),
+        })
     }
 }

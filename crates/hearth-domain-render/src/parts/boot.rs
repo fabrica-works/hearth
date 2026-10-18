@@ -37,17 +37,11 @@ pub fn build(expansion: &Expansion, placement: &revision::Placement) -> Result<B
     }
     let entries = expansion.of(Map::Cmdline);
     let capacity = u32::try_from(entries.len()).expect("bounded expansion");
-    let mut names = Sorted::with_capacity(capacity);
     let mut params = Sorted::with_capacity(capacity);
     let mut faults = List::with_capacity(capacity);
     for located in &entries {
         match crate::kinds::cmdline::entry(located.entry) {
             Ok(param) => {
-                // transitional: hearth 22
-                if names.contains_key(&located.entry.key) {
-                    continue;
-                }
-                names.insert(located.entry.key.clone(), ()).expect("entry count");
                 params
                     .insert(
                         (param.order, located.entry.key.clone(), skein_lib::bytes::copy_of(located.task)),

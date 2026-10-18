@@ -91,7 +91,6 @@ impl Target {
         let script_capacity = script_rows.capacity();
         let mut tree = Map::with_capacity(capacity.saturating_add(2));
         let subordinate = crate::additions::subordinate(&accounts);
-        let tmpfiles = additions::tmpfiles(&expansion, tmpfiles);
         for plan in &plans {
             for install in &plan.installs {
                 let node = match &install.make {
@@ -113,10 +112,8 @@ impl Target {
                     },
                     Make::Rendered { .. } | Make::Copied { .. } => continue,
                 };
-                if !tree.contains_key(&install.path) {
-                    tree.insert(install.path.clone(), TreeEntry { path: install.path.clone(), node })
-                        .expect("plan capacity");
-                } // transitional: hearth 22
+                tree.insert(install.path.clone(), TreeEntry { path: install.path.clone(), node })
+                    .expect("plan capacity");
             }
         }
         Self {

@@ -135,7 +135,7 @@ fn insert(
         *valid = false;
     }
 }
-fn declaration(task: &[u8]) -> Box<[u8]> {
+pub(super) fn declaration(task: &[u8]) -> Box<[u8]> {
     joined(&[b"tasks/", task, b"/task.json"])
 }
 fn joined(parts: &[&[u8]]) -> Box<[u8]> {

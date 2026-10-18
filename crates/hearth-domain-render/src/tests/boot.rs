@@ -1,10 +1,5 @@
 use super::fixtures;
-use crate::{
-    errors::{Format, Schema},
-    kinds::cmdline,
-    parts::boot,
-    revision::Runs,
-};
+use crate::{errors::Schema, kinds::cmdline, parts::boot, revision::Runs};
 use skein_lib::bytes::copy_of;
 #[test]
 fn parameters_sort_by_order_then_key_then_task() {
@@ -43,14 +38,30 @@ fn a_parameter_without_order_defaults_to_500() {
         fixtures::DEFAULT_CMDLINE_ORDER
     );
 }
-const MALFORMED: &[&[u8]] =
-    &[b"a b", b"\"", b"'", b"\\", b"$", b";", b"&", b"|", b"<", b">", b"{", b"}", b"#", b"\n", b"\x00", b"\x7f"];
+const MALFORMED: &[(&[u8], &(Schema, crate::revision::Position))] = &[
+    (b"a b", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"\"", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"'", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"\\", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"$", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b";", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"&", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"|", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"<", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b">", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"{", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"}", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"#", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"\n", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"\x00", &fixtures::BAD_CMDLINE_PARAMETER),
+    (b"\x7f", &fixtures::BAD_CMDLINE_PARAMETER),
+];
 #[test]
 fn a_param_with_a_space_a_quote_a_shell_byte_or_a_control_byte_is_malformed() {
-    for (row, param) in MALFORMED.iter().enumerate() {
+    for (row, (param, expected)) in MALFORMED.iter().enumerate() {
         assert_eq!(
-            cmdline::entry(&fixtures::cmdline(b"quiet", Some(param), None)).expect_err("bad parameter"),
-            (Schema::Malformed { format: Format::Param }, fixtures::FIELD_AT),
+            &cmdline::entry(&fixtures::cmdline(b"quiet", Some(param), None)).expect_err("bad parameter"),
+            *expected,
             "row {row}"
         );
     }
@@ -78,28 +89,41 @@ fn a_missing_param_is_a_missing_field() {
 fn an_empty_param_is_malformed() {
     assert_eq!(
         cmdline::entry(&fixtures::cmdline(b"quiet", Some(b""), None)).expect_err("empty parameter"),
-        (Schema::Malformed { format: Format::Param }, fixtures::FIELD_AT)
+        fixtures::BAD_CMDLINE_PARAMETER
     );
 }
 #[test]
 fn identical_entries_of_two_tasks_make_one_parameter() {
-    let boot = fixtures::built_boot(&[(b"a", b"quiet", b"quiet", None), (b"b", b"quiet", b"quiet", None)]);
-    assert_eq!(boot.params.as_ref(), [copy_of(b"quiet")]);
+    let expansion = fixtures::boot_expansion(&[(b"a", b"quiet", b"quiet", None), (b"b", b"quiet", b"quiet", None)]);
+    let rows = fixtures::collisions::agreeing(&expansion).expect("equal parameters");
+    assert_eq!(fixtures::parameter_values(&rows.parameters).as_ref(), &[b"quiet".as_slice()]);
 }
 #[test]
 fn a_key_two_tasks_give_differently_keeps_the_first_tasks() {
-    let boot = fixtures::built_boot(&[(b"a", b"quiet", b"quiet", None), (b"b", b"quiet", b"debug", None)]);
-    assert_eq!(boot.params.as_ref(), [copy_of(b"quiet")]);
+    let expansion = fixtures::boot_expansion(&[(b"a", b"quiet", b"quiet", None), (b"b", b"quiet", b"debug", None)]);
+    let errors = fixtures::collisions::agreeing(&expansion).expect_err("differing parameters");
+    assert_eq!(
+        fixtures::collisions::kinds(&errors).as_ref(),
+        &[(
+            crate::errors::Kind::Collision(crate::errors::Collision::Differs {
+                subject: crate::errors::Subject::Parameter,
+                name: copy_of(b"quiet"),
+                first: copy_of(b"a"),
+                second: copy_of(b"b"),
+            }),
+            crate::errors::Class::Configuration
+        )]
+    );
 }
-const MUTABLE: &[bool] = &[false, true];
+const MUTABLE: &[(bool, bool)] = &[(false, false), (true, true)];
 #[test]
 fn mutable_comes_from_the_composed_placement() {
-    for (row, &mutable) in MUTABLE.iter().enumerate() {
+    for (row, &(mutable, expected)) in MUTABLE.iter().enumerate() {
         let mut placement = fixtures::containers::placement(None);
         placement.mutable = mutable;
         assert_eq!(
             boot::build(&fixtures::boot_expansion(&[]), &placement).expect("placement").mutable,
-            mutable,
+            expected,
             "row {row}"
         );
     }

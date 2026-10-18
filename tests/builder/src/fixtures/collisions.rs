@@ -16,3 +16,15 @@ pub fn render(name: &str, files: &[File]) -> Rendered {
     let repository = Repository::make(name, &super::thin_with(files));
     super::render(&repository, &[], Form::Text)
 }
+const USER_A: File = File { path: "tasks/a/task.json", mode: 0o644, body: br#"{"users": {"free": {"uid": 1000}}}"# };
+const WITH_USERS: File = File { path: "hosts/x1/x1.json", mode: 0o644, body: br#"{"motd": {}, "a": {}, "b": {}}"# };
+pub const CLASH: &[File] = &[
+    USER_A,
+    WITH_USERS,
+    File { path: "tasks/b/task.json", mode: 0o644, body: br#"{"users": {"free": {"uid": 1001}}}"# },
+];
+pub const SHARED: &[File] = &[
+    USER_A,
+    WITH_USERS,
+    File { path: "tasks/b/task.json", mode: 0o644, body: br#"{"users": {"ci": {"uid": 1000}}}"# },
+];
