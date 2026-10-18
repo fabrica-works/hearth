@@ -1,0 +1,17 @@
+target       test-min   base test   environment min
+placement    vm efi incus
+spec         e8f4048f6abc
+boot         part bc6cab417252
+  mutable    false
+packages     part 78ec4b1fb53a   resolution 21e9a02feb65 known
+  sources    forky amd64 main 20261017T143929Z
+  variant    apt
+  microcode  none
+  apt        install_recommends false
+software     part 656d135b92c3
+config       part 572f1155c217
+data         part 2d4765200bab
+secrets      part ac870b5c968e
+live         part 6f1b7fda0c21
+exports      part 970579fd41be
+keys         packages d018a0eea488   software f60610453970   config 8c9bf06f6262

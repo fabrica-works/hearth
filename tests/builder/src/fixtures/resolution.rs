@@ -7,41 +7,24 @@ pub const TEST_MIN_RESOLUTION: hearth_lib::encode::Digest = hearth_lib::encode::
     0x03, 0xc2, 0xf7, 0x67, 0x5c, 0x78, 0x4a, 0x67, 0x9e, 0xa0, 0x95, 0x6d, 0x5d,
 ]);
 pub const TEST_MIN_KEY: &str = "21e9a02feb654883ef051d247cb14db878e04c03c2f7675c784a679ea0956d5d";
-pub const TEST_MIN_KEYS_LINE: &str = "keys         packages 46a0bdef5234   software 2dcc0e90ef26   config 408d4c837487";
+pub const TEST_MIN_KEYS_LINE: &str = "keys         packages d018a0eea488   software f60610453970   config 8c9bf06f6262";
 pub const TEST_MIN_DIGEST: hearth_lib::encode::Digest = hearth_lib::encode::Digest([
     0x90, 0x8a, 0x3b, 0x8a, 0x1d, 0xdd, 0x78, 0x10, 0x0f, 0x9f, 0x44, 0xb2, 0xd3, 0xe6, 0xb3, 0xf4, 0xed, 0xfd, 0x65,
     0xb2, 0x26, 0xdf, 0x34, 0x8e, 0x50, 0x21, 0xb5, 0xd6, 0xd3, 0x7f, 0x63, 0x8b,
 ]);
 pub const TEST_REPOSITORY: &[File] = &[
-    File { path: "envs/boot.json", body: include_bytes!("../../../../testing/repos/test/envs/boot.json"), mode: 0o644 },
-    File { path: "envs/min.json", body: include_bytes!("../../../../testing/repos/test/envs/min.json"), mode: 0o644 },
-    File { path: "fleet.json", body: include_bytes!("../../../../testing/repos/test/fleet.json"), mode: 0o644 },
-    File {
-        path: "hosts/test/test-min.json",
-        body: include_bytes!("../../../../testing/repos/test/hosts/test/test-min.json"),
-        mode: 0o644,
-    },
-    File {
-        path: "hosts/test/test.json",
-        body: include_bytes!("../../../../testing/repos/test/hosts/test/test.json"),
-        mode: 0o644,
-    },
-    File {
-        path: "hosts/test/test-boot.json",
-        body: include_bytes!("../../../../testing/repos/test/hosts/test/test-boot.json"),
-        mode: 0o644,
-    },
-    File {
-        path: "tasks/hearth/task.json",
-        body: include_bytes!("../../../../testing/repos/test/tasks/hearth/task.json"),
-        mode: 0o644,
-    },
-    File {
-        path: "tasks/boot/task.json",
-        body: include_bytes!("../../../../testing/repos/test/tasks/boot/task.json"),
-        mode: 0o644,
-    },
+    file("envs/boot.json", include_bytes!("../../../../testing/repos/test/envs/boot.json")),
+    file("envs/min.json", include_bytes!("../../../../testing/repos/test/envs/min.json")),
+    file("fleet.json", include_bytes!("../../../../testing/repos/test/fleet.json")),
+    file("hosts/test/test-min.json", include_bytes!("../../../../testing/repos/test/hosts/test/test-min.json")),
+    file("hosts/test/test.json", include_bytes!("../../../../testing/repos/test/hosts/test/test.json")),
+    file("hosts/test/test-boot.json", include_bytes!("../../../../testing/repos/test/hosts/test/test-boot.json")),
+    file("tasks/hearth/task.json", include_bytes!("../../../../testing/repos/test/tasks/hearth/task.json")),
+    file("tasks/boot/task.json", include_bytes!("../../../../testing/repos/test/tasks/boot/task.json")),
 ];
+const fn file(path: &'static str, body: &'static [u8]) -> File {
+    File { path, body, mode: 0o644 }
+}
 #[must_use]
 pub fn test_min_recorded() -> Resolution {
     Resolution {

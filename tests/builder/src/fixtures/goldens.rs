@@ -33,15 +33,18 @@ pub fn text(run: &crate::protocol::Run) -> String {
 }
 /// The same expectation and witnesses apply at both integration boundaries.
 pub fn check_golden(name: &str, variant: &str, laid: &[Laid]) {
-    let golden = golden::load(name);
+    check_loaded_golden(&golden::load(name), variant, laid);
+}
+/// Apply the same process and protocol checks to a repository loaded in place.
+pub fn check_loaded_golden(golden: &golden::Golden, variant: &str, laid: &[Laid]) {
     let files = files_of(&golden.tree);
-    let repository = repository_for(&golden);
+    let repository = repository_for(golden);
     super::lay(&repository.scratch().path().join("store"), laid);
     let out = super::render(&repository, &[], hearth::Form::Text);
     let stdout = String::from_utf8_lossy(&out.stdout);
-    check_output(&golden, variant, &stdout, exit_code(&out));
+    check_output(golden, variant, &stdout, exit_code(&out));
     let joint = crate::protocol::run(&scenario_of(&files, laid, None), GOLDEN_SEED);
-    check_output(&golden, variant, &text(&joint), joint.code);
+    check_output(golden, variant, &text(&joint), joint.code);
 }
 /// The first deterministic protocol schedule; domain goldens sample four schedules.
 pub const GOLDEN_SEED: u64 = 0;
@@ -134,3 +137,10 @@ pub const ERROR_KINDS: &[&str] = &[
     "schema",
     "tool",
 ];
+
+/// The pinned test repository supplies files; the golden holds expectations alone.
+#[must_use]
+pub fn resolution_golden() -> golden::Golden {
+    let files = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testing/repos/test");
+    golden::load_from("resolution", &files)
+}

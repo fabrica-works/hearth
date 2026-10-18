@@ -197,3 +197,19 @@ fn every_kind_of_7_2_but_checks_and_store_has_a_case() {
     names.sort();
     assert_eq!(names, fixtures::ERROR_KINDS);
 }
+
+#[test]
+fn an_empty_store_prints_every_resolution_needed() {
+    fixtures::check_loaded_golden(&fixtures::resolution_golden(), "", &[]);
+}
+#[test]
+fn a_laid_record_prints_known_for_its_targets_alone() {
+    let recorded = fixtures::Laid::Resolution(fixtures::test_min_recorded());
+    fixtures::check_loaded_golden(&fixtures::resolution_golden(), "known", core::slice::from_ref(&recorded));
+}
+#[test]
+fn the_keys_line_is_the_one_hearth_24_pins() {
+    let text = include_str!("../../render/resolution/expected-known/test-min");
+    let line = text.lines().find(|line| line.starts_with("keys ")).expect("known keys");
+    assert_eq!(line, fixtures::TEST_MIN_KEYS_LINE);
+}
