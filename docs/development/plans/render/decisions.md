@@ -1364,6 +1364,31 @@ None yet.
 203. **hearth 28.s9: a range field counts as a record of base and count** (plan defect, hearth 28.s9's block of 2026-10-18T04:18:34Z).
      hearth 28.s9 counts a range field's value as a record too, option B: render.md 2.3's "expanded entries […] count alike, a record as a map of its fields" holds for every record an expanded entry keeps, and `Fielded::Range` keeps one of two fields, `base` and `count`. Each counts `ELEMENT` and its name's bytes, 32 + 4 and 32 + 5, 73 bytes beside the range field's own charge, in `literal`'s and `typed`'s range paths and in the reference model alike, with exact-sum and one-byte-less cases; 28.s9's Shape and Test shape now say so. Ruling 202 named the sites it found; a further record the expanded entry keeps counts the same way: count it, and list it in the commit body. Ruling 203.
 
+204. **hearth 28.s6: the defaults that keep the builder within 1 GiB** (design gap, hearth 28.s6's block of 2026-10-18T04:48:09Z).
+     The designer's answer to question.md of 04:49:23Z, hearth decd06a: 8.4's 1 GiB stays and the defaults change, in 28.s6 alone, which lands them with the 1 GiB test as its section, "28.s6 The defaults, and the 1 GiB test", says. Ruling 204.
+
+     8.4's bound stays, "the defaults keep it within 1 GiB, which a test holds"; the defaults change. render.md 10 leaves them open: "The defaults of 2.3 and the printer's bounds on hunks, to set from the first measurements of the fleet."
+
+     The changed defaults, in render.md 2.3's table (its bullets and 8.4's list follow):
+     - "entries in a revision's listing; the bytes of all its paths | 16,384; 4 MiB" (was 65,536; 16 MiB);
+     - "a JSON document; its depth; keys in an object | 256 KiB; 32; 4,096", and a template, "256 KiB; 4 KiB" (1 MiB each); format.md 2.2: "256 KiB a document";
+     - "JSON documents, declarations and templates decoded from one revision, counted as they are held | 16 MiB" (64 MiB);
+     - "the exports of one environment | […] 16 MiB" (64 MiB);
+     - "one target's composed settings; its validated settings; its expanded entries | 16 MiB each" (64 MiB each);
+     - "the specs one command holds, […] a diff's two sides together | 16 MiB" (64 MiB);
+     - 8.4, new: "the client's printer (client/README.md, 3.2) prints a record of at most 16 MiB, its line endings included, and refuses a longer one, which fails the command" (the code's 64 MiB).
+
+     Unchanged: 2.3's other limits (a path; depth and keys; an expression; a static file's 64 MiB; targets, tasks, settings; nesting; expansion; iterations; one evaluation's 16 MiB; a rendered file's 16 MiB; 256 MiB rendered for a target; errors), store.md 6.1's bounds, 8.4's 1 GiB, and render.md 10's bullet. No formula changes: 8.4, "Each layer's formula is its peak".
+
+     The sum at those values, by a probe at hearth ab8cb24 (`cargo test -q -p hearth-service-builder --lib limits::probe -- --nocapture`, through `heavy`; log `tmp/hearth/render/logs/20261018T050515-27.log`; the probe was scratch, not landed):
+     `PROBE-SUM render 637225111 store 50746183 domain 687972222 protocol 202000236 rest 10008760 total 899981218 under 173760606`
+
+     For the run: 28.s6 lands the test as its section now says, in one increment, with no step before it. Its section, "28.s6 The defaults, and the 1 GiB test", names each value at its line at ab8cb24: render's `src/limits.rs` (`:37` to `:42`, `:54`, `:55`, `:69`, `:70`), `hearth-protocol-config/src/limits.rs:9`, `hearth-protocol-template/src/limits.rs:12`, `hearth-protocol-git/src/limits.rs:17` and `:19`, `hearth-client-protocol-records/src/limits.rs:10`. It also names the derived fixtures, which keep their shapes:
+     - render's `src/tests/fixtures/decoded.rs`: `DOCUMENT_ZEROES` 131,065, `DOCUMENT_HELD_BYTES` 4,194,146, `DOCUMENT_SOURCE_BYTES` 262,143, `COMMENT_HELD_BYTES` 1,048,564, `ADMITTED_DOCUMENTS` still 4;
+     - `tests/render/src/fixtures/decoded.rs`: `DECODED_TEMPLATE_BYTES` 1,310,756, `DECODED_TEMPLATES` still 12, `COMMENT_TEMPLATES` still 16.
+
+     The test then fails on main, at 2,497,232,530, and passes at 899,981,218. The plan's rule now reads "**No default changes but 28.s6's,**". 28.s8's section, a landed step "at hearth a3b67e4", stays as written. Nothing is deferred: no `later.md` row, and `STATUS.md` is unchanged.
+
 ## For the user
 
 The long-term choices the user may veto:
