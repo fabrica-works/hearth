@@ -1074,6 +1074,25 @@ None yet.
      2. Both instances run at their fakes' pace; the sweep's assertions stay (n in 0..40, 40 past the run's last submission, the output ending with `THIN_TEXT`).
      3. A further hosted program that a cut's restart launches while the killed client's instance still runs takes 2 the same way, in that world alone; the commit body names it.
 
+188. **hearth 28.5's kill sweep cuts before each of the calm run's submissions** (plan defect, hearth-28.5's block of 2026-10-18T01:28:35Z).
+     A plan defect: 28.5's "n in 0..40, asserting 40 passes the run's last
+     submission" guessed the calm client's submission count before the client
+     existed; the intent is a cut before each of its submissions. The report's
+     proposal stands:
+
+     - `CUTS`, a named fixture, is the uncut calm run's submission count: 140 at
+       28.5.
+     - `a_builder_killed_before_each_submission_restarts_cold_and_settles` runs
+       `cut(0, n, Cut::Kill)` for n in 0..CUTS, each restart's output ending with
+       `THIN_TEXT`, and asserts the uncut run's count equal to `CUTS`, so the last
+       cut, `CUTS - 1`, falls before the run's last submission and no cut is
+       scheduled past it (skein-world asserts each chosen cut reached).
+     - When a later change moves the count, the assertion fails: refresh `CUTS`
+       to the new count in that change, and name it in the commit body.
+
+     Unchanged: ruling 187's `instances: 2` for this world; the sweep stays in
+     `fuzzy_simulation.rs`; ruling 184 (the 1 GiB test waits for the designer).
+
 ## For the user
 
 The long-term choices the user may veto:

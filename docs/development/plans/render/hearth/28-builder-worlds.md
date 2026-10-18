@@ -346,8 +346,10 @@ binary of its own, `Counting`): `the_builder_holds_no_more_than_its_worst_case_a
 page, asserted from the ledger's `List` count, store.md 8.2). Fuzzy, `fuzzy_simulation.rs`:
 `random_seeds_under_chaos_settle_with_the_calm_runs_spec` (64 seeds, 4 s),
 `a_builder_killed_before_each_submission_restarts_cold_and_settles`
-(`cut(0, n, Cut::Kill)`, n in 0..40, asserting 40 passes the run's last
-submission: the output ends with `THIN_TEXT`).
+(`cut(0, n, Cut::Kill)`, n in 0..CUTS: `CUTS`, a named fixture, is the
+uncut calm run's submission count, 140 at 28.5, and the sweep asserts that
+count exact, so its last cut falls before the run's last submission; each
+restart's output ends with `THIN_TEXT`: ruling 188).
 ```rust
 // tests/builder/tests/simulation.rs
 #[test]
