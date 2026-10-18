@@ -1,0 +1,1 @@
+{% for name, peer in exports.vpn | items %}{% if name != target.name %}{{ name }}={{ peer.address }}{% if peer.endpoint is defined %}@{{ peer.endpoint }}{% endif %};{% endif %}{% endfor +%}

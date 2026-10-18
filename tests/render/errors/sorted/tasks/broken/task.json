@@ -1,0 +1,5 @@
+{
+ "requires": {
+  "a": {"if":"false","message":"first guard"}, "b": {"if":"false","message":"second guard"}
+ }
+}

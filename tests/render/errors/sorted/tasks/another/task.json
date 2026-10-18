@@ -1,0 +1,3 @@
+{
+ "requires": {"a": {"if":"false","message":"first file"}}
+}

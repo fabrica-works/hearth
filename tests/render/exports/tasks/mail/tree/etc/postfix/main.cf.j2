@@ -1,0 +1,3 @@
+mynetworks = local{% for name, peer in exports.mail | items %} {{ peer.address }}{% endfor +%}
+{% for name, peer in exports.mail | items %}{{ name }}={{ peer.role }}
+{% endfor %}

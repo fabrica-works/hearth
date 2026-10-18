@@ -1,0 +1,20 @@
+target       mx1-prod   base mx1   environment prod
+placement    metal efi 7th-gen
+spec         906dc439a7ea
+boot         part bc6cab417252
+  mutable    false
+packages     part 64b1b99b813a   resolution 4ee22520f418 needed
+  sources    forky amd64 main 20261001T030405Z
+  variant    apt
+  microcode  generic
+  apt        install_recommends false
+software     part 656d135b92c3
+config       part cf9195249345
+  /etc/postfix/main.cf     file 0644 root:root 25d199bd6570
+data         part 2d4765200bab
+secrets      part ac870b5c968e
+live         part 6f1b7fda0c21
+exports      part 8ef203aad592
+  mail.address   "192.0.2.1"
+  mail.role      "primary"
+

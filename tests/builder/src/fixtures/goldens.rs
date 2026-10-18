@@ -35,19 +35,13 @@ pub fn text(run: &crate::protocol::Run) -> String {
 pub fn check_golden(name: &str, variant: &str, laid: &[Laid]) {
     let golden = golden::load(name);
     let files = files_of(&golden.tree);
-    let repository = Repository::make(name, &files);
+    let repository = repository_for(&golden);
     super::lay(&repository.scratch().path().join("store"), laid);
     let out = super::render(&repository, &[], hearth::Form::Text);
     let stdout = String::from_utf8_lossy(&out.stdout);
-    let verdict = golden.check(variant, &stdout, exit_code(&out));
-    if golden::bless() {
-        golden.bless(variant, &stdout, exit_code(&out));
-        panic!("blessed: {}", verdict.changed());
-    }
+    check_output(&golden, variant, &stdout, exit_code(&out));
     let joint = crate::protocol::run(&scenario_of(&files, laid, None), GOLDEN_SEED);
-    let joint = golden.check(variant, &text(&joint), joint.code);
-    assert!(joint.is_clean(), "joint: {}", joint.report());
-    assert!(verdict.is_clean(), "{}", verdict.report());
+    check_output(&golden, variant, &text(&joint), joint.code);
 }
 /// The first deterministic protocol schedule; domain goldens sample four schedules.
 pub const GOLDEN_SEED: u64 = 0;
@@ -58,7 +52,7 @@ pub fn golden_output(name: &str) -> String {
 }
 #[must_use]
 pub fn golden_repository(name: &str) -> Repository {
-    Repository::make(name, &files_of(&golden::load(name).tree))
+    repository_for(&golden::load(name))
 }
 /// A production-only hostname edit, leaving the shared carbon base intact.
 pub const CARBON_PRODUCTION_EDIT: File = File {
@@ -66,3 +60,77 @@ pub const CARBON_PRODUCTION_EDIT: File = File {
     body: br#"{"placement":{"kind":"metal","firmware":"efi","hardware":"serverhino"},"core":{"hostname":"carbon-production"}}"#,
     mode: 0o644,
 };
+
+/// Repository configuration failures, followed by the multiple-fault ordering case.
+pub const ERROR_CASES: &[&str] = &[
+    "errors/decode",
+    "errors/repository",
+    "errors/composition",
+    "errors/schema",
+    "errors/evaluation",
+    "errors/guard",
+    "errors/reserved",
+    "errors/ids",
+    "errors/collision",
+    "errors/exported",
+    "errors/sorted",
+];
+#[derive(Clone, Copy)]
+pub enum GoldenCall {
+    KilledGit,
+    Resolve,
+}
+pub const PROTOCOL_ERRORS: &[(&str, GoldenCall, Option<u8>)] =
+    &[("errors/tool", GoldenCall::KilledGit, Some(75)), ("errors/resolution", GoldenCall::Resolve, Some(2))];
+#[must_use]
+pub fn protocol_golden(name: &str, call: GoldenCall) -> ProtocolGolden {
+    let golden = golden::load(name);
+    let files = files_of(&golden.tree);
+    let scenario = match call {
+        GoldenCall::KilledGit => {
+            scenario_of(&files, &[], Some(super::Fault::KilledAt { stdout_bytes: super::KILLED_BYTES }))
+        }
+        GoldenCall::Resolve => super::resolving(&files),
+    };
+    let run = crate::protocol::run(&scenario, GOLDEN_SEED);
+    ProtocolGolden { golden, run }
+}
+pub struct ProtocolGolden {
+    golden: golden::Golden,
+    pub run: crate::protocol::Run,
+}
+impl ProtocolGolden {
+    pub fn check(&self) {
+        check_output(&self.golden, "", &text(&self.run), self.run.code);
+    }
+}
+
+#[must_use]
+fn repository_for(golden: &golden::Golden) -> Repository {
+    Repository::make(&golden.name.replace('/', "-"), &files_of(&golden.tree))
+}
+
+fn check_output(golden: &golden::Golden, variant: &str, stdout: &str, code: Option<u8>) {
+    let verdict = golden.check(variant, stdout, code);
+    if golden::bless() {
+        golden.bless(variant, stdout, code);
+        panic!("blessed: {}", verdict.changed());
+    }
+    assert!(verdict.is_clean(), "{}: {}", golden.name, verdict.report());
+}
+
+/// render.md 7.2's repository-caused kinds plus the two builder-world kinds.
+pub const ERROR_KINDS: &[&str] = &[
+    "collision",
+    "composition",
+    "decode",
+    "evaluation",
+    "exported",
+    "guard",
+    "ids",
+    "repository",
+    "reserved",
+    "resolution",
+    "schema",
+    "tool",
+];

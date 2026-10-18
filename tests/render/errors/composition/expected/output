@@ -1,0 +1,18 @@
+target       ok-prod   base ok   environment prod
+placement    metal efi 7th-gen
+spec         2e232f8413de
+boot         part bc6cab417252
+  mutable    false
+packages     part 64b1b99b813a   resolution 4ee22520f418 needed
+  sources    forky amd64 main 20261001T030405Z
+  variant    apt
+  microcode  generic
+  apt        install_recommends false
+software     part 656d135b92c3
+config       part 572f1155c217
+data         part 2d4765200bab
+secrets      part ac870b5c968e
+live         part 6f1b7fda0c21
+exports      part 970579fd41be
+
+hosts/bad/bad.json:1:14: placement in fleet.json, a base or its member

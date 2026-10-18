@@ -133,3 +133,67 @@ fn a_base_env_file_removes_a_member_from_its_environment() {
         ["stoa-1-lab", "stoa-1-prod", "stoa-2-lab", "stoa-2-prod", "stoa-3-lab"]
     );
 }
+
+#[test]
+fn the_vpn_and_mail_golden_render_with_their_peers_per_environment() {
+    fixtures::check_golden("exports", "", &[]);
+}
+#[test]
+fn the_exports_golden_holds_hearth_20s_vpn_files() {
+    let golden = golden::load("exports");
+    for file in fixtures::VPN {
+        let leaf = golden.tree.iter().find(|leaf| leaf.path == file.path.as_bytes()).expect(file.path);
+        assert_eq!(leaf.bytes, file.body, "{}", file.path);
+    }
+}
+#[test]
+fn each_error_case_prints_its_errors_after_the_healthy_spec() {
+    for name in fixtures::ERROR_CASES {
+        fixtures::check_golden(name, "", &[]);
+    }
+}
+#[test]
+fn an_error_case_exits_2() {
+    let repository = fixtures::golden_repository("errors/schema");
+    let rendered = fixtures::render(&repository, &[], hearth::Form::Text);
+    assert_eq!(fixtures::exit_code(&rendered), Some(2));
+}
+#[test]
+fn the_tool_and_resolution_errors_print_through_the_protocol_world() {
+    for (name, call, _) in fixtures::PROTOCOL_ERRORS {
+        fixtures::protocol_golden(name, *call).check();
+    }
+}
+#[test]
+fn protocol_error_cases_exit_with_their_cause_class() {
+    for (name, call, code) in fixtures::PROTOCOL_ERRORS {
+        assert_eq!(fixtures::protocol_golden(name, *call).run.code, *code, "{name}");
+    }
+}
+
+#[test]
+fn errors_are_sorted_by_path_line_column_and_target() {
+    let text = include_bytes!("../../render/errors/sorted/expected/output");
+    assert_eq!(
+        fixtures::lines_starting(text, &["tasks/"]),
+        concat!(
+            "tasks/another/task.json:2:15: bad-prod: another: requires a: first file\n",
+            "tasks/broken/task.json:3:3: bad-prod: broken: requires a: first guard\n",
+            "tasks/broken/task.json:3:3: bad2-prod: broken: requires a: first guard\n",
+            "tasks/broken/task.json:3:48: bad-prod: broken: requires b: second guard\n",
+            "tasks/broken/task.json:3:48: bad2-prod: broken: requires b: second guard\n",
+        )
+    );
+}
+
+#[test]
+fn every_kind_of_7_2_but_checks_and_store_has_a_case() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../render/errors");
+    let mut names: Vec<_> = std::fs::read_dir(root)
+        .expect("error golden directory")
+        .map(|entry| entry.expect("error golden").file_name().into_string().expect("kind name"))
+        .filter(|name| name != "sorted")
+        .collect();
+    names.sort();
+    assert_eq!(names, fixtures::ERROR_KINDS);
+}

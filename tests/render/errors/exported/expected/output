@@ -1,0 +1,59 @@
+target       carbon-lab   base carbon   environment lab
+placement    vm efi incus
+spec         8a1da29677b4
+boot         part bc6cab417252
+  mutable    false
+packages     part 5f69bb2a41f1   resolution 4ee22520f418 needed
+  sources    forky amd64 main 20261001T030405Z
+  variant    apt
+  microcode  none
+  apt        install_recommends false
+software     part 656d135b92c3
+config       part b9be4a483234
+  /etc/vpn/mtu             file 0644 root:root 93c98d425a5d
+  /etc/vpn/peers           file 0644 root:root afd16377136a
+data         part 2d4765200bab
+secrets      part ac870b5c968e
+live         part 6f1b7fda0c21
+exports      part 1b3b37999b33
+  vpn.address   "10.0.0.2"
+
+target       ion-lab   base ion   environment lab
+placement    vm efi incus
+spec         5e63f1479de6
+boot         part bc6cab417252
+  mutable    false
+packages     part 5f69bb2a41f1   resolution 4ee22520f418 needed
+  sources    forky amd64 main 20261001T030405Z
+  variant    apt
+  microcode  none
+  apt        install_recommends false
+software     part 656d135b92c3
+config       part 614a1dd24d3b
+  /etc/vpn/mtu             file 0644 root:root 93c98d425a5d
+  /etc/vpn/peers           file 0644 root:root 24ff5ec70543
+data         part 2d4765200bab
+secrets      part ac870b5c968e
+live         part 6f1b7fda0c21
+exports      part f7d070aecae2
+  vpn.address   "10.1.0.1"
+
+target       ok-prod   base ok   environment prod
+placement    metal efi 7th-gen
+spec         2e232f8413de
+boot         part bc6cab417252
+  mutable    false
+packages     part 64b1b99b813a   resolution 4ee22520f418 needed
+  sources    forky amd64 main 20261001T030405Z
+  variant    apt
+  microcode  generic
+  apt        install_recommends false
+software     part 656d135b92c3
+config       part 572f1155c217
+data         part 2d4765200bab
+secrets      part ac870b5c968e
+live         part 6f1b7fda0c21
+exports      part 970579fd41be
+
+hosts/ion/ion-prod.json:1:92: carbon-prod: vpn: exports.vpn of ion-prod: not a string
+hosts/ion/ion-prod.json:1:92: ion-prod: vpn: not a string

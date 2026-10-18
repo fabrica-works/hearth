@@ -1,0 +1,1 @@
+{"settings":{"role":{"type":"string","doc":"Mail role."},"address":{"type":"string","doc":"Mail address."}},"reads":{"mail":{"exports":true}},"exports":{"role":{"type":"string","value":"{{ settings.role }}","doc":"Mail role."},"address":{"type":"string","value":"{{ settings.address }}","doc":"Mail address."}}}

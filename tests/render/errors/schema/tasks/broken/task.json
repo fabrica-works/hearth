@@ -1,0 +1,1 @@
+{"settings":{"greeting":{"type":"string","default":"hello","doc":"Greeting."}}}

@@ -1,0 +1,13 @@
+{
+  "debian": {
+    "suite": "forky",
+    "architecture": "amd64",
+    "snapshot": {
+      "archive": "20261001T030405Z"
+    },
+    "pockets": {
+      "updates": false,
+      "security": false
+    }
+  }
+}

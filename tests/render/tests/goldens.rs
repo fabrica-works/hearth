@@ -15,3 +15,8 @@ fn fleet_and_cluster_digests_do_not_depend_on_arrival_order() {
         fixtures::goldens::check_digests(name);
     }
 }
+
+#[test]
+fn exports_digests_do_not_depend_on_arrival_order() {
+    fixtures::goldens::check_digests("exports");
+}
