@@ -138,7 +138,7 @@ pub fn peers_with_absent() -> super::Roots {
         Some(super::map(&[
             (b"a", Some(crate::evaluate::Value::Int(1))),
             (b"absent", None),
-            (b"b", Some(crate::evaluate::Value::Int(2))),
+            (b"b", Some(crate::evaluate::Value::Int(RANGE_COUNT))),
         ])),
     )]);
     roots
@@ -193,8 +193,8 @@ pub fn range_roots() -> super::Roots {
     roots.settings = super::map(&[(
         b"range",
         Some(super::map(&[
-            (b"base", Some(crate::evaluate::Value::Int(42))),
-            (b"count", Some(crate::evaluate::Value::Int(2))),
+            (b"base", Some(crate::evaluate::Value::Int(RANGE_BASE))),
+            (b"count", Some(crate::evaluate::Value::Int(RANGE_COUNT))),
         ])),
     )]);
     roots
@@ -205,7 +205,10 @@ pub fn range_field(count: Literal) -> Field {
         Literal::Range {
             at: FIELD_AT,
             fields: Box::new([
-                field(Name::Base, Literal::Int(crate::revision::declaration::Number { at: FIELD_AT, value: 42 })),
+                field(
+                    Name::Base,
+                    Literal::Int(crate::revision::declaration::Number { at: FIELD_AT, value: RANGE_BASE }),
+                ),
                 field(Name::Count, count),
             ]),
         },
@@ -215,9 +218,35 @@ pub fn range_field(count: Literal) -> Field {
 pub fn expansion(
     declared: &Declaration,
     limits: &crate::limits::Limits,
-    mut left: u64,
+    left: u64,
 ) -> Result<crate::entries::Expanded, crate::entries::Fault> {
-    crate::entries::expand(declared, &super::Roots::x1_prod().context(), limits, &mut left)
+    expansion_budget(declared, limits, left).result
+}
+struct ExpansionBudget {
+    result: Result<crate::entries::Expanded, crate::entries::Fault>,
+    remaining: u64,
+}
+fn expansion_budget(declared: &Declaration, limits: &crate::limits::Limits, left: u64) -> ExpansionBudget {
+    with_roots(declared, limits, left, &super::Roots::x1_prod())
+}
+fn with_roots(
+    declared: &Declaration,
+    limits: &crate::limits::Limits,
+    mut left: u64,
+    roots: &super::Roots,
+) -> ExpansionBudget {
+    let result = crate::entries::expand(declared, &roots.context(), limits, &mut left);
+    ExpansionBudget { result, remaining: left }
+}
+pub fn expansion_remaining(declared: &Declaration, left: u64) -> Result<u64, crate::entries::Fault> {
+    let budget = expansion_budget(declared, &crate::limits::SHIPPED, left);
+    remaining(budget)
+}
+fn remaining(budget: ExpansionBudget) -> Result<u64, crate::entries::Fault> {
+    match budget.result {
+        Ok(_) => Ok(budget.remaining),
+        Err(fault) => Err(fault),
+    }
 }
 pub const UNDEFINED_FIELD: crate::entries::Fault = crate::entries::Fault {
     kind: crate::errors::Kind::Evaluation(crate::evaluate::FaultKind::Undefined),
@@ -238,4 +267,57 @@ pub fn key_collision(key: &[u8], at: Position, first: Position) -> crate::entrie
         at,
         also: Some(first),
     }
+}
+
+// The group's entry costs 32 and its key, "ops", costs three bytes.
+pub const ENTRY_BYTES: u64 = 35;
+// A kept "from" field adds 32 and its four-byte name to the entry.
+pub const FIELD_BYTES: u64 = ENTRY_BYTES + crate::evaluate::ELEMENT + 4;
+// A kept "groups" field adds 32 + six name bytes, and its empty string adds 32.
+pub const EMPTY_LIST_BYTES: u64 = ENTRY_BYTES + crate::evaluate::ELEMENT * 2 + 6;
+pub const KEY_LIMIT: crate::entries::Fault = crate::entries::Fault {
+    kind: crate::errors::Kind::Evaluation(crate::evaluate::FaultKind::Limit),
+    at: Position { line: 3, column: 5 },
+    also: None,
+};
+pub const FIELD_LIMIT: crate::entries::Fault = crate::entries::Fault { at: FIELD_AT, ..KEY_LIMIT };
+pub fn empty_string_field() -> Declaration {
+    let mut from = field(Name::From, Literal::Plain { at: FIELD_AT, text: Box::new([]) });
+    from.at = KEY_LIMIT.at;
+    fields([from])
+}
+pub fn empty_list_field() -> Declaration {
+    fields([field(Name::Groups, Literal::Strings { at: FIELD_AT, each: Box::new([plain(b"")]) })])
+}
+
+pub fn absent_fields() -> Declaration {
+    fields([
+        field(Name::From, Literal::Text(setting_tag(b"wifi"))),
+        field(Name::Uid, Literal::Typed(setting_tag(b"wifi"))),
+    ])
+}
+
+pub const RANGE_BASE: i64 = 42;
+pub const RANGE_COUNT: i64 = 2;
+// The entry (35), subordinate field (32 + 11), and nested fields (36 + 37).
+pub const RANGE_BYTES: u64 = 151;
+#[derive(Clone, Copy)]
+pub enum RangeSource {
+    Literal,
+    Typed,
+}
+fn range_budget(source: RangeSource, left: u64) -> ExpansionBudget {
+    let field = match source {
+        RangeSource::Literal => {
+            range_field(Literal::Int(crate::revision::declaration::Number { at: FIELD_AT, value: RANGE_COUNT }))
+        }
+        RangeSource::Typed => field(Name::Subordinate, Literal::Typed(setting_tag(b"range"))),
+    };
+    with_roots(&fields([field]), &crate::limits::SHIPPED, left, &range_roots())
+}
+pub fn range_remaining(source: RangeSource, left: u64) -> Result<u64, crate::entries::Fault> {
+    remaining(range_budget(source, left))
+}
+pub fn expanded_range() -> crate::entries::Expanded {
+    range_budget(RangeSource::Typed, crate::limits::SHIPPED.expanded).result.expect("expand")
 }

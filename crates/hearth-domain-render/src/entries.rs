@@ -131,6 +131,7 @@ pub fn expand(
                 if let Some(first) = ordered.get(&key) {
                     return Err(Fault { kind: Kind::Collision(Collision::Key { key }), at, also: Some(first.at) });
                 }
+                charge(evaluate::ELEMENT, at, left)?;
                 count = count.checked_add(1).expect("entry limit checked");
                 ordered
                     .insert(
@@ -270,9 +271,7 @@ pub fn interpolate<'c>(
     let at = text.at();
     match text {
         Interpolated::Plain { at: _, text } => {
-            *left = left
-                .checked_sub(u64::try_from(text.len()).expect("bounded text"))
-                .ok_or(failure(FaultKind::Limit, at))?;
+            charge(u64::try_from(text.len()).expect("bounded text"), at, left)?;
             Ok(bytes::copy_of(text))
         }
         Interpolated::Parts { at: _, parts } => {
@@ -299,8 +298,7 @@ pub fn interpolate<'c>(
                 size = size.checked_add(length(written)).ok_or(failure(FaultKind::Limit, at))?;
                 values.push(value).expect("part count");
             }
-            *left =
-                left.checked_sub(u64::try_from(size).expect("bounded text")).ok_or(failure(FaultKind::Limit, at))?;
+            charge(u64::try_from(size).expect("bounded text"), at, left)?;
             let mut writer = Writer::new(size);
             for value in values.into_boxed() {
                 match written(&value).expect("checked output") {
@@ -457,6 +455,16 @@ fn single(text: &Interpolated) -> Option<&evaluate::Expression> {
         }
     }
 }
+fn literal_position(value: &Literal) -> Position {
+    match value {
+        Literal::Text(text) | Literal::Typed(text) => text.at(),
+        Literal::Plain { at, text: _ }
+        | Literal::Bool { at, value: _ }
+        | Literal::Strings { at, each: _ }
+        | Literal::Range { at, fields: _ } => *at,
+        Literal::Int(number) => number.at,
+    }
+}
 fn fields<'c>(
     entry: &Entry,
     context: &Context<'c>,
@@ -467,6 +475,7 @@ fn fields<'c>(
     let mut fields = List::with_capacity(u32::try_from(entry.fields.len()).expect("field count"));
     for field in &entry.fields {
         if let Some(value) = literal(&field.value, field.name.takes(), context, bindings, limits, left)? {
+            charge_field(field.name, literal_position(&field.value), left)?;
             fields.push(Made { name: field.name, at: field.at, value }).expect("field count");
         }
     }
@@ -501,7 +510,8 @@ fn literal<'c>(
         }
         Literal::Int(number) => Fielded::Int(number.value),
         Literal::Bool { at: _, value } => Fielded::Bool(*value),
-        Literal::Strings { at: _, each } => {
+        Literal::Strings { at, each } => {
+            charge_elements(each.len(), *at, left)?;
             let mut strings = List::with_capacity(u32::try_from(each.len()).expect("string count"));
             for text in each {
                 strings.push(interpolate(text, context, bindings, limits, left)?).expect("string count");
@@ -518,6 +528,7 @@ fn typed(value: Operand<'_>, takes: Takes, at: Position, left: &mut u64) -> Resu
         (Takes::Bool, Operand::Bool(value)) => Ok(Fielded::Bool(value)),
         (Takes::Bool, Operand::Value(Value::Bool(value))) => Ok(Fielded::Bool(*value)),
         (Takes::Strings, Operand::Value(Value::List(each))) => {
+            charge_elements(each.len(), at, left)?;
             let mut strings = List::with_capacity(u32::try_from(each.len()).expect("string count"));
             for item in each {
                 let Value::String(text) = item else {
@@ -528,6 +539,7 @@ fn typed(value: Operand<'_>, takes: Takes, at: Position, left: &mut u64) -> Resu
             Ok(Fielded::Strings(strings.into_boxed()))
         }
         (Takes::Strings, Operand::List { items, depth: _ }) => {
+            charge_elements(items.len(), at, left)?;
             let mut strings = List::with_capacity(u32::try_from(items.len()).expect("string count"));
             for item in items {
                 let text = match &item {
@@ -560,7 +572,7 @@ fn typed(value: Operand<'_>, takes: Takes, at: Position, left: &mut u64) -> Resu
                     return Err(wrong(takes, at));
                 }
             }
-            Ok(Fielded::Range { base: base.ok_or(wrong(takes, at))?, count: count.ok_or(wrong(takes, at))? })
+            range_value(base, count, at, left)
         }
         (
             Takes::Text | Takes::Int | Takes::Bool | Takes::Strings | Takes::Range,
@@ -575,8 +587,25 @@ fn typed(value: Operand<'_>, takes: Takes, at: Position, left: &mut u64) -> Resu
     }
 }
 fn charged(text: &[u8], at: Position, left: &mut u64) -> Result<Box<[u8]>, Fault> {
-    *left = left.checked_sub(u64::try_from(text.len()).expect("bounded text")).ok_or(failure(FaultKind::Limit, at))?;
+    charge(u64::try_from(text.len()).expect("bounded text"), at, left)?;
     Ok(bytes::copy_of(text))
+}
+fn charge(bytes: u64, at: Position, left: &mut u64) -> Result<(), Fault> {
+    *left = left.checked_sub(bytes).ok_or(failure(FaultKind::Limit, at))?;
+    Ok(())
+}
+fn charge_field(name: Name, at: Position, left: &mut u64) -> Result<(), Fault> {
+    charge(evaluate::ELEMENT.saturating_add(u64::try_from(name.key().len()).expect("field name")), at, left)
+}
+fn range_value(base: Option<i64>, count: Option<i64>, at: Position, left: &mut u64) -> Result<Fielded, Fault> {
+    let base = base.ok_or(wrong(Takes::Range, at))?;
+    let count = count.ok_or(wrong(Takes::Range, at))?;
+    charge_field(Name::Base, at, left)?;
+    charge_field(Name::Count, at, left)?;
+    Ok(Fielded::Range { base, count })
+}
+fn charge_elements(count: usize, at: Position, left: &mut u64) -> Result<(), Fault> {
+    charge(u64::try_from(count).expect("bounded list").saturating_mul(evaluate::ELEMENT), at, left)
 }
 fn range<'c>(
     fields: &[Field],
@@ -646,7 +675,7 @@ fn range<'c>(
             | Name::Value => unreachable!("compiled range names"),
         }
     }
-    Ok(Fielded::Range { base: base.ok_or(wrong(Takes::Range, at))?, count: count.ok_or(wrong(Takes::Range, at))? })
+    range_value(base, count, at, left)
 }
 
 /// The evaluator, bindings and expanded task at these bounds.

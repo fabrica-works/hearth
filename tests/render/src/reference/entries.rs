@@ -3,7 +3,13 @@ use crate::{
     declarations::{Concrete, Declaration, Expansion, Group, Literal, Piece, Text, Tree},
     expressions::{Roots, Tree as Expression},
 };
-use hearth_domain_render::{entries::Fielded, errors::Takes, evaluate::Value, limits::Limits};
+use hearth_domain_render::{
+    entries::Fielded,
+    errors::Takes,
+    evaluate::{ELEMENT, Value},
+    limits::Limits,
+    revision::declaration::Name,
+};
 use std::collections::BTreeSet;
 /// # Errors
 /// Returns the first declaration evaluation, type, collision or budget fault.
@@ -75,10 +81,12 @@ fn entry(
     if !keys.seen.insert(key.clone()) {
         return Err("collision");
     }
+    charge_bytes(ELEMENT, left)?;
     keys.count += 1;
     let mut fields = Vec::new();
     for (name, value) in &declaration.fields {
         if let Some(value) = literal(value, name.takes(), roots, limits, left)? {
+            charge_field(*name, left)?;
             fields.push((*name, value));
         }
     }
@@ -86,8 +94,23 @@ fn entry(
     Ok(())
 }
 fn charge(text: Vec<u8>, left: &mut u64) -> Result<Vec<u8>, &'static str> {
-    *left = left.checked_sub(text.len() as u64).ok_or("limit")?;
+    charge_bytes(u64::try_from(text.len()).expect("bounded text"), left)?;
     Ok(text)
+}
+fn charge_bytes(bytes: u64, left: &mut u64) -> Result<(), &'static str> {
+    *left = left.checked_sub(bytes).ok_or("limit")?;
+    Ok(())
+}
+fn charge_field(name: Name, left: &mut u64) -> Result<(), &'static str> {
+    charge_bytes(ELEMENT + u64::try_from(name.key().len()).expect("field name"), left)
+}
+fn range_value(base: i64, count: i64, left: &mut u64) -> Result<Fielded, &'static str> {
+    charge_field(Name::Base, left)?;
+    charge_field(Name::Count, left)?;
+    Ok(Fielded::Range { base, count })
+}
+fn charge_elements(count: usize, left: &mut u64) -> Result<(), &'static str> {
+    charge_bytes(u64::try_from(count).expect("bounded list") * ELEMENT, left)
 }
 fn text(text: &Text, roots: &Roots, limits: &Limits, left: &mut u64) -> Result<Vec<u8>, &'static str> {
     let mut output = Vec::new();
@@ -122,11 +145,11 @@ fn literal(
             }
             Fielded::Text(text(input, roots, limits, left)?.into_boxed_slice())
         }
-        Literal::Strings(each) => Fielded::Strings(
-            each.iter()
-                .map(|input| text(input, roots, limits, left).map(Vec::into_boxed_slice))
-                .collect::<Result<Box<[_]>, _>>()?,
-        ),
+        Literal::Strings(each) => {
+            charge_elements(each.len(), left)?;
+            let strings = each.iter().map(|input| text(input, roots, limits, left).map(Vec::into_boxed_slice));
+            Fielded::Strings(strings.collect::<Result<Box<[_]>, _>>()?)
+        }
         Literal::Range(base, count) => {
             let Some(Fielded::Int(base)) = literal(base, Takes::Int, roots, limits, left)? else {
                 return Err("undefined");
@@ -134,7 +157,7 @@ fn literal(
             let Some(Fielded::Int(count)) = literal(count, Takes::Int, roots, limits, left)? else {
                 return Err("undefined");
             };
-            Fielded::Range { base, count }
+            range_value(base, count, left)?
         }
         Literal::Typed(expression) => {
             let Some(value) = evaluate(expression, roots, limits)? else {
@@ -143,16 +166,19 @@ fn literal(
             match (takes, value) {
                 (Takes::Int, Value::Int(value)) => Fielded::Int(value),
                 (Takes::Bool, Value::Bool(value)) => Fielded::Bool(value),
-                (Takes::Strings, Value::List(each)) => Fielded::Strings(
-                    each.into_iter()
-                        .map(|value| {
-                            let Value::String(text) = value else {
-                                return Err("wrong");
-                            };
-                            charge(text.into_vec(), left).map(Vec::into_boxed_slice)
-                        })
-                        .collect::<Result<Box<[_]>, _>>()?,
-                ),
+                (Takes::Strings, Value::List(each)) => {
+                    charge_elements(each.len(), left)?;
+                    Fielded::Strings(
+                        each.into_iter()
+                            .map(|value| {
+                                let Value::String(text) = value else {
+                                    return Err("wrong");
+                                };
+                                charge(text.into_vec(), left).map(Vec::into_boxed_slice)
+                            })
+                            .collect::<Result<Box<[_]>, _>>()?,
+                    )
+                }
                 (Takes::Range, Value::Map(fields)) => {
                     let mut base = None;
                     let mut count = None;
@@ -166,7 +192,7 @@ fn literal(
                             _ => return Err("wrong"),
                         }
                     }
-                    Fielded::Range { base: base.ok_or("wrong")?, count: count.ok_or("wrong")? }
+                    range_value(base.ok_or("wrong")?, count.ok_or("wrong")?, left)?
                 }
                 (
                     Takes::Text | Takes::Int | Takes::Bool | Takes::Strings | Takes::Range,

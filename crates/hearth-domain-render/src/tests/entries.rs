@@ -308,12 +308,13 @@ fn a_list_or_map_in_a_string_fails_with_output() {
 }
 #[test]
 fn a_field_written_as_one_tag_is_absent_when_undefined() {
-    let declared = fields([
-        field(Name::From, Literal::Text(setting_tag(b"wifi"))),
-        field(Name::Uid, Literal::Typed(setting_tag(b"wifi"))),
-    ]);
+    let declared = fixtures::absent_fields();
     let expanded = fixtures::expanded(&declared);
     assert_eq!(only(&only(&expanded.groups).entries).fields.as_ref(), &[]);
+}
+#[test]
+fn an_absent_field_has_no_record_charge() {
+    assert_eq!(fixtures::expansion_remaining(&fixtures::absent_fields(), fixtures::ENTRY_BYTES), Ok(0));
 }
 #[test]
 fn an_undefined_key_is_an_error() {
@@ -421,13 +422,52 @@ fn expanded_text_past_the_targets_budget_fails_at_the_field() {
         Err(fixtures::evaluation_fault(FaultKind::Limit, FIELD_AT))
     );
 }
+type BudgetCase = (&'static str, u64, Result<u64, entries::Fault>);
+const ENTRY_BUDGETS: &[BudgetCase] =
+    &[("exact", fixtures::ENTRY_BYTES, Ok(0)), ("one less", fixtures::ENTRY_BYTES - 1, Err(fixtures::KEY_LIMIT))];
+#[test]
+fn an_entry_counts_32_bytes_beside_its_key() {
+    let declaration = fields([]);
+    for (name, budget, expected) in ENTRY_BUDGETS {
+        assert_eq!(fixtures::expansion_remaining(&declaration, *budget), *expected, "{name}");
+    }
+}
+const FIELD_BUDGETS: &[BudgetCase] =
+    &[("exact", fixtures::FIELD_BYTES, Ok(0)), ("one less", fixtures::FIELD_BYTES - 1, Err(fixtures::FIELD_LIMIT))];
+#[test]
+fn a_kept_field_counts_its_name_and_record() {
+    let declaration = fixtures::empty_string_field();
+    for (name, budget, expected) in FIELD_BUDGETS {
+        assert_eq!(fixtures::expansion_remaining(&declaration, *budget), *expected, "{name}");
+    }
+}
+const EMPTY_LIST_BUDGETS: &[BudgetCase] = &[
+    ("exact", fixtures::EMPTY_LIST_BYTES, Ok(0)),
+    ("one less", fixtures::EMPTY_LIST_BYTES - 1, Err(fixtures::FIELD_LIMIT)),
+];
+#[test]
+fn an_empty_list_string_counts_32_bytes() {
+    let declaration = fixtures::empty_list_field();
+    for (name, budget, expected) in EMPTY_LIST_BUDGETS {
+        assert_eq!(fixtures::expansion_remaining(&declaration, *budget), *expected, "{name}");
+    }
+}
 #[test]
 fn a_typed_range_keeps_its_base_and_count() {
-    let declaration = fields([field(Name::Subordinate, Literal::Typed(setting_tag(b"range")))]);
-    let expanded =
-        entries::expand(&declaration, &fixtures::range_roots().context(), &SHIPPED, &mut { SHIPPED.expanded })
-            .expect("expand");
+    let expanded = fixtures::expanded_range();
     assert_eq!(only(&only(&expanded.groups).entries).range(Name::Subordinate), Some((42, 2)));
+}
+const RANGE_BUDGETS: &[(&str, fixtures::RangeSource, u64, Result<u64, entries::Fault>)] = &[
+    ("literal exact", fixtures::RangeSource::Literal, fixtures::RANGE_BYTES, Ok(0)),
+    ("literal one less", fixtures::RangeSource::Literal, fixtures::RANGE_BYTES - 1, Err(fixtures::FIELD_LIMIT)),
+    ("typed exact", fixtures::RangeSource::Typed, fixtures::RANGE_BYTES, Ok(0)),
+    ("typed one less", fixtures::RangeSource::Typed, fixtures::RANGE_BYTES - 1, Err(fixtures::FIELD_LIMIT)),
+];
+#[test]
+fn a_ranges_base_and_count_each_charge_a_field() {
+    for (name, source, budget, expected) in RANGE_BUDGETS {
+        assert_eq!(fixtures::range_remaining(*source, *budget), *expected, "{name}");
+    }
 }
 #[test]
 fn a_range_member_is_never_absent() {
