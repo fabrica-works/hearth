@@ -1389,6 +1389,9 @@ None yet.
 
      The test then fails on main, at 2,497,232,530, and passes at 899,981,218. The plan's rule now reads "**No default changes but 28.s6's,**". 28.s8's section, a landed step "at hearth a3b67e4", stays as written. Nothing is deferred: no `later.md` row, and `STATUS.md` is unchanged.
 
+205. **Cleanup: the downstream check worktrees are discarded** (process, coordinator's block of 2026-10-18T05:29:17Z).
+     The supervisor's four check worktrees, `wt/{hearth,jig,smith,temper}-downstream`, held only the `Cargo.lock` that the hourly checks' downstream builds rewrote: scratch, never landed. The supervisor discarded each at 2026-10-18T05:31Z, and each is clean. The coordinator removes them with the kit's `plan worktree --remove <repository> downstream`, and goes on to `plan release`. A check worktree that holds only such a rewritten `Cargo.lock` at a later cleanup is discarded the same way (`git -C <worktree> checkout -- Cargo.lock`) and named in the coordinator's log.
+
 ## For the user
 
 The long-term choices the user may veto:
