@@ -8,6 +8,7 @@ pub struct Limits {
     pub error_bytes: u64,
     pub tasks: u32,
     pub decoded: u64,
+    pub composed: u64,
     pub validated: u64,
     pub document: u32,
     pub template: u32,
@@ -33,6 +34,7 @@ pub const SHIPPED: Limits = Limits {
     error_bytes: 16_777_216,
     tasks: 1_024,
     decoded: 67_108_864,
+    composed: 67_108_864,
     validated: 67_108_864,
     document: 1_048_576,
     template: 1_048_576,
@@ -73,14 +75,17 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(PATHS.checked_mul(6)?)?
         .checked_add(u64::from(ENTRIES).checked_mul(64 * 5 + 1)?)?;
     let decoded = revision::decoded_worst_case(limits)?;
-    let settings = limits
-        .decoded
-        .checked_mul(u64::try_from(size_of::<compose::Pair>()).ok()?)?
-        .checked_mul(u64::from(limits.targets).checked_add(1)?)?;
+    // Provenance enlarges the 32-byte value records. During a merge, the old
+    // value, its patch, and the rebuilt value may coexist.
+    let settings = compose::worst_case(limits)?;
     let targets = List::<compose::Target>::worst_case(limits.targets)?
-        .checked_add(List::<compose::Settings>::worst_case(limits.targets)?)?
-        .checked_add(Map::<Box<[u8]>, diff::Made>::worst_case(limits.targets)?)?
-        .checked_add(limits.expanded.checked_mul(u64::from(limits.targets))?)?;
+        .checked_add(List::<Box<[compose::Index]>>::worst_case(limits.targets)?)?
+        .checked_add(
+            u64::from(limits.targets)
+                .checked_mul(u64::from(limits.tasks).checked_add(1)?)?
+                .checked_mul(u64::try_from(size_of::<compose::Index>()).ok()?)?,
+        )?
+        .checked_add(Map::<Box<[u8]>, diff::Made>::worst_case(limits.targets)?)?;
     // Cached resolutions retain one bounded record per distinct target key.
     // A frame byte can introduce one input item; package strings additionally
     // follow store.md, 6.1's fixed M1 name/path limits.

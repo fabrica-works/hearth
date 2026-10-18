@@ -40,25 +40,15 @@ impl super::Side {
     pub(super) fn prime_exports(&mut self, target: &Target) -> bool {
         let revision =
             crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
-        let fleet = Fleet {
-            revision: &revision,
-            targets: &self.targets,
-            settings: &self.settings,
-            faults: &self.errors,
-            limits: &self.limits,
-        };
+        let fleet =
+            Fleet { revision, targets: &self.targets, tasks: &self.tasks, faults: &self.errors, limits: &self.limits };
         self.exports.prime(target, &fleet)
     }
     pub(super) fn read_exports(&self, target: &Target, checked: &Validated) -> Result<(Exports, Value), Box<Error>> {
         let revision =
             crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
-        let fleet = Fleet {
-            revision: &revision,
-            targets: &self.targets,
-            settings: &self.settings,
-            faults: &self.errors,
-            limits: &self.limits,
-        };
+        let fleet =
+            Fleet { revision, targets: &self.targets, tasks: &self.tasks, faults: &self.errors, limits: &self.limits };
         prepare(target, checked, &fleet, &self.exports)
     }
 }

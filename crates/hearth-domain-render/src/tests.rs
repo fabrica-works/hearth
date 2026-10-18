@@ -44,3 +44,4 @@ mod ids;
 mod reserved;
 
 mod decoded;
+mod settings;

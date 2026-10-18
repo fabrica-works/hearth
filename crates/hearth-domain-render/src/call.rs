@@ -35,7 +35,7 @@ pub(crate) struct Side {
     pub errors: errors::Collector,
     pub error_next: u32,
     pub paths: Box<[Box<[u8]>]>,
-    pub settings: Box<[compose::Settings]>,
+    pub tasks: Box<[Box<[compose::Index]>]>,
     pub merge: compose::Merge,
     pub defaults: crate::schema::Defaults,
     pub validator: crate::schema::Validator,
@@ -72,7 +72,7 @@ impl Side {
             errors: errors::Collector::new(limits),
             error_next: 0,
             paths: Box::new([]),
-            settings: Box::new([]),
+            tasks: Box::new([]),
             merge: compose::Merge::new(limits),
             defaults: crate::schema::Defaults::new(),
             validator: crate::schema::Validator::new(limits),
@@ -213,12 +213,12 @@ impl Side {
         self.ready = usize::try_from(self.read).expect("bounded cursor") == self.pending.len();
     }
     fn needs(&self, name: &[u8]) -> bool {
-        for (target, settings) in self.targets.iter().zip(&self.settings) {
+        for (target, tasks) in self.targets.iter().zip(&self.tasks) {
             if !self.needed(target) {
                 continue;
             }
-            for task in &settings.tasks {
-                if task.name.as_ref() == name {
+            for task in tasks {
+                if task.name(&self.documents) == name {
                     return true;
                 }
             }
@@ -226,13 +226,11 @@ impl Side {
         false
     }
     fn compose(&mut self) {
-        let mut settings = List::with_capacity(u32::try_from(self.targets.len()).expect("target count"));
+        let mut tasks = List::with_capacity(u32::try_from(self.targets.len()).expect("target count"));
         for target in &self.targets {
-            settings
-                .push(compose::compose(target, &self.documents, &self.defaults, &mut self.merge))
-                .expect("target count");
+            tasks.push(compose::indexes(target, &self.documents)).expect("target count");
         }
-        self.settings = settings.into_boxed();
+        self.tasks = tasks.into_boxed();
     }
     pub fn files(&mut self, limits: Limits, out: &mut Queue<Output>) -> bool {
         if self.files {

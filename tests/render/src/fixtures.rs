@@ -668,6 +668,8 @@ pub use laws::merged;
 pub use properties::digests;
 mod decoded;
 pub use decoded::*;
+pub mod memory;
+pub mod settings;
 
 pub fn only_mut<T>(items: &mut [T]) -> &mut T {
     let [item] = items else { panic!("one item") };

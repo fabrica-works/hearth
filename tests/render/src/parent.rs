@@ -19,6 +19,28 @@ pub fn run(repository: &Repository, targets: &[&[u8]], seed: u64) -> Run {
 }
 #[must_use]
 pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: limits::Limits) -> Run {
+    drive(repository, targets, seed, limits, skein_world::Memory::Unchecked, 0)
+}
+#[must_use]
+pub fn checked(
+    repository: &Repository,
+    seed: u64,
+    limits: limits::Limits,
+    bound: u64,
+    memory: skein_world::Memory,
+) -> Run {
+    assert_eq!(memory, skein_world::Memory::Checked);
+    drive(repository, &[], seed, limits, memory, bound)
+}
+fn drive(
+    repository: &Repository,
+    targets: &[&[u8]],
+    seed: u64,
+    limits: limits::Limits,
+    memory: skein_world::Memory,
+    bound: u64,
+) -> Run {
+    let meter = (memory == skein_world::Memory::Checked).then(skein_world::domain::heap::Meter::new);
     let mut render = Render::new(&limits);
     let mut env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut queue = Queue::with_capacity(1);
@@ -26,18 +48,18 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
     let mut ledger = Ledger::new("render request");
     let mut rng = Rng::new(seed);
     let mut run = Run { answers: Vec::new(), outcome: Outcome::Done, left_out: 0, requests: Vec::new() };
-    render::step(
-        &mut render,
-        &env,
-        Event::Render {
-            resolve: false,
-            repository: Box::from(b"/repository/.git".as_slice()),
-            revision: Box::from(b"HEAD".as_slice()),
-            targets: targets.iter().map(|t| Box::from(*t)).collect(),
-        },
-        &mut queue,
-    );
-    for _ in 0..10_000 {
+    if let Some(meter) = &meter {
+        meter.start();
+    }
+    render::step(&mut render, &env, render_event(targets), &mut queue);
+    if let Some(meter) = &meter {
+        let measured = meter.end();
+        meter.check(measured, bound, &"initial call");
+    }
+    for iteration in 0..10_000 {
+        if let Some(meter) = &meter {
+            meter.start();
+        }
         if let Some(output) = queue.pop() {
             match output {
                 Output::Answer(answer) => match answer {
@@ -99,6 +121,10 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
             }
             render::step(&mut render, &env, event, &mut queue);
         }
+        if let Some(meter) = &meter {
+            let measured = meter.end();
+            meter.check(measured, bound, &iteration);
+        }
         if render.is_empty() && queue.is_empty() {
             ledger.assert_settled();
             assert!(schedule.is_empty(), "no late answer");
@@ -106,6 +132,15 @@ pub fn run_with(repository: &Repository, targets: &[&[u8]], seed: u64, limits: l
         }
     }
     panic!("render settles: seed {seed}")
+}
+
+fn render_event(targets: &[&[u8]]) -> Event {
+    Event::Render {
+        resolve: false,
+        repository: Box::from(b"/repository/.git".as_slice()),
+        revision: Box::from(b"HEAD".as_slice()),
+        targets: targets.iter().map(|target| Box::from(*target)).collect(),
+    }
 }
 
 pub(crate) fn blob_event(

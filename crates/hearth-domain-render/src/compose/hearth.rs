@@ -1,37 +1,9 @@
 //! The repository's implicit hearth task (format.md, 5.12).
-use super::{Composed, Composite, Layer, Pair, Provenance, Target, layers, placement};
+use super::{Layer, Target, layers, placement};
 use crate::errors::{self, Rule};
 use crate::revision::{self, Documents, Kind, Position};
 use alloc::boxed::Box;
-use skein_lib::{List, Map, bytes};
-pub(super) fn presence(target: &Target, documents: &Documents, pairs: Box<[Pair]>) -> (Box<[Pair]>, bool) {
-    let container = is_container(target, documents);
-    let mut ordered = Map::with_capacity(u32::try_from(pairs.len()).expect("task count").saturating_add(1));
-    for pair in pairs {
-        if !container || pair.key.as_ref() != b"hearth" {
-            ordered.insert(pair.key.clone(), pair).expect("task count");
-        }
-    }
-    let implicit = !container && ordered.get(b"hearth".as_slice()).is_none();
-    if implicit {
-        let from = Provenance { layer: Layer::BaseEnv, document: target.base_env, at: Position { line: 1, column: 1 } };
-        ordered
-            .insert(
-                bytes::copy_of(b"hearth"),
-                Pair {
-                    key: bytes::copy_of(b"hearth"),
-                    from,
-                    value: Composed { from, kind: Composite::Map(Box::new([])) },
-                },
-            )
-            .expect("task count");
-    }
-    let mut pairs = List::with_capacity(ordered.len());
-    for (_, pair) in &ordered {
-        pairs.push(pair.clone()).expect("task count");
-    }
-    (pairs.into_boxed(), implicit)
-}
+use skein_lib::bytes;
 pub(crate) fn reserved(target: &Target, documents: &Documents, errors: &mut errors::Collector) -> bool {
     let container = is_container(target, documents);
     let mut refused = false;

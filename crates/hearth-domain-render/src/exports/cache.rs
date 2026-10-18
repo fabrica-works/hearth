@@ -11,9 +11,9 @@ use crate::{
 use alloc::boxed::Box;
 use skein_lib::{List, Map, bytes};
 pub(crate) struct Fleet<'a> {
-    pub revision: &'a schema::Revision<'a>,
+    pub revision: schema::Revision<'a>,
     pub targets: &'a [Target],
-    pub settings: &'a [compose::Settings],
+    pub tasks: &'a [Box<[compose::Index]>],
     pub faults: &'a errors::Collector,
     pub limits: &'a Limits,
 }
@@ -33,20 +33,30 @@ impl Cache {
         if self.limited {
             return false;
         }
-        for (target, settings) in fleet.targets.iter().zip(fleet.settings) {
+        for (target, tasks) in fleet.targets.iter().zip(fleet.tasks) {
             if target.environment != reader.environment {
                 continue;
             }
-            for task in &settings.tasks {
-                let Some((_, Some(declaration))) = fleet.revision.documents.declaration(&task.name) else { continue };
-                if !needed(reader, target, &task.name, !declaration.exports.is_empty(), fleet) {
+            for index in tasks {
+                let name = index.name(fleet.revision.documents);
+                let Some((_, Some(declaration))) = fleet.revision.documents.declaration(name) else { continue };
+                if !needed(reader, target, name, !declaration.exports.is_empty(), fleet) {
                     continue;
                 }
-                let key = (target.name.clone(), task.name.clone());
+                let key = (target.name.clone(), bytes::copy_of(name));
                 if self.pairs.contains_key(&key) {
                     continue;
                 }
-                let values = self.evaluate(target, task, fleet);
+                let Some(task) = compose::task(
+                    target,
+                    *index,
+                    fleet.revision.documents,
+                    fleet.revision.defaults,
+                    &mut compose::Merge::new(fleet.limits),
+                ) else {
+                    continue;
+                };
+                let values = self.evaluate(target, &task, fleet);
                 if self.pairs.len() == self.pairs.capacity() {
                     let mut larger = Map::with_capacity(self.pairs.capacity().max(1).saturating_mul(2));
                     for (key, value) in &self.pairs {
@@ -73,7 +83,7 @@ impl Cache {
             return Err(Box::new(limit(target, Some(&task.name))));
         };
         self.left = left;
-        let revision = fleet.revision;
+        let revision = &fleet.revision;
         if let Some(error) = document_fault(target, &task.name, fleet) {
             return Err(Box::new(error));
         }
@@ -168,8 +178,8 @@ impl Cache {
                 }
             }
             let mut targets = List::with_capacity(u32::try_from(fleet.targets.len()).expect("target count"));
-            for (target, settings) in fleet.targets.iter().zip(fleet.settings) {
-                if target.environment != reader.environment || !has(settings, &read.task.text) {
+            for (target, tasks) in fleet.targets.iter().zip(fleet.tasks) {
+                if target.environment != reader.environment || !has(tasks, &read.task.text, fleet.revision.documents) {
                     continue;
                 }
                 let values = match self.published(target, &read.task.text) {
@@ -192,12 +202,14 @@ fn needed(reader: &Target, target: &Target, task: &[u8], publishes: bool, fleet:
     if reader.name == target.name && publishes {
         return true;
     }
-    for (target, settings) in fleet.targets.iter().zip(fleet.settings) {
+    for (target, tasks) in fleet.targets.iter().zip(fleet.tasks) {
         if target.name != reader.name {
             continue;
         }
-        for present in &settings.tasks {
-            if let Some((_, Some(declaration))) = fleet.revision.documents.declaration(&present.name) {
+        for present in tasks {
+            if let Some((_, Some(declaration))) =
+                fleet.revision.documents.declaration(present.name(fleet.revision.documents))
+            {
                 for read in &declaration.reads {
                     if read.exports && read.task.text.as_ref() == task {
                         return true;
@@ -208,9 +220,9 @@ fn needed(reader: &Target, target: &Target, task: &[u8], publishes: bool, fleet:
     }
     false
 }
-fn has(settings: &compose::Settings, task: &[u8]) -> bool {
-    for present in &settings.tasks {
-        if present.name.as_ref() == task {
+fn has(tasks: &[compose::Index], task: &[u8], documents: &revision::Documents) -> bool {
+    for present in tasks {
+        if present.name(documents) == task {
             return true;
         }
     }

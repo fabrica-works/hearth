@@ -45,3 +45,14 @@ pub fn composition_merge() -> crate::compose::Merge {
 pub fn composition_collector() -> crate::errors::Collector {
     crate::errors::Collector::new(&crate::limits::SHIPPED)
 }
+
+pub fn target_tasks(
+    targets: &[crate::compose::Target],
+    documents: &crate::revision::Documents,
+) -> Box<[Box<[crate::compose::Index]>]> {
+    let mut tasks = skein_lib::List::with_capacity(u32::try_from(targets.len()).expect("target count"));
+    for target in targets {
+        tasks.push(crate::compose::indexes(target, documents)).expect("target count");
+    }
+    tasks.into_boxed()
+}

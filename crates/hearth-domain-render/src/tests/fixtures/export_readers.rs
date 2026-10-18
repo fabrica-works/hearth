@@ -16,7 +16,7 @@ pub struct Readers {
     pub documents: revision::Documents,
     pub defaults: schema::Defaults,
     pub targets: Box<[compose::Target]>,
-    pub settings: Box<[compose::Settings]>,
+    pub tasks: Box<[Box<[compose::Index]>]>,
     pub faults: errors::Collector,
     pub limits: Limits,
 }
@@ -75,12 +75,8 @@ pub fn built(documents: revision::Documents) -> Readers {
         &mut schemas,
     );
     assert_eq!(schemas.as_slice(), [], "sound declarations");
-    let mut settings = List::with_capacity(u32::try_from(targets.len()).expect("targets"));
-    for target in &targets {
-        settings.push(compose::compose(target, &documents, &defaults, &mut merge)).expect("targets");
-    }
-    let settings = settings.into_boxed();
-    Readers { documents, defaults, targets, settings, faults, limits: SHIPPED }
+    let tasks = super::target_tasks(&targets, &documents);
+    Readers { documents, defaults, targets, tasks, faults, limits: SHIPPED }
 }
 impl Readers {
     pub fn target(&self, name: &[u8]) -> &compose::Target {
@@ -91,58 +87,46 @@ impl Readers {
         }
         panic!("fixture target")
     }
-    pub fn prime(&self, cache: &mut Cache, name: &[u8]) -> usize {
-        let revision = schema::Revision {
-            documents: &self.documents,
-            defaults: &self.defaults,
-            listing: self.documents.entries(),
-        };
-        let fleet = Fleet {
-            revision: &revision,
+    fn fleet(&self) -> Fleet<'_> {
+        Fleet {
+            revision: schema::Revision {
+                documents: &self.documents,
+                defaults: &self.defaults,
+                listing: self.documents.entries(),
+            },
             targets: &self.targets,
-            settings: &self.settings,
+            tasks: &self.tasks,
             faults: &self.faults,
             limits: &self.limits,
-        };
+        }
+    }
+    pub fn prime(&self, cache: &mut Cache, name: &[u8]) -> usize {
         for pairs in 0..=self.targets.len().saturating_mul(2) {
-            if !cache.prime(self.target(name), &fleet) {
+            if !cache.prime(self.target(name), &self.fleet()) {
                 return pairs;
             }
         }
         panic!("bounded pairs")
     }
     pub fn root(&self, cache: &Cache, name: &[u8]) -> Result<crate::evaluate::Value, Box<errors::Error>> {
-        let revision = schema::Revision {
-            documents: &self.documents,
-            defaults: &self.defaults,
-            listing: self.documents.entries(),
-        };
-        let fleet = Fleet {
-            revision: &revision,
-            targets: &self.targets,
-            settings: &self.settings,
-            faults: &self.faults,
-            limits: &self.limits,
-        };
         let (_, Some(declaration)) = self.documents.declaration(b"reader").expect("reader") else {
             panic!("declaration")
         };
-        cache.root(self.target(name), declaration, &fleet)
+        cache.root(self.target(name), declaration, &self.fleet())
     }
     pub fn setting_fault(&mut self) {
-        for (settings, target) in self.settings.iter_mut().zip(&self.targets) {
-            if target.name.as_ref() != b"ion-prod" {
-                continue;
-            }
-            for task in &mut settings.tasks {
-                if task.name.as_ref() == b"vpn" {
-                    task.settings = super::schemas::composed(&map(
-                        at(1, 9),
-                        &[(b"x", at(1, 10), revision::Value { at: at(1, 15), kind: revision::Kind::Bool(false) })],
-                    ));
-                }
+        let path = b"hosts/ion/ion-prod.json";
+        let index = self.documents.find(path).expect("exporter document");
+        let mut document = self.documents.get(index).expect("document").clone();
+        for task in &mut document.layer.tasks {
+            if task.name.as_ref() == b"vpn" {
+                task.value = map(
+                    at(1, 9),
+                    &[(b"x", at(1, 10), revision::Value { at: at(1, 15), kind: revision::Kind::Bool(false) })],
+                );
             }
         }
+        self.documents = with_document(&self.documents, path, document);
     }
     pub fn cache(&self, name: &[u8]) -> Cache {
         let mut cache = Cache::new(&self.limits);
@@ -150,14 +134,14 @@ impl Readers {
         cache
     }
     pub fn remove_exporters(&mut self) {
-        for settings in &mut self.settings {
-            let mut tasks = List::with_capacity(u32::try_from(settings.tasks.len()).expect("tasks"));
-            for task in &settings.tasks {
-                if task.name.as_ref() != b"vpn" {
-                    tasks.push(task.clone()).expect("tasks");
+        for indexes in &mut self.tasks {
+            let mut kept = List::with_capacity(u32::try_from(indexes.len()).expect("task count"));
+            for index in &**indexes {
+                if index.name(&self.documents) != b"vpn" {
+                    kept.push(*index).expect("task count");
                 }
             }
-            settings.tasks = tasks.into_boxed();
+            *indexes = kept.into_boxed();
         }
     }
     pub fn refused(&mut self, path: &[u8]) {

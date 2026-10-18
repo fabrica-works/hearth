@@ -272,6 +272,7 @@ pub fn replay(seed: u64) -> (Vec<String>, skein_world::StateDigests) {
 /// The store's shipped page and one additional file force a subsequent page.
 pub const STORE_PAGE: u32 = hearth::limits().domain.store.page;
 pub const CACHE_FILES: u32 = STORE_PAGE + 1;
+const CACHE_ANCHOR: u32 = 0; // The first cache name owns the empty inode.
 /// The calm client's submission count, checked by the cut sweep (ruling 188).
 pub const CUTS: u32 = 141;
 pub const BUILDER_SLOT: usize = 0;
@@ -286,11 +287,15 @@ pub fn small_limits() -> hearth::Limits {
 }
 pub fn lay_cache_pages(shared: &Shared) {
     let mut fake = shared.borrow_mut();
-    for file in 0..CACHE_FILES {
+    let anchor = format!("/srv/store/cache/{CACHE_ANCHOR:064x}");
+    fake.behind.machine_mut().linux_mut().lay(&[linux::Item::file(anchor.as_bytes(), 0o600, b"").owner(BUILDER)]);
+    for file in CACHE_ANCHOR + 1..CACHE_FILES {
         let path = format!("/srv/store/cache/{file:064x}");
-        fake.behind.machine_mut().linux_mut().lay(&[linux::Item::file(path.as_bytes(), 0o600, b"").owner(BUILDER)]);
+        // The page's empty entries need names, not distinct file contents.
+        fake.behind.machine_mut().linux_mut().lay(&[linux::Item::hard_link(path.as_bytes(), anchor.as_bytes())]);
     }
 }
+
 #[must_use]
 pub fn lists(shared: &Shared) -> u32 {
     shared.borrow().lists

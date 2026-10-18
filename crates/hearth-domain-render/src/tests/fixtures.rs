@@ -230,7 +230,7 @@ pub fn removed_task() -> (crate::call::Side, crate::compose::Target) {
         environment_document: 1,
         base_env: 0,
     };
-    call.settings = Box::new([crate::compose::compose(&target, &call.documents, &call.defaults, &mut call.merge)]);
+    call.tasks = Box::new([crate::compose::indexes(&target, &call.documents)]);
     (call, target)
 }
 
@@ -757,3 +757,4 @@ pub use errors::*;
 
 mod decoded;
 pub use decoded::*;
+pub mod settings;

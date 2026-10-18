@@ -49,14 +49,21 @@ pub(super) fn schema_errors(
 }
 
 impl Side {
-    pub(super) fn validated_target(&mut self, target: &Target) -> Option<crate::schema::Validated> {
+    pub(crate) fn validated_target(&mut self, target: &Target) -> Option<crate::schema::Validated> {
         let revision =
             crate::schema::Revision { documents: &self.documents, defaults: &self.defaults, listing: &self.entries };
-        let settings = self
-            .settings
-            .get(usize::try_from(self.next.saturating_sub(1)).expect("bounded cursor"))
-            .expect("target settings");
-        checked(settings, &revision, target, &self.targets, &mut self.validator, self.validated, &mut self.errors)
+        let Some(settings) =
+            compose::bounded(target, &self.documents, &self.defaults, &mut self.merge, self.limits.composed)
+        else {
+            let mut error = limit(&target.name);
+            error.at = Some(errors::Place {
+                path: skein_lib::bytes::copy_of(self.documents.path(target.base_env)),
+                position: None,
+            });
+            self.errors.push(error);
+            return None;
+        };
+        checked(&settings, &revision, target, &self.targets, &mut self.validator, self.validated, &mut self.errors)
     }
 
     pub(super) fn repository_valid(&self, target: &Target, index: usize) -> bool {
@@ -65,9 +72,9 @@ impl Side {
                 continue;
             }
             if let Some(task) = revision::task(&entry.path) {
-                if let Some(settings) = self.settings.get(index) {
-                    for present in &settings.tasks {
-                        if present.name.as_ref() == task {
+                if let Some(tasks) = self.tasks.get(index) {
+                    for present in tasks {
+                        if present.name(&self.documents) == task {
                             return false;
                         }
                     }
