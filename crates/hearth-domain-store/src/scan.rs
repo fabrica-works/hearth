@@ -163,7 +163,10 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
         | Event::Open
         | Event::Locked
         | Event::Busy
-        | Event::Loaded { .. } => {
+        | Event::Loaded { .. }
+        | Event::Stage { .. }
+        | Event::Seal { .. }
+        | Event::Discard { .. } => {
             unreachable!("scan terminal")
         }
     }
@@ -289,6 +292,9 @@ fn finish(store: &mut Store, answer: Answer, out: &mut Queue<Output>) {
         | Answer::Absent
         | Answer::Have { .. }
         | Answer::Free { .. }
+        | Answer::Staged { .. }
+        | Answer::Sealed { .. }
+        | Answer::Discarded { .. }
         | Answer::Declined { .. }
         | Answer::Waiting
         | Answer::Strays { .. }

@@ -67,7 +67,19 @@ pub(crate) fn step(builder: &mut Builder, env: &Env<Limits>, event: Event, out: 
         Some(Output::Request(build::vocabulary::Request::Want { key })) => {
             store_step(builder, env, crate::store::vocabulary::Event::Want { key }, out);
         }
+        Some(Output::Request(build::vocabulary::Request::Stage { key, parent })) => {
+            builder.staging = Some(key);
+            store_step(builder, env, crate::store::vocabulary::Event::Stage { key, parent }, out);
+        }
         Some(Output::Request(build::vocabulary::Request::Run { step })) => out.push(Request::Run { step }),
+        Some(Output::Request(build::vocabulary::Request::Seal { key })) => {
+            builder.staging = Some(key);
+            store_step(builder, env, crate::store::vocabulary::Event::Seal { key }, out);
+        }
+        Some(Output::Request(build::vocabulary::Request::Discard { key })) => {
+            builder.staging = Some(key);
+            store_step(builder, env, crate::store::vocabulary::Event::Discard { key }, out);
+        }
         Some(Output::Answer(build::vocabulary::Answer::Built { plan })) => {
             report(builder, Report { plan, failed: None, next: 0 }, out);
         }
@@ -76,6 +88,11 @@ pub(crate) fn step(builder: &mut Builder, env: &Env<Limits>, event: Event, out: 
         }
         None => {}
     }
+}
+/// The store answers a stage, a seal or a discard: the question is settled.
+pub(crate) fn staged(builder: &mut Builder, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
+    builder.staging = None;
+    step(builder, env, event, out);
 }
 fn report(builder: &mut Builder, report: Report, out: &mut Queue<Request>) {
     builder.building = Some(Building::Reporting(report));

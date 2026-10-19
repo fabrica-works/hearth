@@ -40,6 +40,8 @@ pub struct Builder {
     resolution: Option<(Token, render::vocabulary::Digest)>,
     index: Option<Token>,
     build: build::Build,
+    /// The key the store was last asked to stage, seal or discard, until it answers.
+    staging: Option<render::vocabulary::Digest>,
     build_output: Queue<build::vocabulary::Output>,
     building: Option<building::Building>,
     resolved: Option<(render::vocabulary::Digest, render::vocabulary::Digest)>,
@@ -59,6 +61,7 @@ impl Builder {
             resolution: None,
             index: None,
             build: build::Build::new(),
+            staging: None,
             build_output: Queue::with_capacity(build::MAX_OUT),
             building: None,
             resolved: None,
@@ -246,28 +249,15 @@ fn store_forward(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Reque
 }
 fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>) {
     use build::vocabulary::Event as BuildEvent;
-    use store::vocabulary::{Answer, Output};
+    use store::vocabulary::{Answer, Output, Step as StoreStep};
     match builder.store_output.pop() {
         Some(Output::Request(request)) => out.push(Request::Store(request)),
+        Some(Output::Answer(Answer::Unusable { step: StoreStep::Stage | StoreStep::Seal | StoreStep::Discard })) => {
+            let key = builder.staging.expect("a refusal answers a layer's question");
+            building::staged(builder, env, BuildEvent::Refused { key }, out);
+        }
         Some(Output::Answer(answer @ (Answer::Ready | Answer::Full { .. } | Answer::Unusable { .. }))) => {
-            store_error(builder, &answer, out);
-            if builder.call.is_none() {
-                return;
-            }
-            let event = match builder.call.take().expect("opening call") {
-                Call::Diff { resolve, repository, from, to, targets } => {
-                    RenderEvent::Diff { resolve, repository, from, to, targets }
-                }
-                Call::Render { resolve, repository, revision, targets } => {
-                    RenderEvent::Render { resolve, repository, revision, targets }
-                }
-                Call::Build { repository, revision, target } => {
-                    RenderEvent::Render { resolve: true, repository, revision, targets: Box::new([target]) }
-                }
-            };
-            let render_env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
-            render::step(&mut builder.render, &render_env, event, &mut builder.output);
-            builder.forward(env, out);
+            opened(builder, env, &answer, out);
         }
         Some(Output::Answer(answer @ (Answer::Cached { .. } | Answer::Refused { .. }))) => {
             if let Some(request) = builder.index.take() {
@@ -324,6 +314,15 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
         Some(Output::Answer(Answer::Declined { why })) => {
             resolution::terminal(builder, env, resolution::Settled::Declined(why), out);
         }
+        Some(Output::Answer(Answer::Staged { key })) => {
+            building::staged(builder, env, BuildEvent::Staged { key }, out);
+        }
+        Some(Output::Answer(Answer::Sealed { key })) => {
+            building::staged(builder, env, BuildEvent::Sealed { key }, out);
+        }
+        Some(Output::Answer(Answer::Discarded { key })) => {
+            building::staged(builder, env, BuildEvent::Discarded { key }, out);
+        }
         Some(Output::Answer(Answer::Have { key })) => building::step(builder, env, BuildEvent::Have { key }, out),
         Some(Output::Answer(Answer::Free { key })) => building::step(builder, env, BuildEvent::Free { key }, out),
         Some(Output::Answer(Answer::HasRoom)) => {
@@ -358,6 +357,27 @@ pub fn next_deadline(builder: &Builder) -> Option<Time> {
     store::next_deadline(&builder.store)
 }
 
+/// The store is ready, full or unusable: the call that waited for it goes on to render.
+fn opened(builder: &mut Builder, env: &Env<Limits>, answer: &store::vocabulary::Answer, out: &mut Queue<Request>) {
+    store_error(builder, answer, out);
+    if builder.call.is_none() {
+        return;
+    }
+    let event = match builder.call.take().expect("opening call") {
+        Call::Diff { resolve, repository, from, to, targets } => {
+            RenderEvent::Diff { resolve, repository, from, to, targets }
+        }
+        Call::Render { resolve, repository, revision, targets } => {
+            RenderEvent::Render { resolve, repository, revision, targets }
+        }
+        Call::Build { repository, revision, target } => {
+            RenderEvent::Render { resolve: true, repository, revision, targets: Box::new([target]) }
+        }
+    };
+    let render_env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
+    render::step(&mut builder.render, &render_env, event, &mut builder.output);
+    builder.forward(env, out);
+}
 fn store_error(builder: &mut Builder, answer: &store::vocabulary::Answer, out: &mut Queue<Request>) {
     use render::errors::{Error, Kind, Step, StoreError, StoreFault, StoreLimit};
     use store::vocabulary::{Answer, Limit, Step as StoreStep};
@@ -376,22 +396,28 @@ fn store_error(builder: &mut Builder, answer: &store::vocabulary::Answer, out: &
         Answer::Full { limit: Limit::Resolutions, most } => {
             StoreFault::Full { limit: StoreLimit::Resolutions, most: *most }
         }
-        Answer::Unusable { step } => StoreFault::Failed {
-            step: match step {
+        Answer::Unusable { step } => {
+            let step = match step {
                 StoreStep::List => Step::List,
                 StoreStep::Remove => Step::Remove,
                 StoreStep::Load => Step::Load,
                 StoreStep::Empty => Step::Empty,
                 StoreStep::Keep => Step::Keep,
                 StoreStep::Write => Step::Write,
-            },
-        },
+                // A layer's question refused ends the build, not the store (domain/build.md, 4.3).
+                StoreStep::Stage | StoreStep::Seal | StoreStep::Discard => return,
+            };
+            StoreFault::Failed { step }
+        }
         Answer::Recorded
         | Answer::HasRoom
         | Answer::Found { .. }
         | Answer::Absent
         | Answer::Have { .. }
         | Answer::Free { .. }
+        | Answer::Staged { .. }
+        | Answer::Sealed { .. }
+        | Answer::Discarded { .. }
         | Answer::Declined { .. }
         | Answer::Ready
         | Answer::Cached { .. }

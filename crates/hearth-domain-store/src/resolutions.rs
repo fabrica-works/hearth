@@ -58,7 +58,10 @@ pub(super) fn find(
         | Event::Loaded { .. }
         | Event::Page { .. }
         | Event::Done
-        | Event::Arrived { .. } => unreachable!("find terminal"),
+        | Event::Arrived { .. }
+        | Event::Stage { .. }
+        | Event::Seal { .. }
+        | Event::Discard { .. } => unreachable!("find terminal"),
     };
     store.finding = false;
     out.push(Output::Answer(answer));
@@ -123,7 +126,10 @@ pub(super) fn record(
         | Event::Busy
         | Event::Loaded { .. }
         | Event::Page { .. }
-        | Event::Arrived { .. } => unreachable!("record terminal"),
+        | Event::Arrived { .. }
+        | Event::Stage { .. }
+        | Event::Seal { .. }
+        | Event::Discard { .. } => unreachable!("record terminal"),
     };
     out.push(Output::Answer(answer));
 }

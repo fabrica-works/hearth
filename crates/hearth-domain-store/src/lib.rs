@@ -8,6 +8,7 @@ pub mod layers;
 pub mod limits;
 pub mod resolutions;
 mod scan;
+mod staging;
 mod start;
 pub mod vocabulary;
 use limits::Limits;
@@ -62,6 +63,12 @@ impl Store {
 pub fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Queue<Output>) {
     if let Event::Want { key } = ev {
         layers::want(store, key, out);
+    } else if let Event::Stage { .. } = ev {
+        staging::stage(out);
+    } else if let Event::Seal { .. } = ev {
+        staging::seal(out);
+    } else if let Event::Discard { .. } = ev {
+        staging::discard(out);
     } else if store.writing.is_some() {
         resolutions::record(store, env, ev, out);
     } else if let Event::Record { .. } | Event::Room = ev {

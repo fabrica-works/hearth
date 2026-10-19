@@ -21,6 +21,19 @@ pub enum Event {
     Want {
         key: Digest,
     },
+    /// A writable copy of the parent layer, to become the layer of this key (4.2, step 1).
+    Stage {
+        key: Digest,
+        parent: Digest,
+    },
+    /// Walk, freeze, record and publish the staged layer (4.2, steps 3 to 6).
+    Seal {
+        key: Digest,
+    },
+    /// Drop the staged layer of this key (4.2, last paragraph).
+    Discard {
+        key: Digest,
+    },
     Layer {
         record: Layer,
     },
@@ -69,6 +82,9 @@ pub enum Answer {
     Absent,
     Have { key: Digest },
     Free { key: Digest },
+    Staged { key: Digest },
+    Sealed { key: Digest },
+    Discarded { key: Digest },
     Declined { why: Decline },
     Waiting,
     Strays { count: u64, first: Stray },
@@ -124,6 +140,9 @@ pub enum Step {
     Keep,
     List,
     Remove,
+    Stage,
+    Seal,
+    Discard,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Entry {

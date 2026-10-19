@@ -135,7 +135,7 @@ fn rendered_keys(seed: u64) -> (hearth_domain_render::keys::Keys, hearth_lib::en
     (keys.clone(), hearth_domain_render::keys::part(spec, b"config"))
 }
 #[test]
-fn a_build_with_no_layers_plans_all_three_and_its_fetch_is_unavailable() {
+fn a_build_with_no_layers_plans_all_three_and_the_stores_stage_is_refused() {
     use hearth_domain_builder::{
         build::{Layer, Step, vocabulary::Why},
         vocabulary::State,
@@ -148,12 +148,16 @@ fn a_build_with_no_layers_plans_all_three_and_its_fetch_is_unavailable() {
                 Answer::Layer { layer: Layer::Packages, key: keys.packages, state: State::ToBuild },
                 Answer::Layer { layer: Layer::Software, key: keys.software, state: State::ToBuild },
                 Answer::Layer { layer: Layer::Config, key: keys.config, state: State::ToBuild },
-                Answer::Failed { step: Step::Fetch(Layer::Packages), why: Why::Unavailable },
+                Answer::Failed { step: Step::Fetch(Layer::Packages), why: Why::Stage },
             ],
-            "seed {seed}: render's keys, each to build, then the unavailable fetch"
+            "seed {seed}: render's keys, each to build, then the refused stage of the first layer"
         );
         assert_eq!(run.outcome, Some(Outcome::Done), "seed {seed}: render's own outcome");
-        assert_eq!(run.referee.asked, run.referee.ended, "seed {seed}: the step has its terminal");
+        assert!(
+            !run.requests().iter().any(|request| matches!(request, Request::Run { .. })),
+            "seed {seed}: no step runs while the store refuses to stage"
+        );
+        assert_eq!(run.referee.asked, run.referee.ended, "seed {seed}: every request has its terminal");
     });
 }
 #[test]

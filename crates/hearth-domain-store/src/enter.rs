@@ -64,7 +64,10 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
         | Event::Locked
         | Event::Busy
         | Event::Loaded { .. }
-        | Event::Page { .. } => {
+        | Event::Page { .. }
+        | Event::Stage { .. }
+        | Event::Seal { .. }
+        | Event::Discard { .. } => {
             unreachable!("arrival terminal")
         }
     }

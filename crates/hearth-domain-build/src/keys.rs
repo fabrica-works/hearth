@@ -26,6 +26,17 @@ impl Keys {
         }
     }
 }
+impl Keys {
+    /// The key of the layer a layer is staged from: the one beneath it, or the empty layer's.
+    #[must_use]
+    pub const fn parent(&self, layer: Layer) -> Digest {
+        match layer {
+            Layer::Packages => self.empty,
+            Layer::Software => self.packages,
+            Layer::Config => self.software,
+        }
+    }
+}
 /// Each layer's key from the resolution's closure digest and the three part digests.
 #[must_use]
 pub fn keys(closure: Digest, packages: Digest, software: Digest, config: Digest) -> Keys {

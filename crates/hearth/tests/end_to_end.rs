@@ -72,7 +72,11 @@ fn end_to_end_build() {
         "stderr: {}",
         String::from_utf8_lossy(&ended.stderr)
     );
-    assert_eq!(ended.exit, Some(Exit::Code(69)), "client/README.md, 3.3: unavailable");
+    assert_eq!(
+        ended.exit,
+        Some(Exit::Code(69)),
+        "client/README.md, 3.3: unavailable, as the store refuses to stage the first layer"
+    );
     let rendered = fixtures::binary(
         env!("CARGO_BIN_EXE_hearth").as_ref(),
         &["render".as_ref(), "--resolve".as_ref(), "test-min".as_ref(), "--store".as_ref(), store.as_os_str()],

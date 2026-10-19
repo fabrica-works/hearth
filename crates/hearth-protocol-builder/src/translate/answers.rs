@@ -124,7 +124,8 @@ pub fn failed(
         layer: kind(layer),
         step,
         why: match why {
-            Why::Unavailable => build::Why::Unavailable,
+            // The records name one reason until the client grows more (client/README.md, 3.3).
+            Why::Unavailable | Why::Failed | Why::Stage | Why::Seal => build::Why::Unavailable,
         },
     }
 }

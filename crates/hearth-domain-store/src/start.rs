@@ -62,7 +62,10 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Qu
         | Event::Resolution { .. }
         | Event::Unreadable
         | Event::Arrived { .. }
-        | Event::Page { .. } => {
+        | Event::Page { .. }
+        | Event::Stage { .. }
+        | Event::Seal { .. }
+        | Event::Discard { .. } => {
             unreachable!("scan has not begun")
         }
         Event::Failed => {
