@@ -47,11 +47,18 @@ const ROWS: &[Row] = &[
         session: "07, 38",
     },
     Row {
-        decoder: "store, cache and resolution frames (kinds 1, 4, 5)",
+        decoder: "store, layer, cache and resolution frames (kinds 1, 2, 4, 5)",
         world: "tree",
         file: "fuzzy_tree.rs",
         corpus: None,
-        session: "39",
+        session: "39, h01",
+    },
+    Row {
+        decoder: "passwd, group, shadow and gshadow lines",
+        world: "accounts",
+        file: "fuzzy_accounts.rs",
+        corpus: None,
+        session: "h02",
     },
     Row { decoder: "store names", world: "builder", file: "fuzzy_inputs.rs", corpus: None, session: "30.6" },
     Row {

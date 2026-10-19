@@ -78,6 +78,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-accounts-world"
+version = "0.0.0"
+dependencies = [
+ "hearth-protocol-accounts",
+ "skein-heap",
+ "skein-lib",
+]
+
+[[package]]
 name = "hearth-builder-world"
 version = "0.0.0"
 dependencies = [
@@ -220,6 +229,13 @@ dependencies = [
  "skein-heap",
  "skein-lib",
  "skein-world",
+]
+
+[[package]]
+name = "hearth-protocol-accounts"
+version = "0.0.0"
+dependencies = [
+ "skein-lib",
 ]
 
 [[package]]

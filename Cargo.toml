@@ -37,6 +37,7 @@ hearth-test-mirror = { path = "testing/hearth-test-mirror" }
 skein-scratch = { git = "https://github.com/fabrig-dev/skein.git" }
 hearth-domain-render = { path = "crates/hearth-domain-render" }
 hearth-protocol-mmdebstrap = { path = "crates/hearth-protocol-mmdebstrap" }
+hearth-protocol-accounts = { path = "crates/hearth-protocol-accounts" }
 skein-world = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-heap = { git = "https://github.com/fabrig-dev/skein.git" }
 hearth-lib = { path = "crates/hearth-lib" }
