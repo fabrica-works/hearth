@@ -17,7 +17,7 @@ development.md, section 3.3).
 | `README.md` | no | the crates of 4.2, each in the milestone it names, and skein's part of each (section 8.1): M1's, render; the rest not planned |
 | `format.md` | no | all; M1 builds it but for checks (section 11, M5) and artifacts (10.2, M6): render; checks and artifacts not planned |
 | `render.md` | no | all, M1, with the client's `render` and `diff` (client/README.md, section 3): render |
-| `store.md` | no | all, M2, but for peers (section 10, M6); M1 needs `hearth-lib`'s canonical encoding and `H` (3.1, 3.2), and a store without layers, its resolutions and cache files with their records, lock and scan (2.1, 2.4, 4.4, 6.1, 6.4 to 6.6, 6.8, 8.1, 8.2), in the first parts of `hearth-domain-store` and `hearth-protocol-tree`: M1's, render; the rest not planned |
+| `store.md` | no | all, M2, but for peers (section 10, M6); M1 needs `hearth-lib`'s canonical encoding and `H` (3.1, 3.2), and a store without layers, its resolutions and cache files with their records, lock and scan (2.1, 2.4, 4.4, 6.1, 6.4 to 6.6, 6.8, 8.1, 8.2), in the first parts of `hearth-domain-store` and `hearth-protocol-tree`: M1's, render; M2's, by its owner (no plan): the layer record (6.2) and `hearth-protocol-accounts` (5.3) built; the rest not yet |
 | `build.md` | no | all, M2, with the tree helper: not planned |
 | `machine.md` | no | the EFI path and bootstrap, M3; the BIOS path, M3b; containers and pool hosts, M5: not planned |
 | `slots.md` | no | all on EFI with a minimal bless and live changes, M3; trials through GRUB, M3b; containers and pool hosts, M5 (section 12): not planned |
