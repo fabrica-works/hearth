@@ -447,9 +447,9 @@ be made or run, so its prepare key is refused.
   for smith's and temper's channels, with hearth's schema: the magic
   `hrth`, one version to start, the kinds of 5.6. It gives framing, an
   opening that agrees a version, terms, bounds and flow control.
-- **The domains own reliability,** as in temper's `channel.md`: the
-  hello, fenced attempts, acknowledged answers and redialling are
-  `hearth-domain-converge`'s and the engine's, never the channel's.
+- **The domains own reliability:** the hello, fenced attempts,
+  acknowledged answers and redialling are `hearth-domain-converge`'s and
+  the engine's, never the channel's.
 - **The stack, hearth's end:**
 
   ```
@@ -502,9 +502,9 @@ Hello
   and the four facts when it composes the hello, never from a cache.
   The hello is a fresh read the engine's connector can decide on (jig's
   `connectors.md`, 5.1).
-- **No time crosses the wire; only durations do** (temper's
-  `channel.md`, 3.3). Ages are durations, and each side turns them into
-  its own clock's times.
+- **No time crosses the wire; only durations do** (as on jig's
+  channel: jig's `protocol/channel.md`, section 8). Ages are durations,
+  and each side turns them into its own clock's times.
 - **The answers it carries are resent on every channel** until the
   engine acknowledges them (5.5). The hello after a reboot is where the
   answer to an activation arrives.
@@ -541,7 +541,7 @@ store, is open (README.md, section 9). What is fixed:
   (an opaque credential, judged by the engine's owner) or by TLS. The
   engine knows machines by it, and keeps one channel per machine: an
   `Open` under a credential that already has one closes the older with
-  `replaced` (temper's `channel.md`, 4.4).
+  `replaced` (jig's `protocol/channel.md`, 4.2).
 - **Planes stay apart by wiring.** A machine's configuration names one
   engine and one trust. A lab machine holds no credential the run side's
   engine accepts, and the run side's engine refuses an unknown one as
@@ -713,8 +713,8 @@ and an attempt (5.5). Each kind declares its recovery class (jig's
   has proved itself: when the engine has acknowledged the hello. A fleet
   that comes back from a power cut spreads its dials.
 - **The protocol layer never redials.** Its end of the link runs idle,
-  connecting, opening, open, closing, and says `Lost` once per dial
-  (temper's `channel.md`, 11.2). The domain decides when to dial again.
+  connecting, opening, open, closing, and says `Lost` once per dial.
+  The domain decides when to dial again.
 
   ```
   state        event                                  next         does
@@ -781,8 +781,8 @@ Application kinds of skein's channel; each belongs to one direction.
   answers in flight, plus a reserve for facts. Facts and events go only
   while the reserve stays free, so the channel never refuses an answer.
 - **Records are versioned by the agreed version,** with a Rust variant
-  per version where a layout changes (temper's `channel.md`, section
-  17), so a record cannot be encoded under the wrong layout.
+  per version where a layout changes, so a record cannot be encoded
+  under the wrong layout.
 
 ## 6. Facts and events
 
