@@ -649,7 +649,7 @@ protocol is their command line. hearth builds it first.
   programs stay temper's, and git's working trees stay
   `skein-fake-checkout`'s.
 - **Only the generic half moves to skein,** when temper builds its
-  machine (temper's `testing.md`, section 9): as a kit beside
+  machine (temper's `testing.md`, 4.3): as a kit beside
   `skein-fake-checkout`, with its tests and hearth as its first user
   (testing-strategy.md, sections 7 and 9). The hearth half (the
   universe, firmware, bootloaders, the kernel, PID 1, the tools' fakes)
