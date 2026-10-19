@@ -286,7 +286,7 @@ hearth-fake-machine
   as btrfs's next free id is the highest existing one plus one; a
   reused number comes with a new ctime.
 - **A change counter** per inode and per subvolume: temper's file
-  version (temper's `testing.md`, 4.3), and the ground truth that a
+  version (temper's `domain/testing.md`, 4.3), and the ground truth that a
   sealed layer never changes (8.3).
 - **Listings come back in an order drawn from the seed,** so nothing
   hearth computes may depend on it.
@@ -401,7 +401,7 @@ unprivileged for this design:
   `skein-fake-checkout` leaves processes to its world.
 - **Shell:** the escape hatches (`customize.sh`, `software.sh`) in the
   test repositories are written in temper's shell subset (temper's
-  `testing.md`, 4.3), with the few file commands scenarios need.
+  `domain/testing.md`, 4.3), with the few file commands scenarios need.
   Maintainer scripts are not shell (3.6).
 
 ### 3.6 The package universe
@@ -633,7 +633,7 @@ The machine then powers on, and the firmware boots what it would (3.7).
 
 ### 3.11 Shared with temper
 
-temper plans the same machine (temper's `testing.md`, 3.2 and 4.3):
+temper plans the same machine (temper's `domain/testing.md`, 3.2 and 4.3):
 files with versions, per-tree views, processes, and programs whose
 protocol is their command line. hearth builds it first.
 
@@ -649,7 +649,7 @@ protocol is their command line. hearth builds it first.
   programs stay temper's, and git's working trees stay
   `skein-fake-checkout`'s.
 - **Only the generic half moves to skein,** when temper builds its
-  machine (temper's `testing.md`, 4.3): as a kit beside
+  machine (temper's `domain/testing.md`, 4.3): as a kit beside
   `skein-fake-checkout`, with its tests and hearth as its first user
   (testing-strategy.md, sections 7 and 9). The hearth half (the
   universe, firmware, bootloaders, the kernel, PID 1, the tools' fakes)

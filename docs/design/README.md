@@ -703,7 +703,7 @@ user (`testing-strategy.md`, section 9). From the earliest:
 
 ### 8.2 temper
 
-- **The fake machine is temper's too** (temper's `testing.md`, 3.2).
+- **The fake machine is temper's too** (temper's `domain/testing.md`, 3.2).
   hearth builds it first, under `testing/`. Its generic half (files,
   processes, programs on an argument-vector face) moves into skein as a
   kit when temper needs it; hearth's half (btrfs, namespaces, firmware,
