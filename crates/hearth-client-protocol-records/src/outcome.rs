@@ -5,6 +5,8 @@ pub enum Outcome {
     Negative,
     Failed,
     Usage,
+    /// Nothing runs what was asked: a build's step with no runner yet.
+    Unavailable,
     TryAgain,
 }
 /// The command's process exit code.
@@ -15,6 +17,7 @@ pub fn code(outcome: Outcome) -> u8 {
         Outcome::Negative => 1,
         Outcome::Failed => 2,
         Outcome::Usage => 64,
+        Outcome::Unavailable => 69,
         Outcome::TryAgain => 75,
     }
 }

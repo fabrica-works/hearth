@@ -119,7 +119,12 @@ impl Default for Options {
 }
 fn build(scenario: &Scenario<'_>, seed: u64, config: Config, options: &Options) -> World<Proc, Referee, Shared> {
     let shared = Shared::for_scenario(scenario, seed, fixtures::WORLD_PIPE);
-    if matches!(scenario.call, hearth::Call::Render { resolve: true, .. } | hearth::Call::Diff { resolve: true, .. }) {
+    if matches!(
+        scenario.call,
+        hearth::Call::Render { resolve: true, .. }
+            | hearth::Call::Diff { resolve: true, .. }
+            | hearth::Call::Build { .. }
+    ) {
         fixtures::serve(&shared);
     }
     fixtures::lay_calls(&shared);

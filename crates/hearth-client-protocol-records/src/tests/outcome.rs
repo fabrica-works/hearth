@@ -1,6 +1,12 @@
 use crate::outcome::{self, Outcome};
-const CODES: [(Outcome, u8); 5] =
-    [(Outcome::Done, 0), (Outcome::Negative, 1), (Outcome::Failed, 2), (Outcome::Usage, 64), (Outcome::TryAgain, 75)];
+const CODES: [(Outcome, u8); 6] = [
+    (Outcome::Done, 0),
+    (Outcome::Negative, 1),
+    (Outcome::Failed, 2),
+    (Outcome::Usage, 64),
+    (Outcome::Unavailable, 69),
+    (Outcome::TryAgain, 75),
+];
 #[test]
 fn each_outcome_exits_with_its_client_readme_code() {
     for (outcome, expected) in CODES {

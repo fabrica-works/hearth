@@ -34,6 +34,10 @@ pub const SHIPPED: Limits = Limits {
     },
     files: Files { files: 32, read: 16_384, entries: 1_024, whole: 4_194_328, timeout: Duration::from_secs(5) },
     protocol: protocol::limits::SHIPPED,
-    domain: domain::Limits { render: domain::render::limits::SHIPPED, store: domain::store::limits::SHIPPED },
+    domain: domain::Limits {
+        render: domain::render::limits::SHIPPED,
+        store: domain::store::limits::SHIPPED,
+        build: domain::build::limits::SHIPPED,
+    },
     queue: 32,
 };

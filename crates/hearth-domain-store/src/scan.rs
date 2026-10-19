@@ -3,7 +3,7 @@ use crate::{
     Phase, Store, index,
     limits::Limits,
     resolutions,
-    vocabulary::{Answer, Directory, Entry, Event, Limit, Output, Removal, Request, Shape, Step, Stray},
+    vocabulary::{Answer, Directory, Entry, Event, Layer, Limit, Output, Removal, Request, Shape, Step, Stray},
 };
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
@@ -12,6 +12,7 @@ use skein_lib::{Env, Map, Queue};
 enum Pass {
     Top,
     Resolutions,
+    Layers,
     Records,
     Files,
     Empty,
@@ -23,7 +24,9 @@ pub(super) struct Scan {
     pass: Pass,
     pub(super) index: index::Index,
     pub(super) resolutions: Map<Digest, ()>,
+    pub(super) layers: Map<Digest, Layer>,
     loading: Option<Digest>,
+    pub(super) layer: Option<(Digest, Box<[u8]>)>,
     full: Answer,
     entries: Box<[Entry]>,
     at: u32,
@@ -40,7 +43,9 @@ impl Scan {
             pass: Pass::Top,
             index: index::Index::with_capacity(limits.cache_files.saturating_mul(2)),
             resolutions: Map::with_capacity(limits.resolutions),
+            layers: Map::with_capacity(limits.layers),
             loading: None,
+            layer: None,
             full: full(limits, Limit::CacheFiles),
             entries: Box::new([]),
             at: 0,
@@ -60,10 +65,18 @@ impl Scan {
     pub(super) fn resolved(&self, key: &Digest) -> bool {
         self.resolutions.get(key).is_some()
     }
+    /// Reports a name once among the scan's strays, by count and the first (8.2, step 7).
+    pub(super) fn refuse(&mut self, directory: Directory, name: Box<[u8]>) {
+        self.strays = self.strays.saturating_add(1);
+        if self.first.is_none() {
+            self.first = Some(Stray { directory, name });
+        }
+    }
     fn directory(&self) -> Directory {
         match self.pass {
             Pass::Top => Directory::Top,
             Pass::Resolutions => Directory::Resolutions,
+            Pass::Layers => Directory::Layers,
             Pass::Records | Pass::Files | Pass::Empty | Pass::Settle | Pass::Closing => Directory::Cache,
         }
     }
@@ -99,7 +112,7 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
         Event::Failed => {
             let step = if scan.removing {
                 Step::Remove
-            } else if scan.loading.is_some() {
+            } else if scan.loading.is_some() || scan.layer.is_some() {
                 Step::Load
             } else if scan.pass == Pass::Empty {
                 Step::Empty
@@ -126,7 +139,21 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
             }
         }
         Event::Unreadable => {
-            scan.loading = None;
+            if scan.layer.is_some() {
+                crate::layers::index(scan, None);
+            } else {
+                scan.loading = None;
+            }
+        }
+        Event::Layer { record } => {
+            if !crate::layers::index(scan, Some(record)) {
+                stop_full(store, &env.limits, Limit::Layers, out);
+                return;
+            }
+        }
+        Event::Want { key } => {
+            crate::layers::want(store, key, out);
+            return;
         }
         Event::Record { .. }
         | Event::Room
@@ -155,6 +182,11 @@ fn advance(store: &mut Store, env: &Env<Limits>, out: &mut Queue<Output>) {
             Shape::Record(key) if scan.pass == Pass::Resolutions => {
                 scan.loading = Some(key);
                 out.push(Output::Request(Request::Load { key }));
+                return;
+            }
+            Shape::Record(key) if scan.pass == Pass::Layers => {
+                scan.layer = Some((key, entry.name.clone()));
+                out.push(Output::Request(Request::LoadLayer { key }));
                 return;
             }
             Shape::Record(digest) if scan.pass == Pass::Records => {
@@ -200,10 +232,11 @@ fn advance(store: &mut Store, env: &Env<Limits>, out: &mut Queue<Output>) {
         return;
     }
     match scan.pass {
-        Pass::Top | Pass::Resolutions | Pass::Records => {
+        Pass::Top | Pass::Resolutions | Pass::Layers | Pass::Records => {
             scan.pass = match scan.pass {
                 Pass::Top => Pass::Resolutions,
-                Pass::Resolutions => Pass::Records,
+                Pass::Resolutions => Pass::Layers,
+                Pass::Layers => Pass::Records,
                 Pass::Records => Pass::Files,
                 Pass::Files | Pass::Empty | Pass::Settle | Pass::Closing => unreachable!("listing pass"),
             };
@@ -227,7 +260,12 @@ fn settle(store: &mut Store, out: &mut Queue<Output>) {
     }
 }
 fn full(limits: &Limits, limit: Limit) -> Answer {
-    Answer::Full { limit, most: if limit == Limit::CacheFiles { limits.cache_files } else { limits.resolutions } }
+    let most = match limit {
+        Limit::CacheFiles => limits.cache_files,
+        Limit::Layers => limits.layers,
+        Limit::Resolutions => limits.resolutions,
+    };
+    Answer::Full { limit, most }
 }
 fn stop_full(store: &mut Store, limits: &Limits, limit: Limit, out: &mut Queue<Output>) {
     store.scan.full = full(limits, limit);
@@ -249,6 +287,8 @@ fn finish(store: &mut Store, answer: Answer, out: &mut Queue<Output>) {
         | Answer::HasRoom
         | Answer::Found { .. }
         | Answer::Absent
+        | Answer::Have { .. }
+        | Answer::Free { .. }
         | Answer::Declined { .. }
         | Answer::Waiting
         | Answer::Strays { .. }
@@ -260,6 +300,7 @@ fn finish(store: &mut Store, answer: Answer, out: &mut Queue<Output>) {
     if answer != Answer::Ready {
         store.scan.index = index::Index::with_capacity(0);
         store.scan.resolutions = Map::with_capacity(0);
+        store.scan.layers = Map::with_capacity(0);
     }
     if answer == Answer::Ready
         && let Some(first) = store.scan.first.take()

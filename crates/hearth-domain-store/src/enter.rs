@@ -52,6 +52,8 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
             };
             out.push(Output::Answer(answer));
         }
+        Event::Want { key } => crate::layers::want(store, key, out),
+        Event::Layer { .. } => crate::scan::step(store, env, event, out),
         Event::Record { .. }
         | Event::Room
         | Event::Unwritable { .. }

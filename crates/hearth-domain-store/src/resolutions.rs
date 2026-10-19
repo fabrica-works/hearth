@@ -28,6 +28,7 @@ pub fn digest(closure: &[Closed]) -> Digest {
 /// A find leaves unreadable records absent; startup alone validates their hashes.
 pub(super) fn find(
     store: &mut crate::Store,
+    env: &skein_lib::Env<crate::limits::Limits>,
     event: crate::vocabulary::Event,
     out: &mut skein_lib::Queue<crate::vocabulary::Output>,
 ) {
@@ -46,6 +47,8 @@ pub(super) fn find(
         }
         Event::Resolution { record } => Answer::Found { resolution: record },
         Event::Unreadable | Event::Failed => Answer::Absent,
+        Event::Want { key } => return crate::layers::want(store, key, out),
+        Event::Layer { .. } => return crate::scan::step(store, env, event, out),
         Event::Record { .. }
         | Event::Room
         | Event::Unwritable { .. }
@@ -110,6 +113,8 @@ pub(super) fn record(
             store.decline = Decline::Unusable { step: Step::Write };
             Answer::Declined { why: store.decline }
         }
+        Event::Want { key } => return crate::layers::want(store, key, out),
+        Event::Layer { .. } => return crate::scan::step(store, env, event, out),
         Event::Find { .. }
         | Event::Resolution { .. }
         | Event::Unreadable

@@ -4,6 +4,7 @@
 extern crate alloc;
 mod enter;
 mod index;
+pub mod layers;
 pub mod limits;
 pub mod resolutions;
 mod scan;
@@ -59,14 +60,16 @@ impl Store {
     }
 }
 pub fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Queue<Output>) {
-    if store.writing.is_some() {
+    if let Event::Want { key } = ev {
+        layers::want(store, key, out);
+    } else if store.writing.is_some() {
         resolutions::record(store, env, ev, out);
     } else if let Event::Record { .. } | Event::Room = ev {
         resolutions::record(store, env, ev, out);
     } else if let Event::Find { .. } = ev {
-        resolutions::find(store, ev, out);
+        resolutions::find(store, env, ev, out);
     } else if store.finding {
-        resolutions::find(store, ev, out);
+        resolutions::find(store, env, ev, out);
     } else if store.entering.is_some() {
         enter::step(store, env, ev, out);
     } else if let Event::Arrived { .. } = ev {

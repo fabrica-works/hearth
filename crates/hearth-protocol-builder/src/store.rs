@@ -55,6 +55,15 @@ impl Store {
             self.walk = Some(crate::walk::Walker::new(limits.walk, roots.staging.fd, below));
             return;
         }
+        let removal =
+            if let Request::Remove { directory, .. } = &request { removal_root(roots, *directory) } else { None };
+        if let (Request::Remove { .. }, None) = (&request, removal) {
+            // The protocol holds no root for layers/: nothing is removed there
+            // before the task that deletes layers with btrfs (store.md, 7.3).
+            self.pending = None;
+            self.deferred = Some(Event::Failed);
+            return;
+        }
         below.push(Asked::File(match request {
             Request::Write { .. } => unreachable!("write handled"),
             Request::Empty => unreachable!("walk started"),
@@ -64,6 +73,14 @@ impl Store {
                 path: names::removal(builder::store::vocabulary::Removal::Record(key)),
                 max: u32::try_from(tree::frame::largest(tree::frame::Kind::Resolution, &limits.tree))
                     .expect("resolution fits u32"),
+                no_follow: true,
+            },
+            Request::LoadLayer { key } => file::Request::Load {
+                owner: OWNER,
+                root: roots.store.token,
+                path: names::layer_record(key),
+                max: u32::try_from(tree::frame::largest(tree::frame::Kind::Layer, &limits.tree))
+                    .expect("layer record fits u32"),
                 no_follow: true,
             },
             Request::Keep { arrival: _, record } => {
@@ -92,6 +109,7 @@ impl Store {
                         Directory::Top => b".",
                         Directory::Cache => b"cache",
                         Directory::Resolutions => b"resolutions",
+                        Directory::Layers => b"layers",
                     }),
                     no_follow: true,
                 }
@@ -101,13 +119,9 @@ impl Store {
                 self.list()
             }
             Request::Close => file::Request::Close { owner: OWNER, file: self.cursor.take().expect("scan cursor") },
-            Request::Remove { directory, name } => file::Request::Remove {
+            Request::Remove { directory: _, name } => file::Request::Remove {
                 owner: OWNER,
-                root: match directory {
-                    Directory::Top => roots.store.fd,
-                    Directory::Cache => roots.cache.fd,
-                    Directory::Resolutions => roots.resolutions.fd,
-                },
+                root: removal.expect("a removal's root, checked above"),
                 name: names::removal(name),
                 directory: false,
             },
@@ -180,6 +194,7 @@ impl Store {
                 Request::Write { .. }
                 | Request::Empty
                 | Request::Load { .. }
+                | Request::LoadLayer { .. }
                 | Request::List { .. }
                 | Request::Next { .. }
                 | Request::Close
@@ -313,8 +328,14 @@ impl Store {
             file::Event::Locked { .. } => Event::Locked,
             file::Event::Busy { .. } => Event::Busy,
             file::Event::Loaded { bytes, .. } => loaded(&bytes, pending, limits),
+            // A store made by a builder that built no layer has no `layers/` (store.md, 2.4).
+            file::Event::Failed { error: Error::NotFound, .. }
+                if *pending == Request::List { directory: Directory::Layers, max: self.max } =>
+            {
+                Event::Page { entries: Box::new([]), last: true }
+            }
             file::Event::TooLarge { .. } => {
-                if let Request::Load { .. } = pending {
+                if let Request::Load { .. } | Request::LoadLayer { .. } = pending {
                     Event::Unreadable
                 } else {
                     Event::Loaded { record: None }
@@ -367,7 +388,21 @@ pub(super) fn startup(why: Why, store: &[u8]) -> records::startup::Startup {
     }
 }
 
+fn removal_root(roots: &Roots, directory: Directory) -> Option<skein_io::kernel::Fd> {
+    match directory {
+        Directory::Top => Some(roots.store.fd),
+        Directory::Cache => Some(roots.cache.fd),
+        Directory::Resolutions => Some(roots.resolutions.fd),
+        Directory::Layers => None,
+    }
+}
 fn loaded(bytes: &[u8], pending: &Request, limits: &Limits) -> Event {
+    if let Request::LoadLayer { .. } = pending {
+        return match tree::layer::read(bytes, &limits.tree) {
+            Ok(record) => Event::Layer { record: translate::store::layer(record) },
+            Err(_) => Event::Unreadable,
+        };
+    }
     if let Request::Load { .. } = pending {
         return match tree::resolution::read(bytes, &limits.tree) {
             Ok(record) => Event::Resolution { record: translate::store::resolution(record) },

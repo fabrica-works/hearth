@@ -110,6 +110,7 @@ pub struct Protocol {
     resolving: Option<resolve::Resolve>,
     proxy: Option<Proxy>,
     file_read: u32,
+    ran: Option<builder::build::Step>,
 }
 impl Protocol {
     #[must_use]
@@ -131,6 +132,7 @@ impl Protocol {
             resolving: None,
             proxy: None,
             file_read: limits.mmdebstrap.chunk.max(1),
+            ran: None,
         }
     }
     #[must_use]
@@ -177,6 +179,7 @@ impl Protocol {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.resolving.is_none()
+            && self.ran.is_none()
             && self.keeping.is_none()
             && self.mode.is_none()
             && self.child.is_none()
@@ -186,7 +189,12 @@ impl Protocol {
     }
     #[must_use]
     pub fn work_pending(&self) -> bool {
-        if self.store.ready() || self.call.is_some() || self.client.work_pending() || self.progress.work_pending() {
+        if self.store.ready()
+            || self.call.is_some()
+            || self.ran.is_some()
+            || self.client.work_pending()
+            || self.progress.work_pending()
+        {
             return true;
         }
         if let Some(resolve) = &self.resolving {
@@ -233,6 +241,12 @@ impl Protocol {
             Mode::Read(read) => read.failed() || (child.output.is_some() && read.work_pending()),
         }
     }
+    /// Every step is unavailable until the task that runs it (build.md, 4.3).
+    fn resume_run(&mut self, above: &mut Queue<Event>) -> bool {
+        let Some(step) = self.ran.take() else { return false };
+        above.push(Event::Build(builder::build::vocabulary::Event::Unavailable { step }));
+        true
+    }
     fn spawn(
         &mut self,
         command: invocation::Command<'_>,
@@ -252,11 +266,15 @@ pub fn down(
     below: &mut Queue<Asked>,
 ) {
     match rq {
-        Request::Progress(progress) => protocol.progress.down(
+        Request::Progress(progress) => protocol.progress.progress(
             &Env { now: env.now, wall: env.wall, limits: env.limits.printer },
-            Request::Progress(progress),
+            progress,
             &protocol.store_path,
         ),
+        Request::Run { step } => {
+            assert!(protocol.ran.is_none(), "one step at a time");
+            protocol.ran = Some(step);
+        }
         Request::Store(request) => protocol.store_request(request, &env.limits, below),
         Request::Unopened { to, why } => {
             assert_eq!(to.into_token(), Token::new(0), "initial call");
@@ -332,17 +350,17 @@ pub fn down(
                 }
             }
         }
-        request @ (Request::Answer(_) | Request::Reply { .. }) => {
-            if let Request::Reply { .. } = request
-                && protocol.progress.bound()
-            {
-                protocol.progress.finish(&Env { now: env.now, wall: env.wall, limits: env.limits.printer });
+        Request::Answer(answer) => protocol.client.answer(
+            &Env { now: env.now, wall: env.wall, limits: env.limits.printer },
+            answer,
+            &protocol.store_path,
+        ),
+        Request::Reply { to, outcome, diff, left_out } => {
+            let env = Env { now: env.now, wall: env.wall, limits: env.limits.printer };
+            if protocol.progress.bound() {
+                protocol.progress.finish(&env);
             }
-            protocol.client.down(
-                &Env { now: env.now, wall: env.wall, limits: env.limits.printer },
-                request,
-                &protocol.store_path,
-            );
+            protocol.client.reply(&env, to, outcome, diff, left_out);
         }
     }
 }
@@ -518,7 +536,7 @@ pub fn resume(protocol: &mut Protocol, env: &Env<Limits>, above: &mut Queue<Even
         protocol.client.resume(&Env { now: env.now, wall: env.wall, limits: env.limits.printer }, below);
         return;
     }
-    if protocol.resume_store(above) || protocol.resume_resolve(env, above, below) {
+    if protocol.resume_run(above) || protocol.resume_store(above) || protocol.resume_resolve(env, above, below) {
         return;
     }
     if let Some(keep) = &mut protocol.keeping {

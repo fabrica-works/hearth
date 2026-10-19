@@ -20,6 +20,8 @@ pub enum Record {
     Change(Change),
     Error(Error),
     Startup(Startup),
+    Layer(crate::build::Layer),
+    Failed(crate::build::Failed),
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Type {
@@ -33,6 +35,8 @@ pub enum Type {
     Change,
     Error,
     Startup,
+    Layer,
+    Failed,
 }
 impl Record {
     #[must_use]
@@ -48,6 +52,8 @@ impl Record {
             Self::Change(_) => Type::Change,
             Self::Error(_) => Type::Error,
             Self::Startup(_) => Type::Startup,
+            Self::Layer(_) => Type::Layer,
+            Self::Failed(_) => Type::Failed,
         }
     }
 }

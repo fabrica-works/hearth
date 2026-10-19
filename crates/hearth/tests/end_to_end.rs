@@ -52,3 +52,36 @@ fn end_to_end_render_resolve() {
     assert!(fixtures::lines_starting(&ended.stdout, &["packages "]).ends_with("resolution 21e9a02feb65 known\n"));
     assert_eq!(ended.exit, Some(Exit::Code(0)), "stderr: {}", String::from_utf8_lossy(&ended.stderr));
 }
+
+#[test]
+fn end_to_end_build() {
+    let repository = fixtures::recorded_test_min("end-to-end-build");
+    let store = repository.scratch().path().join("store");
+    let ended = fixtures::binary(
+        env!("CARGO_BIN_EXE_hearth").as_ref(),
+        &["build".as_ref(), "test-min".as_ref(), "--store".as_ref(), store.as_os_str()],
+        &[],
+        repository.work_tree(),
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&ended.stdout),
+        "packages     d018a0eea488   to build\n\
+         software     f60610453970   to build\n\
+         config       8c9bf06f6262   to build\n\
+         failed       fetch packages   unavailable\n",
+        "stderr: {}",
+        String::from_utf8_lossy(&ended.stderr)
+    );
+    assert_eq!(ended.exit, Some(Exit::Code(69)), "client/README.md, 3.3: unavailable");
+    let rendered = fixtures::binary(
+        env!("CARGO_BIN_EXE_hearth").as_ref(),
+        &["render".as_ref(), "--resolve".as_ref(), "test-min".as_ref(), "--store".as_ref(), store.as_os_str()],
+        &[],
+        repository.work_tree(),
+    );
+    assert_eq!(
+        fixtures::lines_starting(&rendered.stdout, &["keys "]),
+        "keys         packages d018a0eea488   software f60610453970   config 8c9bf06f6262\n",
+        "store.md, 3.3: render's keys are the build's"
+    );
+}

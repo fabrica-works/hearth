@@ -1,4 +1,4 @@
-//! In-process render arguments and startup paths (client/README.md, 3.5).
+//! In-process render, diff and build arguments and startup paths (client/README.md, 3.5).
 use crate::{
     Call, Form, Invocation,
     records::startup::{Misuse, Opened, Startup},
@@ -21,10 +21,11 @@ pub fn invocation(
 ) -> Result<Invocation, Startup> {
     let mut words = args.iter();
     let command = words.next().map_or(OsStr::new(""), OsString::as_os_str);
-    if command != "render" && command != "diff" {
+    if command != "render" && command != "diff" && command != "build" {
         return Err(usage(Misuse::Command, command));
     }
     let diff = command == "diff";
+    let build = command == "build";
     let pair = if diff {
         let from = words.next().ok_or_else(|| usage(Misuse::Value, command))?;
         let to = words.next().ok_or_else(|| usage(Misuse::Value, command))?;
@@ -44,7 +45,7 @@ pub fn invocation(
     while let Some(word) = words.next() {
         match word.as_bytes() {
             b"--json" => {}
-            b"--resolve" => resolve = true,
+            b"--resolve" if !build => resolve = true,
             b"--at" | b"--repo" | b"--store" | b"--target" => {
                 if (diff && word == "--at") || (!diff && word == "--target") {
                     return Err(usage(Misuse::Option, word));
@@ -59,7 +60,7 @@ pub fn invocation(
             }
             bytes if bytes.starts_with(b"-") => return Err(usage(Misuse::Option, word)),
             bytes => {
-                if diff {
+                if diff || (build && !targets.is_empty()) {
                     return Err(usage(Misuse::Option, word));
                 }
                 targets.push(Box::<[u8]>::from(bytes));
@@ -67,31 +68,28 @@ pub fn invocation(
         }
     }
     hearth_protocol_git::invocation::revision(revision.as_bytes()).map_err(|_| usage(Misuse::Revision, revision))?;
+    if build && targets.is_empty() {
+        return Err(usage(Misuse::Value, command));
+    }
     let store = store
         .or_else(|| default_store(xdg_cache_home, home))
         .ok_or_else(|| unopened(Opened::Store, None, "neither XDG_CACHE_HOME nor HOME is absolute"))?;
-    let repository = repository_path(repository, cwd)?;
-    Ok(Invocation {
-        call: if let Some((from, to)) = pair {
-            Call::Diff {
-                resolve,
-                repository: repository.as_os_str().as_bytes().into(),
-                from: from.as_bytes().into(),
-                to: to.as_bytes().into(),
-                targets: targets.into_boxed_slice(),
-            }
-        } else {
-            Call::Render {
-                resolve,
-                repository: repository.as_os_str().as_bytes().into(),
-                revision: revision.as_bytes().into(),
-                targets: targets.into_boxed_slice(),
-            }
-        },
-        proxy: None,
-        form: form(args),
-        store: cwd.join(store),
-    })
+    let repository: Box<[u8]> = repository_path(repository, cwd)?.as_os_str().as_bytes().into();
+    let call = if let Some((from, to)) = pair {
+        Call::Diff {
+            resolve,
+            repository,
+            from: from.as_bytes().into(),
+            to: to.as_bytes().into(),
+            targets: targets.into_boxed_slice(),
+        }
+    } else if build {
+        let target = targets.into_iter().next().expect("one target, checked above");
+        Call::Build { repository, revision: revision.as_bytes().into(), target }
+    } else {
+        Call::Render { resolve, repository, revision: revision.as_bytes().into(), targets: targets.into_boxed_slice() }
+    };
+    Ok(Invocation { call, proxy: None, form: form(args), store: cwd.join(store) })
 }
 fn default_store(xdg: Option<&OsStr>, home: Option<&OsStr>) -> Option<PathBuf> {
     xdg.filter(|path| Path::new(path).is_absolute()).map(|path| Path::new(path).join("hearth/store")).or_else(|| {

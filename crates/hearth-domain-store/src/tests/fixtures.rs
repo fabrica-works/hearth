@@ -36,6 +36,9 @@ impl Harness {
     pub fn indexed(&self, digest: &hearth_lib::encode::Digest) -> bool {
         self.store.scan.indexed(digest)
     }
+    pub fn published(&self, key: &hearth_lib::encode::Digest) -> bool {
+        self.store.scan.layers.contains_key(key)
+    }
     pub fn next_deadline(&self) -> Option<Time> {
         crate::next_deadline(&self.store)
     }
@@ -72,7 +75,52 @@ pub fn scanning(limits: Limits) -> Harness {
     ));
     drop(store.page(&[], true));
     drop(store.page(&[], true));
+    drop(store.page(&[], true));
     store
+}
+/// A scan listing `layers/`, its first two passes done.
+pub fn layering(limits: Limits) -> Harness {
+    let mut store = Harness::new(limits, MIN_UID);
+    drop(store.step(Time::ZERO, Event::Open));
+    drop(store.step(Time::ZERO, Event::Locked));
+    drop(store.step(
+        Time::ZERO,
+        Event::Loaded { record: Some(StoreRecord { layout: 1, made: Wall::EPOCH, range: None, uid: MIN_UID }) },
+    ));
+    drop(store.page(&[], true));
+    drop(store.page(&[], true));
+    store
+}
+pub fn empty_layer() -> crate::vocabulary::Layer {
+    crate::vocabulary::Layer {
+        key: hearth_lib::hash::H::new(b"empty", 0).finish(),
+        parent: None,
+        inputs: crate::vocabulary::LayerInputs::Empty,
+        tree: D3,
+        uuid: [7; 16],
+        at: Wall::EPOCH,
+    }
+}
+/// H("packages", resolution digest, part digest), written out (store.md, 3.3).
+pub fn packages_layer() -> crate::vocabulary::Layer {
+    let mut hash = hearth_lib::hash::H::new(b"packages", 2);
+    hash.values().digest(&D2);
+    hash.values().digest(&D1);
+    crate::vocabulary::Layer {
+        key: hash.finish(),
+        parent: Some(empty_layer().key),
+        inputs: crate::vocabulary::LayerInputs::Packages { part: D1, resolution: D2 },
+        ..empty_layer()
+    }
+}
+pub fn record_name(key: hearth_lib::encode::Digest) -> Box<[u8]> {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut name = skein_lib::Writer::new(71_usize);
+    for byte in key.0 {
+        name.put(&[HEX[usize::from(byte >> 4_u8)], HEX[usize::from(byte & 15_u8)]]).expect("hex room");
+    }
+    name.put(b".record").expect("suffix room");
+    name.finish()
 }
 
 pub const ARRIVAL: skein_lib::Token = skein_lib::Token::new(1);

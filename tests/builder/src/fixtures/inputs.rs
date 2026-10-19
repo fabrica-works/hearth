@@ -133,13 +133,18 @@ pub fn damaged(rng: &mut Rng, name: &[u8]) -> Vec<u8> {
 pub fn invocation(rng: &mut Rng) -> Invocation {
     drawn(rng, None)
 }
-/// One input model for each supported command, render and diff.
-pub const ROUND_TRIP_ROWS: usize = 2;
+/// One input model for each supported command: render, diff and build.
+pub const ROUND_TRIP_ROWS: usize = 3;
 #[must_use]
 pub fn invocations(rng: &mut Rng) -> [Invocation; ROUND_TRIP_ROWS] {
     let input = invocation(rng);
     let diff = matches!(input.call, Call::Render { .. });
-    [input, drawn(rng, Some(diff))]
+    let other = drawn(rng, Some(diff));
+    let mut build = drawn(rng, Some(false));
+    let Call::Render { repository, revision, .. } = build.call else { unreachable!("drawn as render") };
+    build.call =
+        Call::Build { repository, revision, target: format!("node{}-prod", rng.below(TARGETS)).into_bytes().into() };
+    [input, other, build]
 }
 fn drawn(rng: &mut Rng, diff: Option<bool>) -> Invocation {
     let revision = format!("branch{}", rng.below(u64::from(u16::MAX))).into_bytes().into_boxed_slice();
@@ -163,6 +168,7 @@ fn drawn(rng: &mut Rng, diff: Option<bool>) -> Invocation {
 #[must_use]
 pub fn arguments(invocation: &Invocation) -> Vec<OsString> {
     let mut args = Vec::new();
+    let built: Box<[Box<[u8]>]>;
     let (resolve, repository, targets) = match &invocation.call {
         Call::Render { resolve, repository, revision, targets } => {
             args.push(OsString::from("render"));
@@ -175,6 +181,13 @@ pub fn arguments(invocation: &Invocation) -> Vec<OsString> {
             args.push(OsString::from_vec(from.to_vec()));
             args.push(OsString::from_vec(to.to_vec()));
             (*resolve, repository, targets)
+        }
+        Call::Build { repository, revision, target } => {
+            args.push(OsString::from("build"));
+            args.push(OsString::from("--at"));
+            args.push(OsString::from_vec(revision.to_vec()));
+            built = Box::new([target.clone()]);
+            (false, repository, &built)
         }
     };
     args.extend([

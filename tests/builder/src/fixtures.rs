@@ -424,10 +424,14 @@ pub enum Laid {
     Resolution(hearth_protocol_tree::resolution::Resolution),
     File(&'static str),
     Record(&'static str, hearth::service::domain::render::vocabulary::Digest),
+    Layer(Box<hearth_protocol_tree::layer::Layer>),
 }
 pub fn lay(store: &Path, entries: &[Laid]) {
     fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("cache")).expect("cache directory");
     fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("resolutions")).expect("resolutions directory");
+    if entries.iter().any(|entry| matches!(entry, Laid::Layer(_))) {
+        fs::DirBuilder::new().recursive(true).mode(0o700).create(store.join("layers")).expect("layers directory");
+    }
     for (name, bytes) in laid_files(entries) {
         fs::write(store.join(name), bytes).expect("laid file");
     }
@@ -448,6 +452,10 @@ pub fn laid_files(entries: &[Laid]) -> Vec<(String, Vec<u8>)> {
                     .into_vec(),
             ),
             Laid::File(name) => ((*name).to_owned(), b"fixture".to_vec()),
+            Laid::Layer(record) => (
+                format!("layers/{}.record", hex_digest(record.key.0)),
+                hearth_protocol_tree::layer::write(record, &limits::SHIPPED).expect("layer record").into_vec(),
+            ),
             Laid::Record(name, digest) => (
                 (*name).to_owned(),
                 cache_file::write(
@@ -781,5 +789,6 @@ mod goldens;
 pub use goldens::*;
 
 pub mod budgets;
+pub mod build;
 pub mod inputs;
 pub mod properties;

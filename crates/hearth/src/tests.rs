@@ -33,6 +33,10 @@ const MISUSES: &[(&[&str], Misuse, &[u8])] = &[
     (&["diff"], Misuse::Value, b"diff"),
     (&["render", "--bogus"], Misuse::Option, b"--bogus"),
     (&["render", "--at"], Misuse::Value, b"--at"),
+    (&["build"], Misuse::Value, b"build"),
+    (&["build", "x1-prod", "x2-prod"], Misuse::Option, b"x2-prod"),
+    (&["build", "x1-prod", "--resolve"], Misuse::Option, b"--resolve"),
+    (&["build", "--target", "x1-prod"], Misuse::Option, b"--target"),
 ];
 #[test]
 fn an_unknown_command_or_option_is_usage() {
@@ -206,4 +210,24 @@ fn diff_takes_resolve_as_render_does() {
             targets: Box::new([])
         }
     );
+}
+
+#[test]
+fn build_takes_one_target_and_render_s_options() {
+    let invocation = argv::invocation(
+        &words(&["build", "x1-prod", "--at", "main", "--repo", "/", "--store", "/store", "--json"]),
+        None,
+        None,
+        Path::new("/"),
+    )
+    .expect("build");
+    assert_eq!(
+        invocation.call,
+        Call::Build {
+            repository: b"/".as_slice().into(),
+            revision: b"main".as_slice().into(),
+            target: b"x1-prod".as_slice().into()
+        }
+    );
+    assert_eq!((invocation.form, invocation.store.as_path()), (Form::JsonLines, Path::new("/store")));
 }

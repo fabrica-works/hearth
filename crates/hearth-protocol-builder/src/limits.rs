@@ -48,9 +48,15 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // request, its pending clone and the translated clone, with one more
     // record envelope for the old/new list cells during translation.
     // Encoding then overlaps its body and framed copy, without a tree reader.
+    let layer = crate::tree::frame::Kind::Layer;
+    // A layer record's read overlaps its translation, as a resolution's does.
     let records = crate::tree::limits::worst_case(kind, &limits.tree)?
         .checked_add(held)?
-        .max(held.checked_mul(4)?.checked_add(crate::tree::frame::largest(kind, &limits.tree).checked_mul(2)?)?);
+        .max(held.checked_mul(4)?.checked_add(crate::tree::frame::largest(kind, &limits.tree).checked_mul(2)?)?)
+        .max(
+            crate::tree::limits::worst_case(layer, &limits.tree)?
+                .checked_add(crate::tree::limits::held(layer, &limits.tree)?)?,
+        );
     let resolve = hearth_protocol_mmdebstrap::output::worst_case(&limits.mmdebstrap)?
         .checked_mul(2)?
         .checked_add(hearth_protocol_mmdebstrap::packages::worst_case(&limits.mmdebstrap)?)?

@@ -101,6 +101,7 @@ pub fn progress(progress: crate::builder::vocabulary::Progress, store: &[u8]) ->
                 Directory::Top => b".",
                 Directory::Cache => b"cache",
                 Directory::Resolutions => b"resolutions",
+                Directory::Layers => b"layers",
             };
             let mut path = skein_lib::Writer::new(directory.len().saturating_add(1).saturating_add(first.name.len()));
             path.put(directory).expect("directory room");
@@ -154,5 +155,24 @@ pub fn tree_resolution(record: crate::builder::store::vocabulary::Resolution) ->
             mmdebstrap: record.made.mmdebstrap,
             costs: Costs { fetched: record.made.costs.fetched, took: record.made.costs.took },
         },
+    }
+}
+
+/// A layer's record, as far as the store's index reads it (store.md, 6.2 and 8.1).
+#[must_use]
+pub fn layer(record: tree::layer::Layer) -> crate::builder::store::vocabulary::Layer {
+    use crate::builder::store::vocabulary::{Layer, LayerInputs};
+    Layer {
+        key: record.key,
+        parent: record.parent,
+        inputs: match record.inputs {
+            tree::layer::Inputs::Empty => LayerInputs::Empty,
+            tree::layer::Inputs::Packages { part, resolution } => LayerInputs::Packages { part, resolution },
+            tree::layer::Inputs::Software { part } => LayerInputs::Software { part },
+            tree::layer::Inputs::Config { part } => LayerInputs::Config { part },
+        },
+        tree: record.tree,
+        uuid: record.subvolume.uuid,
+        at: record.made.at,
     }
 }

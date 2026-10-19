@@ -207,7 +207,7 @@ fn a_resolution_whose_key_and_digest_recompute_is_indexed() {
     let mut store = fixtures::resolving(limits::SHIPPED, fixtures::KEY);
     assert_eq!(
         &*store.step(Time::ZERO, fixtures::resolution()),
-        &[Output::Request(Request::List { directory: Directory::Cache, max: 1_024 })]
+        &[Output::Request(Request::List { directory: Directory::Layers, max: 1_024 })]
     );
     assert!(store.resolved(&fixtures::KEY));
 }
@@ -244,7 +244,7 @@ fn an_unreadable_resolution_is_left_and_not_counted() {
     let mut store = fixtures::resolving(limits::SHIPPED, fixtures::KEY);
     assert_eq!(
         &*store.step(Time::ZERO, Event::Unreadable),
-        &[Output::Request(Request::List { directory: Directory::Cache, max: 1_024 })]
+        &[Output::Request(Request::List { directory: Directory::Layers, max: 1_024 })]
     );
     assert!(!store.resolved(&fixtures::KEY));
 }

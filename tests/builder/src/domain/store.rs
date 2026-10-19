@@ -55,20 +55,7 @@ impl Store {
                 empty(files);
                 Event::Done
             }
-            Request::List { directory, max } => {
-                self.directory = Some(directory);
-                let root = root(files, directory);
-                let file::Event::Opened { file, .. } = files.answer(file::Request::OpenDirectory {
-                    owner: WORLD_OWNER,
-                    root: root.fd,
-                    name: b".".as_slice().into(),
-                    no_follow: true,
-                }) else {
-                    return Event::Failed;
-                };
-                self.cursor = Some(file);
-                self.page(files, max)
-            }
+            Request::List { directory, max } => self.list(files, directory, max),
             Request::Next { max } => self.page(files, max),
             Request::Close => {
                 self.close(files);
@@ -116,9 +103,12 @@ impl Store {
                     Removal::File(digest) => hex_digest(digest.0).into_bytes().into(),
                     Removal::Record(digest) => format!("{}.record", hex_digest(digest.0)).into_bytes().into(),
                 };
+                let Some(root) = root(files, directory) else {
+                    return Event::Failed;
+                };
                 terminal(&files.answer(file::Request::Remove {
                     owner: WORLD_OWNER,
-                    root: root(files, directory).fd,
+                    root: root.fd,
                     name,
                     directory: false,
                 }))
@@ -133,6 +123,18 @@ impl Store {
                 if let file::Event::Loaded { bytes, .. } = event {
                     match tree::resolution::read(&bytes, &SHIPPED) {
                         Ok(record) => Event::Resolution { record: translate::store::resolution(record) },
+                        Err(_) => Event::Unreadable,
+                    }
+                } else {
+                    Event::Unreadable
+                }
+            }
+            Request::LoadLayer { key } => {
+                let path = format!("layers/{}.record", hex_digest(key.0));
+                let event = load(files, files.roots.store, path.as_bytes(), tree::frame::Kind::Layer);
+                if let file::Event::Loaded { bytes, .. } = event {
+                    match tree::layer::read(&bytes, &SHIPPED) {
+                        Ok(record) => Event::Layer { record: translate::store::layer(record) },
                         Err(_) => Event::Unreadable,
                     }
                 } else {
@@ -166,6 +168,30 @@ impl Store {
             .expect("cache record within shipped limits");
         terminal(&write(files, cache, name.as_bytes(), bytes))
     }
+    /// `layers/` is opened beneath the store's root, and absent in a store without layers.
+    fn list(&mut self, files: &mut Files, directory: Directory, max: u32) -> Event {
+        self.directory = Some(directory);
+        let (root, name): (Root, &[u8]) = match root(files, directory) {
+            Some(root) => (root, b"."),
+            None => (files.roots.store, b"layers"),
+        };
+        let opened = files.answer(file::Request::OpenDirectory {
+            owner: WORLD_OWNER,
+            root: root.fd,
+            name: name.into(),
+            no_follow: true,
+        });
+        if let file::Event::Failed { error: skein_io::kernel::Error::NotFound, .. } = opened
+            && directory == Directory::Layers
+        {
+            return Event::Page { entries: Box::new([]), last: true };
+        }
+        let file::Event::Opened { file, .. } = opened else {
+            return Event::Failed;
+        };
+        self.cursor = Some(file);
+        self.page(files, max)
+    }
     fn page(&mut self, files: &mut Files, max: u32) -> Event {
         let file::Event::Listed { entries, .. } = files.answer(file::Request::ListPage {
             owner: WORLD_OWNER,
@@ -194,11 +220,13 @@ impl Store {
         }
     }
 }
-fn root(files: &Files, directory: Directory) -> Root {
+/// The roots the world opens; `layers/` has none, as in the protocol layer.
+fn root(files: &Files, directory: Directory) -> Option<Root> {
     match directory {
-        Directory::Top => files.roots.store,
-        Directory::Cache => files.roots.cache,
-        Directory::Resolutions => files.roots.resolutions,
+        Directory::Top => Some(files.roots.store),
+        Directory::Cache => Some(files.roots.cache),
+        Directory::Resolutions => Some(files.roots.resolutions),
+        Directory::Layers => None,
     }
 }
 fn load(files: &mut Files, root: Root, name: &[u8], kind: tree::frame::Kind) -> file::Event {
@@ -224,6 +252,9 @@ fn terminal(event: &file::Event) -> Event {
     if matches!(event, file::Event::Stored { .. } | file::Event::Removed { .. }) { Event::Done } else { Event::Failed }
 }
 fn shape(directory: Directory, name: &[u8], kind: Kind) -> Shape {
+    if directory == Directory::Layers {
+        return hearth_protocol_builder::store_shape(directory, name, kind);
+    }
     if directory == Directory::Top
         && matches!(
             name,

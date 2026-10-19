@@ -6,5 +6,6 @@ mod read;
 mod store;
 mod translate;
 
+mod build;
 mod indices;
 mod resolve;

@@ -71,7 +71,7 @@ fn the_call_reaches_render_only_once_the_store_is_open() {
     assert_eq!(out.pop(), Some(Request::Store(crate::store::vocabulary::Request::LoadRecord)));
     let record = Some(fixtures::store_record());
     step(&mut builder, &fixtures::env(), Event::Store(StoreEvent::Loaded { record }), &mut out);
-    for _ in 0_u8..4 {
+    for _ in 0_u8..5 {
         drop(out.pop());
         step(
             &mut builder,
@@ -265,10 +265,9 @@ fn a_find_reaches_the_store_and_its_answer_render() {
 }
 #[test]
 fn a_found_resolution_answers_render_with_the_stored_digest() {
-    let crate::render::vocabulary::Event::Found { resolution, .. } = crate::resolution::answer(
-        Token::new(5),
-        crate::store::vocabulary::Answer::Found { resolution: fixtures::store_resolution() },
-    ) else {
+    let crate::render::vocabulary::Event::Found { resolution, .. } =
+        crate::resolution::answer(Token::new(5), crate::resolution::Settled::Found(fixtures::store_resolution()))
+    else {
         panic!("found record")
     };
     assert_eq!(resolution.digest, fixtures::EMPTY_CLOSURE);

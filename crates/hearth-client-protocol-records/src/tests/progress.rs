@@ -31,6 +31,7 @@ fn the_strays_notice_gives_the_count_and_the_first() {
 const ERRORS: &[(Form, StoreFault, &[u8])] = &[
     (Form::Text, StoreFault::Full { limit: StoreLimit::CacheFiles, most: 2 }, b"the store /store is full: 2 cache files\n"),
     (Form::Text, StoreFault::Full { limit: StoreLimit::Resolutions, most: 3 }, b"the store /store is full: 3 resolutions\n"),
+    (Form::Text, StoreFault::Full { limit: StoreLimit::Layers, most: 4 }, b"the store /store is full: 4 layers\n"),
     (Form::JsonLines, StoreFault::Full { limit: StoreLimit::CacheFiles, most: 2 }, b"{\"record\":\"version\",\"client\":1}\n{\"record\":\"error\",\"kind\":\"store\",\"store\":\"/store\",\"limit\":\"cache_files\",\"most\":2,\"class\":\"operational\"}\n"),
 ];
 #[test]

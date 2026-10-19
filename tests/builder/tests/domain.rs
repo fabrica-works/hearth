@@ -126,3 +126,56 @@ fn resolution_keys_equal_a_naive_transitive_closure_of_the_fake_universe() {
 
 #[path = "domain/naive.rs"]
 mod naive;
+
+/// Render's keys and config part for THIN's target, resolved in the same world.
+fn rendered_keys(seed: u64) -> (hearth_domain_render::keys::Keys, hearth_lib::encode::Digest) {
+    let run = hearth_builder_world::domain::Run::new(&fixtures::resolving(fixtures::THIN), seed).finish();
+    let spec = fixtures::spec(&run);
+    let Some(Resolution::Known { keys, .. }) = spec.resolution.as_deref() else { unreachable!("resolved keys") };
+    (keys.clone(), hearth_domain_render::keys::part(spec, b"config"))
+}
+#[test]
+fn a_build_with_no_layers_plans_all_three_and_its_fetch_is_unavailable() {
+    use hearth_domain_builder::{
+        build::{Layer, Step, vocabulary::Why},
+        vocabulary::State,
+    };
+    fixtures::each_settled(&fixtures::build::building(), |run, seed| {
+        let (keys, _) = rendered_keys(seed);
+        assert_eq!(
+            run.answers,
+            [
+                Answer::Layer { layer: Layer::Packages, key: keys.packages, state: State::ToBuild },
+                Answer::Layer { layer: Layer::Software, key: keys.software, state: State::ToBuild },
+                Answer::Layer { layer: Layer::Config, key: keys.config, state: State::ToBuild },
+                Answer::Failed { step: Step::Fetch(Layer::Packages), why: Why::Unavailable },
+            ],
+            "seed {seed}: render's keys, each to build, then the unavailable fetch"
+        );
+        assert_eq!(run.outcome, Some(Outcome::Done), "seed {seed}: render's own outcome");
+        assert_eq!(run.referee.asked, run.referee.ended, "seed {seed}: the step has its terminal");
+    });
+}
+#[test]
+fn a_build_whose_config_layer_is_published_finds_all_three() {
+    use hearth_domain_builder::{build::Layer, vocabulary::State};
+    fixtures::each_settled(&fixtures::build::building(), |run, seed| {
+        let (keys, part) = rendered_keys(seed);
+        fixtures::build::plant(&run.shared, &fixtures::build::config_layer(keys.config, keys.software, part));
+        let found = run.restart().finish();
+        assert_eq!(
+            found.answers,
+            [
+                Answer::Layer { layer: Layer::Packages, key: keys.packages, state: State::Found },
+                Answer::Layer { layer: Layer::Software, key: keys.software, state: State::Found },
+                Answer::Layer { layer: Layer::Config, key: keys.config, state: State::Found },
+            ],
+            "seed {seed}: build.md, 4.1: a published config key is the output"
+        );
+        assert!(
+            !found.requests().iter().any(|request| matches!(request, Request::Run { .. })),
+            "seed {seed}: nothing runs"
+        );
+        assert_eq!(found.outcome, Some(Outcome::Done), "seed {seed}");
+    });
+}

@@ -150,14 +150,16 @@ fn each_client_firmware_translates_and_back() {
         assert_eq!(client_firmware_back(*expected), *source, "firmware {expected:?}");
     }
 }
-fn outcome_back(outcome: records::outcome::Outcome) -> render::vocabulary::Outcome {
-    match outcome {
+/// A build's unavailable step is the client's outcome alone, never render's.
+fn outcome_back(outcome: records::outcome::Outcome) -> Option<render::vocabulary::Outcome> {
+    Some(match outcome {
         records::outcome::Outcome::Done => render::vocabulary::Outcome::Done,
         records::outcome::Outcome::Failed => render::vocabulary::Outcome::Failed,
         records::outcome::Outcome::Usage => render::vocabulary::Outcome::Usage,
         records::outcome::Outcome::TryAgain => render::vocabulary::Outcome::TryAgain,
         records::outcome::Outcome::Negative => render::vocabulary::Outcome::Negative,
-    }
+        records::outcome::Outcome::Unavailable => return None,
+    })
 }
 const CLIENT_OUTCOMES: &[(render::vocabulary::Outcome, records::outcome::Outcome)] = &[
     (render::vocabulary::Outcome::Done, records::outcome::Outcome::Done),
@@ -170,7 +172,7 @@ const CLIENT_OUTCOMES: &[(render::vocabulary::Outcome, records::outcome::Outcome
 fn each_client_outcome_translates_and_back() {
     for (source, expected) in CLIENT_OUTCOMES {
         assert_eq!(answers::outcome(*source), *expected, "outcome {source:?}");
-        assert_eq!(outcome_back(*expected), *source, "outcome {expected:?}");
+        assert_eq!(outcome_back(*expected), Some(*source), "outcome {expected:?}");
     }
 }
 

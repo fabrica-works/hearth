@@ -55,6 +55,7 @@ pub enum StoreFault {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum StoreLimit {
     Resolutions,
+    Layers,
     CacheFiles,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -88,6 +89,7 @@ impl StoreError {
                 lines.decimal(u64::from(most));
                 lines.put(match limit {
                     StoreLimit::Resolutions => b" resolutions",
+                    StoreLimit::Layers => b" layers",
                     StoreLimit::CacheFiles => b" cache files",
                 });
             }
@@ -107,6 +109,7 @@ impl StoreError {
                     b"limit",
                     match limit {
                         StoreLimit::Resolutions => b"resolutions",
+                        StoreLimit::Layers => b"layers",
                         StoreLimit::CacheFiles => b"cache_files",
                     },
                 );

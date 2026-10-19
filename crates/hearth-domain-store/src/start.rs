@@ -47,6 +47,14 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Qu
             crate::scan::begin(store, env.limits, out);
             return;
         }
+        Event::Want { key } => {
+            crate::layers::want(store, key, out);
+            return;
+        }
+        Event::Layer { .. } => {
+            crate::scan::step(store, env, ev, out);
+            return;
+        }
         Event::Record { .. }
         | Event::Room
         | Event::Unwritable { .. }

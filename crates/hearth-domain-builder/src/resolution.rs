@@ -1,33 +1,33 @@
 //! Resolution records returned through the store (render.md, 5.7).
 use crate::{render, store};
 use skein_lib::Token;
-pub(crate) fn answer(request: Token, answer: store::vocabulary::Answer) -> render::vocabulary::Event {
-    use store::vocabulary::Answer;
+/// The store's answers to a find or a record.
+#[derive(Debug)]
+pub(crate) enum Settled {
+    Found(store::vocabulary::Resolution),
+    Absent,
+    Recorded,
+    Declined(store::vocabulary::Decline),
+}
+pub(crate) fn answer(request: Token, answer: Settled) -> render::vocabulary::Event {
     match answer {
-        Answer::Found { resolution } => render::vocabulary::Event::Found { request, resolution: found(resolution) },
-        Answer::Absent => render::vocabulary::Event::Absent { request },
-        Answer::Declined { why: store::vocabulary::Decline::Bound { max } } => render::vocabulary::Event::Failed {
+        Settled::Found(resolution) => render::vocabulary::Event::Found { request, resolution: found(resolution) },
+        Settled::Absent => render::vocabulary::Event::Absent { request },
+        Settled::Declined(store::vocabulary::Decline::Bound { max }) => render::vocabulary::Event::Failed {
             request,
             class: render::vocabulary::Class::Configuration,
             at: None,
             failure: render::vocabulary::Failure::TooLarge { limit: render::errors::Limit::Record, max },
         },
-        Answer::Declined { .. } => render::vocabulary::Event::Failed {
-            request,
-            class: render::vocabulary::Class::Operational,
-            at: None,
-            failure: render::vocabulary::Failure::Store,
-        },
-        Answer::Recorded => render::vocabulary::Event::Recorded { request },
-        Answer::HasRoom => unreachable!("room answered at root"),
-        Answer::Waiting
-        | Answer::Strays { .. }
-        | Answer::Cached { .. }
-        | Answer::Refused { .. }
-        | Answer::Ready
-        | Answer::Full { .. }
-        | Answer::Unusable { .. }
-        | Answer::Unopened { .. } => unreachable!("find answer"),
+        Settled::Declined(store::vocabulary::Decline::Full { .. } | store::vocabulary::Decline::Unusable { .. }) => {
+            render::vocabulary::Event::Failed {
+                request,
+                class: render::vocabulary::Class::Operational,
+                at: None,
+                failure: render::vocabulary::Failure::Store,
+            }
+        }
+        Settled::Recorded => render::vocabulary::Event::Recorded { request },
     }
 }
 
@@ -125,11 +125,11 @@ pub fn found(record: store::vocabulary::Resolution) -> render::resolution::Recor
 pub(super) fn terminal(
     builder: &mut crate::Builder,
     env: &skein_lib::Env<crate::Limits>,
-    answer: store::vocabulary::Answer,
+    answer: Settled,
     out: &mut skein_lib::Queue<crate::vocabulary::Request>,
 ) {
     use store::vocabulary::Answer;
-    if let Answer::Declined { why } = &answer {
+    if let Settled::Declined(why) = &answer {
         let fault = match why {
             store::vocabulary::Decline::Full { limit, most } => Answer::Full { limit: *limit, most: *most },
             store::vocabulary::Decline::Unusable { step } => Answer::Unusable { step: *step },

@@ -179,6 +179,11 @@ impl Run {
                 self.files = Some(files);
                 self.send(Delivery { event: Event::Store(event), terminal: Some(key) });
             }
+            Request::Run { step } => {
+                self.referee.ask(key);
+                let event = Event::Build(builder::build::vocabulary::Event::Unavailable { step: *step });
+                self.send(Delivery { event, terminal: Some(key) });
+            }
             Request::Answer(answer) => self.answers.push(answer.clone()),
             Request::Progress(progress) => self.progress.push(progress.clone()),
             Request::Reply { outcome, .. } => {

@@ -150,9 +150,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-domain-build"
+version = "0.0.0"
+dependencies = [
+ "hearth-lib",
+ "skein-lib",
+]
+
+[[package]]
 name = "hearth-domain-builder"
 version = "0.0.0"
 dependencies = [
+ "hearth-domain-build",
  "hearth-domain-render",
  "hearth-domain-store",
  "hearth-lib",

@@ -1,7 +1,7 @@
 //! The ordered client record stream (client/README.md, 3.2 and 3.3).
 use crate::{
     Asked,
-    builder::vocabulary::{Answer, Request},
+    builder::vocabulary::Answer,
     records::{self, printer},
     translate::answers,
 };
@@ -20,6 +20,8 @@ pub(crate) struct Client {
     active: bool,
     terminal: Option<crate::render::vocabulary::Outcome>,
     refused: bool,
+    /// Why a build ended on a step, when it did.
+    failed: Option<records::build::Why>,
     finished: bool,
     closing: Option<Token>,
     broken: Option<Fault>,
@@ -34,6 +36,7 @@ impl Client {
             active: false,
             terminal: None,
             refused: false,
+            failed: None,
             finished: false,
             closing: None,
             broken: None,
@@ -101,33 +104,68 @@ impl Client {
     pub fn takes(&self) -> bool {
         !self.active && self.terminal.is_none() && self.requests.is_empty() && self.events.is_empty()
     }
-    pub fn down(&mut self, env: &Env<records::limits::Limits>, request: Request, store: &[u8]) {
+    /// A notice of standard error's (client/README.md, 3.2).
+    pub fn progress(
+        &mut self,
+        env: &Env<records::limits::Limits>,
+        progress: crate::builder::vocabulary::Progress,
+        store: &[u8],
+    ) {
         assert!(self.takes(), "printer takes one record at a time");
-        let record = match request {
-            Request::Progress(progress) => crate::translate::store::progress(progress, store),
-            Request::Answer(Answer::Spec(spec)) => records::records::Record::Spec(Box::new(answers::spec(spec))),
-            Request::Answer(Answer::Error(mut error)) => {
+        self.print(env, crate::translate::store::progress(progress, store));
+    }
+    pub fn answer(&mut self, env: &Env<records::limits::Limits>, answer: Answer, store: &[u8]) {
+        assert!(self.takes(), "printer takes one record at a time");
+        let record = match answer {
+            Answer::Spec(spec) => records::records::Record::Spec(Box::new(answers::spec(spec))),
+            Answer::Error(mut error) => {
                 if let crate::render::errors::Kind::Store(fault) = &mut error.kind {
                     fault.store = skein_lib::bytes::copy_of(store);
                 }
                 records::records::Record::Error(crate::translate::errors::error(error))
             }
-            Request::Answer(Answer::Change(change)) => {
-                records::records::Record::Change(super::translate::changes::change(change))
+            Answer::Change(change) => records::records::Record::Change(super::translate::changes::change(change)),
+            Answer::Layer { layer, key, state } => records::records::Record::Layer(answers::layer(layer, key, state)),
+            Answer::Failed { step, why } => {
+                let failed = answers::failed(step, why);
+                self.failed = Some(failed.why);
+                records::records::Record::Failed(failed)
             }
-            Request::Reply { to, outcome, diff, left_out } => {
-                assert_eq!(to.into_token(), Token::new(0), "the initial call's reply");
-                let outcome =
-                    if self.refused { outcome.worst(crate::render::vocabulary::Outcome::Failed) } else { outcome };
-                self.terminal = Some(outcome);
-                let outcome = answers::outcome(outcome);
-                let diff = super::translate::changes::optional_tally(diff);
-                records::records::Record::Terminal(records::records::Terminal { outcome, diff, left_out })
-            }
-            Request::Store(_) | Request::Unopened { .. } | Request::Render(_) => {
-                unreachable!("git requests stay in the protocol")
-            }
+            Answer::Full { limit, most } => records::records::Record::Error(answers::full(limit, most, store)),
         };
+        self.print(env, record);
+    }
+    pub fn reply(
+        &mut self,
+        env: &Env<records::limits::Limits>,
+        to: skein_lib::ReplyTo,
+        outcome: crate::render::vocabulary::Outcome,
+        diff: Option<crate::render::diff::Tally>,
+        left_out: u32,
+    ) {
+        assert!(self.takes(), "printer takes one record at a time");
+        assert_eq!(to.into_token(), Token::new(0), "the initial call's reply");
+        self.terminal = Some(outcome);
+        let outcome = self.outcome(outcome);
+        let diff = super::translate::changes::optional_tally(diff);
+        self.print(env, records::records::Record::Terminal(records::records::Terminal { outcome, diff, left_out }));
+    }
+    /// The terminal's outcome: a refused record fails the answer, and an
+    /// unavailable step makes a complete one unavailable (client/README.md, 3.3).
+    fn outcome(&self, outcome: crate::render::vocabulary::Outcome) -> records::outcome::Outcome {
+        let outcome = answers::outcome(if self.refused {
+            outcome.worst(crate::render::vocabulary::Outcome::Failed)
+        } else {
+            outcome
+        });
+        match (self.failed, outcome) {
+            (Some(records::build::Why::Unavailable), records::outcome::Outcome::Done) => {
+                records::outcome::Outcome::Unavailable
+            }
+            (Some(records::build::Why::Unavailable) | None, _) => outcome,
+        }
+    }
+    fn print(&mut self, env: &Env<records::limits::Limits>, record: records::records::Record) {
         if self.broken.is_none() {
             self.active = true;
             printer::down(
@@ -165,9 +203,7 @@ impl Client {
         if self.broken.is_some() {
             return Some(75);
         }
-        let outcome = self.terminal.expect("terminal outcome");
-        let outcome = if self.refused { outcome.worst(crate::render::vocabulary::Outcome::Failed) } else { outcome };
-        Some(records::outcome::code(answers::outcome(outcome)))
+        Some(records::outcome::code(self.outcome(self.terminal.expect("terminal outcome"))))
     }
     pub fn resume(&mut self, env: &Env<records::limits::Limits>, below: &mut Queue<Asked>) {
         if let Some(down) = self.requests.pop() {

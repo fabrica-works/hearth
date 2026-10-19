@@ -57,6 +57,9 @@ impl Shared {
             linux::Item::directory(b"/usr", 0o755),
             linux::Item::directory(b"/usr/bin", 0o755),
         ]);
+        if laid.iter().any(|entry| matches!(entry, Laid::Layer(_))) {
+            machine.linux_mut().lay(&[linux::Item::directory(b"/srv/store/layers", 0o700).owner(BUILDER)]);
+        }
         for (name, bytes) in super::laid_files(laid) {
             let path = [b"/srv/store/".as_slice(), name.as_bytes()].concat();
             machine.linux_mut().lay(&[linux::Item::file(&path, 0o600, &bytes).owner(BUILDER)]);

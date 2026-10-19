@@ -4,18 +4,44 @@ use hearth_lib::encode::{Digest, Item};
 use skein_lib::{Duration, Token, Wall};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
-    Record { resolution: Resolution },
+    Record {
+        resolution: Resolution,
+    },
     Room,
-    Unwritable { max: u64 },
-    Find { key: Digest },
-    Resolution { record: Resolution },
+    Unwritable {
+        max: u64,
+    },
+    Find {
+        key: Digest,
+    },
+    Resolution {
+        record: Resolution,
+    },
+    /// Whether a layer of this key is published (build.md, 4.1).
+    Want {
+        key: Digest,
+    },
+    Layer {
+        record: Layer,
+    },
     Unreadable,
-    Arrived { arrival: Token, sha256: Digest, size: u64, origin: Origin, took: Duration },
+    Arrived {
+        arrival: Token,
+        sha256: Digest,
+        size: u64,
+        origin: Origin,
+        took: Duration,
+    },
     Open,
     Locked,
     Busy,
-    Loaded { record: Option<StoreRecord> },
-    Page { entries: Box<[Entry]>, last: bool },
+    Loaded {
+        record: Option<StoreRecord>,
+    },
+    Page {
+        entries: Box<[Entry]>,
+        last: bool,
+    },
     Done,
     Failed,
 }
@@ -23,6 +49,7 @@ pub enum Event {
 pub enum Request {
     Write { resolution: Resolution },
     Load { key: Digest },
+    LoadLayer { key: Digest },
     Empty,
     Keep { arrival: Token, record: CacheFile },
     Discard { arrival: Token },
@@ -40,6 +67,8 @@ pub enum Answer {
     HasRoom,
     Found { resolution: Resolution },
     Absent,
+    Have { key: Digest },
+    Free { key: Digest },
     Declined { why: Decline },
     Waiting,
     Strays { count: u64, first: Stray },
@@ -78,11 +107,13 @@ pub struct Range {
 pub enum Directory {
     Top,
     Resolutions,
+    Layers,
     Cache,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Limit {
     Resolutions,
+    Layers,
     CacheFiles,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -196,4 +227,23 @@ pub enum Decline {
     Bound { max: u64 },
     Full { limit: Limit, most: u32 },
     Unusable { step: Step },
+}
+
+/// A published layer's record, as the startup scan reads it (store.md, 6.2).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Layer {
+    pub key: Digest,
+    pub parent: Option<Digest>,
+    pub inputs: LayerInputs,
+    pub tree: Digest,
+    pub uuid: [u8; 16],
+    pub at: Wall,
+}
+/// A layer's key inputs, which name its kind.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum LayerInputs {
+    Empty,
+    Packages { part: Digest, resolution: Digest },
+    Software { part: Digest },
+    Config { part: Digest },
 }

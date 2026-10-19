@@ -3,8 +3,10 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 use alloc::boxed::Box;
+pub use hearth_domain_build as build;
 pub use hearth_domain_render as render;
 pub use hearth_domain_store as store;
+mod building;
 mod resolution;
 pub mod vocabulary;
 use render::vocabulary::{Answer as RenderAnswer, Event as RenderEvent, Output};
@@ -18,6 +20,7 @@ pub const MAX_OUT_RESUME: u32 = 2;
 pub struct Limits {
     pub render: render::limits::Limits,
     pub store: store::limits::Limits,
+    pub build: build::limits::Limits,
 }
 #[derive(Debug, Hash)]
 pub struct Builder {
@@ -36,6 +39,11 @@ pub struct Builder {
     resolving: Option<render::vocabulary::Request>,
     resolution: Option<(Token, render::vocabulary::Digest)>,
     index: Option<Token>,
+    build: build::Build,
+    build_output: Queue<build::vocabulary::Output>,
+    building: Option<building::Building>,
+    resolved: Option<(render::vocabulary::Digest, render::vocabulary::Digest)>,
+    held: Option<(render::vocabulary::Outcome, Option<render::diff::Tally>, u32)>,
 }
 impl Builder {
     #[must_use]
@@ -50,6 +58,11 @@ impl Builder {
             resolving: None,
             resolution: None,
             index: None,
+            build: build::Build::new(),
+            build_output: Queue::with_capacity(build::MAX_OUT),
+            building: None,
+            resolved: None,
+            held: None,
             render: render::Render::new(&limits.render),
             store: store::Store::new(&limits.store, uid),
             call: None,
@@ -60,7 +73,7 @@ impl Builder {
     }
     #[must_use]
     pub fn work_pending(&self) -> bool {
-        self.render.work_pending()
+        self.render.work_pending() || building::reporting(self)
     }
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -75,6 +88,7 @@ impl Builder {
             }
             if let Output::Request(render::vocabulary::Request::Record { request, resolution }) = output {
                 self.finding = Some(request);
+                self.resolved = Some((resolution.key, resolution.digest));
                 store_step(
                     self,
                     env,
@@ -88,6 +102,16 @@ impl Builder {
                 store_step(self, env, store::vocabulary::Event::Room, out);
                 return;
             }
+            let output = match output {
+                Output::Answer(RenderAnswer::Spec(spec)) if self.building.is_some() => {
+                    return building::spec(self, env, spec, out);
+                }
+                Output::Answer(RenderAnswer::Rendered { outcome, diff, left_out }) if building::holds(self) => {
+                    self.held = Some((self.outcome(outcome), diff, left_out));
+                    return;
+                }
+                output @ (Output::Request(_) | Output::Answer(_)) => output,
+            };
             out.push(match output {
                 Output::Request(request) => {
                     if let render::vocabulary::Request::Read { blobs, .. } = &request {
@@ -98,18 +122,20 @@ impl Builder {
                 Output::Answer(RenderAnswer::Spec(spec)) => Request::Answer(Answer::Spec(spec)),
                 Output::Answer(RenderAnswer::Error(error)) => Request::Answer(Answer::Error(error)),
                 Output::Answer(RenderAnswer::Change(change)) => Request::Answer(Answer::Change(change)),
-                Output::Answer(RenderAnswer::Rendered { outcome, diff, left_out }) => Request::Reply {
-                    to: self.reply.take().expect("active call owns its reply"),
-                    outcome: if self.store_error {
-                        outcome.worst(render::vocabulary::Outcome::TryAgain)
-                    } else {
-                        outcome
-                    },
-                    diff,
-                    left_out,
-                },
+                Output::Answer(RenderAnswer::Rendered { outcome, diff, left_out }) => {
+                    self.building = None;
+                    Request::Reply {
+                        to: self.reply.take().expect("active call owns its reply"),
+                        outcome: self.outcome(outcome),
+                        diff,
+                        left_out,
+                    }
+                }
             });
         }
+    }
+    fn outcome(&self, outcome: render::vocabulary::Outcome) -> render::vocabulary::Outcome {
+        if self.store_error { outcome.worst(render::vocabulary::Outcome::TryAgain) } else { outcome }
     }
 }
 pub fn step(builder: &mut Builder, env: &Env<Limits>, ev: Event, out: &mut Queue<Request>) {
@@ -159,10 +185,14 @@ pub fn step(builder: &mut Builder, env: &Env<Limits>, ev: Event, out: &mut Queue
         Event::Call { reply_to, call } => {
             assert!(builder.reply.is_none(), "one builder call at a time");
             builder.reply = Some(reply_to);
+            if let Call::Build { .. } = call {
+                builder.building = Some(building::Building::Rendering);
+            }
             builder.call = Some(call);
             return store_step(builder, env, store::vocabulary::Event::Open, out);
         }
         Event::Store(event) => return store_step(builder, env, event, out),
+        Event::Build(event) => return building::step(builder, env, event, out),
         Event::Render(event) => {
             let event = resolution::progress(builder, event, out);
             if let RenderEvent::Read { request, .. } | RenderEvent::Cached { request, .. } = &event {
@@ -190,6 +220,9 @@ pub fn step(builder: &mut Builder, env: &Env<Limits>, ev: Event, out: &mut Queue
     builder.forward(env, out);
 }
 pub fn resume(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>) {
+    if building::reporting(builder) {
+        return building::resume(builder, out);
+    }
     let render_env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
     render::resume(&mut builder.render, &render_env, &mut builder.output);
     builder.forward(env, out);
@@ -212,6 +245,7 @@ fn store_forward(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Reque
     }
 }
 fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>) {
+    use build::vocabulary::Event as BuildEvent;
     use store::vocabulary::{Answer, Output};
     match builder.store_output.pop() {
         Some(Output::Request(request)) => out.push(Request::Store(request)),
@@ -227,6 +261,9 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
                 Call::Render { resolve, repository, revision, targets } => {
                     RenderEvent::Render { resolve, repository, revision, targets }
                 }
+                Call::Build { repository, revision, target } => {
+                    RenderEvent::Render { resolve: true, repository, revision, targets: Box::new([target]) }
+                }
             };
             let render_env = Env { now: env.now, wall: env.wall, limits: env.limits.render };
             render::step(&mut builder.render, &render_env, event, &mut builder.output);
@@ -240,25 +277,15 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
                 return;
             }
             if let Some((request, sha256)) = builder.produced.take() {
-                let event = match answer {
-                    Answer::Cached { .. } => RenderEvent::Kept { request, sha256 },
-                    Answer::Refused { .. } => RenderEvent::Failed {
+                let event = if let Answer::Cached { .. } = answer {
+                    RenderEvent::Kept { request, sha256 }
+                } else {
+                    RenderEvent::Failed {
                         request,
                         class: render::vocabulary::Class::Operational,
                         at: None,
                         failure: render::vocabulary::Failure::Store,
-                    },
-                    Answer::Recorded
-                    | Answer::HasRoom
-                    | Answer::Found { .. }
-                    | Answer::Absent
-                    | Answer::Declined { .. }
-                    | Answer::Ready
-                    | Answer::Full { .. }
-                    | Answer::Unusable { .. }
-                    | Answer::Waiting
-                    | Answer::Strays { .. }
-                    | Answer::Unopened { .. } => unreachable!("arrival terminal"),
+                    }
                 };
                 step(builder, env, Event::Render(event), out);
                 return;
@@ -286,11 +313,19 @@ fn store_one(builder: &mut Builder, env: &Env<Limits>, out: &mut Queue<Request>)
                 step(builder, env, Event::Render(RenderEvent::Cached { request, oid, size, sha256 }), out);
             }
         }
-        Some(Output::Answer(
-            answer @ (Answer::Found { .. } | Answer::Absent | Answer::Recorded | Answer::Declined { .. }),
-        )) => {
-            resolution::terminal(builder, env, answer, out);
+        Some(Output::Answer(Answer::Found { resolution })) => {
+            builder.resolved = Some((resolution.key, resolution.digest));
+            resolution::terminal(builder, env, resolution::Settled::Found(resolution), out);
         }
+        Some(Output::Answer(Answer::Absent)) => resolution::terminal(builder, env, resolution::Settled::Absent, out),
+        Some(Output::Answer(Answer::Recorded)) => {
+            resolution::terminal(builder, env, resolution::Settled::Recorded, out);
+        }
+        Some(Output::Answer(Answer::Declined { why })) => {
+            resolution::terminal(builder, env, resolution::Settled::Declined(why), out);
+        }
+        Some(Output::Answer(Answer::Have { key })) => building::step(builder, env, BuildEvent::Have { key }, out),
+        Some(Output::Answer(Answer::Free { key })) => building::step(builder, env, BuildEvent::Free { key }, out),
         Some(Output::Answer(Answer::HasRoom)) => {
             let request = builder.resolving.take().expect("room before resolve");
             if let render::vocabulary::Request::Resolve { request, key, .. } = &request {
@@ -330,13 +365,17 @@ fn store_error(builder: &mut Builder, answer: &store::vocabulary::Answer, out: &
         return;
     }
     let fault = match answer {
-        Answer::Full { limit, most } => StoreFault::Full {
-            limit: match limit {
-                Limit::CacheFiles => StoreLimit::CacheFiles,
-                Limit::Resolutions => StoreLimit::Resolutions,
-            },
-            most: *most,
-        },
+        Answer::Full { limit: Limit::Layers, most } => {
+            builder.store_error = true;
+            out.push(Request::Answer(vocabulary::Answer::Full { limit: Limit::Layers, most: *most }));
+            return;
+        }
+        Answer::Full { limit: Limit::CacheFiles, most } => {
+            StoreFault::Full { limit: StoreLimit::CacheFiles, most: *most }
+        }
+        Answer::Full { limit: Limit::Resolutions, most } => {
+            StoreFault::Full { limit: StoreLimit::Resolutions, most: *most }
+        }
         Answer::Unusable { step } => StoreFault::Failed {
             step: match step {
                 StoreStep::List => Step::List,
@@ -351,6 +390,8 @@ fn store_error(builder: &mut Builder, answer: &store::vocabulary::Answer, out: &
         | Answer::HasRoom
         | Answer::Found { .. }
         | Answer::Absent
+        | Answer::Have { .. }
+        | Answer::Free { .. }
         | Answer::Declined { .. }
         | Answer::Ready
         | Answer::Cached { .. }
@@ -371,11 +412,13 @@ fn store_error(builder: &mut Builder, answer: &store::vocabulary::Answer, out: &
     })));
 }
 
-/// The root owns render, store, and two bounded forwarding queues.
+/// The root owns render, store, build and its report, and two bounded forwarding queues.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     render::limits::worst_case(&limits.render)?
         .checked_add(store::limits::worst_case(&limits.store)?)?
+        // The build domain's plan, and the report's beside it.
+        .checked_add(build::limits::worst_case(&limits.build)?.checked_mul(2)?)?
         .checked_add(Queue::<store::vocabulary::Output>::worst_case(2)?)?
         .checked_add(Queue::<Output>::worst_case(2)?)
 }

@@ -274,7 +274,7 @@ pub const STORE_PAGE: u32 = hearth::limits().domain.store.page;
 pub const CACHE_FILES: u32 = STORE_PAGE + 1;
 const CACHE_ANCHOR: u32 = 0; // The first cache name owns the empty inode.
 /// The calm client's submission count, checked by the cut sweep (ruling 188).
-pub const CUTS: u32 = 141;
+pub const CUTS: u32 = 142;
 pub const BUILDER_SLOT: usize = 0;
 pub const FUZZY_SEEDS: u64 = 64;
 #[must_use]

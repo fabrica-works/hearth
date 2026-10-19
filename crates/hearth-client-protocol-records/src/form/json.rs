@@ -14,6 +14,8 @@ pub(crate) fn print(record: &Record, after: Option<Type>, most: u32) -> Result<B
     let count = match record {
         Record::Spec(spec) => spec.parts.len().checked_add(3),
         Record::Terminal(_)
+        | Record::Layer(_)
+        | Record::Failed(_)
         | Record::Change(_)
         | Record::Error(_)
         | Record::Startup(_)
@@ -75,6 +77,8 @@ fn line(json: &mut Encoder, record: &Record, index: usize) {
             Record::Waiting(waiting) => waiting.json(json),
             Record::Strays(strays) => strays.json(json),
             Record::Change(change) => change.json(json),
+            Record::Layer(layer) => layer.json(json),
+            Record::Failed(failed) => (*failed).json(json),
             Record::Error(error) => error.json(json),
             Record::Startup(startup) => startup.json(json),
             Record::Terminal(terminal) => {
@@ -87,6 +91,7 @@ fn line(json: &mut Encoder, record: &Record, index: usize) {
                         Outcome::Negative => b"negative",
                         Outcome::Failed => b"failed",
                         Outcome::Usage => b"usage",
+                        Outcome::Unavailable => b"unavailable",
                         Outcome::TryAgain => b"try_again",
                     },
                 );

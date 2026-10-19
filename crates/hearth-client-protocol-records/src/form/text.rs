@@ -146,6 +146,8 @@ fn render(lines: &mut Lines, record: &Record, after: Option<Type>) {
             }
         }
         Record::Change(change) => change.text(lines),
+        Record::Layer(layer) => layer.text(lines),
+        Record::Failed(failed) => (*failed).text(lines),
         Record::Error(error) => {
             if after.is_some() && after != Some(Type::Error) {
                 lines.put(b"\n");
