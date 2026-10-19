@@ -362,6 +362,7 @@ dependencies = [
 name = "hearth-tree-world"
 version = "0.0.0"
 dependencies = [
+ "hearth-domain-tree",
  "hearth-lib",
  "hearth-protocol-tree",
  "skein-heap",

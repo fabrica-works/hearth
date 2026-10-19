@@ -154,3 +154,141 @@ fn reading_a_tree_file_at_its_limits_holds_no_more_than_its_worst_case() {
     measure_tree(&file, &limits, 0);
     assert_eq!(check::read_tree(&file, &limits).as_deref(), Ok(items.as_slice()), "read whole");
 }
+
+mod walk {
+    use super::HEAP;
+    use hearth_domain_tree::{
+        MAX_OUT, Tree,
+        limits::{Limits, SHIPPED, worst_case},
+        step,
+        vocabulary::{Event, Kind, Output},
+    };
+    use hearth_lib::encode::Digest;
+    use hearth_tree_world::{
+        fs::{Fs, Node},
+        helper::{self, Helper},
+        layers,
+    };
+    use skein_heap::Meter;
+    use skein_lib::{Env, Queue, Rng, Time, Wall};
+
+    const KEY: Digest = Digest([0x42; 32]);
+    const _: &skein_heap::Counting = &HEAP;
+
+    /// Walks `fs` with the machine metered step by step, and returns the most it held at once of
+    /// its own: its state, and the event it was given.
+    fn peak(fs: &Fs, limits: &Limits, what: &dyn core::fmt::Debug) -> u64 {
+        let bound = worst_case(limits).expect("the limits fit a u64");
+        // The file has its room before the meter, so that the helper's growth is not the walk's.
+        let reserve = helper::walk(fs, limits, KEY).file.len() + 64;
+        let mut helper = Helper::reserving(fs, reserve);
+        let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
+        let meter = Meter::new();
+        let mut machine = Tree::new(limits);
+        let mut event = Event::Hash { key: KEY };
+        let mut most = 0;
+        loop {
+            let mut out = Queue::with_capacity(MAX_OUT);
+            meter.start();
+            step(&mut machine, &env, event, &mut out);
+            let step = meter.end();
+            let (next, done) = match out.pop().expect("a step has an output") {
+                Output::Request(request) => {
+                    let next = helper.answer(&request);
+                    drop(request);
+                    (Some(next), false)
+                }
+                Output::Answer(answer) => {
+                    if let hearth_domain_tree::vocabulary::Answer::Failed { cause, .. } = &answer {
+                        panic!("{what:?}: the walk failed: {cause:?}");
+                    }
+                    drop(answer);
+                    (None, true)
+                }
+            };
+            most = most.max(meter.check(step, bound, what));
+            match next {
+                Some(next) if !done => event = next,
+                Some(_) | None => return most,
+            }
+        }
+    }
+
+    /// Limits small enough that a generated layer comes near them.
+    fn small() -> Limits {
+        Limits {
+            entries: 1_000,
+            names: 256,
+            depth: 16,
+            held: 1_024,
+            name: 32,
+            path: 512,
+            target: 64,
+            attributes: 8,
+            attribute_name: 32,
+            attribute_value: 256,
+            linked: 64,
+            linked_paths: 4_096,
+            page: 8,
+            listed: 16,
+            batch: 4_000,
+        }
+    }
+
+    #[test]
+    fn walking_generated_layers_holds_no_more_than_the_worst_case() {
+        for seed in 0..6_u64 {
+            let mut rng = Rng::new(0x7EE0_7000 + seed);
+            let fs = layers::layer(&mut rng, 60 + seed * 30);
+            let shipped = peak(&fs, &SHIPPED, &("shipped", seed));
+            let tight = peak(&fs, &small(), &("small", seed));
+            assert!(tight <= worst_case(&small()).expect("fits"), "seed {seed}");
+            assert!(shipped > 0, "the walk holds something, seed {seed}");
+        }
+    }
+
+    #[test]
+    fn walking_wide_and_deep_layers_holds_no_more_than_the_worst_case() {
+        let mut rng = Rng::new(0x7EE0_7100);
+        let fs = layers::wide_and_deep(&mut rng, 2_000, 12);
+        peak(
+            &fs,
+            &Limits { entries: 10_000, names: 4_096, held: 8_192, depth: 16, ..small() },
+            &"wide and deep, small",
+        );
+        peak(&fs, &SHIPPED, &"wide and deep, shipped");
+    }
+
+    #[test]
+    fn walking_a_layer_at_its_limits_holds_no_more_than_the_worst_case() {
+        let mut fs = Fs::new();
+        // An entry with its attributes full: 64 names of 255 bytes, 64 values of 64 KiB.
+        let mut full = Node::file(2, b"x");
+        for number in 0..64 {
+            full = full.attr(format!("user.{number:0>250}").as_bytes(), &vec![b'v'; 65_536]);
+        }
+        fs.add(b"full", full);
+        // A link target of 4096 bytes, and two hard links to it.
+        let link = fs.add(b"target", Node::symlink(3, &[b't'; 4_096]));
+        fs.link(b"target2", link);
+        // A directory of names of 255 bytes.
+        fs.add(b"names", Node::new(Kind::Directory, 4));
+        for number in 0..400_u64 {
+            fs.add(format!("names/{number:0>255}").as_bytes(), Node::file(1_000 + number, b""));
+        }
+        // A path of 4096 bytes.
+        let mut path = Vec::new();
+        for _ in 0..16 {
+            if !path.is_empty() {
+                path.push(b'/');
+            }
+            path.extend_from_slice(&[b'd'; 254]);
+            fs.add(&path, Node::new(Kind::Directory, 9_000 + u64::try_from(path.len()).expect("small")));
+        }
+        path.push(b'/');
+        path.extend_from_slice(&[b'f'; 16]);
+        fs.add(&path, Node::file(9, b""));
+        let held = peak(&fs, &SHIPPED, &"at the limits");
+        assert!(held > 4_000_000, "the full entry alone is more: {held}");
+    }
+}
