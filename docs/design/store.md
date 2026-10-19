@@ -821,16 +821,16 @@ and have no kind: a length and a map, bounded by 5.6 (5.3).
 key          digest                 the layer's key
 kind         bytes                  empty | packages | software | config
 parent       digest | none          the parent's key
-inputs       map                    packages: { resolution, part }; software, config: { part }
+inputs       map                    packages: { part, resolution }; software, config: { part }; empty: { }
 tree         digest                 the tree digest (3.4)
 changes      digest                 the change set's digest (3.5)
 tree_file    list [ digest, uint ]  <key>.tree's SHA-256 and size
-subvolume    map                    { uuid, parent_uuid | none }, as read after the snapshot
-counts       map                    entries, files, bytes, puts, deletes, bytes hashed
-scan         digest                 the scan's rules it passed (build.md, 9.3)
+subvolume    map                    { parent_uuid: uuid | none, uuid }, as read after the snapshot
+counts       map                    { bytes, deletes, entries, files, hashed, puts }
+scan         digest                 the scan's rules it passed (build.md, 9.3); absent for the empty layer
 placed       list [ digest ]        software only: each download's SHA-256 it placed, and each artifact's tree digest [M6]
-tools        list                   [ name, version ]: mmdebstrap, apt, dpkg, the target's tools it ran
-costs        map                    per step: wall and CPU time, peak memory, bytes fetched, written, hashed
+tools        list                   list [ name, version ], bytes each, by name: mmdebstrap, apt, dpkg, the target's tools it ran
+costs        map                    by step name: { cpu, fetched, hashed, memory, wall, written }
 made         map                    { at: wall time in ns, by: built | received [M6], from [M6]; packages only: how: scratch | reconcile, base: key | none, depth: uint, line: wall time in ns }
 ```
 
@@ -838,6 +838,15 @@ made         map                    { at: wall time in ns, by: built | received 
 reconciles: its own `at` for a scratch build, its base's `line` for a
 reconcile. It is recorded, not derived from the base chain, since a
 base may be collected while its descendants are kept (build.md, 4.2).
+
+`counts`: `entries` and `files` in the tree, `bytes` the files' sizes
+summed, `puts` and `deletes` the change set's, `hashed` the bytes the
+walk read. `costs`: per step (its name a map key of at most 64 bytes,
+as `fetch`, `mmdebstrap`, `walk`), `wall` and `cpu` in ns, `memory` the peak in
+bytes, and the bytes `fetched`, `written` and `hashed`. The empty
+layer's `tools` and `costs` are empty; `placed` is present, maybe empty,
+in a software layer's record alone, and `how`, `base`, `depth` and
+`line` in a packages layer's alone.
 
 The key recomputes from `kind`, `parent` and `inputs`, and the startup
 scan checks it. `placed` is what collection keeps in the cache for a
