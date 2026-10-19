@@ -287,24 +287,22 @@ mod walk {
         peak(&fs, &SHIPPED, &"wide and deep, shipped");
     }
 
-    #[test]
-    fn walking_a_layer_at_its_limits_holds_no_more_than_the_worst_case() {
+    /// A layer at the limits but for its attribute values, of `value` bytes each: an entry with
+    /// its attributes full, a link target of 4096 bytes with two hard links, a directory of names
+    /// of 255 bytes, and a path of 4096 bytes.
+    fn at_its_limits(value: usize) -> Fs {
         let mut fs = Fs::new();
-        // An entry with its attributes full: 64 names of 255 bytes, 64 values of 64 KiB.
         let mut full = Node::file(2, b"x");
         for number in 0..64 {
-            full = full.attr(format!("user.{number:0>250}").as_bytes(), &vec![b'v'; 65_536]);
+            full = full.attr(format!("user.{number:0>250}").as_bytes(), &vec![b'v'; value]);
         }
         fs.add(b"full", full);
-        // A link target of 4096 bytes, and two hard links to it.
         let link = fs.add(b"target", Node::symlink(3, &[b't'; 4_096]));
         fs.link(b"target2", link);
-        // A directory of names of 255 bytes.
         fs.add(b"names", Node::new(Kind::Directory, 4));
         for number in 0..400_u64 {
             fs.add(format!("names/{number:0>255}").as_bytes(), Node::file(1_000 + number, b""));
         }
-        // A path of 4096 bytes.
         let mut path = Vec::new();
         for _ in 0..16 {
             if !path.is_empty() {
@@ -316,22 +314,37 @@ mod walk {
         path.push(b'/');
         path.extend_from_slice(&[b'f'; 16]);
         fs.add(&path, Node::file(9, b""));
+        fs
+    }
+
+    #[test]
+    fn walking_a_layer_at_its_limits_holds_no_more_than_the_worst_case() {
+        let fs = at_its_limits(65_536);
         let held = peak(&fs, &SHIPPED, &"at the limits");
         assert!(held > 4_000_000, "the full entry alone is more: {held}");
+    }
+
+    /// The walk against a parent at the shipped limits but for attribute values of 4 KiB: the
+    /// same `worst_case`, at a quarter of a megabyte for the full entry rather than four, so that
+    /// its four walks of it stay within the focused suite's budget.
+    #[test]
+    fn walking_a_layer_at_its_limits_against_a_parent_holds_no_more_than_the_worst_case() {
+        let limits = Limits { attribute_value: 4_096, ..SHIPPED };
+        let fs = at_its_limits(4_096);
         // Against itself, with the full entry read again beside the parent's, and with the
         // parent's entries deleted: the deepest path, the full entry, and a long name.
-        let file = helper::walk(&fs, &SHIPPED, KEY).file;
+        let file = helper::walk(&fs, &limits, KEY).file;
         let mut child = fs.clone();
         let full = child.lookup(b"full").expect("full");
         child.touched(full);
-        let touched = peak_against(&child, Some(&file), &SHIPPED, &"the full entry read again");
-        assert!(touched > 4_000_000, "the full entry alone is more: {touched}");
+        let touched = peak_against(&child, Some(&file), &limits, &"the full entry read again");
+        assert!(touched > 2 * 64 * 4_096, "the full entry, twice, is more: {touched}");
         let mut empty = Fs::new();
         empty.add(b"names", Node::new(Kind::Directory, 4));
-        let deleted = peak_against(&empty, Some(&file), &SHIPPED, &"everything deleted but a directory");
+        let deleted = peak_against(&empty, Some(&file), &limits, &"everything deleted but a directory");
         assert!(deleted > 0, "the parent's entries are held one at a time: {deleted}");
         // The other way: the full entry is only in the child, and the parent holds a small one.
-        let small_file = helper::walk(&empty, &SHIPPED, KEY).file;
-        peak_against(&fs, Some(&small_file), &SHIPPED, &"everything put");
+        let small_file = helper::walk(&empty, &limits, KEY).file;
+        peak_against(&fs, Some(&small_file), &limits, &"everything put");
     }
 }
