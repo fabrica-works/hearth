@@ -6,7 +6,7 @@ use skein_lib::Queue;
 pub(super) fn stage(out: &mut Queue<Output>) {
     out.push(Output::Answer(Answer::Unusable { step: Step::Stage }));
 }
-/// Transitional: h04c replaces this with the walk, freeze, record and publish (steps 3 to 6).
+/// Transitional: h04b replaces this with the walk, freeze, record and publish (steps 3 to 6).
 pub(super) fn seal(out: &mut Queue<Output>) {
     out.push(Output::Answer(Answer::Unusable { step: Step::Seal }));
 }
