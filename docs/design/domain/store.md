@@ -390,6 +390,8 @@ change set digest = H("changes", parent tree digest, child tree digest, list [ c
 - **In tree order, a path at most once.** A deleted directory lists
   every path beneath it; a put that changes a path's kind replaces what
   was there.
+- **With no parent** (`hash`, 5.4), the parent tree digest is `none`
+  and every entry is a put, as the end item's `parent_tree` (6.3).
 - **Never trusted alone:** applied to the parent and walked, it must
   give the child's tree digest (5.5, 10.2).
 - **It is what a layer changed,** for peers (10.1) and for people and
@@ -654,7 +656,11 @@ with a token that its one answer echoes.
   the tree file as it walks, then reads it twice more: once for the tree
   digest, and once for the change set's, which hashes the child's tree
   digest before its changes. Then it writes the end item (6.3). Each
-  read is of a file the page cache holds.
+  read is of a file the page cache holds. The walk itself is
+  `hearth-domain-tree`, which parses nothing: it hands typed items down,
+  and the helper's protocol layer encodes them, reads the file back for
+  the digests with the counts the walk gives, and returns the file's
+  SHA-256 and size once the end item and the header are written.
 - **The scan's rules come with the request** as data (domain/build.md, 9.3).
   The helper checks them on what changed, since only it can read every
   file, and answers findings, never contents. A rule on a file's lines
@@ -710,6 +716,7 @@ with a token that its one answer echoes.
 | names in one directory | 262,144 |
 | depth of the walk | 256 |
 | names held across the walk's stack, in all | 1,048,576 |
+| inodes with more than one link, held by the walk; their first paths, in all | 65,536; 16 MiB |
 | a path; a link target | 4096 bytes each |
 | attributes per entry; a name; one value | 64; 255 bytes (`XATTR_NAME_MAX`); 65,536 bytes (`XATTR_SIZE_MAX`) |
 | a tree file; an item in it | 1 GiB; 4,718,592 bytes |
@@ -718,7 +725,9 @@ with a token that its one answer echoes.
 | requests in flight per helper | 1 |
 
 Memory is the sorted names of each directory on the stack, bounded in
-all and not only per directory and per level, and the frames in flight:
+all and not only per directory and per level, each inode with more than
+one link (its first path, and a digest of the mode, owners and
+attributes its later paths must agree with), and the frames in flight:
 tree files stream in and out. A bound passed fails the request, naming
 the path.
 
