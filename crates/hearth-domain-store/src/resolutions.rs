@@ -59,6 +59,8 @@ pub(super) fn find(
         | Event::Page { .. }
         | Event::Done
         | Event::Arrived { .. }
+        | Event::Created { .. }
+        | Event::Helped { .. }
         | Event::Stage { .. }
         | Event::Seal { .. }
         | Event::Discard { .. } => unreachable!("find terminal"),
@@ -127,6 +129,8 @@ pub(super) fn record(
         | Event::Loaded { .. }
         | Event::Page { .. }
         | Event::Arrived { .. }
+        | Event::Created { .. }
+        | Event::Helped { .. }
         | Event::Stage { .. }
         | Event::Seal { .. }
         | Event::Discard { .. } => unreachable!("record terminal"),

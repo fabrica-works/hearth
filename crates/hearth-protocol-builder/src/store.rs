@@ -4,7 +4,7 @@ use crate::{
     Asked, Roots,
     builder::{
         self,
-        store::vocabulary::{Directory, Entry, Event, Request, Why},
+        store::vocabulary::{Directory, Entry, Event, Helper, Request, Why},
     },
     limits::Limits,
     records, translate, tree,
@@ -48,7 +48,10 @@ impl Store {
     ) {
         assert!(self.pending.is_none(), "one store request");
         self.pending = Some(request.clone());
-        if self.write(&request, roots, limits, below) || self.index(&request, roots, index, below) {
+        if self.write(&request, roots, limits, below)
+            || self.index(&request, roots, index, below)
+            || self.unavailable(&request)
+        {
             return;
         }
         if request == Request::Empty {
@@ -57,16 +60,12 @@ impl Store {
         }
         let removal =
             if let Request::Remove { directory, .. } = &request { removal_root(roots, *directory) } else { None };
-        if let (Request::Remove { .. }, None) = (&request, removal) {
-            // The protocol holds no root for layers/: nothing is removed there
-            // before the task that deletes layers with btrfs (domain/store.md, 7.3).
-            self.pending = None;
-            self.deferred = Some(Event::Failed);
-            return;
-        }
         below.push(Asked::File(match request {
             Request::Write { .. } => unreachable!("write handled"),
             Request::Empty => unreachable!("walk started"),
+            Request::Create { .. } | Request::Rename { .. } | Request::WriteLayer { .. } | Request::Helper(_) => {
+                unreachable!("answered unavailable")
+            }
             Request::Load { key } => file::Request::Load {
                 owner: OWNER,
                 root: roots.resolutions.token,
@@ -201,10 +200,23 @@ impl Store {
                 | Request::Remove { .. }
                 | Request::Lock
                 | Request::LoadRecord
-                | Request::WriteRecord { .. } => {}
+                | Request::WriteRecord { .. }
+                | Request::Create { .. }
+                | Request::Rename { .. }
+                | Request::WriteLayer { .. }
+                | Request::Helper(_) => {}
             }
         }
         false
+    }
+    /// Answers a request the binary can do nothing for yet `Failed`.
+    fn unavailable(&mut self, request: &Request) -> bool {
+        if !unavailable(request) {
+            return false;
+        }
+        self.pending = None;
+        self.deferred = Some(Event::Failed);
+        true
     }
     pub fn ready(&self) -> bool {
         self.deferred.is_some()
@@ -359,6 +371,42 @@ impl Store {
             | file::Event::Renamed { .. } => unreachable!("store request terminal"),
         };
         Some(event)
+    }
+}
+/// Whether the binary can do nothing for this request yet; it is answered `Failed`.
+fn unavailable(request: &Request) -> bool {
+    match request {
+        // The protocol holds no root for layers/: nothing is made, renamed, written or removed there
+        // before the tasks that do it with btrfs, h08 (domain/store.md, 4.2 and 7.3).
+        Request::Create { .. }
+        | Request::Rename { .. }
+        | Request::WriteLayer { .. }
+        | Request::Remove { directory: Directory::Layers, .. } => true,
+        // The tree helper is a process of its own, which h06 starts and talks to; until then,
+        // each of its requests is unavailable.
+        Request::Helper(helper) => match helper {
+            Helper::Snapshot { .. }
+            | Helper::Walk { .. }
+            | Helper::Hash { .. }
+            | Helper::Freeze { .. }
+            | Helper::Thaw { .. }
+            | Helper::Apply { .. }
+            | Helper::Empty { .. }
+            | Helper::Delete { .. } => true,
+        },
+        Request::Write { .. }
+        | Request::Load { .. }
+        | Request::LoadLayer { .. }
+        | Request::Empty
+        | Request::Keep { .. }
+        | Request::Discard { .. }
+        | Request::Lock
+        | Request::LoadRecord
+        | Request::WriteRecord { .. }
+        | Request::List { .. }
+        | Request::Next { .. }
+        | Request::Close
+        | Request::Remove { directory: Directory::Top | Directory::Cache | Directory::Resolutions, .. } => false,
     }
 }
 pub(super) fn startup(why: Why, store: &[u8]) -> records::startup::Startup {

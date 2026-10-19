@@ -14,10 +14,15 @@ pub(super) fn want(store: &Store, key: Digest, out: &mut Queue<Output>) {
         Answer::Free { key }
     }));
 }
+/// The empty layer's key (domain/store.md, 3.3).
+#[must_use]
+pub fn empty() -> Digest {
+    H::new(b"empty", 0).finish()
+}
 /// The key a record's kind, parent and inputs make (domain/store.md, 3.3), if they agree.
 #[must_use]
 pub fn key(record: &Layer) -> Option<Digest> {
-    let empty = H::new(b"empty", 0).finish();
+    let empty = empty();
     let (tag, beneath, part) = match record.inputs {
         LayerInputs::Empty => return if record.parent.is_none() { Some(empty) } else { None },
         LayerInputs::Packages { part, resolution } => {

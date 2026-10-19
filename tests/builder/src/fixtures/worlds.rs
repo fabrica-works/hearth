@@ -298,7 +298,7 @@ pub const PROTOCOL_LATENCY: skein_world::domain::Span = skein_world::domain::Spa
 /// One millisecond advances a live child between its bounded turns.
 pub const PROTOCOL_TICK: skein_lib::Duration = skein_lib::Duration::from_millis(1);
 
-fn commit(files: &[File], parents: Box<[objects::Oid]>) -> objects::Commit {
+pub(super) fn commit(files: &[File], parents: Box<[objects::Oid]>) -> objects::Commit {
     let mut tree = objects::Tree::new();
     for file in files {
         let mode = match file.mode {

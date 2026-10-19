@@ -39,6 +39,10 @@ impl Harness {
     pub fn published(&self, key: &hearth_lib::encode::Digest) -> bool {
         self.store.scan.layers.contains_key(key)
     }
+    /// Publishes a layer in the index, as a record the scan loaded.
+    pub fn plant(&mut self, layer: crate::vocabulary::Layer) {
+        self.store.scan.layers.insert(layer.key, layer).expect("fixture layer bound");
+    }
     pub fn next_deadline(&self) -> Option<Time> {
         crate::next_deadline(&self.store)
     }

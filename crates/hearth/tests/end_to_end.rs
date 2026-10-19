@@ -75,7 +75,7 @@ fn end_to_end_build() {
     assert_eq!(
         ended.exit,
         Some(Exit::Code(69)),
-        "client/README.md, 3.3: unavailable, as the store refuses to stage the first layer"
+        "client/README.md, 3.3: unavailable, as the store's first request for a layer, the empty layer's subvolume, has no answer in the binary until h08"
     );
     let rendered = fixtures::binary(
         env!("CARGO_BIN_EXE_hearth").as_ref(),

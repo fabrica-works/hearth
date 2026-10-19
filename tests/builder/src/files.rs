@@ -39,22 +39,26 @@ impl Files {
         };
         Self { shared, roots, handles, next, rng: Rng::new(seed), fault }
     }
+    /// The fake machine's handle of the store's root, for the fake tree helper's own calls.
+    pub(crate) fn store_root(&self) -> Handle {
+        self.handle(self.roots.store.token)
+    }
     fn handle(&self, token: Token) -> Handle {
         *self.handles.get(&token).expect("a file token issued here")
     }
     fn fd(&self, fd: Fd) -> Handle {
         self.handle(Token::new(u64::try_from(fd.raw()).expect("a root descriptor")))
     }
-    fn call(&self, ask: Ask) -> Result<Reply, Error> {
+    pub(crate) fn call(&self, ask: Ask) -> Result<Reply, Error> {
         self.shared.answer(ask)
     }
-    fn open(&self, root: Handle, path: &[u8], how: OpenHow) -> Result<Handle, Error> {
+    pub(crate) fn open(&self, root: Handle, path: &[u8], how: OpenHow) -> Result<Handle, Error> {
         let Reply::Opened(file) = self.call(Ask::Open { root, path: path.into(), how })? else {
             unreachable!("Open opens")
         };
         Ok(file)
     }
-    fn close(&self, file: Handle) {
+    pub(crate) fn close(&self, file: Handle) {
         self.call(Ask::Close { file }).expect("close an issued file");
     }
     fn opened(&mut self, owner: Token, root: Handle, path: &[u8], how: OpenHow) -> Result<Event, Error> {
@@ -201,13 +205,20 @@ impl Files {
             }
         })
     }
-    fn list(&self, dir: Handle, max: u32) -> Result<Box<[file::Entry]>, Error> {
+    pub(crate) fn list(&self, dir: Handle, max: u32) -> Result<Box<[file::Entry]>, Error> {
         let Reply::Listed(entries) = self.call(Ask::List { dir, most: max, room: max.saturating_mul(256) })? else {
             unreachable!("List lists")
         };
         Ok(entries.into_iter().map(|(kind, name)| file::Entry { kind, name }).collect())
     }
-    fn load(&self, owner: Token, root: Handle, path: &[u8], max: u32, no_follow: bool) -> Result<Event, Error> {
+    pub(crate) fn load(
+        &self,
+        owner: Token,
+        root: Handle,
+        path: &[u8],
+        max: u32,
+        no_follow: bool,
+    ) -> Result<Event, Error> {
         let file = self.open(root, path, if no_follow { OpenHow::ReadNoFollow } else { OpenHow::Read })?;
         let result = (|| {
             let Reply::Stat(stat) = self.call(Ask::Stat { file })? else { unreachable!("Stat states") };

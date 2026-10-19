@@ -10,7 +10,7 @@ pub use keys::{Keys, LAYERS, Layer, keys};
 use limits::Limits;
 pub use plan::{How, Plan, Planned, Step};
 use skein_lib::{Env, Queue};
-use vocabulary::{Answer, Event, Output, Request, Why};
+use vocabulary::{Answer, Event, Inputs, Output, Request, Why};
 /// One request or terminal per event.
 pub const MAX_OUT: u32 = 1;
 /// What the store was asked of the layer in hand, and has not yet answered.
@@ -33,11 +33,30 @@ impl Asked {
         }
     }
 }
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+struct Parts {
+    closure: hearth_lib::encode::Digest,
+    packages: hearth_lib::encode::Digest,
+    software: hearth_lib::encode::Digest,
+    config: hearth_lib::encode::Digest,
+}
+impl Parts {
+    /// What the layer's key is made of, besides the key beneath it.
+    const fn inputs(&self, layer: Layer) -> Inputs {
+        match layer {
+            Layer::Packages => Inputs::Packages { part: self.packages, resolution: self.closure },
+            Layer::Software => Inputs::Software { part: self.software },
+            Layer::Config => Inputs::Config { part: self.config },
+        }
+    }
+}
 /// A build runs its plan the way domain/store.md, 4.2 lays out a layer's life: for each
 /// layer, bottom-up, stage it, run its steps in order, seal it. One request is in flight.
 #[derive(Debug, Hash)]
 pub struct Build {
     keys: Option<Keys>,
+    /// The resolution's closure digest and the three part digests, which the layers' records name.
+    parts: Option<Parts>,
     asking: Option<Layer>,
     plan: Option<Plan>,
     /// The index in the plan of the layer being made.
@@ -50,7 +69,7 @@ impl Build {
     #[must_use]
     #[expect(clippy::new_without_default, reason = "step code names no Default (programming-model.md, 10.2)")]
     pub const fn new() -> Self {
-        Self { keys: None, asking: None, plan: None, layer: 0, running: None, asked: None }
+        Self { keys: None, parts: None, asking: None, plan: None, layer: 0, running: None, asked: None }
     }
     #[must_use]
     pub const fn is_empty(&self) -> bool {
@@ -63,6 +82,7 @@ pub fn step(build: &mut Build, env: &Env<Limits>, ev: Event, out: &mut Queue<Out
             assert!(build.is_empty(), "one build at a time");
             let keys = keys(closure, packages, software, config);
             build.keys = Some(keys);
+            build.parts = Some(Parts { closure, packages, software, config });
             want(build, Layer::Config, out);
         }
         Event::Have { key } => {
@@ -177,9 +197,11 @@ fn run(build: &mut Build, at: usize, out: &mut Queue<Output>) {
             out.push(Output::Request(Request::Run { step }));
         }
         None => {
-            let key = current(build).key;
+            let (layer, key) = (current(build).layer, current(build).key);
+            let keys = build.keys.expect("keys before the plan");
+            let parts = build.parts.expect("parts before the plan");
             build.asked = Some(Asked::Seal);
-            out.push(Output::Request(Request::Seal { key }));
+            out.push(Output::Request(Request::Seal { key, parent: keys.parent(layer), inputs: parts.inputs(layer) }));
         }
     }
 }
@@ -203,12 +225,14 @@ fn ran(build: &mut Build, step: Step) -> usize {
 fn built(build: &mut Build, out: &mut Queue<Output>) {
     let plan = build.plan.take().expect("a plan runs");
     build.keys = None;
+    build.parts = None;
     build.layer = 0;
     out.push(Output::Answer(Answer::Built { plan }));
 }
 fn failed(build: &mut Build, step: Step, why: Why, out: &mut Queue<Output>) {
     let plan = build.plan.take().expect("a plan runs");
     build.keys = None;
+    build.parts = None;
     build.layer = 0;
     out.push(Output::Answer(Answer::Failed { plan, step, why }));
 }

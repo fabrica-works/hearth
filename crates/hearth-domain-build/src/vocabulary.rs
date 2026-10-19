@@ -41,14 +41,24 @@ pub enum Request {
     Run {
         step: Step,
     },
-    /// Walk, freeze, record and publish the staged layer.
+    /// Walk, freeze, record and publish the staged layer: `parent` and `inputs` are what its
+    /// key and record are made of (domain/store.md, 6.2).
     Seal {
         key: Digest,
+        parent: Digest,
+        inputs: Inputs,
     },
     /// Drop the staged layer after a failure past its staging.
     Discard {
         key: Digest,
     },
+}
+/// The parts a layer's key is made of, which name its kind (domain/store.md, 3.3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Inputs {
+    Packages { part: Digest, resolution: Digest },
+    Software { part: Digest },
+    Config { part: Digest },
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {

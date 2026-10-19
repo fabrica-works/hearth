@@ -42,6 +42,8 @@ pub struct Store {
     finding: bool,
     writing: Option<hearth_lib::encode::Digest>,
     decline: vocabulary::Decline,
+    working: Option<staging::Working>,
+    staged: Option<staging::Staged>,
 }
 impl Store {
     #[must_use]
@@ -57,18 +59,22 @@ impl Store {
             finding: false,
             writing: None,
             decline: vocabulary::Decline::Unusable { step: vocabulary::Step::List },
+            working: None,
+            staged: None,
         }
     }
 }
 pub fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Queue<Output>) {
     if let Event::Want { key } = ev {
         layers::want(store, key, out);
-    } else if let Event::Stage { .. } = ev {
-        staging::stage(out);
-    } else if let Event::Seal { .. } = ev {
-        staging::seal(out);
+    } else if let Event::Stage { key, parent } = ev {
+        staging::stage(store, env, key, parent, out);
+    } else if let Event::Seal { key, parent, inputs } = ev {
+        staging::seal(store, env, key, parent, inputs, out);
     } else if let Event::Discard { .. } = ev {
         staging::discard(out);
+    } else if store.working.is_some() {
+        staging::step(store, ev, out);
     } else if store.writing.is_some() {
         resolutions::record(store, env, ev, out);
     } else if let Event::Record { .. } | Event::Room = ev {

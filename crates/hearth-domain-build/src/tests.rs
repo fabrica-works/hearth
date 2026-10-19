@@ -3,7 +3,7 @@ use crate::{
     limits::SHIPPED,
     plan::How,
     step,
-    vocabulary::{Answer, Event, Output, Request, Why},
+    vocabulary::{Answer, Event, Inputs, Output, Request, Why},
 };
 use hearth_lib::{encode::Digest, hash::H};
 use skein_lib::{Env, List, Queue, Time, Wall};
@@ -153,11 +153,23 @@ fn run_to(build: &mut Build, layer: Layer, until: usize, mut output: Output) -> 
     }
     output
 }
+/// What `layer`'s key is made of besides the key beneath it, from the build's four digests.
+const fn inputs(layer: Layer) -> Inputs {
+    match layer {
+        Layer::Packages => Inputs::Packages { part: PACKAGES, resolution: CLOSURE },
+        Layer::Software => Inputs::Software { part: SOFTWARE },
+        Layer::Config => Inputs::Config { part: CONFIG },
+    }
+}
 /// Runs every step of `layer` and seals it; the output after the seal.
 fn make(build: &mut Build, layer: Layer, output: Output) -> Output {
     let keys = keys_of();
     let output = run_to(build, layer, crate::plan::steps(layer).len(), output);
-    assert_eq!(output, Output::Request(Request::Seal { key: keys.of(layer) }), "{layer:?}: seal after the last step");
+    assert_eq!(
+        output,
+        Output::Request(Request::Seal { key: keys.of(layer), parent: keys.parent(layer), inputs: inputs(layer) }),
+        "{layer:?}: seal after the last step, with its parent and its inputs"
+    );
     feed(build, Event::Sealed { key: keys.of(layer) })
 }
 #[test]
@@ -208,7 +220,14 @@ fn go_wrong(build: &mut Build, trouble: Trouble, output: Output) -> (Step, Outpu
         Trouble::Unavailable(at) => (at, false),
         Trouble::Seal => {
             let output = run_to(build, Layer::Software, steps.len(), output);
-            assert_eq!(output, Output::Request(Request::Seal { key: keys.software }));
+            assert_eq!(
+                output,
+                Output::Request(Request::Seal {
+                    key: keys.software,
+                    parent: keys.packages,
+                    inputs: inputs(Layer::Software)
+                })
+            );
             let last = steps.last().copied().expect("a layer's steps");
             return (last, feed(build, Event::Refused { key: keys.software }));
         }

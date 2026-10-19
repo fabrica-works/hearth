@@ -65,6 +65,8 @@ pub(super) fn step(store: &mut Store, env: &Env<Limits>, event: Event, out: &mut
         | Event::Busy
         | Event::Loaded { .. }
         | Event::Page { .. }
+        | Event::Created { .. }
+        | Event::Helped { .. }
         | Event::Stage { .. }
         | Event::Seal { .. }
         | Event::Discard { .. } => {

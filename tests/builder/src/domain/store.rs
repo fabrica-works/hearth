@@ -16,12 +16,20 @@ use std::collections::BTreeMap;
 
 #[derive(Debug, Default)]
 pub(super) struct Store {
+    layers: super::layers::Layers,
     cursor: Option<Token>,
     directory: Option<Directory>,
     arrivals: BTreeMap<Token, Box<[u8]>>,
     next: u64,
 }
 impl Store {
+    pub fn new(seed: u64) -> Self {
+        Self { layers: super::layers::Layers::new(seed), ..Self::default() }
+    }
+    /// The seeded files a step leaves in the layer being made.
+    pub fn run(&self, files: &Files, step: hearth_domain_builder::build::Step) {
+        self.layers.run(files, step);
+    }
     pub fn arrival(&mut self, files: &mut Files, sha256: Digest, bytes: &[u8]) -> Token {
         self.next += 1;
         let token = Token::new(self.next);
@@ -71,16 +79,7 @@ impl Store {
                     directory: false,
                 }))
             }
-            Request::Lock => {
-                let event = files.answer(file::Request::Lock { owner: WORLD_OWNER, root: files.roots.store.token });
-                if let file::Event::Locked { .. } = event {
-                    Event::Locked
-                } else if let file::Event::Busy { .. } = event {
-                    Event::Busy
-                } else {
-                    Event::Failed
-                }
-            }
+            Request::Lock => lock(files),
             Request::LoadRecord => {
                 let event = load(files, files.roots.store, b"store.record", tree::frame::Kind::Store);
                 if let file::Event::Loaded { bytes, .. } = event {
@@ -141,6 +140,10 @@ impl Store {
                     Event::Unreadable
                 }
             }
+            Request::Create { key } => self.layers.create(files, key),
+            Request::Rename { key, rename } => super::layers::Layers::rename(files, key, rename),
+            Request::WriteLayer { record } => super::layers::Layers::write(files, &record),
+            Request::Helper(helper) => self.layers.helper(files, helper),
             Request::Write { resolution } => {
                 let name = format!("{}.record", hex_digest(resolution.key.0));
                 let bytes = tree::resolution::write(&translate::store::tree_resolution(resolution), &SHIPPED)
@@ -227,6 +230,16 @@ fn root(files: &Files, directory: Directory) -> Option<Root> {
         Directory::Cache => Some(files.roots.cache),
         Directory::Resolutions => Some(files.roots.resolutions),
         Directory::Layers => None,
+    }
+}
+fn lock(files: &mut Files) -> Event {
+    let event = files.answer(file::Request::Lock { owner: WORLD_OWNER, root: files.roots.store.token });
+    if let file::Event::Locked { .. } = event {
+        Event::Locked
+    } else if let file::Event::Busy { .. } = event {
+        Event::Busy
+    } else {
+        Event::Failed
     }
 }
 fn load(files: &mut Files, root: Root, name: &[u8], kind: tree::frame::Kind) -> file::Event {

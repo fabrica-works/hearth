@@ -26,9 +26,12 @@ pub enum Event {
         key: Digest,
         parent: Digest,
     },
-    /// Walk, freeze, record and publish the staged layer (4.2, steps 3 to 6).
+    /// Walk, freeze, record and publish the staged layer (4.2, steps 3 to 6): `parent` and
+    /// `inputs` are what its key and record are made of (6.2).
     Seal {
         key: Digest,
+        parent: Digest,
+        inputs: LayerInputs,
     },
     /// Drop the staged layer of this key (4.2, last paragraph).
     Discard {
@@ -45,6 +48,14 @@ pub enum Event {
         origin: Origin,
         took: Duration,
     },
+    /// The builder made the empty layer's subvolume, whose uuid it read.
+    Created {
+        uuid: [u8; 16],
+    },
+    /// The tree helper's answer to its one request in flight (5.3).
+    Helped {
+        answer: Helped,
+    },
     Open,
     Locked,
     Busy,
@@ -60,19 +71,152 @@ pub enum Event {
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
-    Write { resolution: Resolution },
-    Load { key: Digest },
-    LoadLayer { key: Digest },
+    Write {
+        resolution: Resolution,
+    },
+    Load {
+        key: Digest,
+    },
+    LoadLayer {
+        key: Digest,
+    },
     Empty,
-    Keep { arrival: Token, record: CacheFile },
-    Discard { arrival: Token },
+    Keep {
+        arrival: Token,
+        record: CacheFile,
+    },
+    Discard {
+        arrival: Token,
+    },
     Lock,
     LoadRecord,
-    WriteRecord { record: StoreRecord },
-    List { directory: Directory, max: u32 },
-    Next { max: u32 },
+    WriteRecord {
+        record: StoreRecord,
+    },
+    List {
+        directory: Directory,
+        max: u32,
+    },
+    Next {
+        max: u32,
+    },
     Close,
-    Remove { directory: Directory, name: Removal },
+    Remove {
+        directory: Directory,
+        name: Removal,
+    },
+    /// The empty layer's subvolume, as `layers/<key>.staging` (4.1); `Created` or `Failed`.
+    Create {
+        key: Digest,
+    },
+    /// One of a layer's renames within `layers/` (4.2, steps 5 and 6); `Done` or `Failed`.
+    Rename {
+        key: Digest,
+        rename: Renaming,
+    },
+    /// `layers/<key>.record`, written by rename (4.2, step 5); `Done` or `Failed`.
+    WriteLayer {
+        record: Box<Record>,
+    },
+    /// A request for the tree helper, one at a time (5.3); `Helped` or `Failed`.
+    Helper(Helper),
+}
+/// A rename within `layers/` (4.2).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Renaming {
+    /// `<key>.tree.tmp` to `<key>.tree`.
+    Tree,
+    /// `<key>.staging` to `<key>`.
+    Publish,
+}
+/// What the tree helper is asked, a closed set (5.3); `layer` and `staging` are keys.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Helper {
+    /// `parent`, writable, into `layers/<staging>.staging`.
+    Snapshot {
+        parent: Digest,
+        staging: Digest,
+    },
+    /// `layer` against its parent's tree file, writing `<layer>.tree.tmp`.
+    Walk {
+        layer: Digest,
+        parent: Option<Digest>,
+    },
+    /// `layer`, which has no parent, every file read.
+    Hash {
+        layer: Digest,
+    },
+    /// The read-only flag, then `syncfs`.
+    Freeze {
+        layer: Digest,
+    },
+    Thaw {
+        layer: Digest,
+    },
+    Apply {
+        layer: Digest,
+    },
+    Empty {
+        layer: Digest,
+    },
+    Delete {
+        layer: Digest,
+    },
+}
+/// The tree helper's one answer to a request (5.3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Helped {
+    Snapshotted { uuid: [u8; 16], parent_uuid: [u8; 16] },
+    Walked(Walk),
+    Hashed(Walk),
+    Frozen,
+    Thawed,
+    Applied,
+    Emptied { removed: u64 },
+    Deleted,
+    Failed { cause: Cause },
+}
+/// A walk's or hash's result: the digests, the tree file and the counts of a layer's record (6.2).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Walk {
+    pub tree: Digest,
+    pub changes: Digest,
+    pub tree_file: TreeFile,
+    pub counts: Counts,
+}
+/// `<key>.tree`'s SHA-256 and size.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct TreeFile {
+    pub sha256: Digest,
+    pub size: u64,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Counts {
+    pub bytes: u64,
+    pub deletes: u64,
+    pub entries: u64,
+    pub files: u64,
+    pub hashed: u64,
+    pub puts: u64,
+}
+/// Why the tree helper failed a request (5.3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Cause {
+    NotFound,
+    Permission,
+    Bound,
+    Refused,
+    NoSpace,
+    BadInput,
+}
+/// What `layers/<key>.record` holds of a sealed layer (6.2): the scan's layer, and what the
+/// walk and the snapshot gave. `tools` and `costs` are empty and a packages layer is a
+/// scratch build, until their tasks.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Record {
+    pub layer: Layer,
+    pub walk: Walk,
+    pub parent_uuid: Option<[u8; 16]>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {

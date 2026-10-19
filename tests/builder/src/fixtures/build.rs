@@ -56,3 +56,28 @@ pub fn plant(shared: &Shared, record: &Layer) {
     }
     linux.lay(&[linux::Item::file(path.as_bytes(), 0o644, &bytes).owner(BUILDER)]);
 }
+/// Whether `layers/<name>` is beneath the world's store.
+#[must_use]
+pub fn laid(shared: &Shared, name: &str) -> bool {
+    shared.borrow().behind.machine().linux().facts(format!("/srv/store/layers/{name}").as_bytes()).is_some()
+}
+/// The published record of this layer, if it has one.
+#[must_use]
+pub fn record(shared: &Shared, key: Digest) -> Option<Layer> {
+    let bytes = shared.contents(format!("/srv/store/layers/{}.record", hex_digest(key.0)).as_bytes())?;
+    Some(hearth_protocol_tree::layer::read(&bytes, &hearth_protocol_tree::limits::SHIPPED).expect("a valid record"))
+}
+/// Commits THIN's motd file changed, which is a change to the config part alone.
+pub fn edit_config(shared: &Shared) {
+    let files = super::thin_with(&[super::File {
+        path: "tasks/motd/tree/etc/motd",
+        body: b"Welcome back to x1.\n",
+        mode: 0o644,
+    }]);
+    let mut fake = shared.borrow_mut();
+    let repository = fake.repositories.0.get_mut(GIT_DIR).expect("laid repository");
+    let hearth_fake_git::repository::Resolved::Commit(before) = repository.resolve(b"HEAD") else {
+        unreachable!("initial commit")
+    };
+    repository.commit(&super::commit(&files, Box::new([before])));
+}

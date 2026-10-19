@@ -72,9 +72,15 @@ pub(crate) fn step(builder: &mut Builder, env: &Env<Limits>, event: Event, out: 
             store_step(builder, env, crate::store::vocabulary::Event::Stage { key, parent }, out);
         }
         Some(Output::Request(build::vocabulary::Request::Run { step })) => out.push(Request::Run { step }),
-        Some(Output::Request(build::vocabulary::Request::Seal { key })) => {
+        Some(Output::Request(build::vocabulary::Request::Seal { key, parent, inputs })) => {
+            use crate::{build::vocabulary::Inputs, store::vocabulary::LayerInputs};
             builder.staging = Some(key);
-            store_step(builder, env, crate::store::vocabulary::Event::Seal { key }, out);
+            let inputs = match inputs {
+                Inputs::Packages { part, resolution } => LayerInputs::Packages { part, resolution },
+                Inputs::Software { part } => LayerInputs::Software { part },
+                Inputs::Config { part } => LayerInputs::Config { part },
+            };
+            store_step(builder, env, crate::store::vocabulary::Event::Seal { key, parent, inputs }, out);
         }
         Some(Output::Request(build::vocabulary::Request::Discard { key })) => {
             builder.staging = Some(key);

@@ -1,5 +1,6 @@
 //! The builder root, render and store driven over their domain faces.
 mod decode;
+mod layers;
 mod resolve;
 mod store;
 use crate::{
@@ -75,7 +76,7 @@ impl Run {
             schedule: Schedule::new(),
             reads: VecDeque::new(),
             requests: Vec::new(),
-            store: store::Store::default(),
+            store: store::Store::new(seed),
             call,
             shared,
             seed,
@@ -181,7 +182,8 @@ impl Run {
             }
             Request::Run { step } => {
                 self.referee.ask(key);
-                let event = Event::Build(builder::build::vocabulary::Event::Unavailable { step: *step });
+                self.store.run(self.files(), *step);
+                let event = Event::Build(builder::build::vocabulary::Event::Ran { step: *step });
                 self.send(Delivery { event, terminal: Some(key) });
             }
             Request::Answer(answer) => self.answers.push(answer.clone()),

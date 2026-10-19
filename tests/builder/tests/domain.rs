@@ -4,7 +4,8 @@ use hearth_domain_render::{
     keys::Resolution,
     vocabulary::{Outcome, Request as RenderRequest},
 };
-use hearth_domain_store::vocabulary::Request as StoreRequest;
+use hearth_domain_store::vocabulary::{Helper, Request as StoreRequest};
+use hearth_protocol_tree::layer::Inputs;
 
 #[test]
 fn a_cold_restart_settles_what_a_cut_left_behind() {
@@ -134,39 +135,135 @@ fn rendered_keys(seed: u64) -> (hearth_domain_render::keys::Keys, hearth_lib::en
     let Some(Resolution::Known { keys, .. }) = spec.resolution.as_deref() else { unreachable!("resolved keys") };
     (keys.clone(), hearth_domain_render::keys::part(spec, b"config"))
 }
+/// The layers of a build from an empty store: their answers, with the state each is in.
+fn laid_out(keys: &hearth_domain_render::keys::Keys, found: hearth_domain_builder::vocabulary::State) -> Vec<Answer> {
+    use hearth_domain_builder::{build::Layer, vocabulary::State};
+    [
+        (Layer::Packages, keys.packages, found),
+        (Layer::Software, keys.software, found),
+        (Layer::Config, keys.config, if found == State::Found { State::Found } else { State::ToBuild }),
+    ]
+    .into_iter()
+    .map(|(layer, key, state)| Answer::Layer { layer, key, state })
+    .collect()
+}
+fn runs(run: &hearth_builder_world::domain::Run) -> usize {
+    run.requests().iter().filter(|request| matches!(request, Request::Run { .. })).count()
+}
+fn helped(run: &hearth_builder_world::domain::Run) -> Vec<&Helper> {
+    run.requests()
+        .iter()
+        .filter_map(
+            |request| if let Request::Store(StoreRequest::Helper(helper)) = request { Some(helper) } else { None },
+        )
+        .collect()
+}
 #[test]
-fn a_build_with_no_layers_plans_all_three_and_the_stores_stage_is_refused() {
-    use hearth_domain_builder::{
-        build::{Layer, Step, vocabulary::Why},
-        vocabulary::State,
-    };
+fn a_build_from_an_empty_store_publishes_the_empty_packages_software_and_config_layers() {
+    use hearth_domain_builder::vocabulary::State;
+    use hearth_domain_store::layers;
+    fixtures::each_settled(&fixtures::build::building(), |run, seed| {
+        let (keys, part) = rendered_keys(seed);
+        assert_eq!(run.answers, laid_out(&keys, State::ToBuild), "seed {seed}: three layers to build, none failed");
+        assert_eq!(run.outcome, Some(Outcome::Done), "seed {seed}: render's own outcome");
+        let empty = layers::empty();
+        let chain = [
+            (empty, None),
+            (keys.packages, Some(empty)),
+            (keys.software, Some(keys.packages)),
+            (keys.config, Some(keys.software)),
+        ];
+        let mut uuids = Vec::new();
+        for (key, parent) in chain {
+            let record = fixtures::build::record(&run.shared, key).expect("a published layer has its record");
+            assert_eq!(record.key, key, "seed {seed}");
+            assert_eq!(record.parent, parent, "seed {seed}: the layer beneath is the parent");
+            assert_eq!(
+                layers::key(&hearth_protocol_builder::translate::store::layer(record.clone())),
+                Some(key),
+                "seed {seed}: domain/store.md, 6.2: the key recomputes from kind, parent and inputs"
+            );
+            if let Some(parent) = parent {
+                let beneath = fixtures::build::record(&run.shared, parent).expect("the parent's record");
+                assert_eq!(record.subvolume.parent_uuid, Some(beneath.subvolume.uuid), "seed {seed}: lineage (4.5)");
+            }
+            assert!(!uuids.contains(&record.subvolume.uuid), "seed {seed}: one subvolume each");
+            uuids.push(record.subvolume.uuid);
+            let hex = fixtures::hex_digest(key.0);
+            for published in [hex.clone(), format!("{hex}.tree")] {
+                assert!(fixtures::build::laid(&run.shared, &published), "seed {seed}: {published}");
+            }
+            for gone in [format!("{hex}.staging"), format!("{hex}.tree.tmp")] {
+                assert!(!fixtures::build::laid(&run.shared, &gone), "seed {seed}: {gone} is renamed away");
+            }
+        }
+        let config = fixtures::build::record(&run.shared, keys.config).expect("config record");
+        assert_eq!(config.inputs, Inputs::Config { part }, "seed {seed}: the part the key covers");
+        assert_eq!(runs(&run), 11, "seed {seed}: three, three and five steps");
+        assert_eq!(run.strays(), 0, "seed {seed}: no staging and no temporary remain");
+        assert_eq!(run.referee.asked, run.referee.ended, "seed {seed}: every request has its terminal");
+    });
+}
+#[test]
+fn a_second_build_of_the_same_spec_stages_and_runs_nothing() {
+    use hearth_domain_builder::vocabulary::State;
     fixtures::each_settled(&fixtures::build::building(), |run, seed| {
         let (keys, _) = rendered_keys(seed);
-        assert_eq!(
-            run.answers,
-            [
-                Answer::Layer { layer: Layer::Packages, key: keys.packages, state: State::ToBuild },
-                Answer::Layer { layer: Layer::Software, key: keys.software, state: State::ToBuild },
-                Answer::Layer { layer: Layer::Config, key: keys.config, state: State::ToBuild },
-                Answer::Failed { step: Step::Fetch(Layer::Packages), why: Why::Stage },
-            ],
-            "seed {seed}: render's keys, each to build, then the refused stage of the first layer"
-        );
-        assert_eq!(run.outcome, Some(Outcome::Done), "seed {seed}: render's own outcome");
+        let again = run.restart().finish();
+        assert_eq!(again.answers, laid_out(&keys, State::Found), "seed {seed}: all three published");
+        assert!(runs(&again) == 0 && helped(&again).is_empty(), "seed {seed}: no Run and no Stage");
         assert!(
-            !run.requests().iter().any(|request| matches!(request, Request::Run { .. })),
-            "seed {seed}: no step runs while the store refuses to stage"
+            !again.requests().iter().any(|request| matches!(request, Request::Store(StoreRequest::Create { .. }))),
+            "seed {seed}: the empty layer is published"
         );
-        assert_eq!(run.referee.asked, run.referee.ended, "seed {seed}: every request has its terminal");
+        assert_eq!(again.outcome, Some(Outcome::Done), "seed {seed}");
+    });
+}
+#[test]
+fn a_changed_config_part_builds_config_alone_staged_from_the_published_software_layer() {
+    use hearth_domain_builder::{build::Layer, vocabulary::State};
+    fixtures::each_settled(&fixtures::build::building(), |run, seed| {
+        let (keys, old) = rendered_keys(seed);
+        fixtures::build::edit_config(&run.shared);
+        let rebuilt = run.restart().finish();
+        let [packages, software, Answer::Layer { layer: Layer::Config, key: config, state: State::ToBuild }] =
+            rebuilt.answers.as_slice()
+        else {
+            panic!("seed {seed}: packages and software found, config to build: {:?}", rebuilt.answers);
+        };
+        assert_eq!(
+            [packages, software],
+            [
+                &Answer::Layer { layer: Layer::Packages, key: keys.packages, state: State::Found },
+                &Answer::Layer { layer: Layer::Software, key: keys.software, state: State::Found }
+            ],
+            "seed {seed}: only the config key moves"
+        );
+        assert_ne!(*config, keys.config, "seed {seed}: a new part, a new key");
+        assert_eq!(
+            helped(&rebuilt),
+            [
+                &Helper::Snapshot { parent: keys.software, staging: *config },
+                &Helper::Walk { layer: *config, parent: Some(keys.software) },
+                &Helper::Freeze { layer: *config },
+            ],
+            "seed {seed}: staged from the published software layer, then sealed"
+        );
+        assert_eq!(runs(&rebuilt), 5, "seed {seed}: the config layer's five steps, nothing beneath");
+        let record = fixtures::build::record(&rebuilt.shared, *config).expect("the new layer's record");
+        assert_eq!(record.parent, Some(keys.software), "seed {seed}");
+        assert_ne!(record.inputs, Inputs::Config { part: old }, "seed {seed}: it names the new part");
+        assert!(fixtures::build::record(&rebuilt.shared, keys.config).is_some(), "seed {seed}: the old layer stays");
+        assert_eq!(rebuilt.strays(), 0, "seed {seed}");
     });
 }
 #[test]
 fn a_build_whose_config_layer_is_published_finds_all_three() {
     use hearth_domain_builder::{build::Layer, vocabulary::State};
-    fixtures::each_settled(&fixtures::build::building(), |run, seed| {
+    fixtures::each_scenario(&fixtures::build::building(), |run, seed| {
         let (keys, part) = rendered_keys(seed);
         fixtures::build::plant(&run.shared, &fixtures::build::config_layer(keys.config, keys.software, part));
-        let found = run.restart().finish();
+        let found = run.finish();
         assert_eq!(
             found.answers,
             [

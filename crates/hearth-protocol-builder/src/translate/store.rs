@@ -3,6 +3,7 @@ use crate::{
     builder::store::vocabulary::{Range, StoreRecord},
     tree,
 };
+use alloc::boxed::Box;
 #[must_use]
 pub fn store_record(record: tree::store::Store) -> StoreRecord {
     StoreRecord { layout: record.layout, made: record.made, range: store_range(record.range), uid: record.uid }
@@ -174,5 +175,53 @@ pub fn layer(record: tree::layer::Layer) -> crate::builder::store::vocabulary::L
         tree: record.tree,
         uuid: record.subvolume.uuid,
         at: record.made.at,
+    }
+}
+
+/// A sealed layer's record as it is written (domain/store.md, 6.2). `tools` and `costs` are empty
+/// and a packages layer is a scratch build with no base, until the tasks that fill them; the scan's
+/// rules, which only a walk with them can name, are the zero digest, until the scan (domain/build.md, 9.3).
+#[must_use]
+pub fn tree_layer(record: &crate::builder::store::vocabulary::Record) -> tree::layer::Layer {
+    use crate::builder::store::vocabulary::LayerInputs;
+    use tree::layer::{Counts, Inputs, LayerKind, Line, Made, Subvolume, TreeFile};
+    let (kind, inputs) = match record.layer.inputs {
+        LayerInputs::Empty => (LayerKind::Empty, Inputs::Empty),
+        LayerInputs::Packages { part, resolution } => (LayerKind::Packages, Inputs::Packages { part, resolution }),
+        LayerInputs::Software { part } => (LayerKind::Software, Inputs::Software { part }),
+        LayerInputs::Config { part } => (LayerKind::Config, Inputs::Config { part }),
+    };
+    let at = record.layer.at;
+    let counts = record.walk.counts;
+    tree::layer::Layer {
+        changes: record.walk.changes,
+        costs: Box::new([]),
+        counts: Counts {
+            bytes: counts.bytes,
+            deletes: counts.deletes,
+            entries: counts.entries,
+            files: counts.files,
+            hashed: counts.hashed,
+            puts: counts.puts,
+        },
+        inputs,
+        key: record.layer.key,
+        kind,
+        made: Made {
+            at,
+            packages: (kind == LayerKind::Packages).then_some(Line {
+                base: None,
+                depth: 0,
+                how: tree::layer::How::Scratch,
+                line: at,
+            }),
+        },
+        parent: record.layer.parent,
+        placed: if kind == LayerKind::Software { Some(Box::new([])) } else { None },
+        scan: if kind == LayerKind::Empty { None } else { Some(crate::render::vocabulary::Digest([0; 32])) },
+        subvolume: Subvolume { parent_uuid: record.parent_uuid, uuid: record.layer.uuid },
+        tools: Box::new([]),
+        tree: record.walk.tree,
+        tree_file: TreeFile { sha256: record.walk.tree_file.sha256, size: record.walk.tree_file.size },
     }
 }
