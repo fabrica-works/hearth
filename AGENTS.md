@@ -39,7 +39,7 @@
   pinned to an exact version, as the template world's oracle
   (`render.md`, 9.5).
 - **skein is named by its GitHub URL,**
-  `{ git = "https://github.com/forgetic/skein.git" }`, in the root
+  `{ git = "https://github.com/fabrig-dev/skein.git" }`, in the root
   `Cargo.toml`'s `[workspace.dependencies]`, with no `rev`, `branch` or
   `tag`: `Cargo.lock` pins it (skein's development.md, sections 5.7 and
   9.5).

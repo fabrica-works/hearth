@@ -18,10 +18,10 @@ hearth-render-world = { path = "tests/render" }
 libc = "0.2.186"
 hearth-service-builder = { path = "crates/hearth-service-builder" }
 hearth = { path = "crates/hearth" }
-skein-shell = { git = "https://github.com/forgetic/skein.git" }
+skein-shell = { git = "https://github.com/fabrig-dev/skein.git" }
 hearth-protocol-builder = { path = "crates/hearth-protocol-builder" }
-skein-sim = { git = "https://github.com/forgetic/skein.git" }
-skein-io = { git = "https://github.com/forgetic/skein.git" }
+skein-sim = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-io = { git = "https://github.com/fabrig-dev/skein.git" }
 hearth-client-protocol-records = { path = "crates/hearth-client-protocol-records" }
 hearth-recordings = { path = "testing/hearth-recordings" }
 hearth-git-world = { path = "tests/git" }
@@ -34,16 +34,16 @@ hearth-protocol-tree = { path = "crates/hearth-protocol-tree" }
 hearth-domain-builder = { path = "crates/hearth-domain-builder" }
 hearth-domain-store = { path = "crates/hearth-domain-store" }
 hearth-test-mirror = { path = "testing/hearth-test-mirror" }
-skein-scratch = { git = "https://github.com/forgetic/skein.git" }
+skein-scratch = { git = "https://github.com/fabrig-dev/skein.git" }
 hearth-domain-render = { path = "crates/hearth-domain-render" }
 hearth-protocol-mmdebstrap = { path = "crates/hearth-protocol-mmdebstrap" }
-skein-world = { git = "https://github.com/forgetic/skein.git" }
-skein-heap = { git = "https://github.com/forgetic/skein.git" }
+skein-world = { git = "https://github.com/fabrig-dev/skein.git" }
+skein-heap = { git = "https://github.com/fabrig-dev/skein.git" }
 hearth-lib = { path = "crates/hearth-lib" }
 hearth-protocol-template = { path = "crates/hearth-protocol-template" }
-skein-lib = { git = "https://github.com/forgetic/skein.git" }
+skein-lib = { git = "https://github.com/fabrig-dev/skein.git" }
 hearth-protocol-git = { path = "crates/hearth-protocol-git" }
-skein-json = { git = "https://github.com/forgetic/skein.git" }
+skein-json = { git = "https://github.com/fabrig-dev/skein.git" }
 
 # Panics are fail-stop and overflow traps, in every profile. (The test harness
 # needs unwinding, so cargo ignores `panic` for test targets.)
