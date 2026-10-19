@@ -1,0 +1,11 @@
+[package]
+name = "hearth-domain-tree"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+[dependencies]
+skein-lib.workspace = true
+hearth-lib.workspace = true
+[lints]
+workspace = true

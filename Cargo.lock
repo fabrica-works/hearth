@@ -185,6 +185,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hearth-domain-tree"
+version = "0.0.0"
+dependencies = [
+ "hearth-lib",
+ "skein-lib",
+]
+
+[[package]]
 name = "hearth-fake-git"
 version = "0.0.0"
 dependencies = [
