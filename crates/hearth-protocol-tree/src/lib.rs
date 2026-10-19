@@ -11,6 +11,7 @@ pub mod layer;
 pub mod limits;
 pub mod resolution;
 pub mod store;
+pub mod tree;
 
 #[cfg(test)]
 mod tests;

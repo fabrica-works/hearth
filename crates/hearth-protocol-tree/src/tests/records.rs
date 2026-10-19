@@ -128,8 +128,8 @@ fn writing_a_cache_file_past_a_limit_is_refused() {
 
 use super::fixtures::{a_resolution, resolution_items};
 use crate::{
-    limits::{Limits, ResolutionLimits},
-    resolution,
+    limits::{Limits, ResolutionLimits, TreeLimits},
+    resolution, tree,
 };
 
 const SMALL: Limits = Limits { resolution: ResolutionLimits { packages: 4, ..SHIPPED.resolution }, ..SHIPPED };
@@ -279,11 +279,13 @@ const WRITE_BOUNDS: &[(Kind, u32, u32, Refused)] = &[
     (Kind::Resolution, 8, 9, Refused::Limit(b"key")),
     (Kind::Layer, 2, 64, Refused::Limit(b"depth")),
     (Kind::Layer, 8, 10, Refused::Limit(b"key")),
+    (Kind::Tree, 2, 64, Refused::Limit(b"depth")),
+    (Kind::Tree, 8, 10, Refused::Limit(b"key")),
 ];
 #[test]
 fn writing_a_record_past_the_decoders_bounds_is_refused() {
     for (kind, depth, key, expected) in WRITE_BOUNDS {
-        let limits = Limits { depth: *depth, key: *key, ..SHIPPED };
+        let limits = Limits { depth: *depth, key: *key, tree: TreeLimits { key: *key, ..SHIPPED.tree }, ..SHIPPED };
         let result = match kind {
             Kind::Store => {
                 store::write(&Store { layout: 1, made: Wall::from_nanos(42), range: None, uid: 1000 }, &limits)
@@ -291,6 +293,7 @@ fn writing_a_record_past_the_decoders_bounds_is_refused() {
             Kind::CacheFile => cache_file::write(&a_cache_file(), &limits),
             Kind::Resolution => resolution::write(&a_resolution(2), &limits),
             Kind::Layer => layer::write(&a_layer(LayerKind::Packages), &limits),
+            Kind::Tree => tree::item(&super::tree::an_end_with_a_kernel(), &limits),
         };
         assert_eq!(result, Err(*expected), "{kind:?}, depth {depth}, key {key}");
     }

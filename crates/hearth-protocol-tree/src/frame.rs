@@ -11,6 +11,7 @@ pub const MAGIC: [u8; 8] = *b"hearth\0r";
 pub enum Kind {
     Store,
     Layer,
+    Tree,
     Resolution,
     CacheFile,
 }
@@ -20,6 +21,7 @@ impl Kind {
         match self {
             Self::Store => 1,
             Self::Layer => 2,
+            Self::Tree => 3,
             Self::Resolution => 4,
             Self::CacheFile => 5,
         }
@@ -34,6 +36,7 @@ impl Kind {
         match self {
             Self::Store => limits.store.body,
             Self::Layer => limits.layer.body,
+            Self::Tree => limits.tree.body,
             Self::Resolution => limits.resolution.body,
             Self::CacheFile => limits.cache_file.body,
         }
@@ -44,11 +47,20 @@ impl Kind {
 pub enum Unreadable {
     Short,
     Magic,
-    Kind { found: u16 },
-    Version { found: u16 },
+    Kind {
+        found: u16,
+    },
+    Version {
+        found: u16,
+    },
     Reserved,
-    Bound { length: u64 },
-    Length { length: u64, after: u64 },
+    Bound {
+        length: u64,
+    },
+    Length {
+        length: u64,
+        after: u64,
+    },
     Body(Malformed),
     Record,
     Missing(&'static [u8]),
@@ -56,6 +68,10 @@ pub enum Unreadable {
     Limit(&'static [u8]),
     Unknown,
     Order(&'static [u8]),
+    /// A tree file's item of a tag this version does not name.
+    Tag {
+        found: u8,
+    },
 }
 /// Why a body cannot be framed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -65,12 +81,13 @@ pub enum Refused {
     Order(&'static [u8]),
 }
 
-/// Checks a frame in header order, checking the kind's bound before its body.
-pub fn body<'a>(bytes: &'a [u8], kind: Kind, limits: &Limits) -> Result<&'a [u8], Unreadable> {
-    if bytes.len() < 24 {
+/// Checks a header in order, checking the kind's bound before any body, and
+/// returns the body's length.
+pub fn check_header(bytes: &[u8], kind: Kind, limits: &Limits) -> Result<u64, Unreadable> {
+    let Some(head) = bytes.get(..24) else {
         return Err(Unreadable::Short);
-    }
-    let mut reader = Reader::new(bytes);
+    };
+    let mut reader = Reader::new(head);
     if reader.bytes(8) != Some(MAGIC.as_slice()) {
         return Err(Unreadable::Magic);
     }
@@ -89,11 +106,29 @@ pub fn body<'a>(bytes: &'a [u8], kind: Kind, limits: &Limits) -> Result<&'a [u8]
     if length > u64::from(kind.bound(limits)) {
         return Err(Unreadable::Bound { length });
     }
+    Ok(length)
+}
+/// Checks a frame in header order, checking the kind's bound before its body.
+pub fn body<'a>(bytes: &'a [u8], kind: Kind, limits: &Limits) -> Result<&'a [u8], Unreadable> {
+    let length = check_header(bytes, kind, limits)?;
+    let mut reader = Reader::new(bytes);
+    reader.skip(24).expect("the header has 24 bytes");
     let after = u64::from(reader.remaining());
     if length != after {
         return Err(Unreadable::Length { length, after });
     }
     Ok(reader.bytes(reader.remaining()).expect("the remaining body fits"))
+}
+/// A kind's header for a body of `length` bytes.
+#[must_use]
+pub fn header(kind: Kind, length: u64) -> [u8; 24] {
+    let mut writer = Writer::new(24);
+    writer.put(&MAGIC).expect("the header has room");
+    writer.put(&kind.number().to_be_bytes()).expect("the header has room");
+    writer.put(&kind.version().to_be_bytes()).expect("the header has room");
+    writer.put(&0_u32.to_be_bytes()).expect("the header has room");
+    writer.put(&length.to_be_bytes()).expect("the header has room");
+    <[u8; 24]>::try_from(writer.finish().as_ref()).expect("the header has 24 bytes")
 }
 /// Frames a body at its kind's version.
 pub fn write(kind: Kind, body: &[u8], limits: &Limits) -> Result<Box<[u8]>, Refused> {

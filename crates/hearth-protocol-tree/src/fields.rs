@@ -45,6 +45,18 @@ impl<'a> Fields<'a> {
     pub(crate) fn key(&mut self) -> Result<Box<[u8]>, Unreadable> {
         self.bytes(b"key", u32::MAX)
     }
+    pub(crate) fn none(&mut self, field: &'static [u8]) -> Result<(), Unreadable> {
+        match self.next(field, u32::MAX)? {
+            Item::None => Ok(()),
+            Item::False
+            | Item::True
+            | Item::Uint(_)
+            | Item::Map(_)
+            | Item::Bytes(_)
+            | Item::Digest(_)
+            | Item::List(_) => Err(Unreadable::Shape(field)),
+        }
+    }
     pub(crate) fn uint(&mut self, field: &'static [u8]) -> Result<u64, Unreadable> {
         match self.next(field, u32::MAX)? {
             Item::Uint(value) => Ok(value),

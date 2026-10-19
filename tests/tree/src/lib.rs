@@ -3,3 +3,4 @@ pub mod check;
 pub mod fixtures;
 pub mod generate;
 pub mod mutate;
+pub mod oracle;

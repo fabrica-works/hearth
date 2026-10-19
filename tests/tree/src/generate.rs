@@ -1,5 +1,5 @@
 //! Valid records generated from injected randomness, framed by their writers.
-use crate::check::Record;
+use crate::{check::Record, oracle};
 use hearth_lib::encode::{Digest, Item};
 use hearth_protocol_tree::{
     cache_file::{CacheFile, Origin},
@@ -7,8 +7,10 @@ use hearth_protocol_tree::{
     limits::Limits,
     resolution::{Costs, Index, Inputs, Line, Made, Package, Resolution},
     store::{Range, Store},
+    tree::{End, Entry, Item as TreeItem, Kernel, Local, Op, Payload, Xattr},
 };
 use skein_lib::{Duration, Rng, Wall};
+use std::collections::BTreeSet;
 
 fn digest(rng: &mut Rng) -> Digest {
     let mut value = [0; 32];
@@ -55,12 +57,13 @@ fn cache_file(rng: &mut Rng, limits: &Limits) -> Record {
 }
 
 #[must_use]
-pub fn one_of_each(rng: &mut Rng, limits: &Limits) -> [Record; 4] {
+pub fn one_of_each(rng: &mut Rng, limits: &Limits) -> [Record; 5] {
     let store = Store { layout: 1, made: Wall::from_nanos(rng.next_u64()), range: None, uid: 1_000 };
     let packages = u32::try_from(rng.between(0, 64)).expect("small closure");
     [
         Record::Store(store),
         Record::Layer(Box::new(layer(rng, limits))),
+        Record::Tree(tree_file(rng, 12).into()),
         cache_file(rng, limits),
         Record::Resolution(resolution(rng, limits, packages)),
     ]
@@ -259,4 +262,256 @@ pub fn resolution_at_its_limits(limits: &Limits) -> Resolution {
     }
     assert_eq!(extra, 0, "filenames fill the body to within 1 KiB");
     record
+}
+
+/// Names that sort differently as a component than as bytes: `/` is between
+/// `.` and `0`, and a space, `-` and `.` come before it.
+const NAMES: &[&[u8]] = &[
+    b"a",
+    b"b",
+    b"a-b",
+    b"a b",
+    b"a.b",
+    b"a_b",
+    b"ab",
+    b"a0",
+    b"-",
+    b".a",
+    b"a.",
+    b"..a",
+    b"A",
+    b"~",
+    b"z",
+    b"\xc3\xa9",
+    b"\xff",
+    b"0",
+];
+fn name(rng: &mut Rng) -> Vec<u8> {
+    if rng.chance(300) {
+        let length = rng.between(1, 3);
+        (0..length).map(|_| b'a' + u8::try_from(rng.below(3)).expect("a letter")).collect()
+    } else {
+        NAMES[usize::try_from(rng.below(NAMES.len() as u64)).expect("an index")].to_vec()
+    }
+}
+fn join(directory: &[u8], name: &[u8]) -> Vec<u8> {
+    if directory.is_empty() { name.to_vec() } else { [directory, b"/", name].concat() }
+}
+fn id(rng: &mut Rng) -> u32 {
+    if rng.chance(700) { 0 } else { u32::try_from(rng.below(65_536)).expect("an owner") }
+}
+fn xattrs(rng: &mut Rng, limits: &Limits) -> Box<[Xattr]> {
+    let names: [&[u8]; 5] =
+        [b"security.capability", b"system.posix_acl_access", b"system.posix_acl_default", b"user.a", b"user.b"];
+    let count = if rng.chance(700) { 0 } else { rng.between(1, 4) };
+    let mut chosen = BTreeSet::new();
+    for _ in 0..count {
+        chosen.insert(names[usize::try_from(rng.below(5)).expect("an index")]);
+    }
+    if rng.chance(50) {
+        chosen.insert(&[b'u'; 255][..]);
+    }
+    chosen
+        .into_iter()
+        .map(|name| {
+            assert!(name.len() <= usize::try_from(limits.tree.key).expect("small"), "a name within the key bound");
+            Xattr { name: name.into(), value: bytes(rng, 65_536) }
+        })
+        .collect()
+}
+fn local(rng: &mut Rng) -> Local {
+    Local {
+        inode: rng.next_u64(),
+        ctime: (rng.next_u64(), u32::try_from(rng.below(1_000_000_000)).expect("nanoseconds")),
+        mtime: (rng.next_u64(), u32::try_from(rng.below(1_000_000_000)).expect("nanoseconds")),
+    }
+}
+
+fn device(rng: &mut Rng) -> (u32, u32) {
+    (u32::try_from(rng.below(256)).expect("small"), u32::try_from(rng.below(1 << 20)).expect("small"))
+}
+/// A leaf's payload: a hard link names one of the earlier `files`.
+fn payload(rng: &mut Rng, files: &[Vec<u8>]) -> Payload {
+    match rng.below(8) {
+        0 => Payload::Directory,
+        1..=3 => Payload::File { size: rng.below(1 << 20), content: digest(rng) },
+        4 => Payload::Symlink { target: bytes(rng, 64) },
+        5 if !files.is_empty() => {
+            let at = usize::try_from(rng.below(files.len() as u64)).expect("an index");
+            Payload::Hardlink { path: files[at].clone().into() }
+        }
+        5 => Payload::Fifo,
+        6 => {
+            let (major, minor) = device(rng);
+            Payload::Char { major, minor }
+        }
+        _ if rng.chance(500) => Payload::Socket,
+        _ => {
+            let (major, minor) = device(rng);
+            Payload::Block { major, minor }
+        }
+    }
+}
+
+/// A tree file's items for about `size` entries: paths of every shape, the
+/// eight kinds, hard links to earlier files, puts after some entries and
+/// deletes between them, and an end item whose digests the oracle made.
+#[must_use]
+pub fn tree_file(rng: &mut Rng, size: u64) -> Vec<TreeItem> {
+    let limits = &crate::fixtures::limits();
+    let mut paths = BTreeSet::from([Vec::new()]);
+    let mut directories = vec![Vec::new()];
+    for _ in 0..size.saturating_mul(4) {
+        if paths.len() as u64 >= size.max(1) {
+            break;
+        }
+        let parent = directories[usize::try_from(rng.below(directories.len() as u64)).expect("an index")].clone();
+        let path = join(&parent, &name(rng));
+        if paths.insert(path.clone()) && rng.chance(350) {
+            directories.push(path);
+        }
+    }
+    let mut ordered: Vec<Vec<u8>> = paths.iter().cloned().collect();
+    ordered.sort_by(|a, b| oracle::order(a, b));
+    let mut gone = Vec::new();
+    for number in 0..rng.between(0, 3) {
+        let parent = directories[usize::try_from(rng.below(directories.len() as u64)).expect("an index")].clone();
+        let path = join(&parent, format!("~gone{number}").as_bytes());
+        for child in 0..rng.between(0, 2) {
+            gone.push(join(&path, format!("c{child}").as_bytes()));
+        }
+        gone.push(path);
+    }
+    let mut slots: Vec<(Vec<u8>, bool)> = ordered.iter().map(|path| (path.clone(), true)).collect();
+    slots.extend(gone.iter().map(|path| (path.clone(), false)));
+    slots.sort_by(|a, b| oracle::order(&a.0, &b.0));
+    let mut items = Vec::new();
+    let mut entries: Vec<Entry> = Vec::new();
+    let mut changes: Vec<(Op, Vec<u8>, Option<usize>)> = Vec::new();
+    let mut files: Vec<Vec<u8>> = Vec::new();
+    let (mut bytes_total, mut file_count) = (0_u64, 0_u64);
+    for (path, is_entry) in slots {
+        if !is_entry {
+            items.push(TreeItem::Change { op: Op::Delete, path: path.clone().into() });
+            changes.push((Op::Delete, path, None));
+            continue;
+        }
+        let has_children = directories.contains(&path)
+            && ordered.iter().any(|other| {
+                other.len() > path.len() && other.starts_with(&path) && (path.is_empty() || other[path.len()] == b'/')
+            });
+        let payload = if has_children || path.is_empty() { Payload::Directory } else { payload(rng, &files) };
+        if let Payload::File { size, .. } = &payload {
+            files.push(path.clone());
+            bytes_total = bytes_total.saturating_add(*size);
+            file_count += 1;
+        }
+        let entry = Entry {
+            path: path.clone().into(),
+            mode: u32::try_from(rng.below(0o10000)).expect("a mode"),
+            uid: id(rng),
+            gid: id(rng),
+            xattrs: xattrs(rng, limits),
+            payload,
+        };
+        items.push(TreeItem::Entry(entry.clone(), local(rng)));
+        entries.push(entry);
+        if rng.chance(350) {
+            items.push(TreeItem::Change { op: Op::Put, path: path.clone().into() });
+            changes.push((Op::Put, path, Some(entries.len() - 1)));
+        }
+    }
+    let tree_refs: Vec<&Entry> = entries.iter().collect();
+    let tree = oracle::tree_digest(&tree_refs);
+    let parent_tree = rng.chance(500).then(|| digest(rng));
+    let listed: Vec<(Op, &[u8], Option<&Entry>)> =
+        changes.iter().map(|(op, path, at)| (*op, path.as_slice(), at.map(|at| &entries[at]))).collect();
+    let changes_digest = oracle::changes_digest(parent_tree, tree, &listed);
+    let mut version = 0_u64;
+    let boot = (0..rng.between(0, 3))
+        .map(|_| {
+            version += rng.between(1, 9);
+            Kernel {
+                version: format!("6.{version:03}.0-amd64").into_bytes().into(),
+                kernel: digest(rng),
+                modules: digest(rng),
+                initramfs: digest(rng),
+            }
+        })
+        .collect();
+    items.push(TreeItem::End(End {
+        key: digest(rng),
+        parent_tree,
+        tree,
+        changes: changes_digest,
+        counts: Counts {
+            bytes: bytes_total,
+            deletes: changes.iter().filter(|change| change.0 == Op::Delete).count() as u64,
+            entries: entries.len() as u64,
+            files: file_count,
+            hashed: rng.below(bytes_total.max(1)),
+            puts: changes.iter().filter(|change| change.0 == Op::Put).count() as u64,
+        },
+        boot,
+    }));
+    items
+}
+
+/// The longest entry: path, target and 64 attributes, each name and value at
+/// its limit.
+#[must_use]
+pub fn entry_at_its_limits(limits: &Limits) -> TreeItem {
+    let component = vec![b'p'; 255];
+    let path = vec![component.as_slice(); 16].join(&b'/');
+    assert_eq!(path.len(), 4_095, "sixteen components of 255 bytes");
+    let xattrs = (0..64_u32)
+        .map(|number| {
+            let mut name = vec![b'n'; usize::try_from(limits.tree.key).expect("small")];
+            name[..4].copy_from_slice(&number.to_be_bytes());
+            Xattr { name: name.into(), value: vec![b'v'; 65_536].into() }
+        })
+        .collect();
+    TreeItem::Entry(
+        Entry {
+            path: path.into(),
+            mode: 0o7777,
+            uid: 65_535,
+            gid: 65_535,
+            xattrs,
+            payload: Payload::Symlink { target: vec![b't'; 4_096].into() },
+        },
+        Local { inode: u64::MAX, ctime: (u64::MAX, 999_999_999), mtime: (u64::MAX, 999_999_999) },
+    )
+}
+/// The end item with all its kernels, each version at its limit.
+#[must_use]
+pub fn end_at_its_limits(limits: &Limits) -> TreeItem {
+    let mut rng = Rng::new(0x7EE0_FFFD);
+    let boot = (0..limits.tree.kernels)
+        .map(|number| {
+            let mut version = vec![b'v'; 255];
+            version[..4].copy_from_slice(&number.to_be_bytes());
+            Kernel {
+                version: version.into(),
+                kernel: digest(&mut rng),
+                modules: digest(&mut rng),
+                initramfs: digest(&mut rng),
+            }
+        })
+        .collect();
+    TreeItem::End(End {
+        key: digest(&mut rng),
+        parent_tree: Some(digest(&mut rng)),
+        tree: digest(&mut rng),
+        changes: digest(&mut rng),
+        counts: Counts {
+            bytes: u64::MAX,
+            deletes: u64::MAX,
+            entries: u64::MAX,
+            files: u64::MAX,
+            hashed: u64::MAX,
+            puts: u64::MAX,
+        },
+        boot,
+    })
 }

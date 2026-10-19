@@ -274,7 +274,7 @@ fn read_subvolume(f: &mut Fields<'_>) -> Result<Subvolume, Unreadable> {
         uuid: uuid.ok_or(Unreadable::Missing(b"uuid"))?,
     })
 }
-fn read_counts(f: &mut Fields<'_>) -> Result<Counts, Unreadable> {
+pub(crate) fn read_counts(f: &mut Fields<'_>) -> Result<Counts, Unreadable> {
     let (mut bytes, mut deletes, mut entries, mut files, mut hashed, mut puts) = (None, None, None, None, None, None);
     for _ in 0..f.map(b"counts")? {
         match f.key()?.as_ref() {
@@ -480,19 +480,7 @@ pub(crate) fn encode(record: &Layer, out: &mut Encoder) {
     out.key(b"costs");
     encode_costs(&record.costs, out);
     out.key(b"counts");
-    out.map(6);
-    out.key(b"bytes");
-    out.uint(record.counts.bytes);
-    out.key(b"deletes");
-    out.uint(record.counts.deletes);
-    out.key(b"entries");
-    out.uint(record.counts.entries);
-    out.key(b"files");
-    out.uint(record.counts.files);
-    out.key(b"hashed");
-    out.uint(record.counts.hashed);
-    out.key(b"puts");
-    out.uint(record.counts.puts);
+    encode_counts(&record.counts, out);
     out.key(b"inputs");
     match &record.inputs {
         Inputs::Empty => out.map(0),
@@ -553,6 +541,21 @@ pub(crate) fn encode(record: &Layer, out: &mut Encoder) {
     out.list(2);
     out.digest(&record.tree_file.sha256);
     out.uint(record.tree_file.size);
+}
+pub(crate) fn encode_counts(counts: &Counts, out: &mut Encoder) {
+    out.map(6);
+    out.key(b"bytes");
+    out.uint(counts.bytes);
+    out.key(b"deletes");
+    out.uint(counts.deletes);
+    out.key(b"entries");
+    out.uint(counts.entries);
+    out.key(b"files");
+    out.uint(counts.files);
+    out.key(b"hashed");
+    out.uint(counts.hashed);
+    out.key(b"puts");
+    out.uint(counts.puts);
 }
 fn encode_costs(costs: &[Step], out: &mut Encoder) {
     out.map(u64::try_from(costs.len()).expect("bounded steps"));
