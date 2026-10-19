@@ -4,7 +4,9 @@ Provisional, 2026-10-09. What a machine looks like to hearth: the kinds
 of machine it runs on, the btrfs top level and its mounts, how each kind
 boots a slot, the kernel's command line, the initramfs, bootstrap from a
 live system, and the firmware's quirks. M3 builds the EFI path and
-bootstrap; M3b builds the BIOS path; containers and pool hosts are M5
+bootstrap; M2's boot test (domain/testing.md, 6.6) first boots a built
+root with the command line's tokens (6.1) and the initramfs (section 7);
+M3b builds the BIOS path; containers and pool hosts are M5
 (domain/slots.md, section 12). A slot's life on this layout is domain/slots.md's, and
 the process that writes the layout is domain/activator.md's. What is open is
 in section 12.
@@ -771,7 +773,7 @@ INCLUDE_MODULES=btrfs,virtio_pci,virtio_scsi,sd_mod
 | Profile | Example | `INCLUDE_MODULES` | `MICROCODE` | Consoles, in the `boot` part |
 |---|---|---|---|---|
 | `7th-gen` | `x1-prod` | `btrfs,nvme` | `generic` | none |
-| `incus`, own disk | the VM tier | `btrfs,virtio_pci,virtio_scsi,sd_mod` (to verify) | `no` | `console=ttyS0,115200n8` |
+| `incus`, own disk | the VM tier | `btrfs,virtio_pci,virtio_scsi,sd_mod` (to verify, by M2's boot test) | `no` | `console=ttyS0,115200n8` |
 | `serverhino` | `rhi-prod` | `btrfs,scsi_mod,sd_mod,virtio_scsi,virtio_pci,virtio_mmio` | `no` | `console=tty0 console=ttyS0,115200n8` |
 | `ionos` | `ion-prod` | `btrfs,virtio_blk,virtio,virtio_pci,virtio_rng,scsi_mod`, and `vmw_pvscsi` (needed in 2022) | `no` | `console=tty0 console=ttyS0,115200n8` |
 | `vultr` [later] | vul | `btrfs,virtio_blk,virtio_pci` | `no` | `console=tty0 console=ttyS0,115200n8` |

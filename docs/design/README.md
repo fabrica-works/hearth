@@ -131,7 +131,7 @@ every milestone, from the first (domain/testing.md, section 10).
 | | Milestone | Gives | Builds |
 |---|---|---|---|
 | M1 | Render | specs with digests; the rendered diff of any change | protocol/format.md, but for checks and artifacts; domain/render.md; the client's render and diff (client/README.md); domain/store.md's encoding and a store without layers (2.4) |
-| M2 | Build | outputs keyed by digest, built unprivileged, layer by layer | domain/store.md, but for peers; domain/build.md; the tree helper |
+| M2 | Build | outputs keyed by digest, built unprivileged, layer by layer; a built root boots in a VM | domain/store.md, but for peers; domain/build.md; the tree helper; the boot test (domain/testing.md, 6.6) |
 | M3 | Slots, standalone, on EFI: **the MVP** | one real EFI machine runs on hearth, installed from scratch | domain/machine.md's EFI path and bootstrap; domain/slots.md, but for containers; domain/activator.md; domain/steward.md, but for peers and artifacts; client/README.md's client and protocol/wire.md's standalone mode; a minimal bless; domain/development.md's mutable machines, capture and working trees |
 | M3b | BIOS; development machines | BIOS machines, which most IaaS providers offer; development machines on Incus | domain/machine.md's BIOS path; domain/slots.md's trial through GRUB; domain/development.md's Incus driver |
 | M4 | The wire | hearth as a system behind an engine | protocol/wire.md's wire, facts and events |

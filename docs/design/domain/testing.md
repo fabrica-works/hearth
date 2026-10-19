@@ -34,7 +34,7 @@ M1 and grows with every milestone. What is open is in section 11.
 - **Real builds run as a regular user** (section 6), against a small
   pinned local mirror fetched once, through hearth's own store: the base
   layer is built once per mirror digest, and each test pays only for its
-  own step.
+  own step. M2 ends with one of its builds booting in QEMU (6.6).
 - **What needs root runs on Incus VMs** (section 7) with their own disk,
   OVMF, Secure Boot off and an iTCO watchdog: bootstrap, trials, every
   fallback, power cuts, and live changes with real overlays and real
@@ -67,6 +67,7 @@ io worlds are skein's: hearth does not retest io.
 | end to end | the `hearth` binary, as processes | as the real loop | no | focused, one per path through `main` | M1 |
 | conformance | each real tool as a regular user; real btrfs; OVMF and SeaBIOS in a VM | nothing: the same scenario also runs on the fake | no | `conformance` profile | M1 |
 | real builds | the builder, the tree helper and the real tools on real btrfs, as a regular user | the network: a pinned local mirror | no | `real` profile | M2 |
+| boot test | a built root, its kernel and its initramfs, from the EFI stub up, in QEMU | the disk, made from the output; the ESP and the activator | no | `boot` profile | M2 |
 | VM tier | everything, as root, from the firmware up | the hardware: an Incus VM | no | `vm` profile | M3 |
 
 ### 2.1 Step tests
@@ -170,8 +171,8 @@ no subordinate ids, no mirror, no root.
 
 ### 2.8 Outside the gate
 
-Three tiers are hearth's own: conformance (section 5), real builds
-(section 6) and the VM tier (section 7). They do not replay. A failure
+Four tiers are hearth's own: conformance (section 5), real builds
+(section 6), the boot test (6.6) and the VM tier (section 7). They do not replay. A failure
 found there is rerun lower down as a scenario, where it replays, and
 fixed there (testing-strategy.md, section 9).
 
@@ -193,6 +194,7 @@ tests/*/tests/*.rs                  focused tests
 tests/*/tests/fuzzy_*.rs            fuzzy tests
 tests/conformance/tests/*.rs        conformance (section 5)
 tests/real/tests/*.rs               real builds (section 6)
+tests/real/tests/boot.rs            the boot test (6.6)
 tests/vm/tests/*.rs                 the VM tier (section 7)
 ```
 
@@ -990,8 +992,8 @@ real costs of each step.
   architecture, and the requests of the test repository's targets:
   `test-min` (the `apt` variant with no package of its own: the test
   repository's `tasks/hearth/task.json` declares none, protocol/format.md,
-  5.12), and `test-boot` for the VM
-  tier (a kernel, tiny-initramfs, systemd, systemd-container,
+  5.12), and `test-boot` for the boot
+  test and the VM tier (a kernel, tiny-initramfs, systemd, systemd-container,
   openssh-server, incus-agent, and the tools hearth runs: mmdebstrap,
   uidmap, efibootmgr, git). The
   mirror digest is the SHA-256 of the pinned `InRelease`, kept in the
@@ -1094,6 +1096,61 @@ real costs of each step.
 
 Every test asserts its own cost facts: which steps ran, which layers
 were reused, what was fetched.
+
+### 6.6 The boot test
+
+M2 ends with a machine booting what it built: `test-boot`'s root, its
+kernel and its initramfs, from a btrfs subvolume, with no image built,
+kept or shipped. The rest of booting, the ESP, the entries, fstab, the
+shift and the activator, stays M3's (section 7).
+
+- **What it boots:** `test-boot`, built as any real build is, through
+  hearth's store. Its packages layer holds the kernel and the initramfs
+  the kernel's hook made with the packages part's `tiny-initramfs.conf`
+  (domain/build.md, 5.5); its boot digests (domain/build.md, 5.8) name the
+  version. The test repository's `boot` task carries the `incus`
+  profile's modules (domain/machine.md, 7.2) and `console=ttyS0,115200n8`
+  (protocol/format.md, 5.4), and its tree the signal's units, below.
+- **The disk:** a sparse file, the VM's only disk, holding a fresh
+  btrfs filesystem, its uuid fixed by the test, made by `mkfs.btrfs
+  --uuid <uuid> --rootdir <dir> --subvol rw:@test-boot.a`, where
+  `<dir>/@test-boot.a` is the config layer, bind-mounted. Its top level
+  is domain/machine.md's (3.1) with one slot, and nothing else: no ESP,
+  no `/var` subvolume.
+- **Ids by view, not by shift:** `mkfs.btrfs` runs unprivileged on the
+  file, in a user and mount namespace mapping the test user's
+  subordinate range to 0 to 65535, as the builder's sandboxes see a
+  layer. It copies owners, capabilities and ACLs as that namespace reads
+  them, which is what the activator's shift writes on disk
+  (domain/slots.md, 5.2), with neither root nor the shift. The same
+  namespace copies `boot/vmlinuz-<version>` and
+  `boot/initrd.img-<version>` out for QEMU. The test deletes all three
+  files after it.
+- **The boot:** QEMU's q35 with OVMF, Secure Boot off (domain/machine.md,
+  9.5), and `-kernel`, `-initrd` and `-append`: OVMF starts the kernel
+  by its EFI stub, as an M3 entry does from the ESP. The line is
+  domain/machine.md's (6.1) less `initrd=`, which QEMU passes itself:
+  `root=UUID=<uuid> rootflags=subvol=@test-boot.a ro panic=10`, the
+  `boot` part, then `systemd.unit=hearth-test-booted.target`. The disk is
+  on virtio-scsi (`virtio-scsi-pci`, `scsi-hd`), as Incus attaches a
+  VM's root disk, so the run verifies the `incus` module list. With
+  `-no-reboot`, a panic ends QEMU. The serial console is logged.
+- **The signal:** `hearth-test-booted.target`, in the test target's
+  tree, requires `multi-user.target`, and a oneshot service after it
+  writes `hearth-test-booted <subvol>` to `/dev/console`, the root's
+  subvolume as `findmnt` reads it, then powers off
+  (`SuccessAction=poweroff`). It runs only when the line asks for it, so
+  the VM tier's boots of `test-boot` are unchanged. The test passes when
+  that line, naming `@test-boot.a`, reaches the serial log and QEMU exits
+  0 within the ceiling (9.2); anything else fails, with the log kept.
+- **KVM where `/dev/kvm` opens, TCG otherwise** (`-accel kvm -accel
+  tcg`): a developer's machine has KVM, a shared runner may not. TCG
+  takes minutes, which is why the test boots once, not per scenario.
+- **Prerequisites:** 6.4's and the mirror, and `qemu-system-x86` and
+  `ovmf`. No prerequisite, no run, as 6.4 says.
+- **What it is not:** an image, a test of the activator, the shift,
+  entries, trials or fstab, or a replacement for the VM tier, which
+  boots from the disk's own ESP and runs as root inside.
 
 ## 7. The VM tier [M3]
 
@@ -1483,7 +1540,8 @@ first step:
 | Profile | Runs | Needs | Ceiling |
 |---|---|---|---|
 | `conformance` | section 5 | its scenarios' (5.5): in M1 git, mmdebstrap and the mirror's indexes; from M2, 6.4's too | 2 minutes |
-| `real` | section 6 | 6.4 and the mirror | 5 minutes |
+| `real` | section 6, but 6.6 | 6.4 and the mirror | 5 minutes |
+| `boot` | 6.6 | 6.4, the mirror, QEMU and OVMF; KVM where it exists | 10 minutes |
 | `vm` | section 7 | KVM and Incus | 30 minutes |
 | `measure` | both suites with `-j 1`, timing each test | — | none |
 
@@ -1526,7 +1584,7 @@ finding, as a failing check is.
 | | Tiers added | The fake machine grows | Fakes of tools | Outside the gate |
 |---|---|---|---|---|
 | M1 | step; domain (render, builder, with the store's resolutions and cache, domain/store.md, 2.4); machine (config, template, git, mmdebstrap); protocol (builder and tools); simulated (builder); real loop (render, real git); end to end (render, diff) | files with owners and modes; processes; the universe's index at snapshot timestamps | git; mmdebstrap `--simulate` | conformance: resolve, git; the mirror's indexes |
-| M2 | domain (store, build, tree); system (builder and tree helper); machine (dpkg, tree); protocol (tree helper); real loop (tree helper, process groups) | btrfs and its ownership rule; ids, maps of several extents, namespaces, cgroups, sandboxes; `openat2`'s flags; attributes, inodes, ctimes; the full universe, `systemd-container` included; full disks; power cuts on files and subvolumes, and `syncfs` | mmdebstrap's bootstrap; `apt-helper`; dpkg-query; the target's systemd tools and `tar` | conformance: bootstrap in both modes, extras, fetch, query, the target's tools, the btrfs rules; real builds |
+| M2 | domain (store, build, tree); system (builder and tree helper); machine (dpkg, tree); protocol (tree helper); real loop (tree helper, process groups) | btrfs and its ownership rule; ids, maps of several extents, namespaces, cgroups, sandboxes; `openat2`'s flags; attributes, inodes, ctimes; the full universe, `systemd-container` included; full disks; power cuts on files and subvolumes, and `syncfs` | mmdebstrap's bootstrap; `apt-helper`; dpkg-query; the target's systemd tools and `tar` | conformance: bootstrap in both modes, extras, fetch, query, the target's tools, the btrfs rules; real builds; the boot test (6.6) |
 | M3 | domain (steward, converge, slots, boot, disk, activator); system (the steward and the activator join); machine (link, jobs, efi, systemd, keygen, client, proc), each fuzzed; protocol (link, jobs, client); simulated (every process, across reboots); real loop (the client's socket); end to end (daemon and client); builders lost at every job, and the bless's render (domain/steward.md, section 8); capture and the bundle (domain/development.md, section 10) | GPT and the ESP; efivarfs, two entries per slot, and OVMF; the kernel, the initramfs, PID 1 with its isolation to emergency mode and its jobs; reboots, soft reboots, panics, the watchdog; power cuts on FAT and variables; mount namespaces, the new mount API and overlayfs (3.13); out-of-memory kills within a cgroup (3.10); cues; a mutable root changed by hand, apt and dpkg on a running slot | efibootmgr; systemctl at run time, its unit verbs included; systemd-tmpfiles; ssh-keygen, for SSH host keys only; mount, cp and bootstrap's disk tools; git's bundles | VM tier on OVMF, live changes included, builders killed for memory and mid-pass, and mutable slots, capture and working trees (7.6); conformance: firmware, host keys, overlays in a user namespace |
 | M3b | machine (grub, incus); domain (dev) | SeaBIOS; msdos and the post-MBR gap; GRUB on FAT, its environment pair, its boot counter, saves that fail, and the slots' fragments; Incus's instances and pool | grub-editenv; grub-install; incus | VM tier on SeaBIOS, and the development loop on a development host (7.6); conformance: env file, GRUB, incus |
 | M4 | protocol (the wire, on `skein-fake-channel`); machine (wire) | — | `hearth-fake-engine` (4.6); systemd-run, for a held bless's timer | — |
