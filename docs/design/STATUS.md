@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-10-17. How far hearth's code is from its design, and which
+Updated 2026-10-19. How far hearth's code is from its design, and which
 plans take it there. The designer keeps this file (skein's
 development.md, section 3.3).
 
@@ -24,7 +24,7 @@ development.md, section 3.3).
 | `activator.md` | no | the operations a slot needs, live changes included, M3; restarting a unit, data's snapshots and restores, a container's operations, M5; backups and disks as an effect, M6: not planned |
 | `steward.md` | no | the steward and its builder, M3; from M1, the builder's domain hosted by the client (client/README.md, 3.5): M1's, render; the rest not planned |
 | `wire.md` | no | the faces and standalone mode (sections 2 and 4), M3; the wire (sections 5 and 9), M4; telemetry (section 7), M5; bytes by digest (section 8), M6: not planned |
-| `client/README.md` | no | `render` and `diff`, in-process, M1 (3.1 to 3.3, 3.5), on built-in defaults: render; the rest of the client and its world, M3; `retarget` and `hearth dev`, M3b: not planned |
+| `client/README.md` | no | `render` and `diff`, in-process, M1 (3.1 to 3.3, 3.5), on built-in defaults: render; `--proxy` with M2's build (3.5): not planned; the rest of the client and its world, M3; `retarget` and `hearth dev`, M3b: not planned |
 | `operating.md` | no | all, M5, local snapshots and restores included; backups and faults, M6: not planned |
 | `testing.md` | no | each milestone's tiers, fakes and the fake machine's growth (section 10), from M1: M1's, render; the rest not planned |
 | `development.md` | no | mutable machines, the capture and applying a working tree, M3; the Incus driver, M3b; clusters and containers in development, M5; VMs from the host's store, M6: not planned |
@@ -35,7 +35,8 @@ development.md, section 3.3).
 
 - **M2 to M6, and reproducible builds** (README.md, section 3): each
   waits for the milestone before it, and skein's part of it
-  (README.md, 8.1).
+  (README.md, 8.1). M2's design is revised for its run (2026-10-19), and
+  skein's files for it are designed (skein's `STATUS.md`, "hearth's M2 files").
 - **The fake machine's generic half in skein** (testing.md, 3.11; README.md,
   8.2): waits for temper to build its machine.
 

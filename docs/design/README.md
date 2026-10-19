@@ -1,6 +1,6 @@
 # hearth's design
 
-Provisional, 2026-10-09, revised 2026-10-16. The design of hearth, the
+Provisional, 2026-10-09, revised 2026-10-19. The design of hearth, the
 factory's build daemon (temper's `factory.md`, section 7): what it
 makes, how it makes it, how a machine runs what it made, and how all of
 it is tested. It takes `draft/brainstorm.md` further and holds where the
@@ -248,6 +248,7 @@ hearth-protocol-http          bytes by digest                                   
 hearth-protocol-builder       the builder's protocol layer: routes its machines           M1
 hearth-protocol-steward       the steward's protocol layer: routes its machines           M3
 hearth-protocol-activator     the activator's protocol layer: routes its machines         M3
+hearth-protocol-helper        the tree helper's protocol layer: routes its machines       M2
 
 client                        what exists for the client, under one prefix, each crate held to its layer's rules (client/README.md, section 2)
 hearth-client-protocol-records  the client's records and their printer                    M1, M3
@@ -625,7 +626,8 @@ that last:
   bootstrap and kept in the store, never in the secret store
   (render.md, 2.2).
 - **A layer is durable before it is recorded:** `syncfs` on the store
-  between its walk and its record (store.md, section 4).
+  between its walk and its record, as the last step of the tree helper's
+  freeze (store.md, section 4.2).
 - **Package indices come from the resolution:** apt's verified,
   decompressed `Packages` files are kept by digest and served from the
   local repository; the fetch gets only packages (build.md, section 5).
@@ -680,19 +682,20 @@ user (`testing-strategy.md`, section 9). From the earliest:
 |---|---|---|
 | a public, streaming SHA-256 in lib, usable by the domain | digests | M1 |
 | JSON: each of the tokenizer's tokens and errors with its position in the document, its byte offset, line and column (the column in bytes, both from 1). `hearth-protocol-config` reads every document through skein-json's tokenizer, and refuses duplicate keys itself, at every depth, as it decodes each object's keys | strict configuration (format.md, 2.2); the file, line and column of every render error (render.md, 3.1 and section 7; format.md, 6.5) | M1 |
-| a full stat by name, without following links; readlink; extended attributes | the tree helper's walk | M2 |
-| writing a tree's metadata: symlink, link, chmod, chown, utimes, mkdir, truncate | change sets; the shift | M2 |
+| a full stat by name, without following links; readlink; extended attributes (skein's `kernel.md`, 6.1 and 6.4; `io.md`, 5) | the tree helper's walk | M2 |
+| writing a tree's metadata: symlink, link, chmod, chown, extended attributes, mkdir, truncate (skein's `kernel.md`, 6.4) | change sets | M2 |
+| setting an entry's times, without following links (`utimensat`) | a slot's `/var`, copied (slots.md, 5.3); later, the walk's clamp (reproducible.md, 5.1) | M3 |
 | spawning as another user, with supplementary groups; signalling a process group | the steward under the activator, the builder under the steward; stopping a tool | M2 |
 | contained process trees (skein's draft `process.md`), with id maps through `newuidmap`, a composed root and `pivot_root`, network and uts namespaces, fresh `/proc`, `/sys` and `/dev`, `no_new_privs` and limits (build.md, 8.8) | sandboxes | M2 |
-| a closed list of synchronous ioctls in the ring adapter: `GET_SUBVOL_INFO`, `GET_SUBVOL_ROOTREF`, `INO_LOOKUP_USER`, `SUBVOL_CREATE_V2`, `SNAP_CREATE_V2`, `SNAP_DESTROY_V2`, `SUBVOL_SETFLAGS` (store.md, 5.8) | the store and the slots, unprivileged where they can be | M2 |
+| a closed list of synchronous ioctls in the ring adapter: `GET_SUBVOL_INFO`, `GET_SUBVOL_ROOTREF`, `INO_LOOKUP_USER`, `SUBVOL_CREATE`, `SNAP_CREATE_V2`, `SNAP_DESTROY_V2`, `SUBVOL_SETFLAGS` (store.md, 5.8; skein's `kernel.md`, 6.5) | the store and the slots, unprivileged where they can be | M2 |
 | a digest of a world's state, for replay (testing.md, 8.4) | replay checks in hearth's worlds | M1 |
 | an exclusive lock on a directory, taken without waiting, which the owner asks for again on its own timer (skein's `kernel.md`, 6.1; `io.md`, 5) | the store's lock (store.md, 8.2, step 1) | M1 |
 | a rename from one directory to another (skein's `io.md`, 5) | a resolution's indices moved from its scratch directory into the cache (render.md, 5.3; store.md, 6.4) | M1 |
 | a directory listed page by page (skein's `io.md`, 5) | the startup scan of `cache/` and `resolutions/`, whatever their size (store.md, 8.2) | M1 |
-| `statfs`'s filesystem type | the scan's subvolume steps, on btrfs alone (store.md, 2.4) | M2 |
+| `statfs`'s filesystem type (skein's `kernel.md`, 6.5) | the scan's subvolume steps, on btrfs alone (store.md, 2.4) | M2 |
 | Unix sockets with peer credentials | the client | M3 |
 | redialling and identity on the channel's TLS client | the wire | M4 |
-| `syncfs` | a layer's data durable before its record | M2 |
+| `syncfs` (skein's `kernel.md`, 6.5) | a layer durable at its freeze, before its record (store.md, 4.2) | M2 |
 | `openat2` with `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS` and `RESOLVE_NO_XDEV`; `FICLONE` | prepare resolving and copying a slot's paths safely | M3 |
 | the new mount API: `fsopen`, `fsconfig`, `fsmount`, `move_mount` with `MOVE_MOUNT_BENEATH`, `open_tree`, `mount_setattr`; `umount2` with `MNT_DETACH`; walking a detached mount through its descriptor | live changes: overlays built aside, verified, swapped beneath and back (slots.md, 6.8) | M3 |
 | `mknodat` of a 0/0 character device | a live delta's whiteouts | M3 |

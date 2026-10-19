@@ -1,6 +1,6 @@
 # The client
 
-Provisional, 2026-10-16. hearth's command-line client: its crates, its
+Provisional, 2026-10-16, revised 2026-10-19. hearth's command-line client: its crates, its
 commands, its output and exit codes, the socket it reaches the steward
 by, what it runs in-process and as root, `shell`, and bootstrap's
 arguments. M1 builds `render` and `diff`, in-process (3.1 to 3.3, 3.5);
@@ -302,8 +302,13 @@ A crate that exists for the client is named
   `XDG_CACHE_HOME` and `HOME`, for the store's default. The builder's
   configuration is a value its host makes: the binary makes the
   defaults, and the test tiers and conformance make their own, the
-  mirror's proxy among them (testing.md, 6.2). What it reads from M2 is
-  open (section 5).
+  mirror's proxy among them (testing.md, 6.2). From M2, when it builds
+  and so fetches, it takes one option more, `--proxy <url>`: the HTTP
+  proxy (an apt-cacher-ng) its fetches go through, in the fetcher's apt
+  configuration (build.md, 5.1), never in a sandbox's. A proxy changes
+  no output, since every file fetched is checked by digest. Its bounds
+  stay the defaults: larger bounds are the daemon's (M3), and a file
+  beside the store waits for a need.
 - **A second command over the same store waits** for the first to
   release the store's lock (store.md, 8.2, step 1), and says once, on
   standard error, that it waits (3.2). The person may interrupt it.
@@ -465,9 +470,3 @@ hearth bootstrap --disk <device> [--wipe]
 - **Operators by group:** admitting a group of operators needs the
   peer's supplementary groups (`SO_PEERGROUPS`, to verify in skein's
   Unix sockets); until then, operators are uids.
-- **The in-process builder's configuration from M2:** M1's runs on
-  built-in defaults alone (3.5). Once it builds, and so fetches, a
-  developer's builder may need a proxy (an apt-cacher-ng), and larger
-  bounds: whether it reads them from a file beside the store, from
-  options, or from the environment is M2's to decide. Defaults stay
-  defaults whichever it takes.

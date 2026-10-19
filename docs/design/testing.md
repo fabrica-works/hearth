@@ -1,6 +1,6 @@
 # Testing hearth
 
-Provisional, 2026-10-09, revised 2026-10-16. How hearth is tested. The
+Provisional, 2026-10-09, revised 2026-10-19. How hearth is tested. The
 strategy is `testing-strategy.md`: the tiers, faults, what every fake
 shares, what every world checks, scenarios and the referee, the two
 suites, and where a failure is fixed. This document keeps what is
@@ -414,9 +414,12 @@ at M2.
 ```
 package    name, version, architecture, priority, Essential, section
 relations  Depends, Pre-Depends, Provides, Conflicts, with their version relations
-files      path, kind, mode, owner and group by name, contents by handle; conffiles marked
+files      path, kind, mode, owner and group by name, contents by the package's handle
+           (one seed per package, so a version's files are the same at every install);
+           conffiles marked
 scripts    typed effects, never shell: make a system user or group; set a file capability;
-           run /etc/kernel/postinst.d; register an alternative; fail (a fault)
+           run /etc/kernel/postinst.d; apply the package's tmpfiles lines; make the
+           kernel's /vmlinuz and /initrd.img links; register an alternative; fail (a fault)
 archive    Installed-Size; the .deb's size and SHA-256, as Packages lists them
 ```
 
@@ -433,12 +436,14 @@ archive    Installed-Size; the .deb's size and SHA-256, as Packages lists them
 - **base-files and base-passwd:** `/usr/lib/os-release`,
   `/etc/debian_version`, and the static users and groups.
 - **dpkg's database, of the real shape:** `/var/lib/dpkg/status` with
-  each package's stanza (Package, Status, Priority, Section,
+  each package's stanza, in the order of installation (Package, Status, Priority, Section,
   Installed-Size, Maintainer, Architecture, Version, Depends, Conffiles
   with their md5sums, Description), and `info/<package>.list`,
   `.md5sums` and `.conffiles`.
 - **Users made by maintainer scripts** take the next free system id, so
-  their ids depend on the order of installation, as on Debian.
+  their ids depend on the order of installation, as on Debian. Users
+  made by hearth's sysusers files are the config layer's, with the ids
+  it gives them (build.md, 7.2), never the universe's.
 - **Conffiles** under `/etc`, recorded with their md5sums. One changed
   both locally and in the package is the question dpkg answers by its
   options (`--force-confold`).

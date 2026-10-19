@@ -1,6 +1,6 @@
 # The store
 
-Provisional, 2026-10-09, revised 2026-10-16. The builder's store on
+Provisional, 2026-10-09, revised 2026-10-19. The builder's store on
 btrfs: its layout, the canonical encoding every digest uses, layer keys
 and tree digests, a layer's life, the tree helper, records, pins and
 collection, how each builder reads the store back, the steward's records
@@ -421,7 +421,7 @@ change set digest = H("changes", parent tree digest, child tree digest, list [ c
 1  snapshot   tree helper   writable snapshot of the parent → layers/<key>.staging
 2  steps      sandboxes     build.md, each in a sandbox over the staging subvolume
 3  walk       tree helper   against the parent's tree file  → layers/<key>.tree.tmp
-4  freeze     tree helper   the read-only flag set; then syncfs(2) on the store, by the builder
+4  freeze     tree helper   the read-only flag set, then syncfs(2) on the store
 5  record     builder       <key>.tree.tmp → <key>.tree; <key>.record written by rename
 6  publish    builder       rename layers/<key>.staging → layers/<key>
 ```
@@ -437,12 +437,14 @@ change set digest = H("changes", parent tree digest, child tree digest, list [ c
    digest, the change set's digest, counts, and the scan's findings
    (build.md, section 9), any of which fails the layer.
 4. **Freeze and sync:** `BTRFS_IOC_SUBVOL_SETFLAGS` with
-   `BTRFS_SUBVOL_RDONLY`, then `syncfs(2)` on the store's filesystem.
+   `BTRFS_SUBVOL_RDONLY`, then `syncfs(2)` on the store's filesystem,
+   both by the tree helper, which answers `freeze` only after the sync.
    Records are synced as they are written (6.8), but the files the steps
    wrote are not; without the sync, a power cut could leave torn files
    in a published layer under a record that claims its tree digest.
-   `syncfs` is one call for the whole layer, and an ask of skein
-   (README.md, 8.1).
+   `syncfs` is one call for the whole layer. It is synchronous and can
+   take seconds, so it runs in the helper, whose loop has nothing else
+   to do meanwhile, never on the builder's (skein's kernel.md, 6.5).
 5. **Record:** the tree file renamed into place, then the record, which
    names the tree file's SHA-256 and the uuids (6.8).
 6. **Publish:** a rename within `layers/` (2.3). A layer is published
@@ -486,7 +488,9 @@ The startup scan (8.2) settles what a crash left:
 | `<key>` with no record | a deletion began (7.3, step 1) | deletes it |
 | a record with no `<key>` | a publish stopped before its rename | deletes the record and tree file |
 | a record whose uuids are not the subvolume's | the subvolume is not the one recorded | deletes both |
-| `cache/<64 hex>.tmp`, `layers/<key>.tree.tmp`; a record's name, then `.skein-` and 16 lowercase hex digits, skein's `Store`'s temporary (6.8); anything in `staging/` | a write or a step in flight | deletes it |
+| a record whose key does not recompute from its fields, or that cannot be read | a damaged record, or a version the builder cannot read (6.8) | deletes it and its layer, reported once |
+| `<key>.tree` with neither a layer nor a record | a deletion stopped after its rmdir (7.3, step 6) | deletes it |
+| `cache/<64 hex>.tmp`, `layers/<key>.tree.tmp` and `layers/<key>.changes` (with or without a finding); a record's name, then `.skein-` and 16 lowercase hex digits, skein's `Store`'s temporary (6.8), in `layers/`, `resolutions/`, `cache/` or `targets/`; anything in `staging/` | a write or a step in flight | deletes it |
 | `cache/<sha256>` with no record | a cut between a cache file's rename and its record, or before the file was durable (6.8) | deletes it |
 | `cache/<sha256>.record` with no file | a deletion stopped (7.5) | deletes the record |
 
@@ -585,19 +589,30 @@ with a token that its one answer echoes.
 | Request | Answer |
 |---|---|
 | `snapshot` a layer into a new name, writable | `snapshotted` |
-| `freeze` or `thaw` a layer | `frozen`, `thawed` |
-| `walk` a layer against its parent's tree file, with the scan's rules; write its tree file | `walked`: tree digest, change set digest, the tree file's SHA-256 and size, counts, findings |
+| `freeze` a layer: the read-only flag, then `syncfs` (4.2); `thaw` one | `frozen`, `thawed` |
+| `walk` a layer against its parent's tree file, with the scan's rules and, for a packages layer, the kernels' inputs (6.3); write its tree file | `walked`: tree digest, change set digest, the tree file's SHA-256 and size, counts, findings |
 | `hash` a layer with no parent: every file read | `hashed`, as `walked` |
-| `apply` a change set from a file, contents by digest | `applied`: counts |
+| `apply` a change set from `<key>.changes`, contents by digest | `applied`: counts |
 | `empty` a layer | `emptied`: entries removed |
 | `delete` a layer whole, where `user_subvol_rm_allowed` is set | `deleted` |
 | any | `failed`: the path and a typed cause: not found, permission, a bound, a refused entry, no space, a bad input |
 
 - **One request at a time;** a builder may run more than one helper
   (one by default).
+- **On the pipes, a message is a length and a map,** not a frame of a
+  kind (6.1): a `u32` BE length, then a map (3.1) of `kind`, the
+  request's or answer's name, `token`, and `fields`, the map its kind
+  names. A scan rule is `list [ how, path, what, with ]` (build.md,
+  9.3). A message is bounded at 4 MiB, 256 rules and 64 findings; a
+  message past a bound, or that its kind does not name, ends the helper,
+  as its death does (5.2). The fields of each kind are
+  `hearth-protocol-helper`'s, from this section's table.
 - **Big data stays in files:** tree files written by the helper, owned
-  by the builder's ids, named in answers by SHA-256; change sets to
-  apply written by the builder. The pipes carry summaries.
+  by the builder's ids, named in answers by SHA-256; a change set to
+  apply is written by the builder to `layers/<key>.changes`, beside the
+  staging layer, as a tree file's items of tag 2 with each put's entry
+  (6.3), and deleted once applied, or with the staging layer. The pipes
+  carry summaries.
 - **Formats are machines, each its own lib-only crate**
   (`programming-model.md`, section 4), so the helper's domain parses
   nothing:
@@ -607,7 +622,16 @@ with a token that its one answer echoes.
   - `hearth-protocol-accounts`: the lines of `/etc/passwd`, `/etc/group`,
     `/etc/shadow` and `/etc/gshadow`, read from a layer, as typed
     entries: names to ids for apply's owners (5.5), and whether each
-    password field is locked, for the scan (build.md, 9.3).
+    password field is locked, for the scan (build.md, 9.3). An empty
+    password field is not locked; a group's password fields are read as
+    a user's; an id past 65,535 is refused, since a layer holds one range
+    of 65,536 ids (9.2);
+  - `hearth-protocol-xattr`: `security.capability` and POSIX ACL values,
+    checked as the walk reads them and apply writes them;
+  - `hearth-protocol-helper`: the helper's protocol layer, which routes
+    bytes between those machines, `hearth-domain-tree` and io: the
+    pipes' messages, the files the helper reads and writes, and the
+    attribute and account files it decodes.
 
 ### 5.4 The walk
 
@@ -615,10 +639,21 @@ with a token that its one answer echoes.
   sorted,** so entries come out in tree order, merged with the parent's
   tree file read as a stream: a path in both is compared (4.3), one
   only in the walk is a put, one only in the parent is a delete.
-- **A changed entry is read whole:** `statx`, `listxattr` and `getxattr`
-  for the covered families, the link target, and a file's contents,
-  hashed as they stream. Files with more than one link are grouped by
-  inode number.
+- **A changed entry is read whole:** skein's `StatEntry`,
+  `ListAttributes` and `GetAttribute` for the covered families,
+  `ReadLink`, and a file's contents, hashed as they stream (skein's
+  kernel.md, 6.4). Files with more than one link are grouped by inode
+  number.
+- **The walk checks what a stream cannot defer:** a path with a hard
+  link to an entry seen before must agree with that first entry's mode,
+  owners and attributes; and a directory's entry, its attributes read,
+  is written before any entry beneath it, so a child never waits on its
+  parent. A mismatch is a refusal of the layer, never a repair.
+- **The digests come from the finished tree file.** 3.5's change set
+  names its count first, so the helper writes the tree file as it walks,
+  then reads it once more to compute the tree digest and the change
+  set's, and writes the end item (6.3). It costs a second read of a file
+  the page cache holds.
 - **The scan's rules come with the request** as data (build.md, 9.3).
   The helper checks them on what changed, since only it can read every
   file, and answers findings, never contents. A rule on a file's lines
@@ -638,8 +673,8 @@ with a token that its one answer echoes.
 - **Apply** takes a change set in tree order: deletes first, deepest
   first; then puts, parents first. A file is written to a temporary
   name in its directory and renamed over its path, its contents from
-  `cache/<sha256>` (cloned with `FICLONE` where it can be, to verify) or
-  from a peer's stream (10.2). For each put: owners first (a `chown`
+  `cache/<sha256>` (copied; a clone with `FICLONE` is a later item,
+  section 12) or from a peer's stream (10.2). For each put: owners first (a `chown`
   clears setuid, setgid and capabilities), then the mode, then
   `security.capability`, then ACLs and `user.*`; covered attributes the
   entry does not list are removed. It refuses a non-canonical path, an
@@ -651,11 +686,20 @@ with a token that its one answer echoes.
   `/etc/group` as `hearth-protocol-accounts` decodes them (build.md, 7.3),
   and hearth's own sysusers, tmpfiles and preset files (build.md, 7.2 to
   7.5); single-file downloads (build.md, 6.2).
+- **Refused in M2 as well:** a FIFO, which no M2 layer's change set
+  makes; it comes with a need. Entries' times are not set, since no
+  digest holds them (3.4): setting them comes with the slot's shift in
+  M3 (slots.md, 5.2).
+- **Records:** skein's `MakeDirectory`, `Create`, `Truncate`,
+  `MakeLink`, `HardLink`, `SetOwner`, `SetMode`, `SetAttribute` and
+  `RemoveAttribute`, beneath the store's root (skein's kernel.md, 6.4).
 - **Empty** removes everything beneath a layer's root, deepest first, so
   the builder can `rmdir` it (7.3). Stopped half-way, it is done again.
-- **Snapshot, freeze, thaw and delete** are `BTRFS_IOC_SNAP_CREATE_V2`,
-  `BTRFS_IOC_SUBVOL_SETFLAGS` and `BTRFS_IOC_SNAP_DESTROY_V2`, the
-  helper's because a layer's root is the namespace root's (5.1).
+- **Snapshot, freeze, thaw and delete** are skein's `Snapshot`,
+  `SubvolumeReadOnly` and `SubvolumeDestroy` (`BTRFS_IOC_SNAP_CREATE_V2`,
+  `BTRFS_IOC_SUBVOL_SETFLAGS`, `BTRFS_IOC_SNAP_DESTROY_V2`), the
+  helper's because a layer's root is the namespace root's (5.1). Freeze
+  ends with `SyncFilesystem` (4.2).
 
 ### 5.6 Bounds
 
@@ -666,8 +710,10 @@ with a token that its one answer echoes.
 | depth of the walk | 256 |
 | names held across the walk's stack, in all | 1,048,576 |
 | a path; a link target | 4096 bytes each |
-| attributes per entry; one value | 64; 65,536 bytes (`XATTR_SIZE_MAX`) |
-| a tree file | 1 GiB |
+| attributes per entry; a name; one value | 64; 255 bytes (`XATTR_NAME_MAX`); 65,536 bytes (`XATTR_SIZE_MAX`) |
+| a tree file; an item in it | 1 GiB; 4,718,592 bytes |
+| kernels in a layer's `boot` | 8 |
+| a message on the pipes | 4 MiB; 256 rules, 64 findings |
 | requests in flight per helper | 1 |
 
 Memory is the sorted names of each directory on the stack, bounded in
@@ -694,22 +740,28 @@ by its protocol layer (render.md, 2.3), whence apply reads them.
 
 ### 5.8 The ioctls, and who makes them
 
-| ioctl | Made by | For |
-|---|---|---|
-| `BTRFS_IOC_SUBVOL_CREATE` | the builder | the empty layer's subvolume (4.1) |
-| `BTRFS_IOC_GET_SUBVOL_INFO` | the builder | a subvolume's uuids and flags (4.2, 8.2) |
-| `BTRFS_IOC_GET_SUBVOL_ROOTREF` | the builder | the subvolumes under the store, and nested ones (8.2) |
-| `BTRFS_IOC_INO_LOOKUP_USER` | the builder | each subvolume's path (8.2) |
-| `BTRFS_IOC_SNAP_CREATE_V2` | the tree helper | a writable snapshot of a parent (4.2) |
-| `BTRFS_IOC_SUBVOL_SETFLAGS` | the tree helper | freeze and thaw (4.2, 7.3) |
-| `BTRFS_IOC_SNAP_DESTROY_V2` | the tree helper | delete whole, where `user_subvol_rm_allowed` is set (7.4) |
-| `FICLONE` | the tree helper | contents cloned from the cache (5.5; to verify) |
+| Call | skein's record | Made by | For |
+|---|---|---|---|
+| `BTRFS_IOC_SUBVOL_CREATE` | `SubvolumeCreate` | the builder | the empty layer's subvolume (4.1) |
+| `BTRFS_IOC_GET_SUBVOL_INFO` | `SubvolumeInfo` | the builder | a subvolume's uuids and flags (4.2, 8.2) |
+| `BTRFS_IOC_GET_SUBVOL_ROOTREF` | `SubvolumeChildren` | the builder | the subvolumes under the store, and nested ones (8.2) |
+| `BTRFS_IOC_INO_LOOKUP_USER` | `SubvolumePath` | the builder | each subvolume's path (8.2) |
+| `BTRFS_IOC_SNAP_CREATE_V2` | `Snapshot` | the tree helper | a writable snapshot of a parent (4.2) |
+| `BTRFS_IOC_SUBVOL_SETFLAGS` | `SubvolumeReadOnly` | the tree helper | freeze and thaw (4.2, 7.3) |
+| `BTRFS_IOC_SNAP_DESTROY_V2` | `SubvolumeDestroy` | the tree helper | delete whole, where `user_subvol_rm_allowed` is set (7.4) |
+| `syncfs(2)` | `SyncFilesystem` | the tree helper | the layer durable, at the end of freeze (4.2) |
+| `fstatfs(2)` | `FilesystemStatus` | the builder | the store on btrfs, and its space (8.1, 8.2) |
 
-All are unprivileged, the first four for any user, the rest for the
-owner of a subvolume's root. They are synchronous records of skein's
-ring adapter, a closed list (README.md, 8.1), made in two processes:
-the builder and its tree helper. Beside them the builder calls
-`syncfs(2)` once per layer (4.2), one more ask of the same kind.
+All are unprivileged: the ioctls the builder makes for any user, the
+helper's for the owner of a subvolume's root. They are synchronous
+records of skein's ring adapter, a closed list (skein's kernel.md, 6.5;
+README.md, 8.1), made in two processes: the builder and its tree
+helper. The long ones (a snapshot, a flag, a destroy, a sync) are the
+helper's alone, so they never stall the builder's loop; the builder's
+own are made once at the store's start (`SubvolumeCreate`, for the
+empty layer) or are reads. `FICLONE`, to clone a file from the cache
+(5.5), is not among them in M2: apply copies, and the clone comes with
+a measured need (section 12).
 
 ## 6. Records
 
@@ -733,8 +785,11 @@ configured (`programming-model.md`, section 7), with these defaults:
 | Kind | Body | Within it |
 |---|---|---|
 | 1 store | 4 KiB | — |
+| 2 layer | 1 MiB | 4,096 digests in `placed`, 256 `tools`, 64 steps in `costs`; a tool's name or version of 256 bytes |
+| 3 tree | 1 GiB | an item of 4,718,592 bytes; 8 kernels in `boot`; an attribute's name, a map key in an entry, of 255 bytes (5.6) |
 | 4 resolution | 4 MiB | 8,192 packages in a closure, 8 source lines, 16 indices a line; a URI, a path or a filename of 4,096 bytes; a suite, a component, a name, a version or an architecture of 256 |
 | 5 cache file | 8 KiB | a URI or a path of 4,096 bytes; a git object id of 64 |
+| 6 target | 8 KiB | a name of 256 bytes, 16 builds, a revision of 64 |
 
 A body past its bound, or a field past its limit, is a record of a
 version the builder cannot read (6.8). A resolution whose closure would
@@ -742,12 +797,17 @@ pass 8,192 packages is an error of kind resolution (render.md, 7.2),
 never a record; so is one whose record would pass its bound or a
 field's limit, which the store declines to write: it depends on the
 inputs alone, a configuration error. The other kinds' bounds are set
-with the milestone that writes them, M2 for layers, tree files and
-targets.
+with the milestone that writes them: M2's are above, and kinds 7 to 9
+come with M3, M5 and M6. The tree helper's messages are not records
+and have no kind: a length and a map, bounded by 5.6 (5.3).
 
 - **The decoders' own bounds,** which no valid record reaches, hold
   for every kind: nesting 8 deep, a field's name of 64 bytes, a list or
-  a map of 8,256 items.
+  a map of 8,256 items. A tree file's decoder takes map keys of 255
+  bytes, since an entry's attributes are a map keyed by their names
+  (3.4).
+- **Field shapes,** for every kind: a count is a `u64`, a cost in time a
+  `u64` of nanoseconds, a uuid 16 bytes.
 - **A record that is not its version's** is one the builder cannot read
   (6.8): a reserved field that is not zero, a field its kind's version
   does not name, a field it requires missing, a value of another kind.
@@ -771,8 +831,13 @@ scan         digest                 the scan's rules it passed (build.md, 9.3)
 placed       list [ digest ]        software only: each download's SHA-256 it placed, and each artifact's tree digest [M6]
 tools        list                   [ name, version ]: mmdebstrap, apt, dpkg, the target's tools it ran
 costs        map                    per step: wall and CPU time, peak memory, bytes fetched, written, hashed
-made         map                    { at: wall time in ns, by: built | received [M6], from [M6]; packages only: how: scratch | reconcile, base: key | none, depth: uint }
+made         map                    { at: wall time in ns, by: built | received [M6], from [M6]; packages only: how: scratch | reconcile, base: key | none, depth: uint, line: wall time in ns }
 ```
+
+`line` is the `at` of the last scratch build in the layer's line of
+reconciles: its own `at` for a scratch build, its base's `line` for a
+reconcile. It is recorded, not derived from the base chain, since a
+base may be collected while its descendants are kept (build.md, 4.2).
 
 The key recomputes from `kind`, `parent` and `inputs`, and the startup
 scan checks it. `placed` is what collection keeps in the cache for a
@@ -801,8 +866,14 @@ boot             list, per kernel the layer holds; empty for a container:
 - **In tree order;** a change item follows its path's entry item, or
   stands alone for a delete. Both digests are computed from the items,
   and the end item must agree.
-- **`boot` is the packages layer's,** computed after its walk (build.md,
-  5.8), and copied unchanged by the layers above, which may not touch
+- **`boot` is the packages layer's,** computed by its walk (build.md,
+  5.8): the `walk` request carries, per kernel package of the
+  resolution's closure, its name, its version and the kernel version it
+  installs, with tiny-initramfs-core's version and the microcode
+  packages; the helper adds the digests the walk computed and writes the
+  end item. A kernel found in the layer that the request does not name
+  is a finding. The layers above copy it unchanged from their parent's
+  end item, which may not touch
   the kernel, its modules or the initramfs's configuration (build.md,
   9.3). slots.md (6.1) reads it to decide when the kernel is unchanged.
 - **About 150 bytes an entry,** 15 MB for 100,000 entries (an
@@ -880,8 +951,9 @@ record.
 - **`store.record`,** kind 1, version 1: `layout`, the layout's version,
   1; `uid`, the builder's; `range`, `{ base, count }`, the subordinate
   range its layers are owned by; `made`, wall time in ns. A store without
-  layers (2.4) has no `range`; the builder records it, by rename, before
-  its first layer [M2]. Once it is recorded, a builder configured with
+  layers (2.4) has no `range`; the store records it, by rename, at the
+  start of its first layer [M2], before the empty layer's subvolume is
+  made. Once it is recorded, a builder configured with
   another base refuses to start: every layer on disk is the recorded
   range's. So does a builder of another uid, which would write files the
   recorded one cannot replace (`sudo hearth render --store` on a
@@ -889,7 +961,8 @@ record.
   error (8.1) names both uids.
 - **`targets/<H("target", name)>.record`:** the name and the last N
   builds (7.1), newest first, each `[revision, output key, at]`,
-  rewritten when a build for the target completes.
+  rewritten when a build for the target completes. Target records are
+  never collected in M2 (section 12).
 - **`state/`:** the steward's records and rings (8.3).
 
 ### 6.7 An artifact's record [M6]
@@ -906,15 +979,17 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   written beside it, synced, renamed over `<name>`, the directory
   synced. A reader sees the old record or the new. A tree file [M2] is
   written the same way by the builder itself, as `<key>.tree.tmp`.
-- **Ordered:** the layer's files synced (`syncfs`) and its tree file
-  in place before its record, a record before the publishing rename
+- **Ordered:** the layer's files synced (`SyncFilesystem`, at the end
+  of the tree helper's freeze) and its tree file in place before its
+  record, a record before the publishing rename
   (4.2), an unrecording before the subvolume is touched (7.3). The
   startup scan repairs any prefix (4.4).
 - **A cache file is durable before its record.** It is written to
   `cache/<random>.tmp` (2.1), hashed as it is written, synced, and
   renamed to `cache/<sha256>`, in its own directory, so a reader never
   sees half a file under a digest; then its record is written. Several
-  files may be made durable with one `syncfs` before their records [M2].
+  files may be made durable with one `SyncFilesystem` before their
+  records [M2], made by the tree helper, never on the builder's loop.
   A file whose name is already present is not written again: its
   temporary is removed. An index a resolution keeps is synced where apt
   left it, renamed from its scratch directory into `cache/<sha256>`
@@ -955,6 +1030,11 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   parent's subvolume (snapshots share extents, not existence), but the
   target's next build starts from it and a peer's change set is against
   it. An ancestor costs only what its descendants changed or deleted.
+  A reconciled packages layer's base (build.md, 4.2) is an ancestor
+  too: its line's next reconcile starts from it.
+- **In M2 there is no steward:** the builder's root gives its store
+  empty pins at its start, so the empty layer, builds in flight and the
+  targets' last N outputs alone pin layers.
 - **A builder collects nothing before it has the steward's pins,** in
   its `Welcome` (steward.md, 3.2): the activator's slots and the desired
   revision's outputs. The steward spawns no builder that may collect
@@ -967,7 +1047,8 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   filesystem falls below its free-space floor (`statfs`), which the
   steward watches between builders and answers with a `collect` job
   (steward.md, 3.3).
-- **Oldest first, bounded per run.** What a deletion frees is not known
+- **Oldest first, bounded per run,** 16 layers by default. What a
+  deletion frees is not known
   in advance: without quotas, which need root, btrfs does not say what a
   subvolume holds alone.
 - **Each deletion is reported** with its reason (wire.md, section 6).
@@ -1017,6 +1098,9 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   lists it in `placed` (6.2), while a build in flight uses it (render's
   blobs among them), and for a configured time after its last use, so a
   rebuild soon after a collection fetches nothing.
+- **Collected by the store's collection,** after its layers, in the same
+  run and by the same pins: what no kept layer, build in flight or
+  configured time holds.
 - **Deleting one** unlinks its name and record; a staging link keeps the
   inode until its step ends.
 - **Nothing is collected in M1.** A store without layers grows with
@@ -1051,8 +1135,9 @@ artifacts.md (4.3) lists them. Its key is artifacts.md's (3.1).
   files by default, 6.1), so a full store runs no mmdebstrap; a
   resolution or a cache file that would still pass its limit while the
   builder runs is refused the same way, and its file is removed. Nothing
-  is evicted to make room: collection is M2's (7.5), and from M2 a
-  builder collects before it calls its store full. A store without
+  is evicted to make room in M1: collection is M2's (7.5). From M2 a
+  store at a limit collects first, one run (7.2), and is full only if it
+  is still at the limit after it. A store without
   layers that is full is deleted whole and made again (2.4).
 - **A store that cannot be opened ends the call.** A lock or a
   `store.record` that fails, or a `store.record` the builder refuses
@@ -1109,7 +1194,8 @@ settled before the first job of every pass.
    each paired with its record; a file with none is deleted (4.4) and
    never counts, so what a crash left cannot fill a store.
 7. **Settled:** deletions done (7.3), strays (any name 2.1 does not
-   list) reported once, by their count and the first found, and the
+   list) reported once, by their count and the first found, one count
+   for the whole scan, M1's directories and the layers' alike, and the
    index built. `state/` is the steward's, read at its own start (8.3).
 
 What the store says while it opens, that it waits for the lock and that
@@ -1336,6 +1422,9 @@ What the steward must keep across restarts and reboots lives in
   machine.md's bootstrap (section 8).
 - **`FICLONE` in apply,** one more ioctl for skein's ring adapter;
   depends on measuring copies of large files.
+- **Collecting target records:** a target no longer built keeps its
+  record, and so its last N outputs, for ever; depends on how targets
+  are retired (steward.md).
 - **Hashing speed:** skein's SHA-256, or a tool, for whole packages
   layers; depends on README.md 8.1's first ask and a measurement.
 - **Several `statx` in flight for the walk;** depends on measuring the

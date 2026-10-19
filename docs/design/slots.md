@@ -1,8 +1,8 @@
 # Slots
 
-Provisional, 2026-10-09. A slot's life on a machine: what a slot is and
-what its record holds, the four facts, the state machine, prepare step
-by step, trial (by a reboot, a soft reboot, or live, with no reboot),
+Provisional, 2026-10-09, revised 2026-10-19. A slot's life on a
+machine: what a slot is and what its record holds, the four facts, the
+state machine, prepare step by step, trial (by a reboot, a soft reboot, or live, with no reboot),
 bless, fall back, roll back, drift, what crashes and power cuts do at
 every step, and containers. M3 builds it on EFI, with a minimal bless
 and live changes; M3b adds trials through GRUB; containers and pool
@@ -406,7 +406,7 @@ A layer is one subvolume, `/var` included (store.md, section 4); a slot
 splits it off, so that dpkg's database travels with its slot and the
 root can stay read-only.
 
-1. **Make `@x1-prod.b.var`** with `BTRFS_IOC_SUBVOL_CREATE_V2`; its root
+1. **Make `@x1-prod.b.var`** with `BTRFS_IOC_SUBVOL_CREATE`; its root
    inode takes the owner and mode of the output's `/var`.
 2. **Copy the output's `/var` into it, sharing extents,** in one walk
    through descriptors: directories made, regular files cloned with
@@ -419,7 +419,7 @@ root can stay read-only.
    descriptors; `/var` itself stays, as the mount point.
 4. **Make the classes and the entries' directories** (machine.md, 3.4).
    For each class an entry of the `data` part uses, make
-   `@x1-prod.<class>` with `BTRFS_IOC_SUBVOL_CREATE_V2` if the top level
+   `@x1-prod.<class>` with `BTRFS_IOC_SUBVOL_CREATE` if the top level
    lacks it, its root `0:0 0755`. For each entry whose directory its
    class lacks, refuse the place if a directory of its name is orphaned
    in another of the target's classes; otherwise make it as
@@ -905,7 +905,7 @@ Every step that leaves the state starts by writing the journal
 | **L8. Live bless** | asked by the steward: 7.6. The default does not move | `live-blessed`; `b` is `live-blessed` |
 | **L9. The native boot** | the next boot consumes the one-shot and boots `b`'s trial entry: `b` runs on trial (6.3), its dead-man armed by `hearth.trial=`; its activator sets the marker `running`; its steward blesses it (7.3), the default moves to `b`, and the delta is deleted | the marker removed by the bless |
 
-**L1, the delta.** `BTRFS_IOC_SUBVOL_CREATE_V2` makes it, with `etc`,
+**L1, the delta.** `BTRFS_IOC_SUBVOL_CREATE` makes it, with `etc`,
 `usr` and `opt` carrying `b`'s metadata. The change is walked in tree
 order through descriptors, `b`'s paths resolved beneath `b`'s root as
 prepare resolves them (section 5), the delta's beneath the delta's:

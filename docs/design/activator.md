@@ -1,7 +1,7 @@
 # The activator
 
-Provisional, 2026-10-09. The privilege boundary of a machine: what the
-activator trusts and what it never does, the process pair it forms with
+Provisional, 2026-10-09, revised 2026-10-19. The privilege boundary of
+a machine: what the activator trusts and what it never does, the process pair it forms with
 its steward, the link between them, its closed list of operations, how
 it verifies what it is asked to place, its state, and the tools it
 drives. M3 builds it, with the operations a slot needs, live changes
@@ -1114,7 +1114,7 @@ an exit status (mount, parted, the mkfs tools and the rest of 8.2).
 
 | Tool | For | Protocol | What the domain gets |
 |---|---|---|---|
-| btrfs ioctls: `SNAP_CREATE_V2`, `SUBVOL_CREATE_V2`, `SNAP_DESTROY_V2`, `SUBVOL_SETFLAGS`, `GET_SUBVOL_INFO`, `GET_SUBVOL_ROOTREF`; `FICLONE` | snapshots, slots, sealing, the running slot; cloning `/var`, seeding entries and restoring one; classes, their snapshots and pruning [M5] | skein's ring adapter: a closed list of synchronous ioctls (an ask of skein, README, 8.1) | typed results |
+| btrfs ioctls: `SNAP_CREATE_V2`, `SUBVOL_CREATE`, `SNAP_DESTROY_V2`, `SUBVOL_SETFLAGS`, `GET_SUBVOL_INFO`, `GET_SUBVOL_ROOTREF`; `FICLONE` | snapshots, slots, sealing, the running slot; cloning `/var`, seeding entries and restoring one; classes, their snapshots and pruning [M5] | skein's ring adapter: a closed list of synchronous ioctls (an ask of skein, README, 8.1) | typed results |
 | files: `openat2` with `RESOLVE_BENEATH`, `RESOLVE_NO_SYMLINKS` and `RESOLVE_NO_XDEV`; stat without following, readlink, extended attributes, chown, chmod, mkdir, symlink, link, unlink, rmdir, `Store` | the shift, `/var`, the slot's files, the state | skein's io, with the records hearth asks for (README, 8.1) | typed results |
 | mounts: `fsopen`, `fsconfig`, `fsmount`, `move_mount` with `MOVE_MOUNT_BENEATH`, `open_tree`, `mount_setattr`, `umount2` with `MNT_DETACH`; `mknodat` of a 0/0 character device; `setns` into a container's mount namespace [M5], in a child | live overlays: the layers' source, the swap and the swap back, the whiteouts (slots.md, 6.8 and 12.8) | skein's io, asks of skein (README, 8.1) | typed results; the mount table through `hearth-protocol-proc` |
 | efivarfs reads | entries, `BootOrder`, `BootNext`, `BootCurrent`, `SecureBoot` | `hearth-protocol-efi` | typed variables |

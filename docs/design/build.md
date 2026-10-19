@@ -1,6 +1,6 @@
 # Building outputs
 
-Provisional, 2026-10-09. How an output is made from a spec: the recipe,
+Provisional, 2026-10-09, revised 2026-10-19. How an output is made from a spec: the recipe,
 the three layers, the plan, each layer's steps, the sandboxes they run
 in, what an output must not hold, the tools as protocols, caches and
 costs. M2 builds it. Where layers live, how they are named and how a
@@ -124,11 +124,16 @@ plan(spec)
 - **By default, a reconcile from a base.** The base is the target's
   previous packages layer, or else the published packages layer of the
   same suite, architecture and variant whose closure shares the most
-  packages with the new one. The step snapshots the base and, in the
+  packages with the new one. The store answers the candidates from its
+  layers' records: a packages layer's `inputs` name its resolution,
+  whose record holds the suite, the architecture, the variant and the
+  closure (store.md, 6.2 and 6.4); a layer whose resolution is gone is
+  no candidate. With no candidate of the same suite, the build is from
+  scratch. The step snapshots the base and, in the
   sandbox, offline from the local repository (5.3), with the seeds and
   preseeds of the new part applied first (5.5):
   `apt-get install --allow-downgrades <name>=<version>…` for the whole
-  closure, then `apt-get purge` of every name the closure no longer
+  closure (a pin with no architecture is the target's), then `apt-get purge` of every name the closure no longer
   holds, never `autoremove`, then `dpkg --configure -a`. The installed
   set is then checked against the closure, and the cleanups and the
   scan run, exactly as after a scratch build (5.6, 5.7, 9.3).
@@ -172,8 +177,9 @@ plan(spec)
 ### 4.4 Concurrency
 
 - **One build per key** (store.md, 4.6), different keys at once within
-  the builder's limits: one packages step at a time, a configured
-  number of other steps, one fetcher per source host.
+  the builder's limits: one packages step at a time, other steps 4 at
+  a time and builds in flight 8 by default (both configured), one
+  fetcher per source host.
 - **On a machine, its own builds one at a time:** the steward gives its
   builder the pass's jobs one by one; from M6, artifacts and peers'
   change sets run beside them within the limits above
@@ -902,7 +908,8 @@ domain never sees a tool's text.
   I: success in <seconds> seconds                           done
   ```
 
-  An `I:` line it does not know is reported as other, not refused.
+  An `I:` line it does not know is reported as other, not refused;
+  apt's `Ign:` and `Fetched` lines are ignored.
 - **Progress** within essential and remaining counts dpkg's `Setting up
   <package> (<version>) ...` lines against the closure's size.
 - **The failure tail** keeps the last 20 lines that match os's list
@@ -958,6 +965,12 @@ with its tail.
   local mirror (testing.md, section 5).
 - **They replace os's hand-written fixtures** (a 17-line `Inst` sample,
   a 22-line failure log), and are recorded again when a tool moves.
+- **What a recording settles, the design does not restate:** a
+  maintainer script's failure line, the fetch's environment,
+  `dpkg-query`'s margin and the `--version` formats behind `tools`
+  (store.md, 6.2) are taken from the recordings, with the rules above:
+  `Ign:` and `Fetched` ignored, a pin with no architecture the
+  target's.
 
 ## 11. Caches
 
