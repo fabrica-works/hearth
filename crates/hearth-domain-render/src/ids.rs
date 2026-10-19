@@ -1,4 +1,4 @@
-//! Fixed owners and package seeds (render.md, 3.3 and 4.2).
+//! Fixed owners and package seeds (domain/render.md, 3.3 and 4.2).
 use crate::{
     entries::Expansion,
     errors::{Error, Ids, Kind, Owns, Place, Why},

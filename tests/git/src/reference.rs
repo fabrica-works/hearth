@@ -1,4 +1,4 @@
-//! A recursive reading of the revision alphabet and git's one-line answer (render.md, 2.2).
+//! A recursive reading of the revision alphabet and git's one-line answer (domain/render.md, 2.2).
 use crate::fixtures::revisions::{REVISION_LIMIT, SHA1_DIGITS, SHA256_DIGITS};
 use hearth_protocol_git::{
     invocation::{Exit, Refused},

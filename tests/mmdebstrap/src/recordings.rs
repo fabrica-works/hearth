@@ -1,4 +1,4 @@
-//! Real mmdebstrap captures paired with hand-reviewed expectations (testing.md, 4.5).
+//! Real mmdebstrap captures paired with hand-reviewed expectations (domain/testing.md, 4.5).
 use crate::reference::{self, Decoded};
 use hearth_recordings::Recording;
 use std::{fs, path::Path};

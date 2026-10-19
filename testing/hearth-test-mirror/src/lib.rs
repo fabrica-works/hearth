@@ -1,4 +1,4 @@
-//! The pinned local mirror for test tiers (testing.md, 6.2).
+//! The pinned local mirror for test tiers (domain/testing.md, 6.2).
 pub mod mirror;
 pub mod pin;
 pub mod proxy;

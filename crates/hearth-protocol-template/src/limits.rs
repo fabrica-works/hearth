@@ -1,6 +1,6 @@
 use crate::{Instruction, Operation};
 use skein_lib::{List, Stack};
-/// Configured expression bounds (render.md, 2.3).
+/// Configured expression bounds (domain/render.md, 2.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
     pub expression: u32,
@@ -8,7 +8,7 @@ pub struct Limits {
     pub template: u32,
     pub statements: u32,
 }
-/// The shipped profile (render.md, 2.3).
+/// The shipped profile (domain/render.md, 2.3).
 pub const SHIPPED: Limits = Limits { expression: 4096, nesting: 64, template: 262_144, statements: 32 };
 
 /// One of the crate's entry points.

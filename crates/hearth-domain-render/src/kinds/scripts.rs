@@ -1,4 +1,4 @@
-//! Declared script files (format.md, 5.8); software content belongs to its pass.
+//! Declared script files (protocol/format.md, 5.8); software content belongs to its pass.
 use crate::{
     errors::{Error, Kind, Place, Repository},
     revision::{self, declaration::Declaration},

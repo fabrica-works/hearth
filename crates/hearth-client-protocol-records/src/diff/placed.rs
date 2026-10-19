@@ -1,4 +1,4 @@
-//! Forms shared by path and seed changes (render.md, 6.1).
+//! Forms shared by path and seed changes (domain/render.md, 6.1).
 use crate::form::{json::field, text::Lines};
 use skein_json::writer::Encoder;
 pub(crate) fn header(lines: &mut Lines, part: &[u8], key: &[u8], before: bool, after: bool) {

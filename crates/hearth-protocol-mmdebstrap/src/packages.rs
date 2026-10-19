@@ -1,4 +1,4 @@
-//! Bounded deb822 Packages stanzas (render.md, 5.3).
+//! Bounded deb822 Packages stanzas (domain/render.md, 5.3).
 use crate::{MaxOut, limits::Limits, vector::Name};
 use alloc::boxed::Box;
 use skein_lib::{

@@ -1,4 +1,4 @@
-//! One owned tree from tokenizer demands (format.md, 2.2; render.md, 3.1).
+//! One owned tree from tokenizer demands (protocol/format.md, 2.2; domain/render.md, 3.1).
 use crate::{
     Error, Fault, Position,
     limits::{self, Limits},
@@ -309,7 +309,7 @@ fn finish(frame: Frame) -> Value {
 }
 
 /// The decoder's peak heap, including the tree under construction
-/// (programming-model.md, 6.3; render.md, 2.3).
+/// (programming-model.md, 6.3; domain/render.md, 2.3).
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let tokenizer = tk::worst_case(&limits::tokenizer(limits))?;

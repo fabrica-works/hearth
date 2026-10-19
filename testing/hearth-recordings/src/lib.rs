@@ -1,4 +1,4 @@
-//! Captured tool runs, testing.md, 4.5. Paths are relative to this checkout.
+//! Captured tool runs, domain/testing.md, 4.5. Paths are relative to this checkout.
 use std::{
     fs,
     path::{Path, PathBuf},

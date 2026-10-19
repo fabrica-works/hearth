@@ -13,7 +13,7 @@
         "pressure_some_percent": { "warning": 20 },
         "pressure_full_percent": { "critical": 10 }
       },
-      "doc": "Resource alarms' thresholds (operating.md, section 4)."
+      "doc": "Resource alarms' thresholds (domain/operating.md, section 4)."
     },
     "snapshots": {
       "type": { "map": { "object": {
@@ -21,7 +21,7 @@
         "keep": { "type": { "map": "int" }, "doc": "How many to keep per bucket: hourly, daily, weekly, monthly." }
       } } },
       "default": {},
-      "doc": "Local snapshots of each class's subvolume, by class: core or data [M5] (operating.md, 7.1)."
+      "doc": "Local snapshots of each class's subvolume, by class: core or data [M5] (domain/operating.md, 7.1)."
     },
     "backups": {
       "type": { "map": { "object": {
@@ -29,7 +29,7 @@
         "keep": { "type": { "map": "int" }, "optional": true, "doc": "What the peer keeps, per bucket; the class's local keep if absent." }
       } } },
       "default": {},
-      "doc": "Backups of each class to the environment's backup peer, by class [M6] (operating.md, 7.2)."
+      "doc": "Backups of each class to the environment's backup peer, by class [M6] (domain/operating.md, 7.2)."
     }
   },
   "packages": { "git": {}, "mmdebstrap": {}, "uidmap": {}, "openssh-client": {} },

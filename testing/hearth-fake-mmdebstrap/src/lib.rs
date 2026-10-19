@@ -1,4 +1,4 @@
-//! The deterministic mmdebstrap domain (testing.md, 3.6).
+//! The deterministic mmdebstrap domain (domain/testing.md, 3.6).
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod face;

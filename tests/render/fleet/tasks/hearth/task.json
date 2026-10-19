@@ -6,7 +6,7 @@
         "keep": { "type": { "map": "int" }, "doc": "How many to keep per bucket: hourly, daily, weekly, monthly." }
       } } },
       "default": {},
-      "doc": "Local snapshots of each class's subvolume, by class: core or data [M5] (operating.md, 7.1)."
+      "doc": "Local snapshots of each class's subvolume, by class: core or data [M5] (domain/operating.md, 7.1)."
     }
   }
 }

@@ -8,7 +8,7 @@ fn hearth_diff_names_each_changed_target_and_its_rebuild() {
     let from = repository.head();
     let to = repository.next(&[fixtures::MOTD_KIND], &[]);
     let rendered = fixtures::diff(&repository, &fixtures::Asked::new(&from, &to));
-    assert_eq!(String::from_utf8_lossy(&rendered.stdout), fixtures::MOTD_DIFF_TEXT, "render.md 6.3");
+    assert_eq!(String::from_utf8_lossy(&rendered.stdout), fixtures::MOTD_DIFF_TEXT, "domain/render.md 6.3");
 }
 #[test]
 fn a_diff_with_changed_targets_exits_1() {

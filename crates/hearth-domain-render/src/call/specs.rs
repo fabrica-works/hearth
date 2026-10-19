@@ -1,4 +1,4 @@
-//! Count held specs as records of values (render.md, 2.3).
+//! Count held specs as records of values (domain/render.md, 2.3).
 mod config;
 mod packages;
 mod values;

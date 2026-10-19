@@ -1,4 +1,4 @@
-//! Static references in every expression, including untaken branches (format.md, 6.4).
+//! Static references in every expression, including untaken branches (protocol/format.md, 6.4).
 use super::Fault;
 use crate::{
     errors::{Root, Schema},

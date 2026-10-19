@@ -1,4 +1,4 @@
-//! A part's record and its forms (render.md, 4).
+//! A part's record and its forms (domain/render.md, 4).
 pub mod boot;
 pub mod config;
 pub mod data;

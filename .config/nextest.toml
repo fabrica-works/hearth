@@ -3,7 +3,7 @@
 # test binaries named fuzzy_* beside each world's focused tests, within 1
 # minute. A suite past its budget fails, naming the tests it stopped; a test
 # past its slow period is flagged SLOW as it runs. The profiles outside the
-# gate (testing.md, 9.2) come with their tiers, and their binaries join these
+# gate (domain/testing.md, 9.2) come with their tiers, and their binaries join these
 # filters' exclusions.
 #
 # nextest refuses a filter that names a binary no crate has, so until the

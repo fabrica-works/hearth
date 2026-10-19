@@ -1,4 +1,4 @@
-//! Configured limits (activator.md, 2.3; store.md, 5.3).
+//! Configured limits (domain/activator.md, 2.3; domain/store.md, 5.3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Limits {
     /// The most bytes of one file.

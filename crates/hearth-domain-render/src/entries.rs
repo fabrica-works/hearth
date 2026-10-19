@@ -1,4 +1,4 @@
-//! Conditions before concrete entries (format.md, 5.9; render.md, 3.5).
+//! Conditions before concrete entries (protocol/format.md, 5.9; domain/render.md, 3.5).
 use crate::{
     errors::{Guard, Kind},
     evaluate::{self, Bindings, Budget, Context, Evaluator},

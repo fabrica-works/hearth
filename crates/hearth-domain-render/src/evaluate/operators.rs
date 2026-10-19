@@ -1,4 +1,4 @@
-//! Operators and scalar output (format.md, 7.4).
+//! Operators and scalar output (protocol/format.md, 7.4).
 use super::{
     Budget, FaultKind, Op, Operand,
     walk::{self, View},

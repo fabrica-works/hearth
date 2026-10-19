@@ -1,4 +1,4 @@
-//! Resolution records returned through the store (render.md, 5.7).
+//! Resolution records returned through the store (domain/render.md, 5.7).
 use crate::{render, store};
 use skein_lib::Token;
 /// The store's answers to a find or a record.

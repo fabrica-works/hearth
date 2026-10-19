@@ -11,7 +11,7 @@ use hearth_protocol_config::{
 use skein_lib::{Rng, stream::Fault as StreamFault};
 #[test]
 fn every_example_decodes_as_the_reference_reads_it_cut_anywhere() {
-    assert_eq!(examples::all().len(), 9, "format.md's nine documents");
+    assert_eq!(examples::all().len(), 9, "protocol/format.md's nine documents");
     for example in examples::all() {
         for seed in 0..8 {
             let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);

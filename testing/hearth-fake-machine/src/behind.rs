@@ -1,4 +1,4 @@
-//! The simulator seam over the machine's operations (testing.md, 3.1).
+//! The simulator seam over the machine's operations (domain/testing.md, 3.1).
 use crate::{
     Machine,
     linux::{self, At, How, Ids, Op, Pid, Refusal},

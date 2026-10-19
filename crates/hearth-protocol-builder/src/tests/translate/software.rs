@@ -1,4 +1,4 @@
-//! Software records translated exhaustively (render.md, 4.2).
+//! Software records translated exhaustively (domain/render.md, 4.2).
 use crate::{records::parts::software as source, render::parts::software as target};
 #[must_use]
 pub(super) fn back(software: source::Software) -> target::Software {

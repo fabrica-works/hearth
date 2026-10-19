@@ -1,4 +1,4 @@
-//! A document model independent of the render domain (format.md, 2.2).
+//! A document model independent of the render domain (protocol/format.md, 2.2).
 use hearth_domain_render::{
     compose::{Composed, Composite},
     revision::{self, Position},

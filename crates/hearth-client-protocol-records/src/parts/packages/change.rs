@@ -1,4 +1,4 @@
-//! Typed packages differences (render.md, 6.1).
+//! Typed packages differences (domain/render.md, 6.1).
 use super::{Apt, Box, Initramfs, Lines, Preseed, Sources, Variant, apt, initramfs, names, preseeds, sources, variant};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Change {

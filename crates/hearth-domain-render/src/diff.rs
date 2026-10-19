@@ -1,4 +1,4 @@
-//! Typed differences and the lowest changed layer (render.md, 6.1, 6.2).
+//! Typed differences and the lowest changed layer (domain/render.md, 6.1, 6.2).
 mod resolution;
 use crate::{
     parts::{PartRecord, Spec, boot, config, data, exports, live, packages, secrets, software},
@@ -174,7 +174,7 @@ fn config_part(spec: &Spec) -> Option<(&Digest, &config::Config)> {
     found
 }
 
-/// Git's retained unified lines (render.md, 6.1).
+/// Git's retained unified lines (domain/render.md, 6.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Hunks {
     pub lines: Box<[Line]>,

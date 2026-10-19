@@ -87,7 +87,7 @@ fn a_spawn_of_an_unclaimed_file_exits_127() {
     assert_eq!(
         answer(&mut behind, fixtures::seam_spawn(root, b"/usr/bin/unclaimed")),
         Ok(Reply::Program(Program::Exit(127))),
-        "testing.md, 3.5"
+        "domain/testing.md, 3.5"
     );
 }
 #[test]
@@ -97,7 +97,7 @@ fn a_spawn_of_a_missing_file_is_not_found() {
     assert_eq!(
         answer(&mut behind, fixtures::seam_spawn(root, b"/usr/bin/missing")),
         Err(Error::NotFound),
-        "testing.md, 3.5"
+        "domain/testing.md, 3.5"
     );
 }
 #[test]

@@ -1,4 +1,4 @@
-//! Uniform declaration entries and their JSON forms (format.md, 5.2 to 5.7, 5.14, 9.1, 9.3, 10.1).
+//! Uniform declaration entries and their JSON forms (protocol/format.md, 5.2 to 5.7, 5.14, 9.1, 9.3, 10.1).
 use crate::{
     Declared, Error, Expected, Object, Position,
     declaration::{Number, Text, fault, object, text, texts, unknown, wrong},

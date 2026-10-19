@@ -1,4 +1,4 @@
-//! Live declarations (format.md, 5.14).
+//! Live declarations (protocol/format.md, 5.14).
 use super::secrets::{fault, formed, required};
 use crate::{
     entries::Located,

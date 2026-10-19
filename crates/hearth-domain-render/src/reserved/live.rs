@@ -1,4 +1,4 @@
-//! Consumers may not act on boot configuration or core services (format.md, 5.14).
+//! Consumers may not act on boot configuration or core services (protocol/format.md, 5.14).
 use super::{Installed, Refused, refused};
 use crate::{
     entries::{Expansion, Located},

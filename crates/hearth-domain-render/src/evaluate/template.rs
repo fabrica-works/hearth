@@ -1,4 +1,4 @@
-//! Flat template instructions (format.md, 7.2; render.md, 8.3).
+//! Flat template instructions (protocol/format.md, 7.2; domain/render.md, 8.3).
 use super::Expression;
 use alloc::boxed::Box;
 /// A compiled template, with the first byte of each line.
@@ -25,7 +25,7 @@ pub enum Does {
     Set { name: Box<[u8]>, value: Expression },
 }
 
-/// Names bound by one loop (format.md, 7.3).
+/// Names bound by one loop (protocol/format.md, 7.3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Names {
     One { name: Box<[u8]> },

@@ -1,4 +1,4 @@
-//! Whitespace at delimiter edges (format.md, 7.2).
+//! Whitespace at delimiter edges (protocol/format.md, 7.2).
 pub(crate) const WHITE_SPACE: &[&[u8]] = &[
     b"\t",
     b"\n",

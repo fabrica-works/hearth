@@ -13,7 +13,7 @@ fn a_targets_meta_is_its_names_and_the_base_envs_placement() {
     for seed in fixtures::COMPOSITION_SEEDS {
         let run = fixtures::render_seeded(&fixtures::x1_prod(), seed);
         let Answer::Spec(spec) = only(&run.answers) else { panic!("one spec: seed {seed}") };
-        assert_eq!(spec.meta, fixtures::x1_prod_meta(), "render.md, 4.4: the target's meta");
+        assert_eq!(spec.meta, fixtures::x1_prod_meta(), "domain/render.md, 4.4: the target's meta");
         assert_eq!(
             spec.digest,
             fixtures::digest("f7796ed03afe370215abfbc0069f738892d01a5445a8c5a63f4d151c5ea977c2"),

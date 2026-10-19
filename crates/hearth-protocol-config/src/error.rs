@@ -1,4 +1,4 @@
-//! A document's first fault, where the faulty thing starts (render.md, 7.1).
+//! A document's first fault, where the faulty thing starts (domain/render.md, 7.1).
 use crate::Position;
 use alloc::boxed::Box;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -20,7 +20,7 @@ pub enum Fault {
     Shape(Shape),
     Declaration(Declared),
 }
-/// Why a decoded task.json is no declaration (format.md, 5.1).
+/// Why a decoded task.json is no declaration (protocol/format.md, 5.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Declared {
     Unknown { of: Object },
@@ -83,7 +83,7 @@ pub enum Shape {
     Misplaced { field: Field },
 }
 
-/// Placement's M1 fields (format.md, 3.4).
+/// Placement's M1 fields (protocol/format.md, 3.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Field {
     Kind,

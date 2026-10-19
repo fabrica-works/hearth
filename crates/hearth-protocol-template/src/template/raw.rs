@@ -1,4 +1,4 @@
-//! Raw tags use ASCII whitespace inside and ordinary edge rules outside (format.md, 7.3).
+//! Raw tags use ASCII whitespace inside and ordinary edge rules outside (protocol/format.md, 7.3).
 use super::{
     scan::{self, Tag},
     whitespace,

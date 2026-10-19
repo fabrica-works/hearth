@@ -1,4 +1,4 @@
-//! Apt's list names for the source lines (render.md, 5.3; store.md, 6.4).
+//! Apt's list names for the source lines (domain/render.md, 5.3; domain/store.md, 6.4).
 use crate::vector::{Component, Line, Name};
 use alloc::boxed::Box;
 use skein_lib::{List, Writer};

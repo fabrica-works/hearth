@@ -1,4 +1,4 @@
-//! Closed reserved rules (format.md, 5.11; machine.md, 6.2).
+//! Closed reserved rules (protocol/format.md, 5.11; domain/machine.md, 6.2).
 use alloc::boxed::Box;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Reserved {

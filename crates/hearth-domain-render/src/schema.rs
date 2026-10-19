@@ -1,4 +1,4 @@
-//! Declared schemas, defaults and target settings (format.md, 6).
+//! Declared schemas, defaults and target settings (protocol/format.md, 6).
 mod debian;
 pub mod forms;
 pub mod references;

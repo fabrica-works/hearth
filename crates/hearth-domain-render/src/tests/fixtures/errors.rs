@@ -69,7 +69,7 @@ pub fn places(errors: &[crate::errors::Error]) -> Box<[Spot<'_>]> {
     places.into_boxed()
 }
 
-// render.md, 7.1: 16 MiB across the strings of the retained errors.
+// domain/render.md, 7.1: 16 MiB across the strings of the retained errors.
 pub const ERROR_BYTES: usize = 16 * 1024 * 1024;
 pub const HALF_ERROR_BYTES: usize = ERROR_BYTES / 2;
 pub const NO_ERRORS: u32 = 0;

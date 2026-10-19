@@ -1,4 +1,4 @@
-//! Published layers, indexed by key from their records (store.md, 6.2, 8.1 and 8.2).
+//! Published layers, indexed by key from their records (domain/store.md, 6.2, 8.1 and 8.2).
 use crate::{
     Store,
     scan::Scan,
@@ -14,7 +14,7 @@ pub(super) fn want(store: &Store, key: Digest, out: &mut Queue<Output>) {
         Answer::Free { key }
     }));
 }
-/// The key a record's kind, parent and inputs make (store.md, 3.3), if they agree.
+/// The key a record's kind, parent and inputs make (domain/store.md, 3.3), if they agree.
 #[must_use]
 pub fn key(record: &Layer) -> Option<Digest> {
     let empty = H::new(b"empty", 0).finish();

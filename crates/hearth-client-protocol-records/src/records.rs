@@ -1,4 +1,4 @@
-//! Printed units (render.md, 3.8 and 4).
+//! Printed units (domain/render.md, 3.8 and 4).
 use crate::{
     diff::{Change, Tally},
     errors::Error,
@@ -127,7 +127,7 @@ pub struct Terminal {
     pub left_out: u32,
 }
 
-/// The resolution key and, when known, its layer keys (render.md, 4.5).
+/// The resolution key and, when known, its layer keys (domain/render.md, 4.5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Resolution {
     Needed { key: [u8; 32] },

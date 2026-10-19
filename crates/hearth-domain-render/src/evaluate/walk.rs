@@ -1,4 +1,4 @@
-//! Iterative deep comparison, with absent entries omitted (format.md, 7.4, 7.6).
+//! Iterative deep comparison, with absent entries omitted (protocol/format.md, 7.4, 7.6).
 use super::{Entry, FaultKind, Operand, Value};
 use skein_lib::Stack;
 #[derive(Clone, Copy, Debug)]

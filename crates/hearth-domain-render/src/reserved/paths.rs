@@ -1,4 +1,4 @@
-//! One table for every path-bearing kind (format.md, 5.11).
+//! One table for every path-bearing kind (protocol/format.md, 5.11).
 use super::{Installed, Refused, Shape, refused};
 use crate::{
     entries::Located,

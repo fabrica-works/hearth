@@ -13,7 +13,7 @@ after M6 (README.md, section 3: "later"). Section 8 lists what is open.
 - **Reproducible means one tree digest per key, on any builder.** Not
   the same bytes on disk: btrfs's inode numbers, UUIDs, generations and
   extents never match. Two builds of one key reproduce when their tree
-  digests (store.md, section 3) are equal.
+  digests (domain/store.md, section 3) are equal.
 - **Deferred, because it is trust, not function.** Nothing in the
   store's naming, the wire or the slots changes when it comes. Every key
   changes once, with the encoding's version (5.4).
@@ -62,8 +62,8 @@ after M6 (README.md, section 3: "later"). Section 8 lists what is open.
 ### 2.2 The catalogue
 
 Each source of difference, where it enters, and its fix. "Day one" means
-build.md already removes it for nothing unique and nothing secret
-(build.md, section 9); the other fixes are the retrofit's (section 5).
+domain/build.md already removes it for nothing unique and nothing secret
+(domain/build.md, section 9); the other fixes are the retrofit's (section 5).
 
 | # | Source | Where it enters | Fix | When |
 |---|---|---|---|---|
@@ -71,10 +71,10 @@ build.md already removes it for nothing unique and nothing secret
 | 2 | **the clock in contents** | tools that write today's date: shadow's last-change day in `/etc/shadow` (useradd, systemd-sysusers), generated headers | `SOURCE_DATE_EPOCH`, where the tool reads it | 5.1 |
 | 3 | **mtimes copied into contents** | a `.pyc` records its source's mtime; an archive made during a build records its members' | `SOURCE_DATE_EPOCH` makes `py_compile` write hash-based `.pyc` files; the clamp covers the rest | 5.1 |
 | 4 | **the initramfs** | mktirfs packs its staging tree with `cpio -H newc`, whose headers carry each file's inode number and mtime | patch mktirfs: clamp the staging tree, pass `cpio --reproducible` | 5.3 |
-| 5 | **the build host** | mmdebstrap copies the host's `/etc/resolv.conf` and `/etc/hostname` (in hearth, the sandbox's); os wrote 8 KiB of the host's randomness as a regular file `/dev/urandom` | removed by a customize hook (`rm -f`, build.md 5.6), the config layer writing the target's own; no fake `/dev/urandom` (the sandbox binds the real one) | day one |
-| 6 | **identity made at install** | `/etc/machine-id`, `/var/lib/dbus/machine-id`, SSH host keys (openssh-server's postinst), the snakeoil key and certificate (ssl-cert's postinst) | emptied or removed; the activator writes the machine's own at prepare (slots.md, 5.4) | day one |
+| 5 | **the build host** | mmdebstrap copies the host's `/etc/resolv.conf` and `/etc/hostname` (in hearth, the sandbox's); os wrote 8 KiB of the host's randomness as a regular file `/dev/urandom` | removed by a customize hook (`rm -f`, domain/build.md 5.6), the config layer writing the target's own; no fake `/dev/urandom` (the sandbox binds the real one) | day one |
+| 6 | **identity made at install** | `/etc/machine-id`, `/var/lib/dbus/machine-id`, SSH host keys (openssh-server's postinst), the snakeoil key and certificate (ssl-cert's postinst) | emptied or removed; the activator writes the machine's own at prepare (domain/slots.md, 5.4) | day one |
 | 7 | **logs and caches** | dpkg's, apt's and alternatives' logs, ldconfig's `aux-cache`, apt's lists and binary caches, mmdebstrap's setup files, `/run`, `/tmp`; logs its list misses (fontconfig's) | mmdebstrap's cleanup, all of it, and hearth's customize hook (2.3) | day one |
-| 8 | **etckeeper** | os commits `/etc` with timestamps (`pristine-debian`, `Manifest config <hash>`) | gone: hearth has no etckeeper, and the scan refuses `/etc/.git` (build.md, 9.2) | day one |
+| 8 | **etckeeper** | os commits `/etc` with timestamps (`pristine-debian`, `Manifest config <hash>`) | gone: hearth has no etckeeper, and the scan refuses `/etc/.git` (domain/build.md, 9.2) | day one |
 | 9 | **arbitrary shell** | maintainer scripts, `customize.sh`, `software.sh` read the clock, the hostname, the processor count, randomness | sealed steps; the gate finds the rest | 5.2; 7 |
 | 10 | **directory order** | btrfs lists a directory in the order its entries were created (to verify); a tool that does not sort writes in that order | the tree digest sorts by path; the gate varies the order | 7.2 |
 | 11 | **parallelism** | a tool whose output depends on how many processors it sees (multi-threaded compressors split their output into blocks) | the gate varies the count; a finding per tool | 7.2 |
@@ -105,12 +105,12 @@ Notes on the rows that research corrected or confirmed:
   mtimes are the build's. cpio's `--reproducible` (`--ignore-devno
   --renumber-inodes`) fixes the first; clamping the staging tree, the
   second. It costs no reboot, since the initramfs is judged by its
-  inputs (build.md, 5.8), but two builds of one key differ in it, so the
+  inputs (domain/build.md, 5.8), but two builds of one key differ in it, so the
   gate and every comparison of outputs meet it.
 - **Containers [M5].** A container's output has no kernel and no
-  initramfs (format.md, 3.4), so row 4 never reaches it, nor does
+  initramfs (protocol/format.md, 3.4), so row 4 never reaches it, nor does
   section 4's initramfs judged by its inputs. Whatever its variant
-  (format.md, section 13), it installs exactly its closure (build.md,
+  (protocol/format.md, section 13), it installs exactly its closure (domain/build.md,
   5.7) and meets the other rows as a host's output does.
 - **Row 6.** mmdebstrap's `cleanup/reproducible` writes an empty
   `/etc/machine-id` if one exists and removes dbus's. An empty file
@@ -123,7 +123,7 @@ Notes on the rows that research corrected or confirmed:
 ### 2.3 Cleanup's choices
 
 - **hearth runs all of mmdebstrap's cleanup, and a customize hook of its
-  own** (build.md, 5.6, which lists what each removes). os skipped all
+  own** (domain/build.md, 5.6, which lists what each removes). os skipped all
   of it (`--skip=cleanup`); the bash fleet did so on purpose, to keep a
   fixed machine-id, which hearth writes at prepare instead.
 - **For reproducibility, `cleanup/reproducible` is the part that
@@ -132,7 +132,7 @@ Notes on the rows that research corrected or confirmed:
 - **`resolv.conf` and `hostname`:** mmdebstrap's manual says cleanup
   keeps the host's copies, and suggests deleting them or filling them
   with fixed contents. Either is reproducible, and in hearth the copies
-  are the sandbox's anyway (an empty file and `localhost`). build.md
+  are the sandbox's anyway (an empty file and `localhost`). domain/build.md
   removes them, and the config layer writes each target's own.
 
 ### 2.4 What os added
@@ -144,7 +144,7 @@ keeps the logs, apt's caches, its proxy configuration and whatever
 machine-id the bootstrap made; and `rsync -rltD`, which gives every
 config file the spec directory's mtime, that is the time of the render.
 The bash fleet's esh templates could also call programs at render
-(`systemd-detect-virt`); hearth's render is pure (render.md).
+(`systemd-detect-virt`); hearth's render is pure (domain/render.md).
 
 ## 3. Kept from day one
 
@@ -153,20 +153,20 @@ peers, and each is what makes the retrofit cheap.
 
 ### 3.1 The tree digest
 
-- **Every output records its tree digest next to its key** (store.md,
+- **Every output records its tree digest next to its key** (domain/store.md,
   sections 3 and 6). Drift needs it, peers verify by it, and the
   activator checks what it places against it.
-- **Its encoding is fixed once** and never changes meaning (store.md,
+- **Its encoding is fixed once** and never changes meaning (domain/store.md,
   section 3): sorted by path, ids inside the namespace, mtimes out.
   Retrofitting is then comparing two digests already recorded, not
   changing how the store names outputs.
-- **The walk already lists each file's digest** (store.md, section 5),
+- **The walk already lists each file's digest** (domain/store.md, section 5),
   so two records of one key say which paths differ without reading a
   file again (7.3).
 
 ### 3.2 Nothing unique, nothing secret
 
-- **Shared outputs would share identities** otherwise (build.md,
+- **Shared outputs would share identities** otherwise (domain/build.md,
   section 9). So host keys, machine-ids, snakeoil keys and every secret
   are kept out of outputs from the first build, and written into the
   slot at prepare.
@@ -179,7 +179,7 @@ peers, and each is what makes the retrofit cheap.
 - **A machine fetches only from its own plane's builders,** so the lab's
   outputs never reach production (README.md, section 5, "plane"). The run
   side builds its own copy of every key, artifacts included
-  (artifacts.md, 7.5).
+  (domain/artifacts.md, 7.5).
 - **This holds whether or not builds reproduce.** Reproducibility adds a
   check across planes; it never replaces the split.
 
@@ -188,7 +188,7 @@ peers, and each is what makes the retrofit cheap.
 - **Every input is pinned:** a Debian snapshot's timestamp, packages by
   the SHA-256 that `Packages` gives, downloads by digest, an artifact's
   sources by commit. Build steps run offline, and packages are installed
-  from a local repository made from the content-addressed cache (build.md,
+  from a local repository made from the content-addressed cache (domain/build.md,
   section 8). The network is not an input.
 - **Rebuilding a key later builds the same inputs,** which Debian's own
   live-image rebuilds cannot assume (6.4).
@@ -203,18 +203,18 @@ peers, and each is what makes the retrofit cheap.
   runs modulo the catalogue's known differences, or waits. Only the
   packages layer needs it: above it, a layer is always replayed on its
   parent's snapshot, so patch and scratch agree by construction
-  (build.md, section 3).
+  (domain/build.md, section 3).
 - **The initramfs is judged by its inputs, not its bytes.** A new
   packages key rebuilds the layer, mktirfs runs again, and the image
-  differs (2.2, row 4). So slots.md (6.1) compares it by its inputs,
-  which build.md (5.8) defines. A snapshot bump that leaves them alone
+  differs (2.2, row 4). So domain/slots.md (6.1) compares it by its inputs,
+  which domain/build.md (5.8) defines. A snapshot bump that leaves them alone
   still allows a soft reboot, on trust that equal inputs make an
   equivalent image, which only a reproducible mktirfs would prove. `/usr/lib/modules/<version>` is
   still judged by its digest, so whether depmod's indexes reproduce is
   to verify.
 - **No verification by rebuilding.** A peer, or the activator, cannot
   check a builder's output by building it again; each trusts its plane.
-- **Warm compile caches are trusted, not checked** (artifacts.md, 6.5),
+- **Warm compile caches are trusted, not checked** (domain/artifacts.md, 6.5),
   which is why production builds artifacts cold.
 - **Not given up: evidence per key.** Keys are digests of inputs, so a
   verdict about a key carries over to every commit that keeps it
@@ -229,21 +229,21 @@ slots or the records' shapes.
 ### 5.1 SOURCE_DATE_EPOCH per layer, from its key
 
 - **The time is the Debian snapshot's timestamp,** taken from the
-  packages part (render.md, section 4), which every layer's cumulative
+  packages part (domain/render.md, section 4), which every layer's cumulative
   key holds. With several archives pinned (`debian`, `debian-security`),
   the latest of their timestamps. An artifact takes its environment's
-  (artifacts.md, 5.2).
+  (domain/artifacts.md, 5.2).
 - **Never the commit's time.** A commit that changes nothing in a layer
   keeps its key, and must keep its bytes; a commit time would change
   them with every commit.
 - **Set in every step's environment:** mmdebstrap's, and through it the
   maintainer scripts' (to verify that mmdebstrap passes it on; if not,
   hearth's apt configuration or a setup hook exports it), the software
-  and config steps', `customize.sh` and `software.sh`. build.md (5.4)
-  leaves it out until then; artifacts set it from M6 (artifacts.md,
+  and config steps', `customize.sh` and `software.sh`. domain/build.md (5.4)
+  leaves it out until then; artifacts set it from M6 (domain/artifacts.md,
   5.2).
 - **Then the clamp, in the tree helper's walk, once per layer**
-  (store.md, 5.4). As the walk visits each changed inode, an mtime newer
+  (domain/store.md, 5.4). As the walk visits each changed inode, an mtime newer
   than the layer's time is set to it (`utimensat`,
   `AT_SYMLINK_NOFOLLOW`, the access time left as it is with
   `UTIME_OMIT`), and the ctime read after the clamp is recorded, so the
@@ -259,29 +259,29 @@ slots or the records' shapes.
 
 | What | Sealed to | How |
 |---|---|---|
-| hostname and domain | `localhost` | the step's uts namespace (build.md, 8.1) |
+| hostname and domain | `localhost` | the step's uts namespace (domain/build.md, 8.1) |
 | `/etc/hostname`, `/etc/resolv.conf` in the packages layer | absent | removed by a customize hook (2.3); the config layer writes the target's own |
 | time zone | UTC | `TZ`; the target's own zone is config data |
-| locale | `C.UTF-8` | `LC_ALL` (build.md, 8.6) |
+| locale | `C.UTF-8` | `LC_ALL` (domain/build.md, 8.6) |
 | umask | 022 | set by the sandbox before exec |
-| variables | the step's fixed set | the environment given whole: none of the builder's crosses (build.md, 8.6) |
+| variables | the step's fixed set | the environment given whole: none of the builder's crosses (domain/build.md, 8.6) |
 | paths | the same in every build | `pivot_root`: a step sees its layer as `/`; the store's host path never appears |
 | user | the namespace's root for build steps; id 1000 for artifacts | the sandbox |
-| network | none, but the fetch step | loopback only (build.md, 8.5); packages from a local repository |
+| network | none, but the fetch step | loopback only (domain/build.md, 8.5); packages from a local repository |
 | the clock | not sealable | time namespaces offset `CLOCK_MONOTONIC` and `CLOCK_BOOTTIME`, not `CLOCK_REALTIME` (time_namespaces(7)); `SOURCE_DATE_EPOCH` is the convention |
-| randomness | not sealable | the real `/dev/urandom`; what a step makes from it is identity (removed, build.md 5.6) or a finding |
+| randomness | not sealable | the real `/dev/urandom`; what a step makes from it is identity (removed, domain/build.md 5.6) or a finding |
 | processors, kernel version | not sealed | the gate varies them (7.2): sealing the count would slow every build |
 
-Most of this is in place from M2, since build.md's sandboxes need it to
-run IaC code safely. The retrofit adds what build.md (8.6) does not set,
+Most of this is in place from M2, since domain/build.md's sandboxes need it to
+run IaC code safely. The retrofit adds what domain/build.md (8.6) does not set,
 `TZ` and the umask, and checks the rest at the gate.
 
 ### 5.3 The normalised list
 
 - **Data in `hearth-domain-build`, in the form of the scan's rules**
-  (build.md, 9.3): a path, a reason, the Debian bug where there is one,
+  (domain/build.md, 9.3): a path, a reason, the Debian bug where there is one,
   and an action besides. It describes Debian's packages, not a target.
-  Whether a task may add entries for what it installs itself (format.md,
+  Whether a task may add entries for what it installs itself (protocol/format.md,
   section 10) is open.
 - **A closed list of actions:** remove a path; empty a file; replace a
   file with fixed bytes from the list; refuse a package. No action edits
@@ -304,16 +304,16 @@ run IaC code safely. The retrofit adds what build.md (8.6) does not set,
   and the version that fixes it; the entry goes once the pinned snapshot
   holds that version.
 - **A constant of the encoding's version,** as every fixed choice of how
-  hearth builds is (store.md, 3.2): a change to the list is a new
+  hearth builds is (domain/store.md, 3.2): a change to the list is a new
   `hearth/N`, every key changes, and every layer is built again once.
   No digest of the list enters a key, and nothing else does either.
-- **Its first entries are build.md's day-one treatments and rules**
+- **Its first entries are domain/build.md's day-one treatments and rules**
   (5.6, 9.2), which keep identity, secrets, the builder's details and
   logs out of every output. The retrofit adds only what reproducibility
   needs, from the gate's findings; the first candidate is man-db's
   index, above.
 - **Fixes outside the list:** the initramfs (row 4), by a fix to mktirfs
-  sent to Debian's tiny-initramfs (machine.md, 7.5), or by hearth
+  sent to Debian's tiny-initramfs (domain/machine.md, 7.5), or by hearth
   clamping the tree mktirfs packs; `.pyc` files and shadow's last-change
   day, by `SOURCE_DATE_EPOCH` (5.1).
 
@@ -326,7 +326,7 @@ run IaC code safely. The retrofit adds what build.md (8.6) does not set,
 4. **The gate** (section 7), in the lab, on every new key from then on.
 
 Each of the first three is a fixed choice of how hearth builds, so each
-comes with a new version of the encoding (store.md, 3.2): every key
+comes with a new version of the encoding (domain/store.md, 3.2): every key
 changes and every layer is built again once. They may land together,
 for one rebuild. Then comes the comparison across planes (7.6), once
 enough keys reproduce to make a mismatch news.
@@ -388,10 +388,10 @@ mmdebstrap's manual
 - **Every new layer key the lab builds,** once, on two builders:
   - a packages layer, from scratch on both;
   - a software or config layer, on the same parent: one builder fetches
-    the other's parent (store.md, section 10), so the layer is judged
+    the other's parent (domain/store.md, section 10), so the layer is judged
     alone, whatever its parent's verdict;
   - an artifact, cold on both, and the lab's warm build compared with a
-    cold one, which checks its compile cache (artifacts.md, 6.5).
+    cold one, which checks its compile cache (domain/artifacts.md, 6.5).
 - **A key is judged once.** Evidence is per key (temper's `factory.md`,
   8.2): a commit that keeps a key gets its verdict by lookup, and a key
   is never built twice again for the gate.
@@ -473,12 +473,12 @@ built, not reproduced      two digests; an open finding names the differing path
   packages layer either has the scratch build's digest or a list of
   differing paths.
 - **An initramfs judged by its bytes,** once it and the modules
-  reproduce: slots.md's rule (6.1) can then check the image itself, not
+  reproduce: domain/slots.md's rule (6.1) can then check the image itself, not
   only the inputs it trusts (section 4).
 - **Verification by rebuilding,** for whoever wants it: a peer, or the
   activator for a builder that runs unreviewed code (README.md, section 9).
 - **Warm equals cold** for artifacts, so compile caches stop being a
-  matter of trust (artifacts.md, 6.5).
+  matter of trust (domain/artifacts.md, 6.5).
 
 ### 7.7 Costs
 
@@ -498,11 +498,11 @@ built, not reproduced      two digests; an open finding names the differing path
   4.17.4 for the last-change day, dh-python's `py3compile` for hash-based
   `.pyc` files. Seen on sid; to verify on trixie.
 - **The initramfs:** a fix to mktirfs sent to Debian, or hearth clamping
-  the tree mktirfs packs before it runs (machine.md, 7.5).
+  the tree mktirfs packs before it runs (domain/machine.md, 7.5).
 - **depmod's indexes:** whether `modules.dep.bin` and its siblings are
   the same for the same modules (to verify); a soft reboot after a
   snapshot bump depends on it while the modules are judged by digest
-  (slots.md, 6.1).
+  (domain/slots.md, 6.1).
 - **btrfs's directory order:** that readdir returns entries in creation
   order (to verify), and whether disorderfs runs over a layer in the
   builder's user namespace.

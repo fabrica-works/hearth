@@ -5,8 +5,8 @@ of machine it runs on, the btrfs top level and its mounts, how each kind
 boots a slot, the kernel's command line, the initramfs, bootstrap from a
 live system, and the firmware's quirks. M3 builds the EFI path and
 bootstrap; M3b builds the BIOS path; containers and pool hosts are M5
-(slots.md, section 12). A slot's life on this layout is slots.md's, and
-the process that writes the layout is activator.md's. What is open is
+(domain/slots.md, section 12). A slot's life on this layout is domain/slots.md's, and
+the process that writes the layout is domain/activator.md's. What is open is
 in section 12.
 
 ## 1. In one page
@@ -66,7 +66,7 @@ in section 12.
 | Kind | Firmware | Disk, boot partition | How a slot is tried | Watchdog | Examples | Milestone |
 |---|---|---|---|---|---|---|
 | bare metal on EFI | the vendor's UEFI | NVMe; ESP | live, soft reboot, or `BootNext` | iTCO where the chipset has it (to verify per machine) | `x1-prod` | M3 |
-| Incus VM with its own disk | OVMF | a virtio disk; ESP | live, soft reboot, or `BootNext` | iTCO on q35 | the VM tier's machines (testing.md, section 7) | M3 |
+| Incus VM with its own disk | OVMF | a virtio disk; ESP | live, soft reboot, or `BootNext` | iTCO on q35 | the VM tier's machines (domain/testing.md, section 7) | M3 |
 | IaaS VM on BIOS | the provider's BIOS | a virtio disk; FAT environment partition | live, soft reboot, or `next_entry` | none known | `rhi-prod`, `ion-prod` | M3b |
 | IaaS VM on EFI, NVRAM unreliable | the provider's UEFI | a virtio disk; ESP | open (9.4) | none known | vul | later |
 | container | none: the host's kernel | slots on the host's top level | live, or restart | the host's | `chat-prod` and `mail-prod` on `rhi-prod`; `mail-lab` in a lab pool | M5 |
@@ -84,7 +84,7 @@ the others all the same.
 
 ### 2.2 Incus VMs with their own disk
 
-The MVP's test machines (testing.md, section 7). Unlike the bash
+The MVP's test machines (domain/testing.md, section 7). Unlike the bash
 fleet's lab VMs they have a real disk, a real ESP and real firmware
 variables, so bootstrap, entries, `BootNext` and fall back run as on
 bare metal.
@@ -111,7 +111,7 @@ bare metal.
 - **Each provider has its own disk bus,** hence its own initramfs
   modules (7.2), and a serial console as its last recovery path, which
   needs a root password hash that is not locked: a secret applied to the
-  slot's `/etc/shadow` (slots.md, 5.4).
+  slot's `/etc/shadow` (domain/slots.md, 5.4).
 - **Bootstrap runs from the provider's rescue system** (section 8).
 
 ### 2.4 IaaS VMs on EFI with unreliable NVRAM [later]
@@ -126,7 +126,7 @@ reliable there; 9.4 gives the lean.
 No kernel, no boot partition, no entries: a container's slots and
 class subvolumes are subvolumes on its host's top level, prepared
 by the host's activator, and activating one restarts its nspawn unit
-(slots.md, section 12). Sections 4 to 7 and 9 do not apply to it; no
+(domain/slots.md, section 12). Sections 4 to 7 and 9 do not apply to it; no
 fstab mounts anything of it (3.3), and it is never bootstrapped (8.4).
 The fleet runs three today, `carbon-forge`, `rhi-chat` and
 `vul-agent-control`, on carbon, rhi and vul.
@@ -144,27 +144,27 @@ devices and starting it. hearth's test VMs do not use it.
 
 ### 2.7 What placement says
 
-Placement is data of the environment (format.md, 3.4), in the spec's
+Placement is data of the environment (protocol/format.md, 3.4), in the spec's
 `meta`. What this document takes from it:
 
 | Field | Values | Decides here |
 |---|---|---|
 | `kind` | `metal`, `vm`, `container` [M5] | section 2; the initramfs's microcode (7.1) |
 | `firmware` | `efi`, `bios` | sections 4 and 5; checked against the machine record |
-| `hardware` | `7th-gen`, `incus`, `ionos`, `serverhino`, `vultr` | nothing directly: the `boot` task keys its modules and parameters, consoles among them, by it (format.md, 5.4) |
-| `on` | the host's target [M5] | slots.md, section 12 |
-| `mutable` | `true`, `false` | 3.3's `/` line `rw` and no seal at prepare, on a machine that accepts it (2.8; development.md, section 4) |
+| `hardware` | `7th-gen`, `incus`, `ionos`, `serverhino`, `vultr` | nothing directly: the `boot` task keys its modules and parameters, consoles among them, by it (protocol/format.md, 5.4) |
+| `on` | the host's target [M5] | domain/slots.md, section 12 |
+| `mutable` | `true`, `false` | 3.3's `/` line `rw` and no seal at prepare, on a machine that accepts it (2.8; domain/development.md, section 4) |
 
 - **The watchdog is the machine's own fact:** the activator looks for a
   device under `/sys/class/watchdog/` when it prepares a slot, on the
-  machine the slot will run on (slots.md, 5.5).
+  machine the slot will run on (domain/slots.md, 5.5).
 - **The trial window** is a place input, 10 minutes in M3, sealed into
-  the slot's units (activator.md, 5.1); a container's is kept by its
-  host's activator instead (slots.md, 12.3) [M5].
+  the slot's units (domain/activator.md, 5.1); a container's is kept by its
+  host's activator instead (domain/slots.md, 12.3) [M5].
 
 ### 2.8 Development machines [M3b]
 
-- **An Incus VM cloned from a base image** (development.md, section 3):
+- **An Incus VM cloned from a base image** (domain/development.md, section 3):
   2.2's kind of machine, with its own disk, ESP and OVMF variables,
   made by `incus copy` of a VM bootstrapped once from a small target,
   then given its own target by `hearth retarget`, which places and blesses
@@ -188,33 +188,33 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 ├── @x1-prod.a.var          slot a's /var           a reflink copy of that output's /var
 ├── @x1-prod.b              slot b's root
 ├── @x1-prod.b.var          slot b's /var
-├── @x1-prod.live.3         a live delta            only while a live state exists (slots.md, 6.6)
+├── @x1-prod.live.3         a live delta            only while a live state exists (domain/slots.md, 6.6)
 ├── @x1-prod.core           the core class          one directory per entry: journal, iwd
 ├── @x1-prod.data           the data class          one directory per entry: home-free
-├── @hearth.store           the builder's store     owned by hearth, 0700; its layers nested in it (store.md, section 2)
-├── @hearth.state           the activator's state   root, 0700 (activator.md, section 7)
-├── @hearth.snapshots [M5]  class snapshots         root, 0700: <target>.<class>/<seq>, read-only (operating.md, 7.1)
-└── @hearth.backups [M6]    received backups        root, 0700, on a backup peer: <from>.<class>/<seq> (operating.md, 7.3)
+├── @hearth.store           the builder's store     owned by hearth, 0700; its layers nested in it (domain/store.md, section 2)
+├── @hearth.state           the activator's state   root, 0700 (domain/activator.md, section 7)
+├── @hearth.snapshots [M5]  class snapshots         root, 0700: <target>.<class>/<seq>, read-only (domain/operating.md, 7.1)
+└── @hearth.backups [M6]    received backups        root, 0700, on a backup peer: <from>.<class>/<seq> (domain/operating.md, 7.3)
 ```
 
 | Subvolume | Its root inode | Made by | Removed by |
 |---|---|---|---|
-| `@<target>.<label>` | the output's `/`; read-only flag set at the end of prepare | prepare: a snapshot (slots.md, 5.1) | the next prepare of that slot |
-| `@<target>.<label>.var` | the output's `/var`, `0:0 0755` | prepare (slots.md, 5.3) | the next prepare of that slot, nested subvolumes first |
-| `@<target>.<class>`: `core`, `data`, `cache` | `0:0 0755`; one directory per `data` entry of the class, each seeded once from the output's content at the entry's path | the first prepare that declares an entry of the class (slots.md, 5.3) | never by hearth (3.4) |
-| `@<target>.live.<n>` | holds `etc`, `usr` and `opt` with the new slot's metadata: its changed files as reflinks, and 0/0 whiteouts; read-only once verified | a live trial (slots.md, 6.8, L1) | the native bless of its slot, a live fall back, or the start that finds no record naming it |
+| `@<target>.<label>` | the output's `/`; read-only flag set at the end of prepare | prepare: a snapshot (domain/slots.md, 5.1) | the next prepare of that slot |
+| `@<target>.<label>.var` | the output's `/var`, `0:0 0755` | prepare (domain/slots.md, 5.3) | the next prepare of that slot, nested subvolumes first |
+| `@<target>.<class>`: `core`, `data`, `cache` | `0:0 0755`; one directory per `data` entry of the class, each seeded once from the output's content at the entry's path | the first prepare that declares an entry of the class (domain/slots.md, 5.3) | never by hearth (3.4) |
+| `@<target>.live.<n>` | holds `etc`, `usr` and `opt` with the new slot's metadata: its changed files as reflinks, and 0/0 whiteouts; read-only once verified | a live trial (domain/slots.md, 6.8, L1) | the native bless of its slot, a live fall back, or the start that finds no record naming it |
 | `@hearth.store` | `hearth:hearth 0700` | bootstrap | never |
 | `@hearth.state` | `0:0 0700` | bootstrap | never |
-| `@hearth.snapshots` [M5] | `0:0 0700`; a directory `<target>.<class>` per class snapshotted, holding read-only snapshots `<seq>`, this machine's own, for its targets and its containers' | the first snapshot | each snapshot by its class's retention, or once sent and no longer needed (operating.md, 7.1) |
-| `@hearth.backups` [M6] | `0:0 0700`; `<from>.<class>/<seq>`, read-only snapshots received from the targets that send to this backup peer | a backup peer's first receive | each by the sender's retention (operating.md, 7.3) |
-| `@<target>.<class>.restoring` [M5] | a writable snapshot of one of the class's snapshots | a class's restore (operating.md, 7.4) | renamed to `@<target>.<class>` by the restore's swap |
+| `@hearth.snapshots` [M5] | `0:0 0700`; a directory `<target>.<class>` per class snapshotted, holding read-only snapshots `<seq>`, this machine's own, for its targets and its containers' | the first snapshot | each snapshot by its class's retention, or once sent and no longer needed (domain/operating.md, 7.1) |
+| `@hearth.backups` [M6] | `0:0 0700`; `<from>.<class>/<seq>`, read-only snapshots received from the targets that send to this backup peer | a backup peer's first receive | each by the sender's retention (domain/operating.md, 7.3) |
+| `@<target>.<class>.restoring` [M5] | a writable snapshot of one of the class's snapshots | a class's restore (domain/operating.md, 7.4) | renamed to `@<target>.<class>` by the restore's swap |
 | `@<target>.<class>.before.<seq>` [M5] | the class a restore replaced | the restore's swap | an operator or the engine |
 
 - **One tree for both snapshots and backups:** `@hearth.snapshots`
   holds this machine's own snapshots of its classes, whatever took
   them, and each snapshot's record says whether the local policy keeps
   it, whether it was sent, and whether the peer confirmed it
-  (activator.md, 7.1). When the local and the backup period meet, one
+  (domain/activator.md, 7.1). When the local and the backup period meet, one
   snapshot serves both; an incremental send's parent is a local
   snapshot the backup keeps; and one walk prunes them all. What a
   backup peer receives from others goes to `@hearth.backups` instead:
@@ -224,16 +224,16 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
   targets: on `rhi-prod`, `@chat-prod.a`, `@chat-prod.a.var`,
   `@chat-prod.b`, `@chat-prod.b.var`, and `@chat-prod.data` and the
   other classes its `data` entries use, beside the host's own
-  (slots.md, 12.1), and their snapshots in the host's
+  (domain/slots.md, 12.1), and their snapshots in the host's
   `@hearth.snapshots`. Its journal has no entry of its own: it lives in
-  the host's (operating.md, section 5). The table above holds for them,
+  the host's (domain/operating.md, section 5). The table above holds for them,
   the host's activator acting for the container; os's
   `@<target>.machines` under `/var/lib/machines` has no successor.
 - **Slots exist once prepared:** os made empty placeholders at format
   time; hearth makes a slot by snapshot, so `@x1-prod.b` is absent until
   the first prepare into `b`. No build happens at the top level: os's
   `@T`, `@T.var` and `@T.install` are layers in the store now
-  (store.md, section 4). Classes, too, exist once an entry uses them:
+  (domain/store.md, section 4). Classes, too, exist once an entry uses them:
   os made `@T.srv`, `@T.srv.core`, `@T.srv.data` and `@T.srv.cache` at
   format time; hearth makes `@x1-prod.cache` only when an entry is
   `cache`, and has no `@T.srv`, since `/srv` is the root's.
@@ -247,7 +247,7 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
   whole filesystem, from its first mount, the root's. hearth passes only
   `subvol=`, and never `user_subvol_rm_allowed`: the builder deletes a
   layer by emptying it through its tree helper and calling `rmdir(2)`
-  (store.md, section 5).
+  (domain/store.md, section 5).
 
 ### 3.2 Mounts
 
@@ -256,17 +256,17 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 | `/` | `@<target>.<label>` | tiny-initramfs, from `root=` and `rootflags=`; then systemd remounts it from fstab | `ro,subvol=/@x1-prod.b` |
 | `/var` | `@<target>.<label>.var` | systemd, from fstab | `nodev,nosuid` |
 | `/var/lib/hearth/state` | `@hearth.state` | systemd, from fstab | `nodev,nosuid,noexec` |
-| `/var/lib/hearth/store` | `@hearth.store` | systemd, from fstab | `nodev,nosuid,noatime` (store.md, 9.1) |
+| `/var/lib/hearth/store` | `@hearth.store` | systemd, from fstab | `nodev,nosuid,noatime` (domain/store.md, 9.1) |
 | `/srv/core`, `/srv/data`, `/srv/cache`, each class some entry uses | `@<target>.<class>` | systemd, from fstab | `nodev,nosuid` |
 | each `data` path but `/srv/<class>/<name>` | a bind of `/srv/<class>/<name>`, the entry's directory | systemd, from fstab, after its source's mount | `bind`; the class mount's `nodev,nosuid` carried over (to verify) |
 | `/run/hearth-activator/top` | the top level, `subvolid=5` | the activator, when it starts | `nodev,nosuid,noexec`; `/run/hearth-activator` is `0700`, root's |
 | `/run/hearth-activator/boot` | the boot partition | the activator, for each write, then unmounted | `vfat`, `umask=0077,nodev,nosuid,noexec` |
-| `/run/nextroot` | a slot's root, for a soft reboot | the activator (slots.md, section 6) | `ro,subvol=/@x1-prod.a` |
-| `/run/hearth-activator/layers` | a clone of the top level: the live overlays' layers | the activator, when it starts | `ro`, private; without `noexec` and `nosuid` (slots.md, 6.8) |
-| `/etc`, `/usr/local`, `/opt`, while a live state runs | overlayfs, source `hearth-live`: a delta over the running slot's directory | the activator (slots.md, 6.8) | `ro,nodev`; `nosuid` on `/etc` only |
+| `/run/nextroot` | a slot's root, for a soft reboot | the activator (domain/slots.md, section 6) | `ro,subvol=/@x1-prod.a` |
+| `/run/hearth-activator/layers` | a clone of the top level: the live overlays' layers | the activator, when it starts | `ro`, private; without `noexec` and `nosuid` (domain/slots.md, 6.8) |
+| `/etc`, `/usr/local`, `/opt`, while a live state runs | overlayfs, source `hearth-live`: a delta over the running slot's directory | the activator (domain/slots.md, 6.8) | `ro,nodev`; `nosuid` on `/etc` only |
 
 - **The store and the state hang below `/var`,** which is per slot, so
-  each slot's `/var` gets their mount points at prepare (slots.md, 5.3).
+  each slot's `/var` gets their mount points at prepare (domain/slots.md, 5.3).
   systemd orders a mount after its parent path's (systemd.mount(5)), so
   fstab needs no `x-systemd.requires-mounts-for=`.
 - **A bind waits for its source:** systemd orders a bind mount after the
@@ -274,13 +274,13 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
   so `/var/log/journal` comes up after both `/srv/core` and `/var`. A
   class mount that fails fails its binds, and the boot isolates
   `emergency.target` rather than start a service on the slot's own copy
-  of the path (slots.md, 5.3).
+  of the path (domain/slots.md, 5.3).
 - **The snapshots are not mounted:** a person reads one through
   `hearth shell`, read-only (client/README.md, 3.7), and `@hearth.snapshots`
   stays the activator's.
 - **The store is `nosuid`:** it holds setuid binaries owned by the
   builder's range, behind a `0700` root. Builds run as root inside their
-  namespaces and need no setuid binary (build.md, section 8).
+  namespaces and need no setuid binary (domain/build.md, section 8).
 - **The boot partition is not in fstab:** only the activator uses it,
   mounted for one write at a time, so a power cut rarely finds it
   dirty.
@@ -288,12 +288,12 @@ btrfs filesystem, UUID 0f3c9a6e-…, label hearth     top level: subvolid 5, mou
 ### 3.3 fstab
 
 The activator writes `/etc/fstab` into each slot at prepare
-(slots.md, 5.5), from typed data: the filesystem's UUID from its machine
+(domain/slots.md, 5.5), from typed data: the filesystem's UUID from its machine
 record, the target and label, and the `data` part's entries. An output
 holds no fstab of its own; the activator replaces whatever is there.
 
 ```
-# /etc/fstab of slot x1-prod.b, written by hearth's activator at prepare (machine.md, 3.3)
+# /etc/fstab of slot x1-prod.b, written by hearth's activator at prepare (domain/machine.md, 3.3)
 UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /                      btrfs  subvol=/@x1-prod.b,ro                   0  0
 UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /srv/core              btrfs  subvol=/@x1-prod.core,nodev,nosuid     0  0
 UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /srv/data              btrfs  subvol=/@x1-prod.data,nodev,nosuid     0  0
@@ -314,15 +314,15 @@ UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /var/lib/hearth/store  btrfs  subvol=
   provider may change it.
 - **A bind by its source's path,** `/srv/<class>/<name>`, so a restore
   that swaps a directory's name or a class's subvolume is mounted at the
-  next boot with no fstab to change (operating.md, 7.4).
+  next boot with no fstab to change (domain/operating.md, 7.4).
 - **Every mount point already exists** in the sealed root or in the
   slot's `/var`, because a read-only root cannot get one later, and
-  systemd would otherwise try to create it (slots.md, 5.3 and 5.5):
+  systemd would otherwise try to create it (domain/slots.md, 5.3 and 5.5):
   `/srv/<class>` for each class used, and each bind's path.
 - **A container is in no fstab [M5].** Its host's fstab holds the
   host's own lines only; nspawn makes the container's root and binds its
   `/var` and its entries' directories from the activator's mount of the
-  top level, as the host's nspawn settings say (slots.md, 12.1). The
+  top level, as the host's nspawn settings say (domain/slots.md, 12.1). The
   container's own `/etc/fstab` is written with no line, so its systemd
   mounts nothing.
 
@@ -333,7 +333,7 @@ UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /var/lib/hearth/store  btrfs  subvol=
   reserved for `@hearth.*`. After a target, `a`, `b`, `core`, `data`,
   `cache` and `live` are the only names, and after a class `restoring`
   and `before` are reserved for restores [M5].
-- **A `data` entry** (format.md, 5.7) has a name, a class and a path.
+- **A `data` entry** (protocol/format.md, 5.7) has a name, a class and a path.
   The name is one segment of lowercase letters, digits and `-`, at most
   32 bytes, unique within its target across classes, and names the
   entry's directory in its class's subvolume. The path is absolute and
@@ -342,17 +342,17 @@ UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90  /var/lib/hearth/store  btrfs  subvol=
   `/srv/core`, `/srv/data` or `/srv/cache` only as the entry's own
   `/srv/<class>/<name>`, which needs no bind. At most 64 entries a
   target, each a line of fstab at most. Render refuses an entry that
-  breaks a rule, and the activator refuses it again (activator.md, 2.2).
+  breaks a rule, and the activator refuses it again (domain/activator.md, 2.2).
 - **A class's contents belong to its entries:** the subvolume is made
   with a root of `0:0 0755`, and each entry's directory when the class
   lacks it, seeded with what the output holds at the entry's path, so
-  packages' files there are not hidden by an empty bind (slots.md, 5.3);
+  packages' files there are not hidden by an empty bind (domain/slots.md, 5.3);
   the slot's own `tmpfiles.d` lines set owners and modes at boot, by
   name. A container's `0:0` is its own root, in the ids its slots are
-  shifted to (slots.md, 12.1) [M5].
+  shifted to (domain/slots.md, 12.1) [M5].
 - **Beside an entry's directory,** only a prepare's `<name>.new` while
-  it seeds (slots.md, 5.3), and a restore's `<name>.restoring` and
-  `<name>.before.<seq>` (operating.md, 7.4); entry names hold no dot,
+  it seeds (domain/slots.md, 5.3), and a restore's `<name>.restoring` and
+  `<name>.before.<seq>` (domain/operating.md, 7.4); entry names hold no dot,
   so none of these is ever an entry.
 - **An entry that disappears keeps its directory,** unbound and
   reported as orphaned; a class left with no entry keeps its subvolume,
@@ -386,7 +386,7 @@ ESP: GPT partition 1, 512 MiB, FAT32, flag esp
 
 - **Flat files, one pair per slot,** as os. The EFI stub loads `initrd=`
   from the volume the kernel came from, so both live on the ESP.
-- **Written at prepare, for that slot only** (slots.md, 5.6): copied
+- **Written at prepare, for that slot only** (domain/slots.md, 5.6): copied
   from the slot's `boot/vmlinuz-<version>` and
   `boot/initrd.img-<version>`, synced, read back and checked against the
   slot record's digests. The slot's entry left `BootOrder` first (4.4),
@@ -419,7 +419,7 @@ firmware uses these, and kept in the machine record. Made with
 ```
 
 - **Why a trial entry:** the dead-man must be armed before any mount
-  (slots.md, 5.5), and the command line is what a one-shot boot carries
+  (domain/slots.md, 5.5), and the command line is what a one-shot boot carries
   that nothing on disk can lose.
 - **`--create-only`** makes the entry without adding it to `BootOrder`;
   `--create` would add it.
@@ -430,7 +430,7 @@ firmware uses these, and kept in the machine record. Made with
 - **`initrd=` is written with a backslash.** efibootmgr converts `/` in
   `--loader`, not in the command line.
 - **The disk is found afresh** at each start, from
-  `/sys/fs/btrfs/<fs uuid>/devices/` (activator.md, 7.4).
+  `/sys/fs/btrfs/<fs uuid>/devices/` (domain/activator.md, 7.4).
 - **Other calls,** each an argument vector of `hearth-protocol-efi`:
 
   ```
@@ -469,9 +469,9 @@ firmware uses these, and kept in the machine record. Made with
   it before it transfers control to the entry (UEFI 2.10, 3.1.2; edk2's
   `BdsEntry()`), so any later reset boots `BootOrder`, and an entry that
   fails to load falls back to `BootOrder` at once. The trial's boot
-  checks `BootCurrent` and `BootNext` (slots.md, 6.3).
+  checks `BootCurrent` and `BootNext` (domain/slots.md, 6.3).
 - **A bless rewrites `BootOrder`** with the slot first, and reads it back
-  (slots.md, 7.3).
+  (domain/slots.md, 7.3).
 
 ### 4.5 Reading the firmware
 
@@ -542,7 +542,7 @@ changes after, so a power cut cannot tear it. The exact script is to
 verify on GRUB 2.12, trixie's:
 
 ```
-# written by hearth at bootstrap (machine.md, 5.3)
+# written by hearth at bootstrap (domain/machine.md, 5.3)
 insmod part_msdos
 insmod fat
 insmod btrfs
@@ -605,10 +605,10 @@ menuentry 'rhi-prod.b' --id rhi-prod.b {
   cannot loop. On btrfs every save fails, which is why GRUB lives on FAT
   and `grub-reboot` is never used.
 - **The trial boots with `hearth.trial=<target>.<label>`,** appended by
-  the slot's fragment (5.4), which arms its dead-man (slots.md, 5.5).
+  the slot's fragment (5.4), which arms its dead-man (domain/slots.md, 5.5).
 - **A boot counter falls back to the previous blessed slot,** RAUC's
   pattern: each boot of the default spends one of `tries`, and at 0 GRUB
-  boots `previous` (slots.md, 8.4). GRUB's script has no arithmetic,
+  boots `previous` (domain/slots.md, 8.4). GRUB's script has no arithmetic,
   hence the chain of comparisons.
 - **`fallback` is the default,** so a trial whose kernel fails to load
   returns to the default within the same boot. It covers only entries
@@ -623,10 +623,10 @@ menuentry 'rhi-prod.b' --id rhi-prod.b {
 
 Each slot carries its own `linux` and `initrd` lines, in
 `/.hearth/grub.cfg` inside its root, written at prepare
-(slots.md, 5.5) and sealed with the slot:
+(domain/slots.md, 5.5) and sealed with the slot:
 
 ```
-# slot rhi-prod.b, written by hearth's activator at prepare (machine.md, 5.4)
+# slot rhi-prod.b, written by hearth's activator at prepare (domain/machine.md, 5.4)
 linux /@rhi-prod.b/boot/vmlinuz-6.12.48+deb13-amd64 root=UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90 rootflags=subvol=@rhi-prod.b ro panic=10 console=tty0 console=ttyS0,115200n8 ${hearth_trial}
 initrd /@rhi-prod.b/boot/initrd.img-6.12.48+deb13-amd64
 ```
@@ -678,9 +678,9 @@ initrd /@rhi-prod.b/boot/initrd.img-6.12.48+deb13-amd64
 
 The default is `default` in the valid file GRUB would read; a trial sets
 `next_entry` in both files; a bless sets `previous`, `default` and
-`tries` in both (slots.md, 7.3). A `next_entry` found still set on the
+`tries` in both (domain/slots.md, 7.3). A `next_entry` found still set on the
 trial's boot means GRUB did not save, and the activator clears it at
-once (slots.md, 6.3).
+once (domain/slots.md, 6.3).
 
 ## 6. The kernel's command line
 
@@ -693,8 +693,8 @@ once (slots.md, 6.3).
 | `rootflags=` | `subvol=@<target>.<label>` | passed as mount data by tiny-initramfs |
 | `ro` | | tiny-initramfs mounts the root read-only, as fstab does after it |
 | `panic=` | `10` | Debian builds with `CONFIG_PANIC_TIMEOUT=0`, which hangs on a panic; a trial must end in a reboot |
-| the `boot` part | its parameters, in their order, such as `console=ttyS0,115200n8` or `audit=0` | the target's own, from task data keyed by hardware (format.md, 5.4; render.md, 4.3); the last `console=` is `/dev/console` |
-| `hearth.trial=` | `<target>.<label>` | the trial entry's line only (4.2), or GRUB's on a trial boot (5.3): it arms the dead-man before any mount (slots.md, 5.5) |
+| the `boot` part | its parameters, in their order, such as `console=ttyS0,115200n8` or `audit=0` | the target's own, from task data keyed by hardware (protocol/format.md, 5.4; domain/render.md, 4.3); the last `console=` is `/dev/console` |
+| `hearth.trial=` | `<target>.<label>` | the trial entry's line only (4.2), or GRUB's on a trial boot (5.3): it arms the dead-man before any mount (domain/slots.md, 5.5) |
 
 An example, for `x1-prod`'s slot `b` on EFI, whose `boot` part is
 `audit=0`, with no console:
@@ -710,11 +710,11 @@ initrd=\initrd.img.x1-prod.b root=UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90 root
   are the activator's, nor `rootfstype`, `rootwait`, `rootdelay` or
   `init`, which would change how tiny-initramfs finds and starts the
   root; `rootwait` in particular would make a missing root wait for ever
-  instead of panicking. Render refuses them (format.md, 5.11), and the
+  instead of panicking. Render refuses them (protocol/format.md, 5.11), and the
   activator refuses them again.
 - **Tokens** are printable ASCII without spaces, quotes or what GRUB's
   script reads (`\`, `$`, `;`, `&`, `|`, `<`, `>`, `{`, `}`, `#`;
-  format.md, 5.4); a value with a space cannot be expressed. Parameters are compared and written as
+  protocol/format.md, 5.4); a value with a space cannot be expressed. Parameters are compared and written as
   tokens, never as one string.
 - **Length:** the whole line, the trial's token included, is at most
   2048 bytes with its terminating NUL, x86's `COMMAND_LINE_SIZE`. The
@@ -724,23 +724,23 @@ initrd=\initrd.img.x1-prod.b root=UUID=0f3c9a6e-5b2d-4c1e-9a7f-2d8e6b1c4a90 root
   a line that fits.
 - **Nothing in hearth reads `/proc/cmdline`** to learn which slot runs:
   after a soft reboot it still names the slot the kernel was booted for
-  (slots.md, section 3).
+  (domain/slots.md, section 3).
 
 ### 6.3 Where it is written, and when it changes
 
 - **Written at prepare only,** into the EFI entry or the BIOS fragment
   (5.4); a trial and a bless never touch it.
 - **A changed line** costs one entry write on EFI (4.3) and forbids a
-  soft reboot (slots.md, 6.1).
+  soft reboot (domain/slots.md, 6.1).
 
 ## 7. The initramfs
 
 ### 7.1 Configuration
 
 tiny-initramfs's configuration, `/etc/tiny-initramfs/tiny-initramfs.conf`,
-is part of the `packages` part (render.md, section 4), because the
+is part of the `packages` part (domain/render.md, section 4), because the
 kernel's postinst hook builds the image while packages install, and the
-configuration must exist before that (build.md, section 5):
+configuration must exist before that (domain/build.md, section 5):
 
 ```
 DEBUG=no
@@ -755,16 +755,16 @@ INCLUDE_MODULES=btrfs,virtio_pci,virtio_scsi,sd_mod
   microcode; `generic`, every installed microcode package, on bare
   metal. `yes` means the build host's processor.
 - **`INCLUDE_MODULES`** is the packages part's `initramfs` set, which the
-  `boot` task keys by hardware profile (7.2; format.md, 5.4), in the
-  set's order, bytewise (store.md, 3.1), comma-joined: the file follows
+  `boot` task keys by hardware profile (7.2; protocol/format.md, 5.4), in the
+  set's order, bytewise (domain/store.md, 3.1), comma-joined: the file follows
   the part's digest, whatever order a list in 7.2 or a task gives.
   `mktirfs` resolves their dependencies when it makes the image, and
   nothing is resolved at boot.
 - **The image is in the output,** at `boot/initrd.img-<version>`,
   independent of the build host. Its bytes differ between two builds of
   the same inputs, since mktirfs's cpio keeps inode numbers and mtimes
-  (reproducible.md, 2.2), so the soft-reboot rule compares its inputs,
-  never its bytes (slots.md, 6.1).
+  (domain/reproducible.md, 2.2), so the soft-reboot rule compares its inputs,
+  never its bytes (domain/slots.md, 6.1).
 
 ### 7.2 Modules per hardware profile
 
@@ -778,7 +778,7 @@ INCLUDE_MODULES=btrfs,virtio_pci,virtio_scsi,sd_mod
 
 These are the bash fleet's lists, learned by trial and error; `virtio_blk`
 needs `virtio_pci` to work. They move from a template keyed by hardware
-into the `boot` task's settings (format.md, 5.4); the `incus` list for a
+into the `boot` task's settings (protocol/format.md, 5.4); the `incus` list for a
 VM with its own disk is new, and `envs/lab.json` adds it.
 
 ### 7.3 What it does, and what it cannot
@@ -803,7 +803,7 @@ VM with its own disk is new, and `envs/lab.json` adds it.
 
 A soft reboot skips the initramfs, so the activator mounts
 `/run/nextroot` as tiny-initramfs would have mounted the root
-(slots.md, 6.2).
+(domain/slots.md, 6.2).
 
 ### 7.5 Debian's package
 
@@ -839,17 +839,17 @@ client/README.md, 3.8):
 | Field | Standalone | Following an engine [M4] |
 |---|---|---|
 | mode | `standalone` | `engine`: never both (client/README.md, 3.1) |
-| target | the machine's target, such as `x1-prod`; its containers come from that target's spec [M5] (wire.md, 4.7) | the same |
-| repository | the IaC repository's URL (wire.md, 4.1) | the same |
-| desired revision | a commit, or a branch to follow with its interval, and `trial: auto` or `manual` (wire.md, 4.1) | none: the engine orders revisions (wire.md, 5.4) |
+| target | the machine's target, such as `x1-prod`; its containers come from that target's spec [M5] (protocol/wire.md, 4.7) | the same |
+| repository | the IaC repository's URL (protocol/wire.md, 4.1) | the same |
+| desired revision | a commit, or a branch to follow with its interval, and `trial: auto` or `manual` (protocol/wire.md, 4.1) | none: the engine orders revisions (protocol/wire.md, 5.4) |
 | operators | the uids that may run every socket command (client/README.md, 3.4) | the same |
-| mutable | `refuse`, or `accept` with `--accept-mutable`: whether the activator places mutable targets (development.md, 4.3); in its machine record | `refuse`: the run side never deploys one |
-| engine | none | its address, what to trust it by, and the machine's credential if the identity chosen is one (wire.md, 5.1 and 5.3) |
+| mutable | `refuse`, or `accept` with `--accept-mutable`: whether the activator places mutable targets (domain/development.md, 4.3); in its machine record | `refuse`: the run side never deploys one |
+| engine | none | its address, what to trust it by, and the machine's credential if the identity chosen is one (protocol/wire.md, 5.1 and 5.3) |
 
 The target and `mutable` go into the activator's machine record; the
-rest is the steward's, kept in its state (store.md, 8.3), from which the
+rest is the steward's, kept in its state (domain/store.md, 8.3), from which the
 client changes only the desired revision and its trial mode
-(wire.md, 4.1).
+(protocol/wire.md, 4.1).
 
 **Before it touches the disk,** bootstrap renders the target: it makes
 the `hearth` user (8.3) and spawns `/proc/self/exe render` as that user,
@@ -863,15 +863,15 @@ it refuses to start, naming every reason at once, unless:
 - the firmware is the rendered placement's `firmware`: on EFI, efivarfs
   writable and `SecureBoot` off (9.5);
 - its own binary, `/proc/self/exe`, has the digest the `hearth` task's
-  download pins in the spec (format.md, 5.12): the slot it makes runs
+  download pins in the spec (protocol/format.md, 5.12): the slot it makes runs
   that release, which must read the records bootstrap writes
-  (activator.md, 7.2);
+  (domain/activator.md, 7.2);
 - the disk is a whole block device, none of it mounted, not the live
   system's own, and blank unless `--wipe` is given (Vultr's volumes come
   with an image installed, and `x1-prod`'s holds os);
 - the tools of 8.2 are present, `ssh-keygen` (`openssh-client`) among
   them, and what the builder needs: `newuidmap` and `newgidmap`
-  (Debian's `uidmap`), `mmdebstrap` and `git` (store.md, section 9).
+  (Debian's `uidmap`), `mmdebstrap` and `git` (domain/store.md, section 9).
 
 ### 8.2 The steps
 
@@ -904,28 +904,28 @@ failure finds what the first run made, up to the disk's wipe.
    partition's volume id, entry numbers) into the state, and the
    machine's configuration (8.1) into the steward's state, owned by
    `hearth`, with the repository's read credential under the store's
-   `credentials/` (render.md, 2.2), never in the secret store.
-5. **Import the secrets** from `--secrets` (activator.md, 5.8). A
+   `credentials/` (domain/render.md, 2.2), never in the secret store.
+5. **Import the secrets** from `--secrets` (domain/activator.md, 5.8). A
    secret the spec names and the store lacks fails the place in step 7,
    naming every missing one. Identity is never imported: step 7 makes
    it.
 6. **Build:** bootstrap enters a transient scope with `Delegate=yes`
    (`systemd-run --scope --property=Delegate=yes`) and lays out its
-   cgroups as the daemon does (activator.md, 3.1; steward.md,
+   cgroups as the daemon does (domain/activator.md, 3.1; domain/steward.md,
    section 7); its activator's domain spawns the steward from
    `/proc/self/exe` (the live system has no `/usr/local/bin/hearth`) over a
-   link, as on a running machine (activator.md, 3.2), with the store
+   link, as on a running machine (domain/activator.md, 3.2), with the store
    mounted at `/var/lib/hearth/store`. The steward spawns a builder for
-   its jobs (steward.md, section 3), which renders the target at its
+   its jobs (domain/steward.md, section 3), which renders the target at its
    desired revision and builds its output; the steward then asks to
-   place it, as converge does on any machine (wire.md, section 4);
+   place it, as converge does on any machine (protocol/wire.md, section 4);
    under an engine [M4], the revision given builds this first slot
    only.
 7. **Place into slot `a`:** prepare, from snapshot to verify
-   (slots.md, section 5), including the boot files and both entries
+   (domain/slots.md, section 5), including the boot files and both entries
    (EFI) or the slot's fragment (BIOS). Prepare first makes every
    identity item the spec declares and the store lacks, and the
-   machine-id (activator.md, 5.7).
+   machine-id (domain/activator.md, 5.7).
 8. **Install the boot loader,** BIOS only [M3b]:
 
    ```
@@ -938,9 +938,9 @@ failure finds what the first run made, up to the disk's wipe.
 9. **Make slot `a` the default:** `efibootmgr --bootorder 4800,…` on
    EFI; `default` is already `a` on BIOS. There is nothing to fall back
    to, so there is no trial: bootstrap blesses `a` with the one
-   transition that needs no running slot (slots.md, section 4).
+   transition that needs no running slot (domain/slots.md, section 4).
 10. **Report and stop:** print the machine-id and each identity item's
-    public half for the repository's exports (format.md, section 8);
+    public half for the repository's exports (protocol/format.md, section 8);
     stop the steward, which stops its builder; unmount everything. The
     operator reboots.
 
@@ -953,7 +953,7 @@ slot, so they must exist when it runs.
 - **The steward and its builder run as `hearth`, unprivileged, even
   here.** A live system has no `hearth` user, so bootstrap makes one,
   with the fixed uid, gid and subordinate range that every output also
-  declares (format.md, 5.12; store.md, 9.2):
+  declares (protocol/format.md, 5.12; domain/store.md, 9.2):
 
   ```
   useradd --system --uid 59999 --user-group --home-dir /nonexistent --shell /usr/sbin/nologin hearth
@@ -968,7 +968,7 @@ slot, so they must exist when it runs.
 - **The build writes to the target disk,** under `@hearth.store`; its
   layers are the first slot's store when it boots.
 - **No program from the output runs as root:** the tools are the live
-  system's, the system running the activator (activator.md, 2.1).
+  system's, the system running the activator (domain/activator.md, 2.1).
 
 ### 8.4 The first boot
 
@@ -978,17 +978,17 @@ revision built and placed, and converges from there.
 
 **A host's containers are not bootstrapped [M5].** Bootstrap places the
 host's own target only. From its first boot, the host's hearth builds
-and prepares each container's first slot as any change (wire.md, 4.7),
-and tries it with nothing to fall back to (slots.md, 12.3). A
+and prepares each container's first slot as any change (protocol/wire.md, 4.7),
+and tries it with nothing to fall back to (domain/slots.md, 12.3). A
 container's secrets are imported for its own target (client/README.md, 3.6),
 before or after: a missing secret only makes its prepare wait
-(wire.md, 4.4).
+(protocol/wire.md, 4.4).
 
 ### 8.5 Disks as an effect [M6]
 
 The lab's throwaway machines need disks made on order, not by a person
 at a live system: the same partitioning and formatting as an effect of
-the activator (activator.md, 5.10), on a disk named by its stable id
+the activator (domain/activator.md, 5.10), on a disk named by its stable id
 (`/dev/disk/by-id/…`), conditional on the disk being blank, and keyed
 by the identifiers the order gives. The pool host's activator makes the
 disk and bootstraps the machine onto it.
@@ -1024,7 +1024,7 @@ fact, never as a slot silently left on trial.
 
 The UEFI watchdog (5 minutes) is disabled at `ExitBootServices()`, so it
 covers the boot loader only; after that a hang needs the machine's own
-watchdog (slots.md, 6.5).
+watchdog (domain/slots.md, 6.5).
 
 ### 9.4 Firmware that discards its variables [later]
 
@@ -1058,7 +1058,7 @@ watchdog (slots.md, 6.5).
 ## 10. Its world
 
 `hearth-domain-disk` and `hearth-domain-boot` run in worlds of the fake
-machine (testing.md, section 3), which models for them:
+machine (domain/testing.md, section 3), which models for them:
 
 - **disks:** gpt and msdos tables, partitions with types and flags, the
   post-MBR gap, FAT volumes, one btrfs filesystem and its subvolumes;
@@ -1072,20 +1072,20 @@ machine (testing.md, section 3), which models for them:
   at any instant, mid-write included.
 
 The fakes of the tools in sections 4, 5 and 8 take their argument
-vectors and act on that machine (testing.md, section 4); their
+vectors and act on that machine (domain/testing.md, section 4); their
 conformance cases run the real tools in the VM tier
-(testing.md, sections 5 and 7): efibootmgr against OVMF, GRUB against
+(domain/testing.md, sections 5 and 7): efibootmgr against OVMF, GRUB against
 SeaBIOS [M3b].
 
-The invariants every world checks (testing.md, section 8), beside
-slots.md, section 4's, judged by booting the firmware and GRUB models:
+The invariants every world checks (domain/testing.md, section 8), beside
+domain/slots.md, section 4's, judged by booting the firmware and GRUB models:
 
 - **no write touches** the default's boot files, its entry, a foreign
   entry, or a file outside the boot partition and the top level;
 - **NVRAM writes per rollout stay within 4.3's count,** and an entry is
   written only when its command line changed;
 - **a one-shot whose save fails is never taken,** and a default that
-  panics at every boot reaches `previous` on BIOS (slots.md, 8.4);
+  panics at every boot reaches `previous` on BIOS (domain/slots.md, 8.4);
 - **bootstrap ends with one blessed default slot,** or with a typed
   failure and a disk that a second run can finish.
 
@@ -1099,7 +1099,7 @@ slots.md, section 4's, judged by booting the firmware and GRUB models:
   entry at every install, at a new number, with labels `a` or
   `x1-prod.a`.
 - **`panic=10` always:** os set none, so a missing root hung the
-  machine (trials are slots.md, section 14's).
+  machine (trials are domain/slots.md, section 14's).
 - **BIOS works:** os's BIOS path booted a kernel nothing copied, edited
   a `grubenv` GRUB did not read, and kept it on btrfs, where no
   one-shot is possible.
@@ -1140,14 +1140,14 @@ slots.md, section 4's, judged by booting the firmware and GRUB models:
 - **Updating GRUB after bootstrap:** never in M3b, since GRUB is shared
   by both slots and cannot be tried; depends on how often trixie's GRUB
   changes in ways that matter.
-- **The `hearth` user's fixed uid and gid,** 59999 (format.md, 5.12), to
+- **The `hearth` user's fixed uid and gid,** 59999 (protocol/format.md, 5.12), to
   verify against the ids the fleet's packages take.
 - **Owners of persistent data:** users made by maintainer scripts get
-  dynamic uids, which may differ between outputs; depends on build.md
-  and format.md pinning them.
+  dynamic uids, which may differ between outputs; depends on domain/build.md
+  and protocol/format.md pinning them.
 - **Deleting orphaned data:** an entry's directory, or a class with no
   entry left, by an operational effect or a person's command; depends
-  on operating.md, section 6.
+  on domain/operating.md, section 6.
 - **A subvolume per entry:** `"subvolume": true` on an entry that needs
   its own snapshot policy, quota or restore unit, made `@<target>.<name>`
   and mounted at its path as before classes; not in the design, a

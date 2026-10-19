@@ -1,4 +1,4 @@
-//! The stable text form (render.md, 9.2), measured before allocation.
+//! The stable text form (domain/render.md, 9.2), measured before allocation.
 use crate::{
     form::Refusal,
     records::{Record, Type},

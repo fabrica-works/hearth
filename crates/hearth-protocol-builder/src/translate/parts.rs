@@ -1,4 +1,4 @@
-//! Render's part vocabulary mapped to client records (render.md, 4.2).
+//! Render's part vocabulary mapped to client records (domain/render.md, 4.2).
 use crate::{records::records as target, render::parts as source};
 pub mod boot;
 pub mod config;

@@ -17,7 +17,11 @@ fn a_loop_binds_each_element_in_turn() {
             advance(37, 2),
         ],
     );
-    assert_eq!(fixtures::run(&Roots::x1_prod(), &template), Ok(Box::from(&b"sudo,wheel,"[..])), "format.md, 7.3");
+    assert_eq!(
+        fixtures::run(&Roots::x1_prod(), &template),
+        Ok(Box::from(&b"sudo,wheel,"[..])),
+        "protocol/format.md, 7.3"
+    );
 }
 #[test]
 fn a_loop_over_a_map_takes_its_present_keys_in_order() {

@@ -1,4 +1,4 @@
-//! The seventeen filters of format.md, 7.5; all results are charged before allocation.
+//! The seventeen filters of protocol/format.md, 7.5; all results are charged before allocation.
 use super::{
     Budget, ELEMENT, Evaluator, FaultKind, Missing, Operand, Value, Written, escape, lookup,
     walk::{self, View},
@@ -25,7 +25,7 @@ pub enum Filter {
     Dirname,
 }
 impl Filter {
-    /// The arguments popped after the input (format.md, 7.5).
+    /// The arguments popped after the input (protocol/format.md, 7.5).
     #[must_use]
     pub const fn arity(self) -> u32 {
         match self {

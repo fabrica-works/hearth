@@ -1,4 +1,4 @@
-//! A task's typed exports depend on its settings and target alone (format.md, 8.1).
+//! A task's typed exports depend on its settings and target alone (protocol/format.md, 8.1).
 use crate::{
     entries::Fault,
     errors::{ExportFault, Kind, Root, Schema},

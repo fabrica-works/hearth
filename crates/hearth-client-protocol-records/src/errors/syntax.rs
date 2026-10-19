@@ -1,4 +1,4 @@
-//! Template syntax faults (format.md, 7.2 to 7.5).
+//! Template syntax faults (protocol/format.md, 7.2 to 7.5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Syntax {
     TooLong,

@@ -1,4 +1,4 @@
-//! Decoded values and compiled text charged by render.md, 2.3.
+//! Decoded values and compiled text charged by domain/render.md, 2.3.
 pub(crate) mod declaration;
 pub(crate) mod template;
 use super::{Document, Kind, Layer, Value};

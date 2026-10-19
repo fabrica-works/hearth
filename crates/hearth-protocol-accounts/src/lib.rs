@@ -1,5 +1,5 @@
-//! The lines of `/etc/passwd`, `/etc/group`, `/etc/shadow` and `/etc/gshadow` (store.md, 5.3;
-//! build.md, 9.3; activator.md, 2.3).
+//! The lines of `/etc/passwd`, `/etc/group`, `/etc/shadow` and `/etc/gshadow` (domain/store.md, 5.3;
+//! domain/build.md, 9.3; domain/activator.md, 2.3).
 //!
 //! A file is read from its whole bytes into typed entries: each name with its ids, and whether its
 //! password field is locked. The files are an output's, so untrusted: the read is bounded, never

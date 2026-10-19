@@ -1,4 +1,4 @@
-//! Statement heads and the bounded open-block stack (format.md, 7.3).
+//! Statement heads and the bounded open-block stack (protocol/format.md, 7.3).
 use super::scan::{self, Tag};
 use crate::{Does, Error, ErrorKind, Expected, Expression, Instruction, Names, expression, limits::Limits};
 use alloc::boxed::Box;

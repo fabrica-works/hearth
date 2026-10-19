@@ -1,4 +1,4 @@
-//! Templates compiled left to right to flat instructions (format.md, 7.2; render.md, 8.3).
+//! Templates compiled left to right to flat instructions (protocol/format.md, 7.2; domain/render.md, 8.3).
 mod raw;
 pub(crate) mod scan;
 pub(crate) mod statement;

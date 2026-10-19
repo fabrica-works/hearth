@@ -9,7 +9,7 @@ targets, and how secrets, identity and software are named. It takes os's
 (draft/brainstorm.md, section 7), and is written fresh: there is no
 converter from os's configurations. Milestone M1 builds it, but for
 checks (M5) and artifacts (M6). How a revision becomes a spec is
-render.md. Open questions are in section 13.
+domain/render.md. Open questions are in section 13.
 
 ## 1. In one page
 
@@ -94,7 +94,7 @@ render.md. Open questions are in section 13.
 - **Render reads `fleet.json`, `envs/`, `hosts/` and `tasks/`.** Any other
   file (a `README.md`, `lab-ca/lab.crt`) is read only when a setting of
   type `file` names it (6.2). Every path in the revision is UTF-8; one
-  that is not is a `repository` error (render.md, 7.2).
+  that is not is a `repository` error (domain/render.md, 7.2).
 - **Under `hosts/<base>/`** the documents are `<base>.json` and
   `<base>-<env>.json` for environments that exist in `envs/`. Any other
   `.json` directly in it is an error; deeper, a `.json` is another
@@ -116,7 +116,7 @@ render.md. Open questions are in section 13.
 - **No document is a template.** Values in `fleet.json`, `envs/` and
   `hosts/` are data, taken literally. Only the declarations of a
   `task.json` (5.2) and `*.j2` files are evaluated.
-- **Bounds** are render's limits (render.md, 2.3): 256 KiB a document,
+- **Bounds** are render's limits (domain/render.md, 2.3): 256 KiB a document,
   depth 32, 4,096 keys an object. They count the document as written: a
   `_note` is one of its object's keys.
 - **What a later milestone adds is refused before it.** A key or value
@@ -153,7 +153,7 @@ render.md. Open questions are in section 13.
 - **One source a destination:** a task that holds both `NAME` and
   `NAME.j2` (in `tree/`, or `customize.sh` or `software.sh` beside its
   `.j2`) is a `repository` error at the second in byte order, the first
-  its `also` (render.md, 7.1). Across tasks, one path from two is a
+  its `also` (domain/render.md, 7.1). Across tasks, one path from two is a
   collision (5.2).
 - **A template is a file with a name.** A symbolic link whose name ends
   in `.j2`, and a `.j2` alone, which would install at its directory's
@@ -175,17 +175,17 @@ render.md. Open questions are in section 13.
 
 - **No dots in target names.** The btrfs top level names a target's
   subvolumes `@<target>.<label>` and `@<target>.<class>`, and the ESP its
-  files `vmlinuz.<target>.<label>` (machine.md, sections 3 and 4); a dot
+  files `vmlinuz.<target>.<label>` (domain/machine.md, sections 3 and 4); a dot
   in a target would make them ambiguous. Data names have no dot either,
   so a restore's `<name>.restoring` beside an entry's directory is never
-  an entry (machine.md, 3.4).
+  an entry (domain/machine.md, 3.4).
 - **`hearth` is never a target,** since `@hearth.store` and `@hearth.state`
   share the top level.
 - **Tasks and settings are identifiers,** so `tasks.core.domain` and
   `settings.public_key` parse; a hyphen would read as a minus.
 - **A guard's name has their form,** though no expression reads it: a
   false guard prints it in its error, `boot: requires modules: no
-  initramfs modules for this hardware` (render.md, 7.3), and a key of any
+  initramfs modules for this hardware` (domain/render.md, 7.3), and a key of any
   bytes, a `: ` or a line feed in it, would break that line. A name out
   of form is a decode error at its key.
 
@@ -256,7 +256,7 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   declared, and each value but `null` of its type and form. What only a
   composed value shows is not checked there: a required setting, and
   whether a `target` names a target of the environment. Such an error
-  names its task and no target (render.md, 7.1).
+  names its task and no target (domain/render.md, 7.1).
 - **Reserved keys** of a document name no task: `debian` (5.3),
   `placement` (3.4), `members` (3.6) and `_note`.
 
@@ -271,15 +271,15 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 | Field | Type | Meaning |
 |---|---|---|
 | `kind` | enum `metal`, `vm`, `container` | where the target runs |
-| `firmware` | enum `efi`, `bios` | how it boots (machine.md, sections 4 and 5); never for a container |
+| `firmware` | enum `efi`, `bios` | how it boots (domain/machine.md, sections 4 and 5); never for a container |
 | `hardware` | string | the profile tasks key hardware data by: `7th-gen`, `incus`, `ionos`, `serverhino`, `vultr`; never for a container |
-| `on` | target | for a container only: its host, a target of the same environment that is not a container; absent for a build environment, which no host runs (artifacts.md, 2.3) [M6] |
+| `on` | target | for a container only: its host, a target of the same environment that is not a container; absent for a build environment, which no host runs (domain/artifacts.md, 2.3) [M6] |
 | `ids` | int | for a container on a host [M5]: the base of its 64 Ki id range, nspawn's `PrivateUsers=` (3.5) |
 | `binds` | map | for a container on a host [M5]: host paths bound into it, keyed by the path inside, each `{ "source": path, "read_only": bool }`, `read_only` true by default |
 | `capabilities` | set of names | for a container on a host [M5]: capabilities added to nspawn's default set, such as `CAP_NET_ADMIN`; none by default |
 | `network` | enum `host`, `veth` | for a container on a host [M5]: `host` by default, the host's own network; `veth`, a veth pair whose host end joins `bridge` [M6] |
 | `bridge` | string | for `network: veth` only: the host's bridge [M6] |
-| `mutable` | bool | `false` by default; `true` leaves the target's slots unsealed and their root read-write, for changes by hand on a development machine (development.md, section 4); a container's too [M5]; never a build environment's |
+| `mutable` | bool | `false` by default; `true` leaves the target's slots unsealed and their root read-write, for changes by hand on a development machine (domain/development.md, section 4); a container's too [M5]; never a build environment's |
 
 - **Placement is data of the environment** (draft/brainstorm.md, 7.7). It
   may appear in `envs/<env>.json` and in a base-env layer or its members,
@@ -287,7 +287,7 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   where it runs. Every target must have a placement once composed.
 - **A placement is whole where it is written:** `kind` always; `firmware`
   and `hardware` for metal and a VM, which boot by one and are keyed by
-  the other (5.4; machine.md, 2.7); `on` for a container until M6's
+  the other (5.4; domain/machine.md, 2.7); `on` for a container until M6's
   build environments. One missing is an error at the placement's `{`,
   and a field the kind never takes is one at its key.
 - **`placement` and `members` are objects:** `null` for either is an
@@ -298,21 +298,21 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   `firmware` and `hardware` never leak into a lab target that its own
   file places in a container.
 - **What placement decides by itself:** the bootstrap variant
-  (render.md, 4.2), and that a container has no kernel, so its initramfs
+  (domain/render.md, 4.2), and that a container has no kernel, so its initramfs
   modules and boot parameters must be empty: its packages part has no
   initramfs, its boot part holds its container parameters instead of a
   command line (3.5), and render refuses a module or a parameter on it
-  (render.md, 7.2). The `boot` task, which installs the kernel, refuses a
+  (domain/render.md, 7.2). The `boot` task, which installs the kernel, refuses a
   container by a guard of its own (5.4).
 - **`mutable` is a slot's, never an output's.** Render puts it in the
-  `boot` part (render.md, 4.3), so it enters the prepare key and no
+  `boot` part (domain/render.md, 4.3), so it enters the prepare key and no
   layer key: a mutable target builds the output its sealed twin would.
   Render accepts it in every layer placement may be in, on metal and a
   VM, and on a container from M5 (2.2): before M5 a container's
   `mutable` is refused at its key, as its `ids` is, since a container in
-  development is M5's (development.md, 3.4). Whether a machine takes
-  it is the machine's configuration (machine.md, 8.1), and the run
-  side's engine never orders one [M4] (development.md, 4.3). An
+  development is M5's (domain/development.md, 3.4). Whether a machine takes
+  it is the machine's configuration (domain/machine.md, 8.1), and the run
+  side's engine never orders one [M4] (domain/development.md, 4.3). An
   environment such as `dev` sets it for all its targets.
 - **Everything else that differs by placement is task data** that reads
   `target.placement`: the gettys masked in containers, the initramfs
@@ -325,7 +325,7 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   the host's templates as `target.containers` (7.7), a map from target
   name to placement. A container reads no more of its host than that
   placement, so what else fails on its host leaves it rendering
-  (render.md, 3.4).
+  (domain/render.md, 3.4).
 - **One source of truth.** The host keeps no list of its containers,
   where draft/brainstorm.md (7.7) kept one in the host's configuration.
   The bash fleet's `runner:600` user, declared once for carbon and again
@@ -345,12 +345,12 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
   gettys masked by the `core` task (5.10). Its `data` entries, identity
   and secrets are its own target's, kept by its host's activator: its
   class subvolumes sit on the host's top level, and its machine-id is no
-  longer its host's (slots.md, 12.1).
+  longer its host's (domain/slots.md, 12.1).
 - **Users are not mirrored** [M5]. The bash fleet declared
   carbon-forge's `runner:600` on carbon too, with a home inside the
   container's `/srv`. A container's entries are bound into it alone,
   from its own class subvolumes, and never mounted on its host
-  (slots.md, 12.1), so its host needs no such user; a host task that
+  (domain/slots.md, 12.1), so its host needs no such user; a host task that
   must know a container's user reads it from the container's exports
   (section 8).
 - **A container's parameters are placement fields** [M5] (3.4): its id
@@ -363,22 +363,22 @@ hosts/<base>/<base>-<env>.json     the base in <env>, without its members key
 
   - **Render puts them in the container's `boot` part,** a slot part,
     which for a container holds them instead of a command line
-    (render.md, 4.3). So a change to one changes the slot's prepare key
+    (domain/render.md, 4.3). So a change to one changes the slot's prepare key
     and prepares a new slot of the same output, which its host tries by
     a restart, since nspawn reads them only when it starts
-    (slots.md, 12.1 and 12.2).
+    (domain/slots.md, 12.1 and 12.2).
   - **Render checks their form:** a base aligned to 64 Ki and clear of
-    the builder's range (store.md, 9.2) and of the other containers'
+    the builder's range (domain/store.md, 9.2) and of the other containers'
     placed on the same host; binds whose two paths are absolute and
     normal; capability names from the kernel's list. The host's
-    activator checks them again (activator.md, 2.2).
+    activator checks them again (domain/activator.md, 2.2).
   - **They are refused on anything but a container on a host:** a host
     and a build environment have none.
 - **How a host runs a container** (its slots, the shift into its ids,
-  its nspawn settings) is slots.md, section 12 [M5].
+  its nspawn settings) is domain/slots.md, section 12 [M5].
 - **A container's journal is its host's** [M5]: nspawn links it into
   the host's journal entry, `/srv/core/journal`
-  (operating.md, section 5), so the `core` task declares no `journal`
+  (domain/operating.md, section 5), so the `core` task declares no `journal`
   entry on a container (5.7).
 
 ### 3.6 Clusters
@@ -503,14 +503,14 @@ merge(target, patch):
   has no null type, and an absent optional setting is simply absent.
 - **A `null` a merge would carry is an error where it is written:** one
   inside a list (`[1, null]`, `[{"a": null}]`), which replaces whole, is
-  a `decode` error in a document (render.md, 7.2) and a bad default in a
+  a `decode` error in a document (domain/render.md, 7.2) and a bad default in a
   `task.json` (6.5); one in a placement is a wrong type (3.4).
 - **Lists replace.** os concatenated them, so a variant could add to a
   base's list but never drop or replace an entry, and thin variants grew
   into copies.
 - **Values keep where they came from.** Each composed value carries the
   file, line and column of the layer that set it, so an error names the
-  layer at fault (render.md, section 7).
+  layer at fault (domain/render.md, section 7).
 
 ### 4.2 Collections are maps keyed by name
 
@@ -574,7 +574,7 @@ merge(target, patch):
 unknown key is an error: `{"doc": "…"}` is a valid task that does
 nothing.
 
-| Key | Declares | Part (render.md, section 4) | Section |
+| Key | Declares | Part (domain/render.md, section 4) | Section |
 |---|---|---|---|
 | `doc` | one line about the task | | |
 | `settings` | the schema of its settings | | 6 |
@@ -630,13 +630,13 @@ nothing.
   key in two declarations makes an entry in each, as `hearth` does in
   5.12's `software` and `users`. What two such entries claim together,
   a `groups` entry of a user's own name (5.6) or one path, is compared as
-  render.md 3.7 says. The bound on entries counts every declaration of
-  the task (render.md, 2.3).
+  domain/render.md 3.7 says. The bound on entries counts every declaration of
+  the task (domain/render.md, 2.3).
 - **Across tasks,** a file path, a data name and a secret's or identity's
   path belong to one task. Users, groups, presets, tmpfiles lines,
   preseeds and boot parameters may be declared by several tasks only
   identically. Packages and modules are a union. Anything else is a
-  collision, an error that names both tasks (render.md, 3.7).
+  collision, an error that names both tasks (domain/render.md, 3.7).
 - Accounts from a setting, in `tasks/users/task.json`:
 
   ```json
@@ -700,7 +700,7 @@ nothing.
   `select`, `multiselect`, `string`, `boolean`) and `value`, both
   required, and `owner` (default: the question's first segment). There
   is no `password` type: a preseed is in the spec, and a spec holds no
-  secret. They are answered before any package is configured (build.md,
+  secret. They are answered before any package is configured (domain/build.md,
   section 5). The timezone
   and locale, which os and the bash fleet set in code, are the `locale`
   task's:
@@ -728,7 +728,7 @@ nothing.
   }
   ```
 
-- **A preseed is one line of `debconf-set-selections`** (build.md, 5.5),
+- **A preseed is one line of `debconf-set-selections`** (domain/build.md, 5.5),
   so render refuses what would break it: a question is two or more
   segments joined by `/`, and an owner one, each of letters, digits,
   `.`, `_`, `+` and `-`; a value holds no control character and does not
@@ -743,14 +743,14 @@ nothing.
   configuration's `INCLUDE_MODULES`. The
   rest of the configuration is no task's: the packages part carries
   `microcode`, `none` on a VM and `generic` on metal, which render
-  derives from placement (machine.md, 7.1), and render writes
+  derives from placement (domain/machine.md, 7.1), and render writes
   `tiny-initramfs.conf` from the modules and that choice, with
-  `AUTO_MODULES=no` always (render.md, 4.2). So neither `yes`, which
+  `AUTO_MODULES=no` always (domain/render.md, 4.2). So neither `yes`, which
   would read the build host, can reach an output (5.11).
 - **`cmdline`** is a map of entries with `param` (the parameter as the
   kernel reads it: printable ASCII but a space, `"` and `'`, and `\`,
   `$`, `;`, `&`, `|`, `<`, `>`, `{`, `}` and `#`, which GRUB's script
-  would read in a BIOS slot's fragment, machine.md, 5.4) and `order`. The
+  would read in a BIOS slot's fragment, domain/machine.md, 5.4) and `order`. The
   boot part is the parameters in order (4.3). Ten keys are the
   activator's or would change how the root is found (5.11). A line that
   would pass 2,048 bytes with the activator's tokens is refused at the
@@ -800,7 +800,7 @@ nothing.
   }
   ```
 
-  The lists are the bash fleet's and machine.md's (7.2). The `incus`
+  The lists are the bash fleet's and domain/machine.md's (7.2). The `incus`
   profile is not a default: the bash fleet's list served a virtiofs root,
   and hearth's test VMs boot from a disk of their own. `envs/lab.json`
   adds it, with the lab's placement and console:
@@ -817,8 +817,8 @@ nothing.
   }
   ```
 
-  The `incus` list is to verify on the VM tier (machine.md, 7.2;
-  testing.md, section 7).
+  The `incus` list is to verify on the VM tier (domain/machine.md, 7.2;
+  domain/testing.md, section 7).
 
 ### 5.5 The file tree
 
@@ -856,7 +856,7 @@ nothing.
   that both `tree/` and a `template`, `copy` or `link` entry give.
 - **Owners are names.** Build resolves them in the layer's own
   `/etc/passwd` and `/etc/group`, once the users are applied
-  (build.md, section 7); a name it cannot resolve fails the build.
+  (domain/build.md, section 7); a name it cannot resolve fails the build.
   `root` is always id 0.
 - **A file replaces whatever the packages put at its path,** mode and
   owner included. os kept a packaged file's mode, so a task could not
@@ -868,8 +868,8 @@ nothing.
   `/usr/local/bin` and their shared files to `/usr/local/share`. A unit
   a task ships goes in `/etc/systemd/system/`. So nothing above the
   packages changes what every process maps from `/usr`, and a live
-  change overlays `/usr/local` alone of it (slots.md, 6.6). The build
-  holds scripts to the same rule (build.md, 9.3).
+  change overlays `/usr/local` alone of it (domain/slots.md, 6.6). The build
+  holds scripts to the same rule (domain/build.md, 9.3).
 - **Forbidden destinations:** anything under a data path or a class's
   mount point (5.7), which a mount would hide, and the paths hearth
   reserves (5.11).
@@ -899,7 +899,7 @@ nothing.
 ### 5.6 Users, groups, presets and tmpfiles
 
 - **`users`** is a map keyed by user name. Build writes them as sysusers
-  records and applies them in the config layer (build.md, section 7).
+  records and applies them in the config layer (domain/build.md, section 7).
 
   | Field | Type | Default |
   |---|---|---|
@@ -918,14 +918,14 @@ nothing.
   with no other field but `uid`, `gid`, `if` and `for_each`. Render knows
   the name and checks it as it checks a declared user, but never writes
   it: build writes no sysusers line for it, and the activator confirms it
-  exists in the slot's `/etc/passwd` at prepare (slots.md, 5.7). A name
+  exists in the slot's `/etc/passwd` at prepare (domain/slots.md, 5.7). A name
   declared by two tasks, once from a package and once for sysusers, is a
   collision.
 - **`groups`** is a map keyed by group name, with `gid` and `from`, as
   for users: a group a package creates is declared with
   `"from": "package"`. Like a package user, build writes no sysusers
   line for it, and the activator confirms it exists in the slot's
-  `/etc/group` at prepare (slots.md, 5.7).
+  `/etc/group` at prepare (domain/slots.md, 5.7).
 - **Persistent owners have fixed ids.** A package's postinst, and
   sysusers for a user with no `uid`, take the next free id when they
   install, and the packages layer is rebuilt from scratch: a snapshot
@@ -934,7 +934,7 @@ nothing.
   identity file (section 9) has a fixed id, package users included, and
   render refuses one that has none. Build seeds the package users' and
   groups' lines into `/etc/passwd` and `/etc/group` before any package
-  installs, so adduser finds them (build.md, section 5). In the mail
+  installs, so adduser finds them (domain/build.md, section 5). In the mail
   task:
 
   ```json
@@ -955,16 +955,16 @@ nothing.
 - **A sysusers user's own group,** what an unset `group` names, has the
   user's name and the user's `uid` as its id. A `groups` entry of that
   name is that group, so its `gid` is the user's `uid`, and another is a
-  collision (render.md, 3.7): user `free` with `uid` 1000 and group
+  collision (domain/render.md, 3.7): user `free` with `uid` 1000 and group
   `free` with `gid` 1001 differ. A user whose primary group has another
   id names a group of another name in `group`.
 - **A package user gives both `uid` and `gid`, or neither:** build seeds
-  its passwd line from both (build.md, 5.5), and one alone is an `ids`
-  error (render.md, 7.2). With neither, nothing is seeded, and the
+  its passwd line from both (domain/build.md, 5.5), and one alone is an `ids`
+  error (domain/render.md, 7.2). With neither, nothing is seeded, and the
   user may own nothing that needs a fixed id (above).
 - **Ids and strings are bounded:** a `uid` or `gid` is 1 to 65533: 0 is
   root's, 65534 nobody's and 65535 no id, and the builder's namespace
-  maps no more (store.md, 3.4). A `subordinate` range has a count of 1
+  maps no more (domain/store.md, 3.4). A `subordinate` range has a count of 1
   at least and a base of 65,536 at least, so that no id a target's
   files own is subordinate, and base plus count is at most
   4,294,967,295. `gecos`, `home` and `shell` hold no `:`, which splits a
@@ -972,7 +972,7 @@ nothing.
   control character. Render refuses any other where it is written.
 - **`presets`** is a map keyed by unit name, with `action`, `enable` or
   `disable`. Build applies them with the target's own systemctl
-  (build.md, section 7). A unit is masked by a `link` to `/dev/null` in
+  (domain/build.md, section 7). A unit is masked by a `link` to `/dev/null` in
   `files`.
 - **`tmpfiles`** is a map keyed by path, with `type` (enum `d`, `D`, `e`,
   `f`, `f+`, `w`, `w+`, `L`, `L+`, `C`, `z`, `Z`, `r`, `R`), `mode`,
@@ -980,7 +980,7 @@ nothing.
   `v`, `q` and `Q` are reserved, so a line of one is refused as such
   (5.11), not as an unknown type; any other letter is a schema error.
   Build applies them to the image and writes them for every boot
-  (build.md, 7.4), which is what directories inside `/var` and the
+  (domain/build.md, 7.4), which is what directories inside `/var` and the
   data entries need. Lines that make subvolumes, lines that write over
   what is there outside `/var`, and lines for a path under `/usr` but
   `/usr/local`, are refused (5.11).
@@ -993,7 +993,7 @@ nothing.
   subvolumes at the btrfs top level, `@<target>.core`, `@<target>.data`
   and `@<target>.cache`, each made only when some entry uses it, and
   mounted at `/srv/core`, `/srv/data` and `/srv/cache`
-  (machine.md, section 3). They outlive every slot. The classes are os's
+  (domain/machine.md, section 3). They outlive every slot. The classes are os's
   and the bash fleet's, whose reason was a snapshot policy per class:
 
   | Class | Holds | Snapshots and backups (5.12) |
@@ -1005,7 +1005,7 @@ nothing.
 - **`data` is a map keyed by name; each entry is a directory** in its
   class's subvolume, named by the entry's name (`/srv/core/journal`,
   `/srv/data/postfix`), and bind-mounted at the path the task declares,
-  from the fstab the activator writes (machine.md, 3.3). An entry never
+  from the fstab the activator writes (domain/machine.md, 3.3). An entry never
   names a subvolume.
 
   | Field | Type | Default |
@@ -1023,7 +1023,7 @@ nothing.
 - **The activator makes the class subvolume** when the top level lacks
   it, with a root of `0:0 0755`, and **the entry's directory** when the
   class lacks it, seeded once from the output's content at the entry's
-  path (slots.md, 5.3), so what packages put there (a database's
+  path (domain/slots.md, 5.3), so what packages put there (a database's
   cluster, a mail spool) is not hidden by an empty bind. The data part
   holds names, classes and paths, a slot part that enters no layer key.
 - **Mode and owner are applied at every boot:** render turns them into a
@@ -1033,17 +1033,17 @@ nothing.
 - **Paths** are beneath `/srv`, `/var` or `/home`, never one of the three
   itself, whose bind would hide the rest of it, never `/var/lib/hearth`
   or beneath it, and never beneath another entry's path. A target has at
-  most 64 entries (machine.md, 3.4): the 65th, in name order (4.3), is a
+  most 64 entries (domain/machine.md, 3.4): the 65th, in name order (4.3), is a
   schema error at its key. The rest of `/` stays immutable.
 - **Names are per target, across classes:** two entries of one target
-  with one name are a collision (render.md, 3.7), even in two classes.
+  with one name are a collision (domain/render.md, 3.7), even in two classes.
   Moving an entry to another class moves no data, so the activator
-  refuses it while the old directory exists (machine.md, 3.4).
+  refuses it while the old directory exists (domain/machine.md, 3.4).
 - **Snapshots and backups are by class, never by entry:** their policies
   are the `hearth` task's settings (5.12). A snapshot is of a whole
   class subvolume, so it is atomic across every service in the class,
   postfix's spool and its mailboxes together; one entry is restored by
-  copying its directory out of a snapshot (operating.md, 7.4).
+  copying its directory out of a snapshot (domain/operating.md, 7.4).
 - **Data keeps a program's default path.** An entry is bound where the
   program already looks, as Debian ships it, so no configuration changes
   for it: journald writes `/var/log/journal`, iwd keeps its networks in
@@ -1104,7 +1104,7 @@ nothing.
 - **On x1-prod** the entries make `@x1-prod.core`, with `journal` and
   `iwd`, and `@x1-prod.data`, with `home-free` (6.6), bound at
   `/var/log/journal`, `/var/lib/iwd` and `/home/free`; neither journald
-  nor iwd is configured to find them. Its fstab is machine.md, 3.3's
+  nor iwd is configured to find them. Its fstab is domain/machine.md, 3.3's
   example.
 
 ### 5.8 Escape hatches
@@ -1120,16 +1120,16 @@ nothing.
   keys are those two alone (2.1), each an object of an optional `order`
   (4.3). `scripts` is not a map of entries (5.2): it is decoded as
   written, so a third key is a decode error at the key, and an `order`
-  that is not an integer from 0 to 999 one at its value (render.md, 7.2).
+  that is not an integer from 0 to 999 one at its value (domain/render.md, 7.2).
 - **`customize.sh`** runs in the config layer, after its files and users
-  are in place (build.md, section 7). **`software.sh`** runs in the
+  are in place (domain/build.md, section 7). **`software.sh`** runs in the
   software layer, after every download is placed at its declared path
-  (build.md, section 6), so it names a download by that path instead of
+  (domain/build.md, section 6), so it names a download by that path instead of
   guessing a cache's layout, as os's examples did and got wrong.
 - **Fragments run in order** (4.3), each as its own `sh -eu` script, so
   an error names its task and no `cd` or `set` leaks into the next one.
   os concatenated them in alphabetical order of task.
-- **They run in the step's sandbox, offline** (build.md, section 8), and
+- **They run in the step's sandbox, offline** (domain/build.md, section 8), and
   their output is part of the layer like any file.
 - **They are the exception.** What the bash fleet's fragments did (users,
   modes, symbolic links, software unpacked into `/opt`) is declarative
@@ -1192,27 +1192,27 @@ nothing.
 ### 5.11 What hearth reserves
 
 What a later step would refuse, render refuses first, at the line that
-declares it (render.md, 7.2):
+declares it (domain/render.md, 7.2):
 
 | Reserved | Why | Defined in |
 |---|---|---|
-| command-line keys `root`, `rootflags`, `rootfstype`, `rootwait`, `rootdelay`, `ro`, `rw`, `init`, `initrd`, `panic`, and every `hearth.*` key (the trial's token, slots.md, 6.3); a line past 2048 bytes with the activator's tokens | the activator's, or they change how tiny-initramfs finds and starts the root | machine.md, 6.2 |
-| task files at `/etc/fstab`, anything under `/.hearth/`; in `/etc/systemd/system.conf.d/`, a name beginning `zz-hearth` or sorting after `zz-hearth-watchdog.conf` | the activator writes them at prepare, and the watchdog's drop-in must sort last | slots.md, 5.5 |
-| units, links and presets named `hearth-trial*`; `hearth-check-*` | the dead-man's; checks' transient units | slots.md, 5.5; operating.md, 2.4 |
-| [M5] presets and links that enable `systemd-nspawn@<c>.service` for a container `c` placed on the target | the host's activator starts each container once its link and settings exist; one started before fails | slots.md, 12.2 |
-| task files at `/etc/passwd`, `/etc/group`, `/etc/shadow`, `/etc/gshadow`, `/etc/subuid`, `/etc/subgid`, `/etc/machine-id`, `/var/lib/dbus/machine-id` | users are declared (5.6); identity is written at prepare | build.md, 7.3 and 9.2 |
-| task files at `/etc/ssh/ssh_host_*_key` and their `.pub`, `/etc/dropbear/dropbear_*_host_key`, anything under `/etc/ssl/private/`, `/var/lib/systemd/random-seed`, `/var/lib/systemd/credential.secret` | identity and secrets: `identity` and `secrets` entries name these paths, files never do | build.md, 9.2 |
-| anything under `/var/lib/hearth/` | the mount points of hearth's state and store | machine.md, 3.4 |
-| task files, links, downloads and tmpfiles lines under `/usr` but `/usr/local` | the rest of `/usr` is the packages layer's: nothing above it may change what every process maps, and live changes overlay `/usr/local` alone | 5.5; 10.1; build.md, 9.3; slots.md, 6.6 |
-| anything under `/srv/core`, `/srv/data` or `/srv/cache` but a data entry at its own `/srv/<class>/<name>` (5.7) | the class subvolumes' mounts hide what the slot holds there | 5.7; machine.md, 3.4 |
-| anything under `/dev`, `/proc`, `/sys`; anything but a tmpfiles line under `/run`, `/tmp`, `/var/tmp`; a file under `/var/log` that is not empty; `/etc/.git`, `/etc/.etckeeper` | runtime, noise, history; a tmpfiles line there waits for boot (build.md, 7.4) | build.md, 9.2 |
-| a task file at `/etc/tiny-initramfs/tiny-initramfs.conf`, so `AUTO_MODULES=yes` and `MICROCODE=yes` cannot reach an output | the packages part's, written before the kernel installs | build.md, 5.5; machine.md, 7.1 |
-| tmpfiles `v`, `q`, `Q`; `w`, `w+`, `f+`, `L+` outside `/var`, `/run` and `/tmp` | a nested subvolume breaks a layer; a write on the read-only root fails at boot | build.md, 7.4 |
-| preseeds of type `password` | they leave the password in `/var/cache/debconf/passwords.dat` | build.md, 9.2 |
-| a secret or identity file owned by user `hearth`, or by a group `hearth` belongs to (`systemd-journal`); a secret's or identity item's `mode` with a bit outside `0770` | neither the steward nor its builder may ever read a secret or a private key | activator.md, section 2; 9.1; 9.3 |
+| command-line keys `root`, `rootflags`, `rootfstype`, `rootwait`, `rootdelay`, `ro`, `rw`, `init`, `initrd`, `panic`, and every `hearth.*` key (the trial's token, domain/slots.md, 6.3); a line past 2048 bytes with the activator's tokens | the activator's, or they change how tiny-initramfs finds and starts the root | domain/machine.md, 6.2 |
+| task files at `/etc/fstab`, anything under `/.hearth/`; in `/etc/systemd/system.conf.d/`, a name beginning `zz-hearth` or sorting after `zz-hearth-watchdog.conf` | the activator writes them at prepare, and the watchdog's drop-in must sort last | domain/slots.md, 5.5 |
+| units, links and presets named `hearth-trial*`; `hearth-check-*` | the dead-man's; checks' transient units | domain/slots.md, 5.5; domain/operating.md, 2.4 |
+| [M5] presets and links that enable `systemd-nspawn@<c>.service` for a container `c` placed on the target | the host's activator starts each container once its link and settings exist; one started before fails | domain/slots.md, 12.2 |
+| task files at `/etc/passwd`, `/etc/group`, `/etc/shadow`, `/etc/gshadow`, `/etc/subuid`, `/etc/subgid`, `/etc/machine-id`, `/var/lib/dbus/machine-id` | users are declared (5.6); identity is written at prepare | domain/build.md, 7.3 and 9.2 |
+| task files at `/etc/ssh/ssh_host_*_key` and their `.pub`, `/etc/dropbear/dropbear_*_host_key`, anything under `/etc/ssl/private/`, `/var/lib/systemd/random-seed`, `/var/lib/systemd/credential.secret` | identity and secrets: `identity` and `secrets` entries name these paths, files never do | domain/build.md, 9.2 |
+| anything under `/var/lib/hearth/` | the mount points of hearth's state and store | domain/machine.md, 3.4 |
+| task files, links, downloads and tmpfiles lines under `/usr` but `/usr/local` | the rest of `/usr` is the packages layer's: nothing above it may change what every process maps, and live changes overlay `/usr/local` alone | 5.5; 10.1; domain/build.md, 9.3; domain/slots.md, 6.6 |
+| anything under `/srv/core`, `/srv/data` or `/srv/cache` but a data entry at its own `/srv/<class>/<name>` (5.7) | the class subvolumes' mounts hide what the slot holds there | 5.7; domain/machine.md, 3.4 |
+| anything under `/dev`, `/proc`, `/sys`; anything but a tmpfiles line under `/run`, `/tmp`, `/var/tmp`; a file under `/var/log` that is not empty; `/etc/.git`, `/etc/.etckeeper` | runtime, noise, history; a tmpfiles line there waits for boot (domain/build.md, 7.4) | domain/build.md, 9.2 |
+| a task file at `/etc/tiny-initramfs/tiny-initramfs.conf`, so `AUTO_MODULES=yes` and `MICROCODE=yes` cannot reach an output | the packages part's, written before the kernel installs | domain/build.md, 5.5; domain/machine.md, 7.1 |
+| tmpfiles `v`, `q`, `Q`; `w`, `w+`, `f+`, `L+` outside `/var`, `/run` and `/tmp` | a nested subvolume breaks a layer; a write on the read-only root fails at boot | domain/build.md, 7.4 |
+| preseeds of type `password` | they leave the password in `/var/cache/debconf/passwords.dat` | domain/build.md, 9.2 |
+| a secret or identity file owned by user `hearth`, or by a group `hearth` belongs to (`systemd-journal`); a secret's or identity item's `mode` with a bit outside `0770` | neither the steward nor its builder may ever read a secret or a private key | domain/activator.md, section 2; 9.1; 9.3 |
 | an owner of a data path, a secret or an identity file without a fixed id; a download's owner other than `root` or a package user with a fixed id | ids that move between builds; no sysusers user exists when software is placed | 5.6; 10.1 |
-| `live` entries that name a never-live unit or path (5.14); a `unit` with action `none`; a path not beneath `/etc`, `/usr/local` or `/opt` | a never-live unit must not be acted on live, and a change elsewhere is never live | 5.14; slots.md, 6.7 |
-| presets and links that enable `systemd-sysext.service` or `systemd-confext.service`; anything under `/etc/extensions`, `/usr/lib/confexts`, `/usr/local/lib/confexts`, `/var/lib/extensions` or `/var/lib/confexts` | nothing may merge extensions over hearth's live overlays, at boot or after a soft reboot, a container's included, which has no `hearth` task to disable them | 5.12; slots.md, 6.6 |
+| `live` entries that name a never-live unit or path (5.14); a `unit` with action `none`; a path not beneath `/etc`, `/usr/local` or `/opt` | a never-live unit must not be acted on live, and a change elsewhere is never live | 5.14; domain/slots.md, 6.7 |
+| presets and links that enable `systemd-sysext.service` or `systemd-confext.service`; anything under `/etc/extensions`, `/usr/lib/confexts`, `/usr/local/lib/confexts`, `/var/lib/extensions` or `/var/lib/confexts` | nothing may merge extensions over hearth's live overlays, at boot or after a soft reboot, a container's included, which has no `hearth` task to disable them | 5.12; domain/slots.md, 6.6 |
 
 - **A row's paths hold for whatever is placed at a path:** a `tree/`
   file, a `files` entry or link, a download, a secret or identity file,
@@ -1243,21 +1243,21 @@ declares it (render.md, 7.2):
 - **Every target has the `hearth` task,** but a container (below),
   without naming it: render adds it, and `"hearth": null` is an error.
   In any layer, `fleet.json` and an environment's included, it is a
-  `reserved` error at the key (render.md, 7.2), and no other kind
+  `reserved` error at the key (domain/render.md, 7.2), and no other kind
   reports it.
   Every such output then carries hearth's binary, its activator's unit
   (which starts the steward, which starts builders) and its user, which
-  machine.md (8.3) and slots.md assume. Its files are in the repository
+  domain/machine.md (8.3) and domain/slots.md assume. Its files are in the repository
   like any task's, `tasks/hearth/`, so the release a fleet runs is
   pinned by a change. A revision without them fails each target that
-  has the task, as any task that does not exist does (3.3; render.md,
-  7.2), and its containers render (render.md, 3.4).
+  has the task, as any task that does not exist does (3.3; domain/render.md,
+  7.2), and its containers render (domain/render.md, 3.4).
 - **But a container's:** render adds no `hearth` task to a
   container's target, and naming it there, in its base, member or
   base-env layer (3.3), is a `reserved` error at the key. The `hearth`
   settings of `fleet.json` and of an environment reach no container,
   since it lacks the task (3.3). No hearth runs in
-  a container [M5] (slots.md, 12.5): its host's builder builds its output and
+  a container [M5] (domain/slots.md, 12.5): its host's builder builds its output and
   its host's activator prepares and starts it, so an activator enabled
   inside would only fail, and the tools, the user and the range would
   serve nothing. Should a container run a hearth of its own, this
@@ -1280,7 +1280,7 @@ declares it (render.md, 7.2):
           "pressure_some_percent": { "warning": 20 },
           "pressure_full_percent": { "critical": 10 }
         },
-        "doc": "Resource alarms' thresholds (operating.md, section 4)."
+        "doc": "Resource alarms' thresholds (domain/operating.md, section 4)."
       },
       "snapshots": {
         "type": { "map": { "object": {
@@ -1288,7 +1288,7 @@ declares it (render.md, 7.2):
           "keep": { "type": { "map": "int" }, "doc": "How many to keep per bucket: hourly, daily, weekly, monthly." }
         } } },
         "default": {},
-        "doc": "Local snapshots of each class's subvolume, by class: core or data [M5] (operating.md, 7.1)."
+        "doc": "Local snapshots of each class's subvolume, by class: core or data [M5] (domain/operating.md, 7.1)."
       },
       "backups": {
         "type": { "map": { "object": {
@@ -1296,7 +1296,7 @@ declares it (render.md, 7.2):
           "keep": { "type": { "map": "int" }, "optional": true, "doc": "What the peer keeps, per bucket; the class's local keep if absent." }
         } } },
         "default": {},
-        "doc": "Backups of each class to the environment's backup peer, by class [M6] (operating.md, 7.2)."
+        "doc": "Backups of each class to the environment's backup peer, by class [M6] (domain/operating.md, 7.2)."
       }
     },
     "packages": { "git": {}, "mmdebstrap": {}, "uidmap": {}, "openssh-client": {} },
@@ -1321,8 +1321,8 @@ declares it (render.md, 7.2):
   ```
 
   with `tree/etc/systemd/system/hearth-activator.service`, the unit of
-  activator.md (3.1); `tree/usr/local/lib/hearth/askpass`, which gives
-  git the fetch's credential (render.md, 2.4); and
+  domain/activator.md (3.1); `tree/usr/local/lib/hearth/askpass`, which gives
+  git the fetch's credential (domain/render.md, 2.4); and
   `tree/etc/hearth/alarms.json.j2`, which is
   `{{ settings.alarms | tojson }}`.
 - **Where hearth's files live:** under `/usr/local` and `/etc`, as
@@ -1333,13 +1333,13 @@ declares it (render.md, 7.2):
   as any package's.
 - **The uid, gid and range are constants of the task,** not settings:
   every slot of a machine mounts the same `@hearth.store`, owned by them
-  (machine.md, 8.3; store.md, 9.2). The range is 64 Ki at base 262144.
+  (domain/machine.md, 8.3; domain/store.md, 9.2). The range is 64 Ki at base 262144.
   The uid 59999, with its own group of the same id, sits at the top of
   the ids adduser hands to people from 1000 up, and away from the system
   ids packages take below 1000 (to verify against the fleet's packages).
 - **`systemd-journal`** lets the steward read the journal for telemetry
-  (wire.md, section 7); its builder runs with no supplementary group
-  (steward.md, 2.3).
+  (protocol/wire.md, section 7); its builder runs with no supplementary group
+  (domain/steward.md, 2.3).
 - **Snapshots and backups are declared once, by class** (5.7), normally
   in `fleet.json` or an environment file:
 
@@ -1359,26 +1359,26 @@ declares it (render.md, 7.2):
   - **`snapshots`** are local, snapper's role [M5]: the activator takes
     read-only snapshots of the class's subvolume on the period and
     prunes them by retention; they stay on the machine, readable by a
-    person and restorable (operating.md, 7.1 and 7.4).
+    person and restorable (domain/operating.md, 7.1 and 7.4).
   - **`backups`** are what is sent to the backup peer, encrypted with
-    `age` [M6] (operating.md, 7.2).
+    `age` [M6] (domain/operating.md, 7.2).
   - **`cache` is never snapshotted or backed up:** a key other than
     `core` and `data` is an error, and `"cache": null` only says so,
     since null deletes (4.1). Buckets are `hourly`, `daily`, `weekly`
     and `monthly`, each at least 1.
-  - **Render puts them in the data part** (render.md, 4.3), so a change
+  - **Render puts them in the data part** (domain/render.md, 4.3), so a change
     to one prepares a new slot of the same output, which the activator
-    then follows (slots.md, 2.2).
+    then follows (domain/slots.md, 2.2).
   - **A container has no `hearth` task:** its classes follow its host's
     policies, which the host's activator applies to them under the
-    container's target (slots.md, 12.1) [M5].
+    container's target (domain/slots.md, 12.1) [M5].
 - **`systemd-sysext` and `systemd-confext` are disabled.** Debian's
   `90-systemd.preset` enables both; hearth makes its live overlays
-  itself (slots.md, 6.6), and a boot service that merged an extension
+  itself (domain/slots.md, 6.6), and a boot service that merged an extension
   would stack it over them, or over a root it was not made for after a
   soft reboot.
 - **The tools** hearth runs as child processes come from Debian: git
-  for render, mmdebstrap and `newuidmap` for builds (store.md, 9.3), and
+  for render, mmdebstrap and `newuidmap` for builds (domain/store.md, 9.3), and
   `ssh-keygen` for the activator's host keys (9.3).
 
 ### 5.13 Units that may fail
@@ -1391,26 +1391,26 @@ declares it (render.md, 7.2):
   ```
 
 - **The target's list is the union over its tasks,** in the checks part
-  (render.md, 4.4), which holds it from M3. The minimal bless counts only
-  the failed units that are not on it (slots.md, 7.1).
+  (domain/render.md, 4.4), which holds it from M3. The minimal bless counts only
+  the failed units that are not on it (domain/slots.md, 7.1).
 - **Before M3, which brings the bless,** render checks each list and
   places it in no part. Unlike a check (section 11), the list only
   relaxes: with no bless, no failure is ignored, so nothing it declares
   is dropped silently.
 - **A failed unit on the list is still reported** as a fact
-  (operating.md, section 4); it only stops counting against a bless.
+  (domain/operating.md, section 4); it only stops counting against a bless.
 - **A container's list holds as a host's [M5]:** its host reads the
   container's failed units from outside during its trial
-  (slots.md, 12.3).
+  (domain/slots.md, 12.3).
 - **A container never counts against its host [M5]:** the host's
   minimal bless leaves out its containers' nspawn units without any
-  list, since each container's slot has its own trial (slots.md, 7.1).
+  list, since each container's slot has its own trial (domain/slots.md, 7.1).
 
 ### 5.14 Live changes
 
 A change applies live, with no reboot, only if every path it changes
 has a consumer: a unit to act on, or a declaration that none is needed
-(slots.md, 6.7, rule 7). A task declares its own. Without one the
+(domain/slots.md, 6.7, rule 7). A task declares its own. Without one the
 change takes an ordinary trial, a soft reboot or a reboot; that is never
 an error.
 
@@ -1474,7 +1474,7 @@ an error.
 
 - **Several consumers may cover one path,** in one task or several: a
   certificate under `/etc/ssl/certs/` read by postfix and nginx runs
-  both reloads. Render takes their union (render.md, 3.7).
+  both reloads. Render takes their union (domain/render.md, 3.7).
 - **A deleted path's consumer** is declared by the running slot's spec,
   where the path still exists; every other path's by the new spec.
 - **Consumers hearth knows itself,** which no task declares:
@@ -1483,10 +1483,10 @@ an error.
   |---|---|
   | a unit file or drop-in in `etc/systemd/system/` or `usr/local/lib/systemd/system/` | its unit: `daemon-reload`, then restarted if it runs, started if new and wanted, stopped before the swap if its file goes |
   | a `.wants/` or `.requires/` link | the unit it names: started when the link comes, stopped before the swap when it goes |
-  | `etc/passwd`, `etc/group`, `etc/shadow`, `etc/gshadow`, `etc/subuid`, `etc/subgid` | the accounts, entries only added (slots.md, 6.7, rule 5); `nscd --invalidate` if nscd runs |
+  | `etc/passwd`, `etc/group`, `etc/shadow`, `etc/gshadow`, `etc/subuid`, `etc/subgid` | the accounts, entries only added (domain/slots.md, 6.7, rule 5); `nscd --invalidate` if nscd runs |
   | `etc/tmpfiles.d/hearth.conf` | `systemd-tmpfiles --create` on that file (rule 6) |
   | D-Bus policy in `etc/dbus-1/system.d/` | `systemctl reload dbus` |
-  | `etc/sysusers.d/hearth.conf`, `etc/systemd/system-preset/00-hearth.preset` | none: their effects, account lines and unit links, are in the change already (build.md, 7.2 and 7.5) |
+  | `etc/sysusers.d/hearth.conf`, `etc/systemd/system-preset/00-hearth.preset` | none: their effects, account lines and unit links, are in the change already (domain/build.md, 7.2 and 7.5) |
 
 - **Never live.** A change to any of these takes an ordinary trial,
   whatever a task declares, and render refuses a `live` entry that names
@@ -1506,15 +1506,15 @@ an error.
   ```
 
   Their counterparts under `usr/lib/` are the packages' alone (5.5),
-  which never change live (slots.md, 6.7, rule 1).
+  which never change live (domain/slots.md, 6.7, rule 1).
 
   and the services that must not restart live:
 
   | What | Units and paths | Why |
   |---|---|---|
   | systemd's own | every unit the `systemd` packages ship; `etc/systemd/*.conf`, their `.d/` directories and `usr/local/lib/systemd/*.conf.d/` (journald, logind, networkd, resolved, timesyncd and the rest) | PID 1's and its daemons' state does not survive a careless restart |
-  | the core services | `dbus.service` and `dbus.socket` (their policy files are allowed, with a reload of dbus); `systemd-logind`, `systemd-journald`, `systemd-udevd`, `systemd-networkd`, `NetworkManager`; `getty@`, `serial-getty@`, `console-getty`; `apparmor.service` and `etc/apparmor.d/` | a restart ends sessions, loses logs, devices or the network; a profile needs `apparmor_parser -r` (slots.md, section 15) |
-  | hearth itself, for now | every file of the `hearth` task (5.12) and every path 5.11 reserves | until live changes are proven (slots.md, section 15) |
+  | the core services | `dbus.service` and `dbus.socket` (their policy files are allowed, with a reload of dbus); `systemd-logind`, `systemd-journald`, `systemd-udevd`, `systemd-networkd`, `NetworkManager`; `getty@`, `serial-getty@`, `console-getty`; `apparmor.service` and `etc/apparmor.d/` | a restart ends sessions, loses logs, devices or the network; a profile needs `apparmor_parser -r` (domain/slots.md, section 15) |
+  | hearth itself, for now | every file of the `hearth` task (5.12) and every path 5.11 reserves | until live changes are proven (domain/slots.md, section 15) |
 
 - **Render refuses what it can tell is never live** (5.11): a `unit`
   among the core services, or named `systemd-*` or `hearth-*`, and a
@@ -1523,9 +1523,9 @@ an error.
   as `/etc/systemd/`, is accepted, and a change to the never-live path
   beneath it still takes a trial. Render reads no package, so the
   builder and the activator find the units the `systemd` packages ship
-  under other names (slots.md, 6.7, rule 8).
+  under other names (domain/slots.md, 6.7, rule 8).
 - **What the declarations cost:** nothing in any key. The `live` part
-  enters no layer key and no prepare key (render.md, 4.4), so declaring
+  enters no layer key and no prepare key (domain/render.md, 4.4), so declaring
   consumers builds nothing and prepares nothing.
 
 ## 6. The schema
@@ -1644,7 +1644,7 @@ type  = "bool" | "int" | "string" | "path" | "mode" | "duration" | "secret" | "t
 
 ### 6.5 What is an error
 
-Each with its file and line (render.md, section 7):
+Each with its file and line (domain/render.md, section 7):
 
 - a setting the task does not declare, or an undeclared field at any
   depth of an object;
@@ -1725,7 +1725,7 @@ Each with its file and line (render.md, section 7):
   shipped without it).
 - These are MiniJinja 2's semantics with `trim_blocks`, `lstrip_blocks`
   and `keep_trailing_newline` on, and render's tests hold hearth's engine
-  to MiniJinja on generated templates (render.md, 9.5).
+  to MiniJinja on generated templates (domain/render.md, 9.5).
 - **`trim_blocks` eats the newline after a statement at the end of a
   line too,** which os's `grub.cfg` met: write `+%}` there.
 
@@ -1898,7 +1898,7 @@ integer    = [ "-" ] [0-9]+
 - **Nothing else:** no process environment, no clock, no random, no
   other task's files, no secret values, no global functions. The context
   is a function of the revision and the target, which is what lets
-  render be one (render.md, section 1).
+  render be one (domain/render.md, section 1).
 
 ### 7.8 From esh and from MiniJinja
 
@@ -1947,7 +1947,7 @@ typed values make unneeded:
   value, and a `settings.<name>` the task does not declare is an error,
   as anywhere (6.4).
 - **An optional export** whose expression is undefined is absent.
-- The exports part holds them (render.md, 4.4); a change to an export
+- The exports part holds them (domain/render.md, 4.4); a change to an export
   changes exactly the specs that read it.
 
 ### 8.2 Reading
@@ -1969,7 +1969,7 @@ typed values make unneeded:
   container carrying production's forge host key in the lab, cannot be
   written.
 - **Render evaluates the exports of the environment's targets** to render
-  any one of them (render.md, 3.4): rendering stays a function of the
+  any one of them (domain/render.md, 3.4): rendering stays a function of the
   revision and the target.
 
 ### 8.4 Public halves as data
@@ -1980,7 +1980,7 @@ typed values make unneeded:
 - **So the public half is recorded in the repository** as a setting of
   the target that owns it, in its base-env file. For identity, the
   activator generates the item and reports its public half as a fact
-  (wire.md, section 6); a person or an agent records it, and the change's
+  (protocol/wire.md, section 6); a person or an agent records it, and the change's
   rendered diff shows every peer that picks it up. Until then the
   setting is absent, the optional export with it, and peers skip that
   target.
@@ -2062,7 +2062,7 @@ PersistentKeepalive=25
 ### 8.7 Example: the backup peer [M6]
 
 - **Backups are encrypted to the peer's key** with `age` before any byte
-  reaches a steward (operating.md, section 7). The peer's `backup_peer`
+  reaches a steward (domain/operating.md, section 7). The peer's `backup_peer`
   task holds that key as identity and exports its public half, recorded
   as data like any other (8.4):
 
@@ -2082,7 +2082,7 @@ PersistentKeepalive=25
 - **The backed-up target's render reads it.** A class that the `hearth`
   task's `backups` names (5.12) makes render read `backup_peer`'s
   exports in the target's environment and put the peer and its
-  recipient into that class's policy in the data part (render.md, 4.3),
+  recipient into that class's policy in the data part (domain/render.md, 4.3),
   where the activator takes it at prepare. A target with backups and no
   peer that exports a recipient is an error.
 
@@ -2108,12 +2108,12 @@ PersistentKeepalive=25
   ```
 
 - **The activator writes each into the slot at prepare,** from the
-  root-only secret store (slots.md, 5.4). A missing secret fails the
+  root-only secret store (domain/slots.md, 5.4). A missing secret fails the
   prepare, not the render: render never sees the store.
 - **Paths:** a secret's path may not be one the file tree, another secret
   or identity gives, nor lie under a data path; a collision is an error
-  (render.md, 3.7). A path beneath `/var` is allowed, and is written into
-  the slot's own `/var` subvolume (slots.md, 5.4).
+  (domain/render.md, 3.7). A path beneath `/var` is allowed, and is written into
+  the slot's own `/var` subvolume (domain/slots.md, 5.4).
 - **Never `hearth`'s to read,** the steward's nor its builder's: a
   secret's mode gives others nothing (at most `0770`, no setuid, setgid
   or sticky bit), and its owner is neither user `hearth` nor a group
@@ -2121,7 +2121,7 @@ PersistentKeepalive=25
 - **Rotating a secret changes no part.** The activator prepares a new
   slot of the same output (README, section 7).
 - **TLS keys are secrets.** Build removes the snakeoil pair that
-  ssl-cert's postinst makes (build.md, 5.6), so a task that serves TLS
+  ssl-cert's postinst makes (domain/build.md, 5.6), so a task that serves TLS
   declares its private key as a secret file, such as
   `"mail/tls/mx1.key": {"path": "/etc/ssl/private/mx1.ekanayaka.io.key",
   "mode": "0640", "group": "ssl-cert"}`, with `ssl-cert` declared from
@@ -2132,7 +2132,7 @@ PersistentKeepalive=25
 
 - **An account's `password` names a secret** that holds its hash, as
   crypt(3) writes it. The activator applies it to the slot's shadow file
-  at prepare, the one edit it makes to a packaged file (slots.md, 5.4).
+  at prepare, the one edit it makes to a packaged file (domain/slots.md, 5.4).
   An account without one stays locked.
 - The bash fleet ran `chpasswd --encrypted` in `customize.sh`, so hashes
   ended up in every slot's `/etc/shadow` and in etckeeper's history.
@@ -2151,7 +2151,7 @@ PersistentKeepalive=25
   |---|---|---|---|
   | `ssh-host-key` | `algorithm`: `ed25519`, `ecdsa` or `rsa` | the `.pub` line | M3: made with the running slot's `ssh-keygen`, which the hearth task installs (5.12) |
   | `wireguard-key` | none | the base64 public key | [later]: a target's first slot cannot be prepared with a `wg` only that slot installs, so it waits for keys made in-process, an ask of skein |
-  | `backup-key` | none; no `path`: the activator keeps it and writes it nowhere | the `age1…` recipient | [M6]: an X25519 key made with `age-keygen` (activator.md, 5.7; 8.7) |
+  | `backup-key` | none; no `path`: the activator keeps it and writes it nowhere | the `age1…` recipient | [M6]: an X25519 key made with `age-keygen` (domain/activator.md, 5.7; 8.7) |
 
   ```json
   {
@@ -2174,16 +2174,16 @@ PersistentKeepalive=25
 - **The machine-id is every target's,** never declared. The bash fleet
   fixed it in configuration so the journal had a stable path, and lab,
   production and a container shared one; here each target on each
-  machine has its own, kept across its slots (slots.md, 5.4); a
-  container's is kept by its host's activator (slots.md, 12.1) [M5].
+  machine has its own, kept across its slots (domain/slots.md, 5.4); a
+  container's is kept by its host's activator (domain/slots.md, 12.1) [M5].
 - **The kinds are a closed list** that grows with the activator's
-  operations (activator.md, section 5).
+  operations (domain/activator.md, section 5).
 
 ### 9.4 What the spec holds
 
 - **Names and places, never values:** the secrets part holds secret
   names with their paths, modes and owners; accounts' password secret
-  names; identity items' names, kinds and paths (render.md, 4.3). No
+  names; identity items' names, kinds and paths (domain/render.md, 4.3). No
   byte of a secret or of identity is in a repository, a spec or an
   output.
 
@@ -2191,12 +2191,12 @@ PersistentKeepalive=25
 
 ### 10.1 Downloads
 
-This section defines how software is placed; build.md (section 6) and
-artifacts.md (7.3) cite it.
+This section defines how software is placed; domain/build.md (section 6) and
+domain/artifacts.md (7.3) cite it.
 
 - **`software` is a map keyed by name;** a download is fetched by its
   SHA-256 into the builder's content-addressed cache and placed in the
-  software layer (build.md, section 6), in one of two ways:
+  software layer (domain/build.md, section 6), in one of two ways:
 
   | Field | `file` | `tar` | Meaning |
   |---|---|---|---|
@@ -2226,11 +2226,11 @@ artifacts.md (7.3) cite it.
 - **Modes:** a `file` takes its `mode`; an archive's files keep the modes
   it records. `path`, and any parent missing, is made `0755`.
 - **Owners:** software is placed in the software layer, before any
-  sysusers user exists (build.md, 7.1). So an owner or group is `root`,
+  sysusers user exists (domain/build.md, 7.1). So an owner or group is `root`,
   or a package user or group with a fixed id (5.6), which build seeds
   before any package installs; render refuses any other. An archive is
   unpacked with `--no-same-owner`, whatever owners it records, and its
-  files then take the entry's owners (build.md, 6.2).
+  files then take the entry's owners (domain/build.md, 6.2).
 - **No setuid, setgid or file capability:** a `file`'s mode has no such
   bit, and an archive whose members carry setuid or setgid fails the
   build. A program that needs privilege comes from a package.
@@ -2238,7 +2238,7 @@ artifacts.md (7.3) cite it.
   the bash fleet's and os's places for software (5.5), and outside every
   path of the file tree and every other download's: an overlap is an
   error. hearth's own binary is `/usr/local/bin/hearth` (5.12;
-  activator.md, 3.1).
+  domain/activator.md, 3.1).
 - **A version moves with its digest.** A task pins both in `task.json`; a
   bump edits both, in one change whose rendered diff shows it. os's
   `%VERSION%` in a URL goes.
@@ -2246,7 +2246,7 @@ artifacts.md (7.3) cite it.
 ### 10.2 Artifacts [M6]
 
 - **An artifact is pinned by its key,** with how to make it, and its tree
-  is placed at `path` (artifacts.md, 7.1):
+  is placed at `path` (domain/artifacts.md, 7.1):
 
   ```json
   {
@@ -2265,23 +2265,23 @@ artifacts.md (7.3) cite it.
   ```
 
 - **Built from this head,** a lab variant writes `"artifact": {"recipe":
-  "stoa"}`: the recipe at the revision being rendered (artifacts.md, 7.2).
+  "stoa"}`: the recipe at the revision being rendered (domain/artifacts.md, 7.2).
   The software part holds the recipe and the digest of its sources'
   listing at the revision, which render computes from its own listing and
   the repository's `artifacts.json`; never a resolved key. The key,
   resolved and remembered as packages are, enters the software layer's
-  key instead (render.md, 4.5), so render stays a function of the
+  key instead (domain/render.md, 4.5), so render stays a function of the
   revision.
 - **An artifact is a tree, not an archive:** it has no `unpack`, `strip`
   or `mode`; its tree is placed under `path` from the artifact's
-  subvolume, with the owners and modes 10.1 allows (artifacts.md, 7.3).
+  subvolume, with the owners and modes 10.1 allows (domain/artifacts.md, 7.3).
   An entry has either `url` and `sha256`, or `artifact`.
 
 ## 11. Checks [M5]
 
 - **A task declares its checks** under `checks`, a map keyed by check
   name: what healthy means for what it installs. Their kinds, fields and
-  semantics are operating.md, section 2; render places them in the
+  semantics are domain/operating.md, section 2; render places them in the
   checks part.
 - **Checks are declarations like the others** (5.2): `if` and
   `for_each`, keys and string fields interpolated, typed fields written
@@ -2292,12 +2292,12 @@ artifacts.md (7.3) cite it.
   ```
 
 - **A role is a task.** A probe's `from` names a task, and the targets of
-  the environment that have it run the probe (operating.md, 2.6),
+  the environment that have it run the probe (domain/operating.md, 2.6),
   reading it as they read exports (section 8).
 - **Render refuses** a `blessing` check with `from`, a `from` that no
   target of the environment has, and a command check whose `user` is
   `root`, or is neither `nobody`, a sysusers user nor a package user some
-  task declares (5.6; operating.md, 2.2; render.md, 3.9). The
+  task declares (5.6; domain/operating.md, 2.2; domain/render.md, 3.9). The
   postfix task's `queue` check, as `postfix`, needs the postfix task to
   declare `"postfix": {"from": "package"}`.
 - **Until M5, render refuses a task that declares checks,** so nothing in
@@ -2323,7 +2323,7 @@ artifacts.md (7.3) cite it.
 | templates completed at deploy or activation | none: the activator writes fstab from the data part (README, section 7) |
 | settings undeclared; undefined is falsy | schemas; undefined only where optional (6, 7.6) |
 | modes from the source file; owners root | modes and owners declared (5.5) |
-| collisions overwrite in task order | collisions are errors (render.md, 3.7) |
+| collisions overwrite in task order | collisions are errors (domain/render.md, 3.7) |
 | `customize.sh` concatenated in task order | ordered, each run alone (5.8) |
 | `packages` and `secrets` as templates of lines | maps of entries (5.3, 9.1) |
 | secrets copied into the output | written into the slot at prepare, with modes and owners (9.1) |
@@ -2333,24 +2333,24 @@ artifacts.md (7.3) cite it.
 | variant maps (never implemented) | maps of objects |
 | hard-coded preseeds, journal and iwd, gettys, snapshot host | task data (5.10) |
 | `@T.srv`, `@T.srv.core`, `@T.srv.data`, `@T.srv.cache` made at format time, with `journal` and `iwd` bound by fstab's template; snapper for snapshots | the classes `@<target>.core`, `.data` and `.cache`, made when an entry uses one; each entry a directory bound at its path; snapshots by class, the `hearth` task's (5.7, 5.12) |
-| `deploy patch`, rewriting a running root's `/etc` | live changes: a prepared slot's delta mounted over the running one, its consumers declared (5.14; slots.md, 6.6) |
+| `deploy patch`, rewriting a running root's `/etc` | live changes: a prepared slot's delta mounted over the running one, its consumers declared (5.14; domain/slots.md, 6.6) |
 
 ## 13. What is open
 
 - **Identity kinds beyond SSH host keys:** the Syncthing
   certificate and DKIM keys could be identity or imported secrets; it
-  depends on activator.md's operations and on whether DNS records follow
+  depends on domain/activator.md's operations and on whether DNS records follow
   from facts.
 - **The bootstrap variant for containers:** os's `custom` with an
   essential list in a task, or mmdebstrap's `essential` variant; settled
-  with containers in M5 (slots.md, section 12). It depends too on where
+  with containers in M5 (domain/slots.md, section 12). It depends too on where
   preseeds load: mmdebstrap runs no essential hook for `custom`, and
-  runs it for `essential` (build.md, 5.5).
+  runs it for `essential` (domain/build.md, 5.5).
 - **A lab pool's containers** [M5], which its engine places rather than
   a repository: how their placement, parameters included (3.5), reaches
   the pool host; it depends on M5's pool design.
 - **The `incus` module list** for a lab VM booting from its own disk, to
-  verify on the VM tier (machine.md, section 7; testing.md, section 7).
+  verify on the VM tier (domain/machine.md, section 7; domain/testing.md, section 7).
 - **Whether interpolation and `for_each` in declarations are enough,** or
   some declaration needs statements; it depends on converting the
   fleet's 27 tasks, which will show it.
@@ -2358,7 +2358,7 @@ artifacts.md (7.3) cite it.
   `tar`; it depends on the downloads the fleet's tasks pin.
 - **A download over a packaged file:** render cannot see what the
   packages layer holds, so a software path that replaces a packaged
-  file is caught, if at all, by the build; it depends on build.md's
+  file is caught, if at all, by the build; it depends on domain/build.md's
   scan.
 - **A subvolume per entry,** as `"subvolume": true` on an entry that
   needs its own snapshot policy, quota or restore unit: not in the

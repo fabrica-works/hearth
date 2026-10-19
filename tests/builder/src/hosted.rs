@@ -1,4 +1,4 @@
-//! Hosted tools use the same kernel seam as the shipped client (testing.md, 2.6).
+//! Hosted tools use the same kernel seam as the shipped client (domain/testing.md, 2.6).
 use crate::fixtures::{self, Fault, Shared};
 use hearth_fake_git::face::{Read, Want};
 use skein_io::kernel::{self as k, Complete, Done, Exit, Fd, Op, OpenHow, Submit};

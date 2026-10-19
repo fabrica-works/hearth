@@ -1,4 +1,4 @@
-//! One render call: distinct reads, ordered answers (render.md, 2.2, 8.2).
+//! One render call: distinct reads, ordered answers (domain/render.md, 2.2, 8.2).
 mod comparison;
 mod debian;
 mod decoded;

@@ -1,4 +1,4 @@
-//! A task's fixed declaration shape (format.md, 5.1, 5.8, 5.9, 5.13, 6.4).
+//! A task's fixed declaration shape (protocol/format.md, 5.1, 5.8, 5.9, 5.13, 6.4).
 use crate::{
     Declared, Error, Expected, Fault, Object, Position, Required,
     json::{Entry, Kind, Value},

@@ -1,9 +1,9 @@
-//! The plan as data: the layers above the highest published one (build.md, 4.1).
+//! The plan as data: the layers above the highest published one (domain/build.md, 4.1).
 use crate::keys::{Keys, LAYERS, Layer};
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
 use skein_lib::List;
-/// Every step of the rootfs recipe, a closed set (build.md, 5 to 7).
+/// Every step of the rootfs recipe, a closed set (domain/build.md, 5 to 7).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Step {
     Fetch(Layer),
@@ -17,7 +17,7 @@ pub enum Step {
     Presets,
     Customize,
 }
-/// How the packages layer is made (build.md, 4.2): `Reconcile { base }` comes with its task.
+/// How the packages layer is made (domain/build.md, 4.2): `Reconcile { base }` comes with its task.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum How {
     Scratch,
@@ -37,7 +37,7 @@ pub struct Plan {
 }
 /// The most steps one layer runs: the config layer's.
 pub const MAX_STEPS: u32 = 5;
-/// Each layer's steps, in order (build.md, 3).
+/// Each layer's steps, in order (domain/build.md, 3).
 #[must_use]
 pub const fn steps(layer: Layer) -> &'static [Step] {
     match layer {

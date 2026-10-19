@@ -1,4 +1,4 @@
-//! Exhaustive config faults and client error records (render.md, 7.1).
+//! Exhaustive config faults and client error records (domain/render.md, 7.1).
 mod ids;
 mod reserved;
 use crate::{

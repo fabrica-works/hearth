@@ -1,4 +1,4 @@
-//! Apt's configuration verdict and the bounded closure (render.md, 5.5, 7.2).
+//! Apt's configuration verdict and the bounded closure (domain/render.md, 5.5, 7.2).
 use super::{Box, Encoder, Lines, field};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Resolution {

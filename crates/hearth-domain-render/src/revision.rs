@@ -1,4 +1,4 @@
-//! The listing and typed documents (format.md, 2.1 and 3.4).
+//! The listing and typed documents (protocol/format.md, 2.1 and 3.4).
 use crate::errors::Repository;
 use alloc::boxed::Box;
 pub mod declaration;
@@ -205,7 +205,7 @@ pub struct On {
     pub at: Position,
 }
 
-/// Decoded configuration values with positions (render.md, 3.1).
+/// Decoded configuration values with positions (domain/render.md, 3.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Value {
     pub at: Position,
@@ -338,7 +338,7 @@ impl Documents {
         None
     }
 }
-/// Retained decoded bytes admitted on arrival (render.md, 2.3).
+/// Retained decoded bytes admitted on arrival (domain/render.md, 2.3).
 #[derive(Debug, Hash)]
 pub struct Budget {
     held: u64,
@@ -390,7 +390,7 @@ pub fn base(path: &[u8]) -> Option<&[u8]> {
     Some(split(path.strip_prefix(b"hosts/")?)?.0)
 }
 
-/// Retained decoded storage, including template line offsets (render.md, 2.3).
+/// Retained decoded storage, including template line offsets (domain/render.md, 2.3).
 /// Each newline holds one text byte and a four-byte line offset; other decoded
 /// records fit within the largest record's ratio to a charged 32-byte element.
 #[must_use]
@@ -413,7 +413,7 @@ pub fn decoded_worst_case(limits: &crate::limits::Limits) -> Option<u64> {
     limits.decoded.checked_mul(ratio)
 }
 
-/// The logical bytes retained from one decoded input (render.md, 2.3).
+/// The logical bytes retained from one decoded input (domain/render.md, 2.3).
 #[must_use]
 pub fn decoded_size(read: &crate::vocabulary::Decoded, limits: &crate::limits::Limits) -> u64 {
     match read {

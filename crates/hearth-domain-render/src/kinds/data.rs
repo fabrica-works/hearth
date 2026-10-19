@@ -1,4 +1,4 @@
-//! Persistent directory declarations (format.md, 5.7).
+//! Persistent directory declarations (protocol/format.md, 5.7).
 use super::secrets::{fault, formed, mode, required, text};
 use crate::{
     entries::Located,

@@ -1,4 +1,4 @@
-//! Strict configuration decoding (format.md, 2.2; render.md, 3.1).
+//! Strict configuration decoding (protocol/format.md, 2.2; domain/render.md, 3.1).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;

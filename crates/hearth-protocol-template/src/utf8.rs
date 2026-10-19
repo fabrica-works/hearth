@@ -1,6 +1,6 @@
 //! UTF-8, checked a byte at a time (RFC 3629, section 4).
 //!
-//! Template bytes are checked before their tags are read (format.md, 2.3).
+//! Template bytes are checked before their tags are read (protocol/format.md, 2.3).
 
 /// Where a check of UTF-8 is: between characters, or within one.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

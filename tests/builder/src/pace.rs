@@ -1,4 +1,4 @@
-//! Seeded work durations for hosted tools (testing.md, 4.1).
+//! Seeded work durations for hosted tools (domain/testing.md, 4.1).
 use skein_lib::{Duration, Rng};
 use skein_world::domain::Span;
 #[derive(Clone, Copy, Debug)]

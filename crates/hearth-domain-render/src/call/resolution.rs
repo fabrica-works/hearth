@@ -1,4 +1,4 @@
-//! Find distinct resolution keys after assembling every target (render.md, 5.7).
+//! Find distinct resolution keys after assembling every target (domain/render.md, 5.7).
 use super::Side;
 use crate::{
     diff::Made,

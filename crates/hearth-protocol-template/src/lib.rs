@@ -1,4 +1,4 @@
-//! Expressions compiled to postfix operations (format.md, 7.4; render.md, 8.3).
+//! Expressions compiled to postfix operations (protocol/format.md, 7.4; domain/render.md, 8.3).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;

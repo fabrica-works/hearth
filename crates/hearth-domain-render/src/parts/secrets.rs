@@ -1,4 +1,4 @@
-//! Names and places for the activator, never values (render.md, 4.3).
+//! Names and places for the activator, never values (domain/render.md, 4.3).
 use crate::{
     entries::Expansion,
     errors::Error,

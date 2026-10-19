@@ -43,12 +43,12 @@ pub const ALLOWED: &[Allowed] = &[
     Allowed {
         case: None,
         what: What::ListSizes,
-        reason: "The fake emits its own unsigned InRelease and KEPT index (testing.md, 3.6).",
+        reason: "The fake emits its own unsigned InRelease and KEPT index (domain/testing.md, 3.6).",
     },
     Allowed {
         case: None,
         what: What::StanzaFields,
-        reason: "The fake keeps KEPT fields; hearth reads its six fields (render.md, 5.3).",
+        reason: "The fake keeps KEPT fields; hearth reads its six fields (domain/render.md, 5.3).",
     },
     Allowed {
         case: Some("unsatisfiable"),

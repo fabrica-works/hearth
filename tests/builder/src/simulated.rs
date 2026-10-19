@@ -1,4 +1,4 @@
-//! The shipped client and hosted tools over the fake machine (testing.md, 2.6).
+//! The shipped client and hosted tools over the fake machine (domain/testing.md, 2.6).
 mod client;
 use crate::{
     fixtures::{self, Scenario, Shared},

@@ -1,4 +1,4 @@
-//! The config part's file tree (render.md, 4.2).
+//! The config part's file tree (domain/render.md, 4.2).
 use crate::form::text::Lines;
 use alloc::boxed::Box;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

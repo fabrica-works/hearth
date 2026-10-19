@@ -82,7 +82,7 @@ impl Client {
         client.staging = Some(staging);
         Ok(client)
     }
-    /// Start over caller-owned directories and an append output (testing.md, 2.6).
+    /// Start over caller-owned directories and an append output (domain/testing.md, 2.6).
     #[must_use]
     pub fn with_roots(
         configuration: Configuration,
@@ -191,7 +191,7 @@ impl Host for Client {
         }
     }
 }
-/// Set the process's file creation mask at startup (store.md, 2.2).
+/// Set the process's file creation mask at startup (domain/store.md, 2.2).
 #[expect(unsafe_code, reason = "the shell owns the process creation mask")]
 pub fn umask(mask: u16) {
     // SAFETY: umask accepts every mode value and holds no pointers or resources.
@@ -204,7 +204,7 @@ pub const fn limits() -> Limits {
     service::limits::SHIPPED
 }
 
-/// Draw the cache temporary generator's seed at process startup (store.md, 2.1).
+/// Draw the cache temporary generator's seed at process startup (domain/store.md, 2.1).
 pub fn seed() -> Result<u64, records::startup::Startup> {
     skein_shell::seed().map_err(|error| {
         argv::unopened(records::startup::Opened::Store, None, std::io::Error::from_raw_os_error(error))

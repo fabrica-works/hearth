@@ -1,4 +1,4 @@
-//! A build's events, requests and terminals (build.md, 4.1 and 4.3).
+//! A build's events, requests and terminals (domain/build.md, 4.1 and 4.3).
 use crate::{
     keys::Layer,
     plan::{Plan, Step},

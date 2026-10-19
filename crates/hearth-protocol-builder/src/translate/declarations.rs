@@ -1,4 +1,4 @@
-//! Declaration schemas and reads (format.md, 6.1 to 6.5).
+//! Declaration schemas and reads (protocol/format.md, 6.1 to 6.5).
 use super::documents::{position, value};
 use crate::{Limits, config, render::revision::declaration as target};
 use alloc::boxed::Box;

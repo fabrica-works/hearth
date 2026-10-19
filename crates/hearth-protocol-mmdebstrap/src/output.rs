@@ -1,4 +1,4 @@
-//! The two pipe readers and apt's install triples (render.md, 5.3).
+//! The two pipe readers and apt's install triples (domain/render.md, 5.3).
 use crate::{
     MaxOut,
     limits::Limits,

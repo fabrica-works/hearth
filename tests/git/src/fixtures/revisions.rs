@@ -4,7 +4,7 @@ use hearth_protocol_git::{
     rev_parse::{self, Error, Resolved},
 };
 use skein_lib::Rng;
-/// render.md 2.2 admits at most 255 revision bytes; ids have the two git widths.
+/// domain/render.md 2.2 admits at most 255 revision bytes; ids have the two git widths.
 pub const REVISION_LIMIT: usize = 255;
 pub const SHA1_DIGITS: usize = 40;
 pub const SHA256_DIGITS: usize = 64;

@@ -1,4 +1,4 @@
-//! Paged settlement of startup debris (store.md, 4.4 and 8.2).
+//! Paged settlement of startup debris (domain/store.md, 4.4 and 8.2).
 use crate::{
     Phase, Store, index,
     limits::Limits,

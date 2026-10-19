@@ -1,4 +1,4 @@
-//! Printer admission limits (render.md, 10).
+//! Printer admission limits (domain/render.md, 10).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
     /// The most bytes one record prints, including line endings.

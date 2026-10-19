@@ -58,7 +58,7 @@ activity at different stakes (temper's `factory.md`, section 3): run a
 revision somewhere and watch it, here on one agent's throwaway machine
 with a root it may change. A session, adding DKIM to `mail-dev`, the
 mail stack, which `dev` places as a container on `rhi-dev` as `prod`
-places `mail-prod` on `rhi-prod` (format.md, 3.1):
+places `mail-prod` on `rhi-prod` (protocol/format.md, 3.1):
 
 ```
 hearth dev up rhi-dev --containers mail-dev      rhi-dev's VM, cloned (3.2), running mail-dev alone of its containers (3.4)
@@ -85,15 +85,15 @@ production is developed as a machine of its own (3.4).
   apt-cacher-ng on the Incus bridge, the `hearth` binary and the
   agent's checkout. The driver needs no root, and keeps its instances in
   a project of their own, `hearth-dev`. They are the VM tier's machines
-  (machine.md, 2.2; testing.md, 7.1), real EFI machines to hearth.
+  (domain/machine.md, 2.2; domain/testing.md, 7.1), real EFI machines to hearth.
 - **The base image is one stopped VM, `hearth-dev-seed`,** bootstrapped
   once by `hearth dev image` from a small target, `seed-dev` (the
   `core` and `hearth` tasks and `incus-agent`), as the VM tier makes
-  its machines (testing.md, 7.3 and 7.4), with `--accept-mutable` (4.3)
+  its machines (domain/testing.md, 7.3 and 7.4), with `--accept-mutable` (4.3)
   and `--trial auto`. Clones share its filesystem's UUID, which is
   harmless: no machine sees two.
 - **Its store is warm** with the essential set every target shares, and
-  its builder fetches through the host's apt-cacher-ng (build.md, 5.1),
+  its builder fetches through the host's apt-cacher-ng (domain/build.md, 5.1),
   so a clone fetches only what its target adds. A hearth release needs
   no new image: adoption runs the release the target pins (3.2).
 
@@ -108,7 +108,7 @@ production is developed as a machine of its own (3.4).
 2. **Copy** `hearth-dev-seed` to `rhi-dev`, a snapshot on the btrfs
    pool, set the instance's keys (8.2), start it, and wait for its agent.
 3. **Push** the commit's bundle (6.2), the secrets, and the hearth
-   binary the target's `hearth` task pins (format.md, 5.12), fetched
+   binary the target's `hearth` task pins (protocol/format.md, 5.12), fetched
    once by its digest.
 4. **Retarget:** `incus exec rhi-dev -- <binary> retarget rhi-dev --revision
    <commit> --bundle <file> --secrets <dir> [--containers <c>,…]`; wait
@@ -118,14 +118,14 @@ production is developed as a machine of its own (3.4).
 in-process, as bootstrap is (client/README.md, 3.6), and refused unless the
 configuration accepts mutable targets (4.3) and the placement has the
 machine record's kind and firmware. It runs bootstrap's steps 5 to 7 and
-9 on the machine's own top level (machine.md, 8.2): import the secrets;
+9 on the machine's own top level (domain/machine.md, 8.2): import the secrets;
 stop the daemon; build the output as `hearth` unless the store holds it;
 place it into `@rhi-dev.a`, the target's identity made anew; give it the
-first bless (slots.md, section 4); write the target, the desired
+first bless (domain/slots.md, section 4); write the target, the desired
 revision and [M5] the container selection (3.4); reboot. It writes as
 the release it places, checked as bootstrap checks its own
-(activator.md, 7.2). The new slot's first start deletes the retired
-seed's slots, entries, ESP files, records and identity (activator.md,
+(domain/activator.md, 7.2). The new slot's first start deletes the retired
+seed's slots, entries, ESP files, records and identity (domain/activator.md,
 7.4). A failed first boot is a VM to throw away, as after a bootstrap.
 
 ### 3.3 Several machines, and down
@@ -133,10 +133,10 @@ seed's slots, entries, ESP files, records and identity (activator.md,
 - **`--count <n>`** makes `rhi-dev-1` to `rhi-dev-<n>`, one target
   with its own identity on each: agents in parallel, or replicas.
 - **Several targets make a cluster** [M5]: `hearth dev up stoa-1-dev
-  stoa-2-dev stoa-3-dev`, a machine per member (format.md, 3.6) on one
+  stoa-2-dev stoa-3-dev`, a machine per member (protocol/format.md, 3.6) on one
   bridge, which resolves `<instance>.incus`; the development
   environment's settings name peers that way, and members read each
-  other's exports as anywhere (format.md, section 8). Containers placed
+  other's exports as anywhere (protocol/format.md, section 8). Containers placed
   `on` a development machine's target run in its VM, as on any host
   (3.4).
 - **Built once:** the driver builds every output in the first clone
@@ -156,7 +156,7 @@ seed's slots, entries, ESP files, records and identity (activator.md,
   { "placement": { "kind": "container", "on": "rhi-dev", "mutable": true } }
   ```
 
-  A placement is replaced whole (format.md, 3.4), so it names `mutable`
+  A placement is replaced whole (protocol/format.md, 3.4), so it names `mutable`
   again, which `envs/dev.json`'s VM placement set. `hearth dev up
   mail-dev` is refused before Incus is touched: `mail-dev is a container
   on rhi-dev: hearth dev up rhi-dev`. What counts is the placement in
@@ -164,23 +164,23 @@ seed's slots, entries, ESP files, records and identity (activator.md,
   there, as before M5 (the last bullet).
 - **A machine comes up with its containers.** `hearth dev up rhi-dev`
   brings up its VM (3.2), whose hearth then builds and starts every
-  container `dev` places on it, as any host's does (wire.md, 4.7;
-  slots.md, section 12). `--containers mail-dev,chat-dev` runs those
+  container `dev` places on it, as any host's does (protocol/wire.md, 4.7;
+  domain/slots.md, section 12). `--containers mail-dev,chat-dev` runs those
   alone, `--no-containers` none. The selection is the machine's own
-  setting, kept by its hearth (wire.md, 4.1 and 4.7) and reported as a
+  setting, kept by its hearth (protocol/wire.md, 4.1 and 4.7) and reported as a
   fact; the host's spec stays whole, and nothing in any key changes. A
   second `up` of a running instance sets its selection again; a
   container it leaves out is stopped and its slots deleted, as a
-  removed container's are (slots.md, 12.7), its data kept for the next
+  removed container's are (domain/slots.md, 12.7), its data kept for the next
   time it runs.
-- **One revision for the machine and its containers** (wire.md, 4.7),
+- **One revision for the machine and its containers** (protocol/wire.md, 4.7),
   so `apply` names machines too. `hearth dev apply rhi-dev` ships the
   working tree; the host's pass converges each container it runs, then
   its own target; the report has a line per target: unchanged, live,
   restarted, rebooted or fell back. A commit that changes the host and
   a container is one apply. One that changes only `mail-dev` prepares a
   new slot of `mail-dev` alone, tried live inside the container when
-  eligible (slots.md, 12.8), else by restarting it on the new slot
+  eligible (domain/slots.md, 12.8), else by restarting it on the new slot
   (12.2): seconds, with the host's own slot untouched.
 - **`shell` and `diff` take `--container`** (`-c`): `hearth dev shell
   rhi-dev -c mail-dev` enters the container (4.4), and `hearth dev diff
@@ -202,7 +202,7 @@ seed's slots, entries, ESP files, records and identity (activator.md,
   target that runs as a container in production is placed on a VM in
   `dev`, its base-env file adding what a machine needs and a container
   lacks, the `hearth` and `boot` tasks, as `mail-lab` runs in the lab
-  until M5 (format.md, 3.1). It is then a machine, and `up` takes it.
+  until M5 (protocol/format.md, 3.1). It is then a machine, and `up` takes it.
   What that leaves untried, the container's parameters and its host, is
   the lab's.
 
@@ -216,20 +216,20 @@ seed's slots, entries, ESP files, records and identity (activator.md,
 { "placement": { "kind": "vm", "firmware": "efi", "hardware": "incus", "mutable": true } }
 ```
 
-Placement is data of the environment (format.md, 3.4). Render puts
-`mutable` in the `boot` part (render.md, 4.3): a slot part, so it
+Placement is data of the environment (protocol/format.md, 3.4). Render puts
+`mutable` in the `boot` part (domain/render.md, 4.3): a slot part, so it
 enters the prepare key and no layer key, and a mutable target builds the
 very output its sealed twin would.
 
 ### 4.2 What changes in a slot
 
-Prepare leaves out the read-only flag (slots.md, 5.7, step 1) and still
+Prepare leaves out the read-only flag (domain/slots.md, 5.7, step 1) and still
 writes the manifest that capture compares against. fstab's `/` line
-says `rw` (machine.md, 3.3); the command line keeps `ro`, since
+says `rw` (domain/machine.md, 3.3); the command line keeps `ro`, since
 tiny-initramfs mounts the root read-only and systemd remounts it from
 fstab, so the line is the sealed twin's and the kernel's rule holds
-(slots.md, 6.1). A container's [M5] nspawn settings say `ReadOnly=no`
-(slots.md, 12.1).
+(domain/slots.md, 6.1). A container's [M5] nspawn settings say `ReadOnly=no`
+(domain/slots.md, 12.1).
 
 ### 4.3 Who accepts one
 
@@ -241,9 +241,9 @@ fstab, so the line is the sealed twin's and the kernel's rule holds
   machine a development machine. Sealed targets run there too.
 - **The activator enforces it:** the setting is in its machine record,
   and it refuses a place whose `boot` part is mutable on a machine that
-  refuses, naming the field (activator.md, 2.2); it would be the one to
+  refuses, naming the field (domain/activator.md, 2.2); it would be the one to
   leave a root unsealed. The steward refuses first, from the facts, as a
-  configuration error that waits for another commit (wire.md, 4.4).
+  configuration error that waits for another commit (protocol/wire.md, 4.4).
 
 ### 4.4 Exploring
 
@@ -253,19 +253,19 @@ fstab, so the line is the sealed twin's and the kernel's rule holds
   rhi-dev -c mail-dev` [M5] is `incus exec rhi-dev -- machinectl shell
   mail-dev` (3.4). There the
   agent installs from the slot's own sources, the pinned snapshot's
-  (build.md, 5.6), edits `/etc`, fills `/opt`, enables units, adds
+  (domain/build.md, 5.6), edits `/etc`, fills `/opt`, enables units, adds
   users.
 - **The experiment lives in the running slot,** its root and its
   `/var`, never in data entries. The next prepare leaves it behind: a
-  new slot is a snapshot of the output (slots.md, 5.1), never of the
+  new slot is a snapshot of the output (domain/slots.md, 5.1), never of the
   running root. The explored slot stays on disk as the previous blessed
   one until a later prepare takes its label; `hearth rollback` would
   bring it back, and the loop never does.
-- **Live changes need an unexplored root** (slots.md, 6.7, rule 12): on
+- **Live changes need an unexplored root** (domain/slots.md, 6.7, rule 12): on
   a mutable machine a change is live only while nothing under `/etc`,
   `/usr/local` and `/opt` differs from the slot's manifest; otherwise its
   trial is a soft reboot, which ends the experiment at once. After a
-  live change those three are read-only overlays (slots.md, 6.6) until
+  live change those three are read-only overlays (domain/slots.md, 6.6) until
   the slot boots natively, which `hearth trial` does by a soft reboot.
 
 ## 5. Capture
@@ -274,10 +274,10 @@ fstab, so the line is the sealed twin's and the kernel's rule holds
 
 `hearth diff --running [--target <t>] [--suggest] [--json]` runs on the
 machine, for operators. The steward asks its activator, since drift is
-the activator's (slots.md, section 10): capture is drift's walk with
+the activator's (domain/slots.md, section 10): capture is drift's walk with
 contents, presented as a diff, and reaches the client as the link's
 typed records, so the steward reads no file of the slot itself
-(steward.md, 2.2).
+(domain/steward.md, 2.2).
 
 | Kind | Compared | Read from | Shown as |
 |---|---|---|---|
@@ -305,17 +305,17 @@ typed records, so the steward reads no file of the slot itself
 ### 5.2 Suggestions
 
 `--suggest` turns each kind into a draft fragment of a task
-(format.md, section 5): a pure function of the capture, in
+(protocol/format.md, section 5): a pure function of the capture, in
 `hearth-client-domain-dev`, run by the client.
 
 | Captured | Suggested |
 |---|---|
 | a package installed by hand (apt's manual mark) | `"packages": { "opendkim": {} }`; its dependencies are the resolution's |
 | a package removed | a note naming the task that requests it |
-| a file added or changed | the file under `tree/`, with a `files` entry when its mode or owners are not the defaults (format.md, 5.5) |
-| a file deleted | a note: a task's file to drop, or a removal in `customize.sh` (format.md, 5.8) |
+| a file added or changed | the file under `tree/`, with a `files` entry when its mode or owners are not the defaults (protocol/format.md, 5.5) |
+| a file deleted | a note: a task's file to drop, or a removal in `customize.sh` (protocol/format.md, 5.8) |
 | a unit enabled, disabled or masked | `"presets": { "opendkim.service": { "action": "enable" } }`; a mask, a `files` link to `/dev/null` |
-| a user or a group added | a `users` or `groups` entry with its ids, which build writes as sysusers lines (format.md, 5.6); a system id, below 1000, as `"from": "package"`, to confirm |
+| a user or a group added | a `users` or `groups` entry with its ids, which build writes as sysusers lines (protocol/format.md, 5.6); a system id, below 1000, as `"from": "package"`, to confirm |
 
 `--out <dir>` writes them as a task directory, `task.json` and `tree/`,
 on the development host with `hearth dev diff`, never into the
@@ -324,7 +324,7 @@ unit a `live` entry is the agent's decision.
 
 ### 5.3 Drift on a mutable machine
 
-The same checks run under the same ids (slots.md, section 10): what
+The same checks run under the same ids (domain/slots.md, section 10): what
 `slot.root.tree` finds is the experiment, reported as `explored`, never
 as a fault; `slot.root.subvolume` expects the read-only flag clear. A
 mutable root hides a service that writes beneath `/etc` at run time,
@@ -358,25 +358,25 @@ whole history.
 
 - **Pushed** with `incus file push --uid 59999 --gid 59999 --mode 0600`
   to `/run/hearth/<commit>.bundle`, which only the builder reads, in a
-  fetch job (steward.md, 3.3).
-- **`hearth revision set <commit> --bundle <file>`** (wire.md, 4.1): the
-  steward has a builder fetch the bundle into its clone (render.md, 2.4)
+  fetch job (domain/steward.md, 3.3).
+- **`hearth revision set <commit> --bundle <file>`** (protocol/wire.md, 4.1): the
+  steward has a builder fetch the bundle into its clone (domain/render.md, 2.4)
   as `refs/hearth-dev/<commit>` and delete the file, then sets the
   desired revision; a missing prerequisite is refused, and the driver
   sends the whole history. The pass never fetches the commit, which the
-  clone holds (wire.md, 4.2). Any standalone machine accepts it from an
+  clone holds (protocol/wire.md, 4.2). Any standalone machine accepts it from an
   operator, as `revision set` accepts any commit (client/README.md, 3.1).
 
 ### 6.3 What the machine does
 
-The pass, as on any machine (wire.md, 4.2); a development machine's
+The pass, as on any machine (protocol/wire.md, 4.2); a development machine's
 trials are `auto`.
 
 | The change | Built | Activation | Time |
 |---|---|---|---|
-| config: a template, a file, a preset, a user | the config layer (build.md, section 4) | live, with a declared consumer over an unexplored root (slots.md, 6.7); else a soft reboot | seconds |
+| config: a template, a file, a preset, a user | the config layer (domain/build.md, section 4) | live, with a declared consumer over an unexplored root (domain/slots.md, 6.7); else a soft reboot | seconds |
 | software under `/opt` | software and config | live, by its `restart` entry; else a soft reboot | seconds |
-| a package added or removed | all three; packages reconciled from the previous layer (build.md, 4.2), through apt-cacher-ng | a soft reboot while the kernel is unchanged | a minute or less |
+| a package added or removed | all three; packages reconciled from the previous layer (domain/build.md, 4.2), through apt-cacher-ng | a soft reboot while the kernel is unchanged | a minute or less |
 | the kernel, the initramfs, the command line | all three | a one-shot reboot | a minute or two |
 
 In a container [M5] (3.4), a soft reboot or a reboot in this table is a
@@ -386,11 +386,11 @@ the kernel and its command line are the host's.
 - **`hearth dev apply <machine>… [--repo <path>] [--how auto|live|full]`**
   makes the commit and its bundle, prints the rendered diff of the
   machine's target and each container it runs against the revision the
-  machine runs (render.md, section 6), pushes, sets the revision, and
+  machine runs (domain/render.md, section 6), pushes, sets the revision, and
   follows `hearth status` until the pass converges, is refused or falls
   back, with a line per target (3.4); its exit code is `status
   --check`'s, and `--how` is `hearth trial`'s (client/README.md, 3.1). A trial that falls back refuses its prepare key, as
-  anywhere (wire.md, 4.4).
+  anywhere (protocol/wire.md, 4.4).
 - **Without the driver** [M3]: `hearth revision bundle`, any copy, and
   `hearth revision set --bundle` on any standalone machine.
 
@@ -403,10 +403,10 @@ the kernel and its command line are the host's.
   disappears at once, and the agent sees it at the next apply.
 - **The build is not what differs:** above packages an incremental layer
   equals a scratch one by construction, and packages are reconciled,
-  with a scratch build now and then (build.md, 4.2). What a development
+  with a scratch build now and then (domain/build.md, 4.2). What a development
   machine does not show is a machine's history:
   - a first boot from nothing: data entries are seeded and identity is
-    made once, then kept (slots.md, 5.3 and 5.4);
+    made once, then kept (domain/slots.md, 5.3 and 5.4);
   - the native boot after a live change, until the agent reboots;
   - the upgrade from production's revision and data;
   - a sealed root, on which a service that writes `/etc` fails (5.3);
@@ -415,10 +415,10 @@ the kernel and its command line are the host's.
   `factory.md`, section 8): a sealed throwaway machine bootstrapped at
   the change's head, possibly once for a stack of related changes, at
   its top. So is the comparison of patch and scratch for the packages
-  layer (build.md, 4.2; temper's `factory.md`, 6.4).
+  layer (domain/build.md, 4.2; temper's `factory.md`, 6.4).
 - **What lands is the agent's own commit** of the same tree;
   `refs/hearth/dev/` never leaves the development host. Reviewers read
-  the rendered diff (render.md, section 6) and the lab's verdicts gate
+  the rendered diff (domain/render.md, section 6) and the lab's verdicts gate
   it.
 
 ## 8. The Incus driver [M3b]
@@ -480,10 +480,10 @@ backoff), a timeout, a full pool.
   builds each output once; its activator prepares a slot per VM on its
   own top level, a snapshot of the output, which the VM boots with no
   disk image, by Incus's direct kernel boot with its root over virtiofs
-  (machine.md, 2.6).
+  (domain/machine.md, 2.6).
 - **One build, a snapshot per VM, a boot in seconds:** a cluster of one
   spec costs one build, as the lab's pools do (temper's `factory.md`,
-  6.5; slots.md, 12.4), and the host's store stays warm across every
+  6.5; domain/slots.md, 12.4), and the host's store stays warm across every
   `down`. No base image and no adoption: slots, records and identities
   are the host's activator's, as a container's are.
 - **What it gives up** is an ESP, firmware variables and a bootloader,
@@ -493,7 +493,7 @@ backoff), a timeout, a full pool.
 
 - **`hearth-client-dev-world`** [M3b], under `tests/dev`, runs
   `hearth-client-domain-dev` against `hearth-client-fake-incus` on the
-  fake machine (testing.md, sections 3 and 4): a pool whose copy is a snapshot,
+  fake machine (domain/testing.md, sections 3 and 4): a pool whose copy is a snapshot,
   agents that answer late or never, and `incus exec` running a scripted
   hearth, or hearth's domains on a fake machine of the instance's own.
   Scenarios: `up` of one, of `--count 3`, of a cluster built once; a
@@ -511,16 +511,16 @@ backoff), a timeout, a full pool.
   suggestions, applied unchanged, give a slot whose capture against the
   explored root is empty. No machine that refuses holds a mutable slot,
   and a live trial on one runs only over an unexplored root.
-- **The bundle, in the standalone world** [M3] (wire.md, section 10):
+- **The bundle, in the standalone world** [M3] (protocol/wire.md, section 10):
   imported, refused without its prerequisite, never fetched.
   `hearth-client-protocol-incus`'s machine world [M3b] is fed recordings of
-  real runs (testing.md, 4.5), and the VM tier runs the whole loop on a
-  real development host (testing.md, 7.6).
+  real runs (domain/testing.md, 4.5), and the VM tier runs the whole loop on a
+  real development host (domain/testing.md, 7.6).
 
 ## 11. What is open
 
 - **Whether `incus copy` carries the VM's variables** (`qemu.nvram`),
-  without which a stub-only disk has nothing to boot (testing.md, 7.4);
+  without which a stub-only disk has nothing to boot (domain/testing.md, 7.4);
   to verify, with the time a copy takes on a btrfs pool.
 - **Adoption with a trial:** the seed's slot could stay the default
   while the target's first slot is tried, so a broken first build falls
@@ -528,7 +528,7 @@ backoff), a timeout, a full pool.
   fail, and on guards that span two targets.
 - **How the builder's fetch proxy is set,** by a bootstrap argument or a
   file of hearth's configuration, which the steward passes to its
-  builders; it depends on build.md's fetch.
+  builders; it depends on domain/build.md's fetch.
 - **Noise in capture,** to verify on the VM tier: whether systemd's
   update services (`ConditionNeedsUpdate=/etc`) write `/etc` at a
   mutable root's first boot, marking every root explored, and whether

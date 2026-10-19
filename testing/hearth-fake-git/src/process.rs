@@ -1,4 +1,4 @@
-//! The same git face as a child on the fake machine (testing.md, 4.1).
+//! The same git face as a child on the fake machine (domain/testing.md, 4.1).
 use crate::{
     face::{self, Command, Faults, Place, Read, Run, Want},
     repository::Repositories,

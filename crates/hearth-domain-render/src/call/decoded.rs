@@ -1,4 +1,4 @@
-//! Charge decoded ownership before retaining an arrival (render.md, 2.3).
+//! Charge decoded ownership before retaining an arrival (domain/render.md, 2.3).
 use super::Side;
 use crate::{
     errors::{self, Decode, Limit},

@@ -98,7 +98,7 @@ fn id_back(id: records::Id) -> render::Id {
         records::Id::Gid => render::Id::Gid,
     }
 }
-// A valid account id inside format.md 5.6's bounds.
+// A valid account id inside protocol/format.md 5.6's bounds.
 pub const COLLISION_UID: u32 = 1_000;
 fn shared(id: render::Id) -> render::Collision {
     render::Collision::Shared { id, value: COLLISION_UID, first: copy_of(b"alice"), second: copy_of(b"bob") }

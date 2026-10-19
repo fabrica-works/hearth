@@ -1,4 +1,4 @@
-//! One bounded rev-parse answer (render.md, 2.2).
+//! One bounded rev-parse answer (domain/render.md, 2.2).
 use crate::{invocation::Exit, oid::Oid};
 /// Longest valid output: a SHA-256 id and LF. Keep one more byte to detect excess.
 pub const MAX_STDOUT: u32 = 65;

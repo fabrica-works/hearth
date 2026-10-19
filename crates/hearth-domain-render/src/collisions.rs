@@ -1,4 +1,4 @@
-//! Claims meet before templates run (render.md, 3.7).
+//! Claims meet before templates run (domain/render.md, 3.7).
 mod claims;
 mod declarations;
 mod ids;

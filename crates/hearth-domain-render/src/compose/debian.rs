@@ -1,5 +1,5 @@
 use super::{Box, Composed, Documents, Kind, Layer, Merge, Position, Target, Value, bytes, layers, revision};
-/// Compose the fixed Debian schema over format.md, 3.2's six layers.
+/// Compose the fixed Debian schema over protocol/format.md, 3.2's six layers.
 #[must_use]
 pub fn debian(target: &Target, documents: &Documents, merge: &mut Merge) -> Option<Composed> {
     let at = Position { line: 1, column: 1 };

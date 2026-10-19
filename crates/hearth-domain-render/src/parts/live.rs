@@ -1,4 +1,4 @@
-//! Live paths and their ordered consumers (render.md, 4.4).
+//! Live paths and their ordered consumers (domain/render.md, 4.4).
 use crate::{
     entries::Expansion,
     errors::Error,

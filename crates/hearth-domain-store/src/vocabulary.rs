@@ -1,4 +1,4 @@
-//! Typed store requests and terminals (store.md, 6.6, 8.2).
+//! Typed store requests and terminals (domain/store.md, 6.6, 8.2).
 use alloc::boxed::Box;
 use hearth_lib::encode::{Digest, Item};
 use skein_lib::{Duration, Token, Wall};
@@ -17,7 +17,7 @@ pub enum Event {
     Resolution {
         record: Resolution,
     },
-    /// Whether a layer of this key is published (build.md, 4.1).
+    /// Whether a layer of this key is published (domain/build.md, 4.1).
     Want {
         key: Digest,
     },
@@ -150,7 +150,7 @@ pub struct Stray {
     pub name: Box<[u8]>,
 }
 
-/// A cache file's provenance and cost (store.md, 6.5).
+/// A cache file's provenance and cost (domain/store.md, 6.5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct CacheFile {
     pub at: Wall,
@@ -167,7 +167,7 @@ pub enum Origin {
     Rendered { path: Box<[u8]> },
 }
 
-/// The four canonical values of a resolution key (render.md, 5.1).
+/// The four canonical values of a resolution key (domain/render.md, 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Inputs {
     pub apt: Box<[Item]>,
@@ -175,7 +175,7 @@ pub struct Inputs {
     pub sources: Box<[Item]>,
     pub variant: Box<[Item]>,
 }
-/// A closure package with its source and archive metadata (store.md, 6.4).
+/// A closure package with its source and archive metadata (domain/store.md, 6.4).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Closed {
     pub source: u32,
@@ -187,7 +187,7 @@ pub struct Closed {
     pub sha256: Digest,
 }
 
-/// A complete resolution record, loaded only when requested (store.md, 6.4).
+/// A complete resolution record, loaded only when requested (domain/store.md, 6.4).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Resolution {
     pub key: Digest,
@@ -229,7 +229,7 @@ pub enum Decline {
     Unusable { step: Step },
 }
 
-/// A published layer's record, as the startup scan reads it (store.md, 6.2).
+/// A published layer's record, as the startup scan reads it (domain/store.md, 6.2).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Layer {
     pub key: Digest,

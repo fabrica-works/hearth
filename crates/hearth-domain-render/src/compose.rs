@@ -1,4 +1,4 @@
-//! Target discovery and whole-placement replacement (format.md, 3.1, 3.4).
+//! Target discovery and whole-placement replacement (protocol/format.md, 3.1, 3.4).
 use crate::{
     limits::Limits,
     revision::{self, Class, Entry},
@@ -19,7 +19,7 @@ pub struct Target {
     pub environment_document: u32,
     pub base_env: u32,
 }
-/// A target placed on a host of the same environment (format.md, 3.5).
+/// A target placed on a host of the same environment (protocol/format.md, 3.5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Container {
     pub name: Box<[u8]>,
@@ -184,7 +184,7 @@ fn base_document(documents: &Documents, base: &[u8]) -> Option<u32> {
     }
     None
 }
-/// Ordered layers and each value's origin (render.md, 3.2).
+/// Ordered layers and each value's origin (domain/render.md, 3.2).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Layer {
     Defaults,
@@ -236,7 +236,7 @@ enum Frame {
         out: List<Composed>,
     },
 }
-/// RFC 7386 on a stack bounded by JSON nesting (render.md, 8.3).
+/// RFC 7386 on a stack bounded by JSON nesting (domain/render.md, 8.3).
 #[derive(Debug, Hash)]
 pub struct Merge {
     stack: skein_lib::Stack<Frame>,
@@ -375,7 +375,7 @@ pub fn compose(
     tasks::settings(target, documents, defaults, merge, u64::MAX).expect("unlimited composition")
 }
 
-/// Listing rules apply once to the revision (format.md, 2.1 to 2.4).
+/// Listing rules apply once to the revision (protocol/format.md, 2.1 to 2.4).
 pub(crate) fn listing(
     entries: &[Entry],
     limits: &Limits,
@@ -683,7 +683,7 @@ fn error(
     }
 }
 
-/// The host's containers, in target name order (format.md, 3.5).
+/// The host's containers, in target name order (protocol/format.md, 3.5).
 pub fn containers(
     host: &Target,
     targets: &[Target],

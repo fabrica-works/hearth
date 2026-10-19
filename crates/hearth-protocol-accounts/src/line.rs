@@ -1,10 +1,10 @@
-//! One line's fields (store.md, 5.3).
+//! One line's fields (domain/store.md, 5.3).
 use crate::{File, Ids, Line, Password, What, limits::Limits};
 use alloc::boxed::Box;
 use skein_lib::bytes;
 /// The most fields of any file's line: `/etc/shadow`'s.
 const MOST_FIELDS: usize = 9;
-/// A layer holds one range of 65,536 ids (store.md, 9.2).
+/// A layer holds one range of 65,536 ids (domain/store.md, 9.2).
 pub const MAX_ID: u32 = 65_535;
 /// How many fields a line of `file` has.
 const fn fields(file: File) -> usize {

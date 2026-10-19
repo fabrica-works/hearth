@@ -1,4 +1,4 @@
-# The signed snapshot indexes for test-min and test-boot (testing.md, 6.2).
+# The signed snapshot indexes for test-min and test-boot (domain/testing.md, 6.2).
 archive 20261017T143929Z
 suite forky
 architecture amd64

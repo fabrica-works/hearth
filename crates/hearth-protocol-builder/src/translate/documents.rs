@@ -1,4 +1,4 @@
-//! The thin story takes placement and names later document fields (render.md, 3.1).
+//! The thin story takes placement and names later document fields (domain/render.md, 3.1).
 use crate::{
     config::{self, document as source},
     render::revision as target,

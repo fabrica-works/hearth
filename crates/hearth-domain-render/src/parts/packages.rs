@@ -1,4 +1,4 @@
-//! The packages record and its four resolution inputs (render.md, 4.2, 5.1).
+//! The packages record and its four resolution inputs (domain/render.md, 4.2, 5.1).
 use alloc::boxed::Box;
 mod change;
 pub use change::*;

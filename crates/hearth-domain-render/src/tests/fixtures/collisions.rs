@@ -175,17 +175,17 @@ pub fn ranged(name: &[u8], task: &[u8], base: i64, count: i64) -> crate::kinds::
     *subordinate = Some((u32::try_from(base).expect("fixture base"), u32::try_from(count).expect("fixture count")));
     user
 }
-// An account id inside format.md 5.6's bounds; its neighbour is the second account's id.
+// An account id inside protocol/format.md 5.6's bounds; its neighbour is the second account's id.
 pub const ACCOUNT_ID: i64 = 1_000;
 pub const ACCOUNT_UID: u32 = 1_000;
-// Ranges begin at format.md 5.6's lower bound and span one ordinary subuid block.
+// Ranges begin at protocol/format.md 5.6's lower bound and span one ordinary subuid block.
 pub const RANGE_BASE: i64 = kinds::MIN_SUBORDINATE;
 pub const RANGE_COUNT: i64 = RANGE_BASE;
 
 pub fn equal_users() -> Expansion {
     user_rows(&[kinds::integer(Name::Uid, ACCOUNT_ID)], &[kinds::integer(Name::Uid, ACCOUNT_ID)])
 }
-// The smallest count format.md 5.6 permits for a subordinate range.
+// The smallest count protocol/format.md 5.6 permits for a subordinate range.
 pub const MIN_RANGE_COUNT: i64 = 1;
 
 pub fn first_range() -> crate::kinds::users::User {

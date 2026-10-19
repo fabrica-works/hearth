@@ -11,7 +11,7 @@ use skein_lib::bytes::copy_of;
 #[test]
 fn a_spec_prints_its_meta_and_config_as_render_md_shows() {
     let printed = form::print(Form::Text, &Record::Spec(fixtures::x1_prod()), None, &limits::SHIPPED);
-    assert_eq!(printed.as_deref(), Ok(fixtures::X1_PROD_TEXT.as_bytes()), "render.md, 9.2's lines");
+    assert_eq!(printed.as_deref(), Ok(fixtures::X1_PROD_TEXT.as_bytes()), "domain/render.md, 9.2's lines");
 }
 #[test]
 fn a_digest_prints_its_first_twelve_lowercase_hex_digits() {

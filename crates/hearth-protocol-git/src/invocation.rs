@@ -1,4 +1,4 @@
-//! The four vectors and complete environment of render.md, 2.2.
+//! The four vectors and complete environment of domain/render.md, 2.2.
 use crate::oid::Oid;
 use alloc::boxed::Box;
 use skein_lib::{Writer, bytes};

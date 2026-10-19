@@ -1,4 +1,4 @@
-//! A record reader's fields in canonical key order (store.md, 6.1).
+//! A record reader's fields in canonical key order (domain/store.md, 6.1).
 
 use crate::{
     decode::{Decoder, Malformed},

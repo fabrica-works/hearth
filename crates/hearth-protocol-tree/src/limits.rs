@@ -1,4 +1,4 @@
-//! The configured record bounds (store.md, 6.1).
+//! The configured record bounds (domain/store.md, 6.1).
 
 use crate::{
     decode,
@@ -84,7 +84,7 @@ pub fn worst_case(kind: Kind, limits: &Limits) -> Option<u64> {
     own.checked_add(inputs)?.checked_add(held(kind, limits)?)?.checked_add(u64::from(kind.bound(limits)))
 }
 
-/// The most heap a decoded record holds (store.md, 6.1), for its owner's
+/// The most heap a decoded record holds (domain/store.md, 6.1), for its owner's
 /// worst case. Returns `None` past the encoder's depth, or past a u64 for
 /// a resolution. Boxed bytes together fit within the body's bound.
 #[must_use]

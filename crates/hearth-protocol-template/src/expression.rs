@@ -1,4 +1,4 @@
-//! One bounded token pass with explicit nesting (format.md, 7.4; render.md, 8.3).
+//! One bounded token pass with explicit nesting (protocol/format.md, 7.4; domain/render.md, 8.3).
 mod chain;
 mod jumps;
 mod lexer;

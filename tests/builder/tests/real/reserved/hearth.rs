@@ -51,7 +51,7 @@ fn a_host_without_hearth_exits_two() {
 }
 #[test]
 fn a_container_names_hearth_at_its_key() {
-    assert_eq!(f::render_container_hearth().stdout, b"hosts/chat/chat-prod.json:1:56: chat-prod: hearth: \"hearth\" is reserved: a container has no hearth task (format.md, 5.12)\n");
+    assert_eq!(f::render_container_hearth().stdout, b"hosts/chat/chat-prod.json:1:56: chat-prod: hearth: \"hearth\" is reserved: a container has no hearth task (protocol/format.md, 5.12)\n");
 }
 #[test]
 fn a_container_naming_hearth_exits_two() {

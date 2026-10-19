@@ -1,10 +1,10 @@
-//! Whole record frames, version 1 (store.md, 6.1 and 6.8).
+//! Whole record frames, version 1 (domain/store.md, 6.1 and 6.8).
 
 use crate::{decode::Malformed, limits::Limits};
 use alloc::boxed::Box;
 use skein_lib::{Reader, Writer};
 
-/// The frame's first eight bytes (store.md, 6.1).
+/// The frame's first eight bytes (domain/store.md, 6.1).
 pub const MAGIC: [u8; 8] = *b"hearth\0r";
 /// The kinds of record this release reads and writes.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -39,7 +39,7 @@ impl Kind {
         }
     }
 }
-/// Why a record is of a version the builder cannot read (store.md, 6.8).
+/// Why a record is of a version the builder cannot read (domain/store.md, 6.8).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Unreadable {
     Short,

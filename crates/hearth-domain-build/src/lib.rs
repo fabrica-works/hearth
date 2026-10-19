@@ -1,4 +1,4 @@
-//! A build's plan, from its keys and what the store has published (build.md, 4.1).
+//! A build's plan, from its keys and what the store has published (domain/build.md, 4.1).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;

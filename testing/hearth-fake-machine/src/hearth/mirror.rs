@@ -1,4 +1,4 @@
-//! Snapshot suites and their unsigned indices (testing.md, 3.6).
+//! Snapshot suites and their unsigned indices (domain/testing.md, 3.6).
 use super::universe::Universe;
 use alloc::{boxed::Box, collections::BTreeMap, format, string::String, vec::Vec};
 use core::fmt::Write;

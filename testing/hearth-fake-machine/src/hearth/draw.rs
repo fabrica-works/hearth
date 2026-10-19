@@ -1,4 +1,4 @@
-//! Seeded package universes with a Debian-shaped core (testing.md, 3.6).
+//! Seeded package universes with a Debian-shaped core (domain/testing.md, 3.6).
 use super::universe::{Alternative, Package, Priority, Provide, Relation, Universe};
 use alloc::{boxed::Box, format, vec::Vec};
 use skein_lib::{Rng, sha256};

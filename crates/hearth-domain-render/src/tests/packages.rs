@@ -25,9 +25,13 @@ fn the_resolution_inputs_are_the_four_values_as_the_record_encodes_them() {
             bytes(b"updates"),
             Item::False
         ],
-        "store.md 3.1"
+        "domain/store.md 3.1"
     );
-    assert_eq!((&*inputs.request, &*inputs.variant), (&[Item::List(0)][..], &[bytes(b"apt")][..]), "render.md 5.1");
+    assert_eq!(
+        (&*inputs.request, &*inputs.variant),
+        (&[Item::List(0)][..], &[bytes(b"apt")][..]),
+        "domain/render.md 5.1"
+    );
     assert_eq!(&*inputs.apt, &[Item::Map(1), bytes(b"install_recommends"), Item::False]);
 }
 #[test]

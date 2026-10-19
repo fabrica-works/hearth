@@ -1,4 +1,4 @@
-//! Pipe routing for the git child (render.md, 2.2).
+//! Pipe routing for the git child (domain/render.md, 2.2).
 use crate::{git, git::Intake, render, terminal::stream_ended};
 use skein_lib::{Token, stream::Up};
 

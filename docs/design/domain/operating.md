@@ -34,7 +34,7 @@ section 10.
 - **Telemetry stays on the machine** (section 5), in bounded windows:
   the journal, in a data entry a task declares, a container's in its
   host's; hearth's own samples of the machine's signals; each
-  check's history. It is served when asked (wire.md, section 7). There
+  check's history. It is served when asked (protocol/wire.md, section 7). There
   is no central store to start.
 - **Three operational effects, keyed or conditional** (section 6): roll
   back, restart a unit, and restore data. Policy is the engine's. Any
@@ -58,7 +58,7 @@ section 10.
 ## 2. Checks
 
 This section defines the checks' format and what each result means.
-format.md, section 11 shows where a task declares them.
+protocol/format.md, section 11 shows where a task declares them.
 
 ### 2.1 A task's checks
 
@@ -111,8 +111,8 @@ The postfix task, its checks and the user its command check runs as:
 - **A command check's `user` is one a task of the target declares:** a
   sysusers user, or a user a package makes, such as `postfix`, made by
   postfix's maintainer script and declared as the package's
-  (format.md, 5.6). Render refuses any other, and `root`; `nobody`
-  needs no declaration (render.md, 3.9; 2.4).
+  (protocol/format.md, 5.6). Render refuses any other, and `root`; `nobody`
+  needs no declaration (domain/render.md, 3.9; 2.4).
 
 ### 2.2 Fields
 
@@ -125,7 +125,7 @@ The postfix task, its checks and the user its command check runs as:
 | `window` | all | `{ "pass": n, "fail": n }` | `{ 2, 3 }` | how many results in a row change the check's state (2.7) |
 | `unit` | unit | a unit's name | | the unit that must be active |
 | `argv` | command | strings; the first an absolute path | | what runs |
-| `user` | command | a user a task declares (format.md, 5.6) | `nobody` | as whom it runs |
+| `user` | command | a user a task declares (protocol/format.md, 5.6) | `nobody` | as whom it runs |
 | `capabilities` | command | capability names | none | the only capabilities it keeps |
 | `network` | command | bool | `false` | whether it may reach the network |
 | `probe` | probe | `tcp`, `http`, `smtp`, `dns` | | the protocol spoken |
@@ -136,17 +136,17 @@ The postfix task, its checks and the user its command check runs as:
 | `tls` | tcp, http, smtp | `true`, or `{ "expires_within": duration }` | `false`; `true` for https | verify the certificate (for smtp, after `STARTTLS`, or from the start without it), and fail it if it expires within the duration |
 | `server`, `name`, `type`, `expect` | dns | an address; a name; a record type; a value | | ask `server` for `name`'s `type` records; one must equal `expect` |
 
-- **Durations** are the schema's `duration` type (format.md, 6.2): a
+- **Durations** are the schema's `duration` type (protocol/format.md, 6.2): a
   positive integer and one unit, `s`, `m`, `h` or `d`, such as `5s`,
   `1m`, `14d`.
 - **A field may take its value from the task's settings,** as the
-  task's other declarations do (render.md, 3.9). A check's rendered
+  task's other declarations do (domain/render.md, 3.9). A check's rendered
   form, every value resolved, is what enters the `checks` part's
   digest.
 - **Render refuses** an unknown field, a field of another kind, a
   `blessing` check with `from` (section 3), a command run as `root` or
   as a `user` no task declares, `nobody` aside (2.1), and a `from` that
-  names a task no target of the environment has (2.6; render.md, 3.9).
+  names a task no target of the environment has (2.6; domain/render.md, 3.9).
 
 ### 2.3 A unit active
 
@@ -162,7 +162,7 @@ The postfix task, its checks and the user its command check runs as:
 
 - **The activator starts it as a transient unit,** with properties it
   fixes. It is one operation of the activator's closed list, *run a
-  check* [M5] (activator.md, 5.14): the activator builds the argument
+  check* [M5] (domain/activator.md, 5.14): the activator builds the argument
   vector from the typed check, renders nothing and runs nothing itself;
   systemd runs the command, as the declared user, under these
   properties:
@@ -185,7 +185,7 @@ The postfix task, its checks and the user its command check runs as:
   ```
 
 - **As which user:** the one the check declares, a user a task
-  declares (2.1; format.md, 5.6); `nobody` by default. **Never `root`:**
+  declares (2.1; protocol/format.md, 5.6); `nobody` by default. **Never `root`:**
   render refuses it and the activator refuses it again, so a check
   cannot read what the slot's secrets protect.
 - **With which privileges:** none, unless the check lists them from the
@@ -237,13 +237,13 @@ The postfix task, its checks and the user its command check runs as:
 ### 2.6 Probes from another target
 
 - **A probe with `from` runs on the targets that play that role.** A
-  role is a task, as exports are read by task (format.md, 8.2):
+  role is a task, as exports are read by task (protocol/format.md, 8.2):
   `"from": "prober"` names the targets of the environment that have the
   `prober` task. Render exports such a probe with its task's exports,
   rendered, with the target it probes; each target of the environment
   that has the task `from` names reads those probes, as exports are read
-  (render.md, 3.4), and renders them into its own `checks` part
-  (render.md, 3.9).
+  (domain/render.md, 3.4), and renders them into its own `checks` part
+  (domain/render.md, 3.9).
 - **So the coupling stays narrow and the digests follow.** A change to
   `mail-prod`'s public probe changes `mail-prod`'s and its probers'
   `checks` parts, and nothing else.
@@ -252,7 +252,7 @@ The postfix task, its checks and the user its command check runs as:
   engine pairs it with the probed machine; neither hearth needs the
   other.
 - **Within one environment.** A lab target never probes production, and
-  the reverse, as exports never cross an environment (format.md, 8.3).
+  the reverse, as exports never cross an environment (protocol/format.md, 8.3).
 
 ### 2.7 Results and states
 
@@ -273,7 +273,7 @@ any        window.fail errors in a row          unknown
 any        skip                                 skipped
 ```
 
-- **Every result is a fact** (wire.md, section 6, `check`): the check's
+- **Every result is a fact** (protocol/wire.md, section 6, `check`): the check's
   id, its state, the last result with a typed cause (`timeout`,
   `refused`, `exit-code`, `oom-kill`, `status 503`, `inactive`,
   `unknown unit`, `sandbox failed`) and, for units and probes, a reason
@@ -302,7 +302,7 @@ which the lab's experiments want, needs a rule for production first.
 
 ### 2.9 Checks of a container
 
-No hearth runs in a container in M5 (slots.md, 12.5): the host's hearth
+No hearth runs in a container in M5 (domain/slots.md, 12.5): the host's hearth
 runs its containers' checks, from the host, and reports them as its own
 facts, naming the container's target.
 
@@ -310,27 +310,27 @@ facts, naming the container's target.
   <unit>`, through the container's systemd.
 - **A command:** the same transient unit, started inside the container
   with `systemd-run --machine=<container>` by the host's activator
-  (activator.md, 5.14), under the same properties (2.4), with the
+  (domain/activator.md, 5.14), under the same properties (2.4), with the
   container slot's secret and identity paths inaccessible.
 - **A probe** the container's target runs itself: from the host, to the
   container's address, which is the host's own under the fleet's host
   networking.
 - **Its failed units** are read the same way, for its trial's minimal
-  criterion (slots.md, 12.3) and as its `units` fact (section 4).
+  criterion (domain/slots.md, 12.3) and as its `units` fact (section 4).
 - **To verify:** that `--machine=` reaches a container that
   `systemd-nspawn@.service` started, as machined registers it, and
   whether it needs a system bus inside the container
-  (slots.md, section 15).
+  (domain/slots.md, section 15).
 
 ## 3. Blessing with checks
 
-This extends slots.md, section 7.
+This extends domain/slots.md, section 7.
 
-- **M3's minimal criterion stays the first condition** (slots.md, 7.1):
+- **M3's minimal criterion stays the first condition** (domain/slots.md, 7.1):
   the boot reached its default target with no failed unit but those the
-  target's `bless.ignore_failed` lists (format.md), the slot's own
+  target's `bless.ignore_failed` lists (protocol/format.md), the slot's own
   steward is up and has answered its activator, and a builder it spawned
-  has rendered the slot's own revision (steward.md, section 6).
+  has rendered the slot's own revision (domain/steward.md, section 6).
 - **Then every blessing check of the slot's target must reach
   `passing`.** While the slot is on trial its blessing checks run back
   to back, a `trial_interval` apart (5 s to start), not at their watching
@@ -339,15 +339,15 @@ This extends slots.md, section 7.
   runs itself. A probe from another target cannot see a trial slot's
   hearth, so render refuses `blessing` with `from` (2.2). Under an
   engine, the engine may hold the bless while such probes bake
-  (wire.md, 5.4).
+  (protocol/wire.md, 5.4).
 - **`error` blocks the bless; `skip` does not.** A check that cannot be
   judged cannot prove health. A check that errors everywhere is a bug the
   lab finds first, since it runs the same checks.
 - **The trial's window grows with the checks.** The dead-man's window is
-  10 minutes in M3 (slots.md, 6.4). From M5 the steward computes it
+  10 minutes in M3 (domain/slots.md, 6.4). From M5 the steward computes it
   before prepare, from the blessing checks its builder's render answered
-  (steward.md, 3.3), and passes it as an input of the place request
-  (activator.md, 5.1). It is part of the prepare key (slots.md, 2.2) and
+  (domain/steward.md, 3.3), and passes it as an input of the place request
+  (domain/activator.md, 5.1). It is part of the prepare key (domain/slots.md, 2.2) and
   sealed into the slot's trial units, so a slot carries the window it
   was prepared with, and a change to the checks' windows is a new slot:
 
@@ -361,31 +361,31 @@ This extends slots.md, section 7.
 - **How a trial ends:**
   - every blessing check passing: the slot's steward asks its activator
     to bless, or to hold the bless under an engine that holds it
-    (slots.md, 7.4; wire.md, 5.4);
+    (domain/slots.md, 7.4; protocol/wire.md, 5.4);
   - the window passes first: the dead-man reboots into the default, and
     the slot falls back;
   - a check that is failing is waited for until the window ends, since
     services start at their own pace. Only what the minimal criterion
     treats as final ends a trial early: a failed unit that
-    `bless.ignore_failed` does not list (slots.md, 7.1). A desktop's
+    `bless.ignore_failed` does not list (domain/slots.md, 7.1). A desktop's
     routinely failing unit belongs on that list, so it never fails a
     trial.
 - **A container's trial** follows the same rule, with its own first
   condition: its unit stably active and no failed unit that counts,
-  read from its host (slots.md, 12.3). Its window is computed the same
+  read from its host (domain/slots.md, 12.3). Its window is computed the same
   way and kept by its host's activator, which falls it back at the end,
   since no dead-man runs in a container.
-- **A live trial's checks join its settle** (slots.md, 6.8, L7). From
+- **A live trial's checks join its settle** (domain/slots.md, 6.8, L7). From
   the swap on, the new slot's blessing checks run back to back at
   `trial_interval`, as on any trial; the live bless waits for the settle
-  period and for every one of them to pass (slots.md, 7.6). Its window
+  period and for every one of them to pass (domain/slots.md, 7.6). Its window
   is the base's, whose dead-man ends it, so a change whose new window
-  would be longer than the base's is not live (slots.md, 6.7, rule 10).
+  would be longer than the base's is not live (domain/slots.md, 6.7, rule 10).
   A failing check is waited for until a margin before that window ends;
-  then the steward asks the live fall back (slots.md, 8.5), which needs
+  then the steward asks the live fall back (domain/slots.md, 8.5), which needs
   no reboot, and the dead-man stays the backstop.
 - **A live bless is not the last word:** the slot's native boot is a
-  trial of its own (slots.md, 6.8, L9), and its blessing checks run
+  trial of its own (domain/slots.md, 6.8, L9), and its blessing checks run
   again there before the default moves.
 - **After the bless, checks only report.** Every check runs at its
   interval, blessing and watching alike. A check that starts failing on
@@ -398,8 +398,8 @@ This extends slots.md, section 7.
 ## 4. Facts up
 
 What decisions need, small and typed, sent when they change and only
-while the channel has room (wire.md, 5.6). The catalogue is
-wire.md, section 6.
+while the channel has room (protocol/wire.md, 5.6). The catalogue is
+protocol/wire.md, section 6.
 
 - **Check results** (section 2): each check's state and last result.
 - **Resource alarms,** sampled every 10 s, each with a level (`warning`,
@@ -412,7 +412,7 @@ wire.md, section 6.
   | pressure | `/proc/pressure/{cpu,memory,io}`, `avg60` | `some` above 20 %: warning; `full` above 10 % (memory, io): critical |
 
   - Thresholds are the `alarms` setting of the hearth task
-    (format.md, 5.12), so a target tunes its own.
+    (protocol/format.md, 5.12), so a target tunes its own.
   - **Hysteresis:** an alarm is raised after 3 samples past its
     threshold and cleared after 6 back within it, so a flapping value
     does not flood the channel.
@@ -423,7 +423,7 @@ wire.md, section 6.
 - **Failed units:** the running slot's units in the `failed` state,
   read every 30 s with `systemctl list-units --state=failed`, with each
   unit's `Result`. M3's minimal criterion already reads them during a
-  trial, leaving out those `bless.ignore_failed` lists (slots.md, 7.1);
+  trial, leaving out those `bless.ignore_failed` lists (domain/slots.md, 7.1);
   from M5 the whole list is a fact (`units`), ignored units included and
   marked, and each new one an event (`unit failed`). Which of
   systemctl's output forms is stable to parse is to verify.
@@ -431,27 +431,27 @@ wire.md, section 6.
   (2.9) and reported under their own targets. They share the host's file
   system, memory and pressure, so the host's alarms cover them, with the
   host's thresholds.
-- **Drift:** the activator's (slots.md, section 10), checked at every
+- **Drift:** the activator's (domain/slots.md, section 10), checked at every
   start of the activator and on demand, and from M5 on a period (daily
   to start), reported by its stable ids.
 - **Costs:** hearth's own, per build step: time, bytes fetched, cache
   hits; and the steward's memory, idle and at its peak, and the
-  builder's (build.md, section 12; steward.md, 5.3). The lab benchmarks
+  builder's (domain/build.md, section 12; domain/steward.md, 5.3). The lab benchmarks
   hearth with them, and a regression in its efficiency is a finding.
-- **Liveness is redialling** (wire.md, 5.5). A machine that stops
+- **Liveness is redialling** (protocol/wire.md, 5.5). A machine that stops
   redialling is down; there is no heartbeat fact.
 
 ## 5. Telemetry
 
 Logs and metrics stay on the machine, in bounded windows, served to
-whoever asks (wire.md, section 7; `hearth logs`). A triage agent or a
+whoever asks (protocol/wire.md, section 7; `hearth logs`). A triage agent or a
 person reads them through the engine.
 
 - **The journal lives in a data entry a task declares,** so it outlives
   slot switches: the `core` task's `journal` entry, the directory
   `/srv/core/journal` of `@x1-prod.core` on x1-prod, bound at
-  `/var/log/journal` with group `systemd-journal` (format.md, 5.7;
-  machine.md, 3.3).
+  `/var/log/journal` with group `systemd-journal` (protocol/format.md, 5.7;
+  domain/machine.md, 3.3).
   - The task sets journald's `Storage=persistent`, `SystemMaxUse=` and
     `MaxRetentionSec=` from its settings. The bash fleet relied on the
     directory's existence and capped it at 100 MB and a week.
@@ -460,16 +460,16 @@ person reads them through the engine.
     drop-in.
   - The journal's directory is `/var/log/journal/<machine-id>`. The
     machine-id is identity, written into every slot at prepare
-    (slots.md, 5.4), so every slot of the target writes one journal.
+    (domain/slots.md, 5.4), so every slot of the target writes one journal.
   - **A container's journal lives in its host's** [M5]. The host's
     activator writes `LinkJournal=try-host` into the container's nspawn
-    settings (slots.md, 12.1), so nspawn makes
+    settings (domain/slots.md, 12.1), so nspawn makes
     `/var/log/journal/<the container's machine-id>` in the host's
     journal, the `journal` entry's directory in its `core` class, and
     binds it into the container at the same path. The container's `core`
-    task declares no `journal` entry (format.md, 5.7).
+    task declares no `journal` entry (protocol/format.md, 5.7).
   - The container's machine-id is its identity, made once and kept by
-    its host's activator (slots.md, 5.4 and 12.1), so every slot of the
+    its host's activator (domain/slots.md, 5.4 and 12.1), so every slot of the
     container writes one journal. nspawn refuses to link a journal whose
     id is its host's, which a container's never is.
   - The host's steward reads it as it reads its own, being in
@@ -478,22 +478,22 @@ person reads them through the engine.
     runs or not. That journald inside a container with its own id range
     can write the directory nspawn makes, and that the host's
     `systemd-journal` can read what it writes there, is to verify on the
-    VM tier (testing.md, 7.3).
+    VM tier (domain/testing.md, 7.3).
 - **hearth samples the machine's signals:** CPU (`/proc/stat`), memory
   (`/proc/meminfo`), pressure (`/proc/pressure/*`), load
   (`/proc/loadavg`), and disk use per mount (`df`), every 10 s.
   - They are kept in a ring of fixed size in the steward's records, in
-    the store's `state/` (store.md, 8.3; steward.md, 2.2), at three
+    the store's `state/` (domain/store.md, 8.3; domain/steward.md, 2.2), at three
     resolutions: 10 s for 6 hours, 1 minute for 3 days, 15 minutes for
     60 days. The sizes are computed at startup and bounded.
   - The ring is on disk, so a reboot keeps what led up to it.
 - **Each check's history:** its last 1,024 results, a ring per check in
   the steward's records, beside the signals.
 - **Served on demand,** by bounded reads of a window
-  (wire.md, section 7). Nothing is pushed. The steward reads the journal
-  itself, as `hearth` in the group `systemd-journal` (activator.md, 3.2;
-  format.md, 5.12); its builder, spawned with no supplementary group,
-  cannot (steward.md, 2.3).
+  (protocol/wire.md, section 7). Nothing is pushed. The steward reads the journal
+  itself, as `hearth` in the group `systemd-journal` (domain/activator.md, 3.2;
+  protocol/format.md, 5.12); its builder, spawned with no supplementary group,
+  cannot (domain/steward.md, 2.3).
 - **No central store for metrics or logs to start.** If history across
   the fleet is needed later, it is a service the factory deploys from
   its own IaC, behind an observability connector of its own (temper's
@@ -504,13 +504,13 @@ person reads them through the engine.
 Work after a rollout is a change through temper, an operational effect,
 or one of the run side's standing procedures (convergence, certificate
 renewal, snapshots and backups). The operational effects start with three
-(wire.md, 5.4 defines their orders):
+(protocol/wire.md, 5.4 defines their orders):
 
 | Effect | Class | Condition or key |
 |---|---|---|
-| roll back | conditional | the running slot and the default the engine decided from (slots.md, section 9; activator.md, 5.5) |
-| restart a unit | keyed by the order's key, kept by hearth; conditional at the activator | the unit's `InvocationID` read when the order was taken (activator.md, 5.9); only a unit the running slot's spec ships or enables |
-| restore data [M5] | keyed by the order's key; conditional | the class subvolume's UUID the engine decided from; one entry or a whole class, from a snapshot by its sequence (7.4; activator.md, 5.12) |
+| roll back | conditional | the running slot and the default the engine decided from (domain/slots.md, section 9; domain/activator.md, 5.5) |
+| restart a unit | keyed by the order's key, kept by hearth; conditional at the activator | the unit's `InvocationID` read when the order was taken (domain/activator.md, 5.9); only a unit the running slot's spec ships or enables |
+| restore data [M5] | keyed by the order's key; conditional | the class subvolume's UUID the engine decided from; one entry or a whole class, from a snapshot by its sequence (7.4; domain/activator.md, 5.12) |
 
 - **Policy is the engine's.** Who may roll back or restart, when, and
   whether a person must accept it first are authority's (jig's
@@ -519,9 +519,9 @@ renewal, snapshots and backups). The operational effects start with three
 - **hearth checks only mechanics:** the key, the condition, that the
   unit belongs to the slot. It never refuses on judgement.
 - **For a container's target,** a roll back is a trial of its other
-  blessed slot through its host (slots.md, 12.3), and a restart names a
+  blessed slot through its host (domain/slots.md, 12.3), and a restart names a
   unit inside the container, restarted through `systemctl --machine=`
-  (activator.md, 5.9).
+  (domain/activator.md, 5.9).
 - **In standalone mode,** `hearth rollback` and `hearth restore` are
   the client's (client/README.md, 3.1). A person on the machine restarts a unit
   with `systemctl` as root; hearth does not wrap it.
@@ -533,7 +533,7 @@ renewal, snapshots and backups). The operational effects start with three
 A target's data belongs to its services, not to hearth's unprivileged
 side, so snapshotting it and backing it up is the activator's work, and
 it may use `btrfs send`, which needs root. Data is kept by class
-(format.md, 5.7): `core`, `data` and `cache`, one subvolume each, with a
+(protocol/format.md, 5.7): `core`, `data` and `cache`, one subvolume each, with a
 policy per class, as os's and the bash fleet's layout intended. The bash
 fleet relied on snapper, which missed `/srv/data` and was off on rhi for
 lack of disk, and had no off-machine backup of service data at all.
@@ -541,22 +541,22 @@ lack of disk, and had no off-machine backup of service data at all.
 ### 7.1 Snapshots [M5]
 
 - **What:** each class the `hearth` task's `snapshots` setting names
-  (format.md, 5.12), whole: a snapshot of `@mail-prod.data` holds
+  (protocol/format.md, 5.12), whole: a snapshot of `@mail-prod.data` holds
   postfix's spool and the mailboxes as they were at one instant. `cache`
   never.
 - **How:** on the class's period, from the running slot's data policies
-  (slots.md, 2.2), the activator itself takes a read-only snapshot,
+  (domain/slots.md, 2.2), the activator itself takes a read-only snapshot,
   atomic and crash-consistent, as a power cut would leave the data, with
   `BTRFS_IOC_SNAP_CREATE_V2` and the read-only flag
-  (activator.md, 5.11), the equivalent of:
+  (domain/activator.md, 5.11), the equivalent of:
 
   ```
   btrfs subvolume snapshot -r <top>/@mail-prod.data <top>/@hearth.snapshots/mail-prod.data/<seq>
   ```
 
   `<top>` is the top level, mounted by the activator at
-  `/run/hearth-activator/top` (machine.md, 3.2). `@hearth.snapshots` is
-  a top-level subvolume, root's, mode 0700 (machine.md, 3.1). `<seq>`
+  `/run/hearth-activator/top` (domain/machine.md, 3.2). `@hearth.snapshots` is
+  a top-level subvolume, root's, mode 0700 (domain/machine.md, 3.1). `<seq>`
   only grows, and keys the snapshot: one of that sequence means done.
   The activator's record of the class names each snapshot's sequence,
   time, which policies keep it, and its backup state [M6].
@@ -571,7 +571,7 @@ lack of disk, and had no off-machine backup of service data at all.
   at rest needs more (a quiescing command before the snapshot); that is
   open.
 - **A container's classes** sit on its host's top level
-  (slots.md, 12.1), so the host's activator snapshots them by its own
+  (domain/slots.md, 12.1), so the host's activator snapshots them by its own
   policies, into its own `@hearth.snapshots`, under the container's
   target.
 
@@ -590,7 +590,7 @@ lack of disk, and had no off-machine backup of service data at all.
   the parent. The parent is a local snapshot the backup keeps: the
   newest the peer has confirmed, whatever the local retention says.
 - **To a backup peer:** a target of the same environment that has the
-  `backup_peer` task, a role as exports read roles (format.md, 8.2).
+  `backup_peer` task, a role as exports read roles (protocol/format.md, 8.2).
   Render gives each target its peer through that task's exports, and
   the peer the targets it receives from, so a peer accepts streams only
   from the targets its own spec names.
@@ -605,9 +605,9 @@ lack of disk, and had no off-machine backup of service data at all.
   ```
 
   - **The peer's backup key** is an identity item of the peer's target,
-    an X25519 key made once with `age-keygen` (activator.md, 5.7), whose
+    an X25519 key made once with `age-keygen` (domain/activator.md, 5.7), whose
     public half is a fact, recorded in the repository and exported by
-    the peer's `backup_peer` task (format.md, 8.4 and 8.7).
+    the peer's `backup_peer` task (protocol/format.md, 8.4 and 8.7).
   - **The recipient reaches the activator at prepare,** in the class's
     policy in the sending slot's `data` part, rendered from that export,
     and is kept in the slot record: a send request names a class and a
@@ -622,7 +622,7 @@ lack of disk, and had no off-machine backup of service data at all.
 - **To verify:** `age` on trixie, and that it streams a large input in
   bounded memory (its format encrypts in 64 KiB chunks).
 - **Facts:** per class, the last snapshot's age, the last sent, the
-  peer and the bytes (`backup`, wire.md, section 6). An alarm when the
+  peer and the bytes (`backup`, protocol/wire.md, section 6). An alarm when the
   last confirmed send is older than two periods.
 
 ### 7.3 Retention
@@ -653,7 +653,7 @@ lack of disk, and had no off-machine backup of service data at all.
 - **An effect, granted by policy** like the others (section 6), keyed
   by the order's key and conditional on the class subvolume being the
   one decided from (its UUID, reported in the `data` fact). It is
-  an operation of the activator (activator.md, 5.12). In standalone
+  an operation of the activator (domain/activator.md, 5.12). In standalone
   mode, `hearth restore` asks for it (client/README.md, 3.1).
 - **From a local snapshot [M5], or from the peer [M6]:** a snapshot the
   machine no longer has is first received from the peer, which sends it
@@ -670,10 +670,10 @@ lack of disk, and had no off-machine backup of service data at all.
   4. a clean full reboot
   ```
 
-  The copy is slots.md, 5.3's walk through descriptors, with `FICLONE`.
+  The copy is domain/slots.md, 5.3's walk through descriptors, with `FICLONE`.
   The reboot is needed because the bind and every service hold the old
   directory until then; fstab names the source by path
-  (machine.md, 3.3), so the restored one is bound at the next boot.
+  (domain/machine.md, 3.3), so the restored one is bound at the next boot.
 - **A class: the swap of subvolumes:**
 
   ```
@@ -682,7 +682,7 @@ lack of disk, and had no off-machine backup of service data at all.
   3. rename  @mail-prod.data            →  @mail-prod.data.before.<seq>
      rename  @mail-prod.data.restoring  →  @mail-prod.data
   4. a clean full reboot, `systemctl reboot` with SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT=1
-     (slots.md, 6.3): fstab names the subvolume by name (machine.md, 3.3),
+     (domain/slots.md, 6.3): fstab names the subvolume by name (domain/machine.md, 3.3),
      so the restored one is mounted, and every bind of the class with it
   ```
 
@@ -691,11 +691,11 @@ lack of disk, and had no off-machine backup of service data at all.
   between the two renames is finished or undone at startup from the
   record. For a container's data, the reboot is a restart of the
   container instead, which binds the entries by path again
-  (slots.md, 12.2).
+  (domain/slots.md, 12.2).
 - **The old data is kept** as `mail.before.<seq>` or
   `@mail-prod.data.before.<seq>` until an operator or the engine
-  removes it. Both forms are in machine.md, 3.1 and 3.4's layout, so
-  drift expects them (slots.md, section 10).
+  removes it. Both forms are in domain/machine.md, 3.1 and 3.4's layout, so
+  drift expects them (domain/slots.md, section 10).
 - **One entry from a class snapshot restores that entry only:** the
   other services of the class keep their present data, so a restore
   that must agree across services (postfix's queue and the mailboxes)
@@ -718,11 +718,11 @@ lack of disk, and had no off-machine backup of service data at all.
   needs no cooperation from the system under test.
 - **Granted only by the lab's policy,** and refused by the activator
   itself on any machine but a lab pool host, whatever its engine says
-  (activator.md, 5.15). A pool host of the lab is one whose own target
+  (domain/activator.md, 5.15). A pool host of the lab is one whose own target
   is in the lab's environment and has containers placed on it
-  (format.md, 3.5; slots.md, 12.4).
+  (protocol/format.md, 3.5; domain/slots.md, 12.4).
 - **The kinds, each applied and removed by an operation of the
-  activator [M6] (activator.md, 5.15) with typed arguments, never a
+  activator [M6] (domain/activator.md, 5.15) with typed arguments, never a
   command line from the engine:**
 
   | Fault | Mechanism, on the host (to verify) |
@@ -735,7 +735,7 @@ lack of disk, and had no off-machine backup of service data at all.
 - **The network faults need a pool's containers on networks of their
   own** (veth pairs and a bridge), where the fleet's containers share
   their host's (`VirtualEthernet=no`); a container's network is a
-  placement field, `network: veth` with its `bridge` (format.md, 3.4).
+  placement field, `network: veth` with its `bridge` (protocol/format.md, 3.4).
 - **Every fault has an end,** a duration in its order, after which the
   host's hearth removes it itself: a fault, like a trial, always ends,
   even if the engine is gone.
@@ -752,7 +752,7 @@ lack of disk, and had no off-machine backup of service data at all.
   TCP, HTTP, SMTP and DNS, which answer slowly, refuse, reset, present a
   certificate close to expiry or offer no `STARTTLS`; probers that lose
   their route to the probed target; a host's containers, whose units
-  and commands are reached with `--machine=` (testing.md, 3.12). The
+  and commands are reached with `--machine=` (domain/testing.md, 3.12). The
   seed draws them. Its invariants:
   - a slot is blessed only once the minimal bless held and every
     blessing check reached `passing`, within the trial's window;
@@ -784,7 +784,7 @@ lack of disk, and had no off-machine backup of service data at all.
     a lost parent leads to a full send, never a broken chain [M6].
 - **The faults' world:** every fault ends at its end; none is applied
   outside a lab pool host; removing twice is harmless.
-- **Conformance and the VM tier** (testing.md, sections 5 and 7): the
+- **Conformance and the VM tier** (domain/testing.md, sections 5 and 7): the
   sandbox's properties, the probes against real postfix, nginx and a
   DNS server, `btrfs send` and `receive` between two VMs, and a restore
   that boots.
@@ -802,7 +802,7 @@ lack of disk, and had no off-machine backup of service data at all.
 - **Restoring an entry without a reboot:** stopping the units that use
   the entry, swapping its directory and remounting its bind; it depends
   on hearth knowing those units, as `live` entries name them for files
-  (format.md, 5.14).
+  (protocol/format.md, 5.14).
 - **Backups at rest on the peer:** whether the peer keeps the
   ciphertext streams as files, needing no root and never seeing the
   data, at the cost of retention keeping whole chains between periodic
@@ -812,7 +812,7 @@ lack of disk, and had no off-machine backup of service data at all.
   encrypting for the peer (7.2): no steward would carry the stream at
   all, but the activator would dial out and need an HTTP and TLS client
   of its own; it depends on how small the activator must stay
-  (activator.md, section 2).
+  (domain/activator.md, section 2).
 - **Where backup peers live** and how many each target has; it depends
   on the run side's pools.
 - **DNS probes over UDP:** a DNS machine over TCP needs nothing new;
@@ -824,11 +824,11 @@ lack of disk, and had no off-machine backup of service data at all.
 - **Operational effects beyond the three,** when one is needed.
 - **Faults' mechanisms** on the pool host: the exact nftables and `tc`
   recipes, and whether qgroups cost too much to leave enabled; it
-  depends on the lab's pool hosts (machine.md).
+  depends on the lab's pool hosts (domain/machine.md).
 - **History across the fleet:** when a central store for metrics and
   logs is worth deploying, and which.
 - **A container's journal under its own ids [M5]:** whether journald
   in a container with a private id range can write the directory
   `LinkJournal=try-host` makes on the host, and whether the host's
   `systemd-journal` reads its files (section 5); to verify on the VM
-  tier (testing.md, 7.3).
+  tier (domain/testing.md, 7.3).

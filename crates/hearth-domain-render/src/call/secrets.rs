@@ -1,4 +1,4 @@
-//! Assemble names and places after target expansion (render.md, 3.3).
+//! Assemble names and places after target expansion (domain/render.md, 3.3).
 use crate::{entries::Expansion, errors, parts, parts::meta, vocabulary::Outcome};
 use alloc::boxed::Box;
 pub(crate) fn build(

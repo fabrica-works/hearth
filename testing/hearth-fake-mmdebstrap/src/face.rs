@@ -1,4 +1,4 @@
-//! Render's simulate vector and apt's list names (render.md, 5.2 and 5.3).
+//! Render's simulate vector and apt's list names (domain/render.md, 5.2 and 5.3).
 use crate::resolve::{Failure, Field, Variant};
 use hearth_fake_machine::hearth::mirror::Timestamp;
 use std::fmt::Write;
@@ -45,7 +45,7 @@ pub struct Printed {
 pub fn check(args: &[Box<[u8]>], env: &[Box<[u8]>]) -> Simulate {
     let mut args = args.iter().map(AsRef::as_ref);
     for fixed in [b"--verbose".as_slice(), b"--simulate", b"--mode=chrootless", b"--variant=apt"] {
-        assert_eq!(args.next(), Some(fixed), "render.md 5.2's ordered vector");
+        assert_eq!(args.next(), Some(fixed), "domain/render.md 5.2's ordered vector");
     }
     let architecture =
         args.next().expect("architecture").strip_prefix(b"--architectures=").expect("architecture option");
@@ -83,7 +83,7 @@ pub fn check(args: &[Box<[u8]>], env: &[Box<[u8]>]) -> Simulate {
         b"PATH=/usr/sbin:/usr/bin:/sbin:/bin".as_slice().into(),
         [b"TMPDIR=".as_slice(), &scratch].concat().into(),
     ]);
-    assert_eq!(env, expected.as_ref(), "the complete environment of render.md 5.2");
+    assert_eq!(env, expected.as_ref(), "the complete environment of domain/render.md 5.2");
     Simulate {
         variant: Variant::Apt,
         architecture: architecture.into(),

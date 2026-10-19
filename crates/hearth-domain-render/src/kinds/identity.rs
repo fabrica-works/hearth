@@ -1,4 +1,4 @@
-//! M1 identity is an SSH host key (format.md, 9.3).
+//! M1 identity is an SSH host key (protocol/format.md, 9.3).
 use super::secrets::{fault, formed, mode, required, text};
 use crate::{
     entries::Located,

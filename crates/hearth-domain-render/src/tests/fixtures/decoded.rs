@@ -9,7 +9,7 @@ pub const ADMITTED_DOCUMENTS: u32 = 4;
 pub const OVER_BUDGET_DOCUMENTS: u32 = ADMITTED_DOCUMENTS + 1;
 // The source fits one document: two bytes per zero, then the enclosing syntax.
 pub const DOCUMENT_SOURCE_BYTES: u64 = 262_143;
-/// The shipped template input allowance (render.md, 2.3).
+/// The shipped template input allowance (domain/render.md, 2.3).
 pub const TEMPLATE_BYTES: u64 = 262_144;
 pub const DOCUMENT_PATHS: &[&[u8]] = &[b"envs/a.json", b"envs/b.json", b"envs/c.json", b"envs/d.json", b"envs/e.json"];
 

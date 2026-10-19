@@ -1,4 +1,4 @@
-//! Cache admission preserves the first record and never evicts (store.md, 6.8, 8.1).
+//! Cache admission preserves the first record and never evicts (domain/store.md, 6.8, 8.1).
 use crate::{
     Store,
     limits::Limits,

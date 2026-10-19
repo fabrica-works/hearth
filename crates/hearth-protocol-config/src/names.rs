@@ -1,4 +1,4 @@
-//! Names in configuration documents (format.md, 2.4).
+//! Names in configuration documents (protocol/format.md, 2.4).
 #[must_use]
 pub fn identifier(name: &[u8]) -> bool {
     let Some(first) = name.first() else {
@@ -15,7 +15,7 @@ pub fn identifier(name: &[u8]) -> bool {
     true
 }
 
-/// A base, environment or member name (format.md, 2.4).
+/// A base, environment or member name (protocol/format.md, 2.4).
 #[must_use]
 pub fn member(name: &[u8]) -> bool {
     let Some(first) = name.first() else {

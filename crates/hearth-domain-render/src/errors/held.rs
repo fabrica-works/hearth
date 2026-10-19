@@ -1,4 +1,4 @@
-//! The bytes an error owns, and the stable order of render.md, 7.1.
+//! The bytes an error owns, and the stable order of domain/render.md, 7.1.
 use super::{Cause, Collision, Composition, Decode, Error, Host, Kind, Order, Place, Repository, Resolution, Schema};
 use alloc::boxed::Box;
 use core::cmp::Ordering;

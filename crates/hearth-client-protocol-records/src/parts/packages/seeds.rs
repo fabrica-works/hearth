@@ -1,4 +1,4 @@
-//! Fixed ids in the packages record (render.md, 4.2).
+//! Fixed ids in the packages record (domain/render.md, 4.2).
 use super::Seeds;
 use crate::form::text::Lines;
 use skein_json::writer::Encoder;

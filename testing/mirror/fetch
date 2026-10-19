@@ -1,5 +1,5 @@
 #!/bin/sh
-# Fetch the signed local test mirror once (testing.md, 6.2).
+# Fetch the signed local test mirror once (domain/testing.md, 6.2).
 set -eu
 for tool in curl sqv xz sha256sum awk sed wc date mkdir ln mv dirname cat tr head grep cut; do
     command -v "$tool" >/dev/null || { echo "missing tool: $tool" >&2; exit 1; }

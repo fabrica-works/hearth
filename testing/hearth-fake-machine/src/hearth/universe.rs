@@ -1,4 +1,4 @@
-//! The M1 package index (testing.md, 3.6), with Policy 7.1 relations.
+//! The M1 package index (domain/testing.md, 3.6), with Policy 7.1 relations.
 use super::version;
 use alloc::{
     boxed::Box,

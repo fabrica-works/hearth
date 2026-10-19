@@ -1,4 +1,4 @@
-//! Render answers become the client's typed records (render.md, 8.1).
+//! Render answers become the client's typed records (domain/render.md, 8.1).
 use crate::{
     records::{outcome as target, parts::meta, records},
     render::{parts as source, revision, vocabulary::Outcome},
@@ -98,7 +98,7 @@ fn kind(layer: crate::builder::build::Layer) -> crate::records::build::Kind {
         Layer::Config => Kind::Config,
     }
 }
-/// The step a build ended on, named with its layer (build.md, 3).
+/// The step a build ended on, named with its layer (domain/build.md, 3).
 #[must_use]
 pub fn failed(
     step: crate::builder::build::Step,
@@ -128,7 +128,7 @@ pub fn failed(
         },
     }
 }
-/// The store full at a limit, as an operational error of kind store (store.md, 8.1).
+/// The store full at a limit, as an operational error of kind store (domain/store.md, 8.1).
 #[must_use]
 pub fn full(limit: crate::builder::store::vocabulary::Limit, most: u32, store: &[u8]) -> crate::records::errors::Error {
     use crate::{

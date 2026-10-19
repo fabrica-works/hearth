@@ -1,4 +1,4 @@
-//! Software records and their fetch hints (render.md, 4.2).
+//! Software records and their fetch hints (domain/render.md, 4.2).
 pub use super::config::Script;
 use crate::form::text::Lines;
 use alloc::boxed::Box;

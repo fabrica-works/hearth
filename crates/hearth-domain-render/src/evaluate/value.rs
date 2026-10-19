@@ -1,4 +1,4 @@
-//! Validated values and expression operands (format.md, 6.2, 7.4, 7.6).
+//! Validated values and expression operands (protocol/format.md, 6.2, 7.4, 7.6).
 use super::{Budget, ELEMENT, FaultKind};
 use alloc::boxed::Box;
 use skein_lib::{List, Stack, bytes};

@@ -13,7 +13,7 @@ fn a_cold_restart_settles_what_a_cut_left_behind() {
         let left = run.finish();
         assert!(left.strays() > 0, "seed {seed}: a synced arrival awaits its rename");
         let after = left.restart().finish();
-        assert_eq!(after.strays(), 0, "seed {seed}: store.md, 11");
+        assert_eq!(after.strays(), 0, "seed {seed}: domain/store.md, 11");
         assert_eq!(after.outcome, Some(Outcome::Done), "seed {seed}: call answered");
         assert_eq!(after.answers.len(), 1, "seed {seed}: one spec");
         assert!(matches!(fixtures::only(&after.answers), Answer::Spec(_)), "seed {seed}");
@@ -170,7 +170,7 @@ fn a_build_whose_config_layer_is_published_finds_all_three() {
                 Answer::Layer { layer: Layer::Software, key: keys.software, state: State::Found },
                 Answer::Layer { layer: Layer::Config, key: keys.config, state: State::Found },
             ],
-            "seed {seed}: build.md, 4.1: a published config key is the output"
+            "seed {seed}: domain/build.md, 4.1: a published config key is the output"
         );
         assert!(
             !found.requests().iter().any(|request| matches!(request, Request::Run { .. })),

@@ -1,4 +1,4 @@
-//! Configured bounds (render.md, 2.3).
+//! Configured bounds (domain/render.md, 2.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
     pub document: u32,

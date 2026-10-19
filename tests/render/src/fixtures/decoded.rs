@@ -9,7 +9,7 @@ use skein_lib::{Env, Queue, Time, Wall};
 use skein_world::domain::heap::Meter;
 
 // A 256-KiB newline-only template holds its text and 262,145 u32 offsets.
-// The decoded charge adds the one instruction's 32 bytes (render.md, 2.3).
+// The decoded charge adds the one instruction's 32 bytes (domain/render.md, 2.3).
 pub const DECODED_TEMPLATE_BYTES: u64 = 1_310_756; // Text + 32 + 262,145 * 4.
 pub const DECODED_TEMPLATES: u32 = 12; // 16,777,216 / 1,310,756.
 // Sixteen 256-KiB comments have 262,141 lines each and almost fill 16 MiB.

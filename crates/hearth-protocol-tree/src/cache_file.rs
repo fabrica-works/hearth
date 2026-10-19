@@ -1,4 +1,4 @@
-//! Cache files' provenance records, kind 5 at version 1 (store.md, 6.5).
+//! Cache files' provenance records, kind 5 at version 1 (domain/store.md, 6.5).
 
 use crate::{
     fields::Fields,
@@ -18,7 +18,7 @@ pub struct CacheFile {
     pub size: u64,
     pub took: Duration,
 }
-/// A map of the variant's fields and `kind`, its name (store.md, 3.1).
+/// A map of the variant's fields and `kind`, its name (domain/store.md, 3.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Origin {
     Fetch { uri: Box<[u8]> },

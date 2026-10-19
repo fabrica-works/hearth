@@ -1,4 +1,4 @@
-//! Store records, kind 1 at version 1 (store.md, 6.6).
+//! Store records, kind 1 at version 1 (domain/store.md, 6.6).
 
 use crate::{
     fields::Fields,
@@ -17,7 +17,7 @@ pub struct Store {
     pub range: Option<Range>,
     pub uid: u32,
 }
-/// The subordinate range; absent in a store without layers (store.md, 2.4).
+/// The subordinate range; absent in a store without layers (domain/store.md, 2.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Range {
     pub base: u32,

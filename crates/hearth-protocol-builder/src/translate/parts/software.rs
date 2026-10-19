@@ -1,4 +1,4 @@
-//! Software records translated exhaustively (render.md, 4.2).
+//! Software records translated exhaustively (domain/render.md, 4.2).
 use crate::{records::parts::software as target, render::parts::software as source};
 use alloc::boxed::Box;
 #[must_use]

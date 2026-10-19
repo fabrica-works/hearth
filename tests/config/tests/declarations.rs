@@ -41,7 +41,8 @@ const READS: &[ReadShape] = &[
 fn the_reads_example_decodes_to_its_three_reads_cut_anywhere() {
     for seed in 0..8 {
         let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
-        let declaration = world::declare(examples::task("reads").bytes, &settings, seed).expect("format.md, 6.4");
+        let declaration =
+            world::declare(examples::task("reads").bytes, &settings, seed).expect("protocol/format.md, 6.4");
         assert_eq!(declaration.reads.len(), 3);
         for (read, expected) in declaration.reads.iter().zip(READS) {
             assert_eq!(
@@ -60,7 +61,8 @@ const READ_SETTINGS: &[(&[u8], &[u8], Position)] = &[
 fn the_reads_example_keeps_each_setting_at_its_string() {
     for seed in 0..8 {
         let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
-        let declaration = world::declare(examples::task("reads").bytes, &settings, seed).expect("format.md, 6.4");
+        let declaration =
+            world::declare(examples::task("reads").bytes, &settings, seed).expect("protocol/format.md, 6.4");
         let observed: Vec<_> = declaration
             .reads
             .iter()
@@ -77,7 +79,8 @@ const SCRIPTS: &[Script] = &[
 fn the_scripts_example_decodes_cut_anywhere() {
     for seed in 0..8 {
         let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
-        let declaration = world::declare(examples::task("scripts").bytes, &settings, seed).expect("format.md, 5.8");
+        let declaration =
+            world::declare(examples::task("scripts").bytes, &settings, seed).expect("protocol/format.md, 5.8");
         assert_eq!(&*declaration.scripts, SCRIPTS, "seed {seed}");
     }
 }
@@ -85,7 +88,8 @@ fn the_scripts_example_decodes_cut_anywhere() {
 fn the_bless_example_decodes_cut_anywhere() {
     for seed in 0..8 {
         let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
-        let declaration = world::declare(examples::task("bless").bytes, &settings, seed).expect("format.md, 5.13");
+        let declaration =
+            world::declare(examples::task("bless").bytes, &settings, seed).expect("protocol/format.md, 5.13");
         let bless = declaration.bless.expect("bless");
         let [unit] = &bless.ignore_failed[..] else { panic!("one unit") };
         assert_eq!(bless.at, Position { offset: 11, line: 1, column: 12 });
@@ -122,7 +126,7 @@ fn every_entry_example_decodes_to_its_entries_cut_anywhere() {
         for seed in 0..8 {
             let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
             let declaration =
-                world::declare(examples::task(name).bytes, &settings, seed).expect("format.md entry example");
+                world::declare(examples::task(name).bytes, &settings, seed).expect("protocol/format.md entry example");
             assert_eq!(declaration.entries.len(), maps, "{name}, seed {seed}");
             let actual = declaration.entries.iter().find(|actual| actual.map == map).expect("expected map");
             assert_eq!(actual.entries.len(), entries, "{name}, {map:?}, seed {seed}");
@@ -162,7 +166,7 @@ fn every_schema_example_decodes_to_its_settings_cut_anywhere() {
         for seed in 0..8 {
             let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
             let declaration =
-                world::declare(examples::task(name).bytes, &settings, seed).expect("format.md schema example");
+                world::declare(examples::task(name).bytes, &settings, seed).expect("protocol/format.md schema example");
             let actual: Vec<_> = declaration.settings.iter().map(|spec| &*spec.name.text).collect();
             assert_eq!(actual, names, "{name}, seed {seed}");
             assert_eq!(declaration.types.len(), types, "{name}, seed {seed}");
@@ -200,7 +204,8 @@ fn every_task_example_decodes_as_a_declaration_cut_anywhere() {
     for &(name, exports) in TASK_EXAMPLES {
         for seed in 0..8 {
             let settings = Settings::calm(&mut Rng::new(seed), SHIPPED);
-            let declared = world::declare(examples::task(name).bytes, &settings, seed).expect("format.md task example");
+            let declared =
+                world::declare(examples::task(name).bytes, &settings, seed).expect("protocol/format.md task example");
             let actual: Vec<_> = declared.exports.iter().map(|export| &*export.name.text).collect();
             assert_eq!(actual, exports, "{name}, seed {seed}");
         }

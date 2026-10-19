@@ -15,4 +15,4 @@ secrets      part ac870b5c968e
 live         part 6f1b7fda0c21
 exports      part 970579fd41be
 
-tasks/broken/task.json:1:21: bad-prod: broken: "rootwait" is reserved: tiny-initramfs would wait for ever for a missing root (machine.md, 6.2)
+tasks/broken/task.json:1:21: bad-prod: broken: "rootwait" is reserved: tiny-initramfs would wait for ever for a missing root (domain/machine.md, 6.2)

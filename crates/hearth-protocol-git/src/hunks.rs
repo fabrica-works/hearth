@@ -1,4 +1,4 @@
-//! Unified hunks with bounded lines and retained text (render.md, 2.2 and 6.1).
+//! Unified hunks with bounded lines and retained text (domain/render.md, 2.2 and 6.1).
 use crate::{MaxOut, limits::Limits};
 use alloc::boxed::Box;
 use core::mem;

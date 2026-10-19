@@ -1,4 +1,4 @@
-//! cat-file --batch's bounded header and streamed body (render.md, 2.2–2.3).
+//! cat-file --batch's bounded header and streamed body (domain/render.md, 2.2–2.3).
 use crate::{MaxOut, limits::Limits, oid::Oid};
 use alloc::boxed::Box;
 use skein_lib::{

@@ -14,7 +14,7 @@ const GUARD: &str =
 fn a_false_guard_prints_as_render_md_shows() {
     let printed =
         form::print(Form::Text, &Record::Error(fixtures::modules_guard()), Some(Type::Spec), &limits::SHIPPED);
-    assert_eq!(printed.as_deref(), Ok(GUARD.as_bytes()), "render.md, 7.3, after a spec's blank line");
+    assert_eq!(printed.as_deref(), Ok(GUARD.as_bytes()), "domain/render.md, 7.3, after a spec's blank line");
 }
 const WITHOUT_TARGET: &str =
     "tasks/boot/task.json:22:7: boot: requires modules: no initramfs modules for this hardware\n";

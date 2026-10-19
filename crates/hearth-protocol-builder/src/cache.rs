@@ -1,4 +1,4 @@
-//! A single streamed cache file, durable before publication (store.md, 6.8).
+//! A single streamed cache file, durable before publication (domain/store.md, 6.8).
 use crate::render::vocabulary::Digest;
 use alloc::boxed::Box;
 use skein_io::{file, kernel::Fd};

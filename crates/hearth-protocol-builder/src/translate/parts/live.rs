@@ -1,4 +1,4 @@
-//! Live records translated exhaustively (render.md, 4.4).
+//! Live records translated exhaustively (domain/render.md, 4.4).
 use crate::{records::parts::live as target, render::parts::live as source};
 use alloc::boxed::Box;
 #[must_use]

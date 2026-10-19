@@ -1,4 +1,4 @@
-//! The root's requests as git processes and decoded documents (render.md, 8.1).
+//! The root's requests as git processes and decoded documents (domain/render.md, 8.1).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
@@ -241,7 +241,7 @@ impl Protocol {
             Mode::Read(read) => read.failed() || (child.output.is_some() && read.work_pending()),
         }
     }
-    /// Every step is unavailable until the task that runs it (build.md, 4.3).
+    /// Every step is unavailable until the task that runs it (domain/build.md, 4.3).
     fn resume_run(&mut self, above: &mut Queue<Event>) -> bool {
         let Some(step) = self.ran.take() else { return false };
         above.push(Event::Build(builder::build::vocabulary::Event::Unavailable { step }));

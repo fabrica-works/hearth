@@ -1,4 +1,4 @@
-//! Live records translated exhaustively (render.md, 4.4).
+//! Live records translated exhaustively (domain/render.md, 4.4).
 use crate::{records::parts::live as source, render::parts::live as target};
 #[must_use]
 pub(super) fn back(live: source::Live) -> target::Live {

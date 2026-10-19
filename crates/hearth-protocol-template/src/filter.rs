@@ -1,4 +1,4 @@
-/// Filters by name and argument count (format.md, 7.5).
+/// Filters by name and argument count (protocol/format.md, 7.5).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Filter {
     Default,

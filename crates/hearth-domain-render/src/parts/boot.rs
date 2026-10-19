@@ -1,4 +1,4 @@
-//! Boot parameters and mutability (render.md, 4.3).
+//! Boot parameters and mutability (domain/render.md, 4.3).
 use crate::{
     entries::Expansion,
     errors::Error,

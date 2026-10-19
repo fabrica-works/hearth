@@ -17,7 +17,7 @@ pub fn building() -> Scenario<'static> {
         ..super::thin()
     }
 }
-/// A config layer's record whose key recomputes from its parent and part (store.md, 6.2).
+/// A config layer's record whose key recomputes from its parent and part (domain/store.md, 6.2).
 #[must_use]
 pub fn config_layer(key: Digest, software: Digest, part: Digest) -> Layer {
     Layer {

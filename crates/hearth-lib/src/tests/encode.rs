@@ -5,7 +5,7 @@ use crate::encode::{DEPTH, Digest, Encoder, Item};
 fn a_list_of_texts_encodes_as_store_md_writes_it() {
     let value = [Item::List(2), text(b"hearth/1"), text(b"empty")];
     let expected = hex("06 0000000000000002 04 0000000000000008 6865617274682f31 04 0000000000000005 656d707479");
-    assert_eq!(encode(&value), expected, "store.md, 3.2: encode(list [bytes hearth/1, bytes empty])");
+    assert_eq!(encode(&value), expected, "domain/store.md, 3.2: encode(list [bytes hearth/1, bytes empty])");
 }
 
 #[test]
@@ -14,7 +14,7 @@ fn a_map_key_is_encoded_as_a_whole_bytes_value() {
     assert_eq!(
         encode(&value),
         hex("07 0000000000000001 04 0000000000000001 61 03 0000000000000001"),
-        "store.md, 3.2: a key is bytes"
+        "domain/store.md, 3.2: a key is bytes"
     );
 }
 

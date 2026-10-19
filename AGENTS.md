@@ -11,7 +11,7 @@
   `tests/fuzzy_*.rs`, randomized tests) at most 1 minute. Keep new tests
   within these budgets: see the same document. Every test runs as a
   regular user; conformance, real builds and the VM tier are outside the
-  gate (`testing.md`, 2.8).
+  gate (`domain/testing.md`, 2.8).
 - **hearth is the factory's build daemon** (temper's `factory.md`,
   section 7): it renders, builds and runs a machine's outputs. Read
   [docs/design/README.md](docs/design/README.md) first: its section 2 is
@@ -25,8 +25,8 @@
   Citations use those file
   names and their sections. hearth depends on no crate of smith, jig or
   temper.
-- **hearth's design is `docs/design/`.** Inside hearth, a bare file name
-  names one of its documents (`render.md, 8.3`); other projects'
+- **hearth's design is `docs/design/`.** Inside hearth, a document is named
+  by its path from there (`domain/render.md, 8.3`); other projects'
   documents carry their project's name, never a path (skein's
   `json.md`, temper's `factory.md`): `README.md`, section 6. Code cites a
   section at module or type level, never stamped on every field.
@@ -37,9 +37,9 @@
   the step crates' lints; a crate of ordinary Rust declares its own.
 - **Step code depends on skein's crates and hearth's own, and nothing
   else:** no serde, and no template engine; hearth parses its own
-  templates (`render.md`, 8.3). MiniJinja 2 is a dev-dependency only,
+  templates (`domain/render.md`, 8.3). MiniJinja 2 is a dev-dependency only,
   pinned to an exact version, as the template world's oracle
-  (`render.md`, 9.5).
+  (`domain/render.md`, 9.5).
 - **skein is named by its GitHub URL,**
   `{ git = "https://github.com/fabrig-dev/skein.git" }`, in the root
   `Cargo.toml`'s `[workspace.dependencies]`, with no `rev`, `branch` or

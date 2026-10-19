@@ -1,4 +1,4 @@
-//! Secret records translated exhaustively (render.md, 4.3).
+//! Secret records translated exhaustively (domain/render.md, 4.3).
 use crate::{records::parts::secrets as source, render::parts::secrets as target};
 #[must_use]
 pub(super) fn back(secrets: source::Secrets) -> target::Secrets {

@@ -1,4 +1,4 @@
-//! Meta's changed fields (render.md, 6.1).
+//! Meta's changed fields (domain/render.md, 6.1).
 use crate::diff::{MemberPair, MetaChange, NamePair, PlacementPair};
 use crate::{
     form::{json::field, text::Lines},

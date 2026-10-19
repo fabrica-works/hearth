@@ -1,4 +1,4 @@
-//! The independent engine adapter and the differences listed by render.md, 9.5.
+//! The independent engine adapter and the differences listed by domain/render.md, 9.5.
 use hearth_domain_render::{
     evaluate::{self, Operand, Value as HearthValue},
     limits,
@@ -39,7 +39,7 @@ pub const DIFFERENCES: &[Difference] = &[
         template: "{{ 'a' + 'b' }}",
         hearth: Outcome::Fails,
         oracle: Outcome::Text(Cow::Borrowed("ab")),
-        reason: "Addition takes integers in format.md 7.4.",
+        reason: "Addition takes integers in protocol/format.md 7.4.",
     },
     Difference {
         id: "boolean concatenation",

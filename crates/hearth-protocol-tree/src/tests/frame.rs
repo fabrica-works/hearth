@@ -15,7 +15,7 @@ fn a_framed_body_has_the_header_store_md_gives_byte_for_byte() {
         "6865617274680072 0001 0001 00000000 000000000000001c ",
         "07 0000000000000001 04 0000000000000001 61 03 0000000000000001"
     ));
-    assert_eq!(framed, expected, "store.md, 6.1's header around 3.2's map");
+    assert_eq!(framed, expected, "domain/store.md, 6.1's header around 3.2's map");
     assert_eq!(frame::body(&framed, Kind::Store, &SHIPPED), Ok(body.as_ref()), "the frame returns its body");
 }
 

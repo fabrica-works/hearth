@@ -20,7 +20,7 @@ fn a_settings_reference_must_be_a_declared_setting() {
                 },
                 9
             )),
-            "row {row}: format.md, 6.4"
+            "row {row}: protocol/format.md, 6.4"
         );
     }
 }

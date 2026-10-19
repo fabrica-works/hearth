@@ -1,4 +1,4 @@
-//! Scenario data shared with fake git (testing.md, 5.2).
+//! Scenario data shared with fake git (domain/testing.md, 5.2).
 use hearth_protocol_git::hunks::Kind as LineKind;
 pub const IDENTITY: &[(&str, &str)] = &[
     ("GIT_AUTHOR_NAME", "hearth"),

@@ -1,4 +1,4 @@
-//! Layer records, kind 2 at version 1 (store.md, 6.2).
+//! Layer records, kind 2 at version 1 (domain/store.md, 6.2).
 
 use crate::{
     fields::Fields,

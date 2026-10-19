@@ -1,4 +1,4 @@
-//! Check the composed Debian root before task conditions (render.md, 3.3).
+//! Check the composed Debian root before task conditions (domain/render.md, 3.3).
 use super::{Target, compose};
 use crate::{errors, evaluate::Value, schema};
 use skein_lib::{List, bytes};

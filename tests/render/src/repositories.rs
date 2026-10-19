@@ -1,4 +1,4 @@
-//! Small fleets generated from a model, never from a rendered spec (render.md, 9.3).
+//! Small fleets generated from a model, never from a rendered spec (domain/render.md, 9.3).
 use crate::{
     golden::{Kind, Leaf},
     json::{self, Json},

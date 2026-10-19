@@ -1,4 +1,4 @@
-//! Boundary obligations and the store's settled invariants (testing.md, 8.4).
+//! Boundary obligations and the store's settled invariants (domain/testing.md, 8.4).
 use crate::files::Files;
 use skein_io::kernel::Kind;
 use skein_world::domain::Ledger;
@@ -26,7 +26,7 @@ impl Referee {
     pub fn settled(&self, files: &Files) {
         self.requests.assert_settled();
         assert_eq!(self.asked, self.ended, "each request has one terminal");
-        assert_eq!(strays(files), 0, "store.md, 11: no temporary and no staging entry");
+        assert_eq!(strays(files), 0, "domain/store.md, 11: no temporary and no staging entry");
         let names = files.names(files.roots.cache);
         for entry in &names {
             if let Some(file) = entry.name.strip_suffix(b".record") {

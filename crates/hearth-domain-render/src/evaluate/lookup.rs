@@ -1,4 +1,4 @@
-//! Strict lookups, with only marked missing links yielding undefined (format.md, 7.6).
+//! Strict lookups, with only marked missing links yielding undefined (protocol/format.md, 7.6).
 use super::{
     FaultKind, Missing,
     value::{Entry, Operand, Value},

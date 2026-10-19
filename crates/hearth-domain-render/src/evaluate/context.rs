@@ -1,4 +1,4 @@
-//! The five roots and scoped names (format.md, 7.7).
+//! The five roots and scoped names (protocol/format.md, 7.7).
 use super::{
     Budget, FaultKind,
     value::{Entry, Operand, Value},
@@ -112,7 +112,7 @@ pub fn target(meta: &Meta, containers: &[crate::compose::Container]) -> Value {
 }
 use alloc::boxed::Box;
 
-/// One task's owned context roots (format.md, 7.7).
+/// One task's owned context roots (protocol/format.md, 7.7).
 #[derive(Debug, Hash)]
 pub struct Roots {
     pub target: Value,

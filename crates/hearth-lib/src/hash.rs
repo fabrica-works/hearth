@@ -1,8 +1,8 @@
-//! H hashes the canonical encoding as it is written, without a copy (store.md, 3.2).
+//! H hashes the canonical encoding as it is written, without a copy (domain/store.md, 3.2).
 
 use crate::encode::{Digest, Encoder};
 
-/// The encoding's version and hearth's constants', H's first value (store.md, 3.2).
+/// The encoding's version and hearth's constants', H's first value (domain/store.md, 3.2).
 pub const VERSION: &[u8] = b"hearth/1";
 
 /// One digest being made: its list's head, version and tag hashed, its values to come.

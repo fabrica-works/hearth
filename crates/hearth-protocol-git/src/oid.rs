@@ -1,4 +1,4 @@
-//! Git object ids, read exactly as git prints them (render.md, 2.2).
+//! Git object ids, read exactly as git prints them (domain/render.md, 2.2).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Oid {
     digits: [u8; 64],

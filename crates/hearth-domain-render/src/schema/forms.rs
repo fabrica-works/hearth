@@ -1,4 +1,4 @@
-//! Byte forms from format.md, 2.4, 5.3 and 6.2.
+//! Byte forms from protocol/format.md, 2.4, 5.3 and 6.2.
 use super::{Check, Composed, Composite};
 use crate::{
     errors::{Format, Schema},

@@ -6,7 +6,7 @@ use std::{
 
 /// The directory below the cache, holding mirrors by digest.
 pub const CACHE: &str = "hearth-test-mirror";
-/// One pin's fetched mirror (testing.md, 6.2).
+/// One pin's fetched mirror (domain/testing.md, 6.2).
 #[derive(Clone, Debug)]
 pub struct Mirror {
     root: PathBuf,

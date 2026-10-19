@@ -1,9 +1,9 @@
-//! One value, encoded in pre-order without recursion (store.md, 3.1).
+//! One value, encoded in pre-order without recursion (domain/store.md, 3.1).
 
 use alloc::boxed::Box;
 use skein_lib::{Stack, Writer, bytes, sha256::Sha256};
 
-/// The first byte of `none` (store.md, 3.1).
+/// The first byte of `none` (domain/store.md, 3.1).
 pub const NONE: u8 = 0x00;
 /// The first byte of `false`.
 pub const FALSE: u8 = 0x01;
@@ -19,10 +19,10 @@ pub const DIGEST: u8 = 0x05;
 pub const LIST: u8 = 0x06;
 /// The first byte of a map.
 pub const MAP: u8 = 0x07;
-/// The most containers open at once: render.md, 2.3's depth plus a part's levels, with room.
+/// The most containers open at once: domain/render.md, 2.3's depth plus a part's levels, with room.
 pub const DEPTH: u32 = 64;
 
-/// A SHA-256 digest: a key, a part's digest, or file content (store.md, 3.2).
+/// A SHA-256 digest: a key, a part's digest, or file content (domain/store.md, 3.2).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Digest(pub [u8; 32]);
 
@@ -40,7 +40,7 @@ pub enum Item {
     Map(u64),
 }
 
-/// Encodes one value, asserting its shape as each item arrives (store.md, 3.1).
+/// Encodes one value, asserting its shape as each item arrives (domain/store.md, 3.1).
 #[derive(Debug)]
 pub struct Encoder {
     sink: Sink,

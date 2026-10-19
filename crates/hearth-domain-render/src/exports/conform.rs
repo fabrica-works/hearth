@@ -11,7 +11,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use skein_lib::{List, Stack};
-/// Validate an evaluated value without interpreting or filling it (format.md, 8.1).
+/// Validate an evaluated value without interpreting or filling it (protocol/format.md, 8.1).
 pub fn conform(
     value: &Value,
     against: &Against<'_>,

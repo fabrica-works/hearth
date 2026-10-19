@@ -1,4 +1,4 @@
-//! Configured render bounds (render.md, 2.3).
+//! Configured render bounds (domain/render.md, 2.3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
     pub closure: u32,
@@ -59,13 +59,13 @@ pub const SHIPPED: Limits = Limits {
 pub const FOUR_MADE: Limits = Limits { made: 4, ..SHIPPED };
 
 /// Retained revision, targets and resolution records, plus one evaluation's
-/// scratch space (render.md, 8.4; programming-model.md, 6.3).
+/// scratch space (domain/render.md, 8.4; programming-model.md, 6.3).
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     use crate::{compose, diff, evaluate, revision, vocabulary};
     use alloc::boxed::Box;
     use skein_lib::{List, Map};
-    // Render's domain receives the listing at render.md, 8.4's bounds.
+    // Render's domain receives the listing at domain/render.md, 8.4's bounds.
     const ENTRIES: u32 = 16_384;
     const PATHS: u64 = 4_194_304;
     let listing = List::<revision::Entry>::worst_case(ENTRIES)?
@@ -91,7 +91,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // A find or record arrival holds one full record transiently; retained
     // specs, file sizes and diff closures share the command budget.
     // A frame byte can introduce one input item; package strings additionally
-    // follow store.md, 6.1's fixed M1 name/path limits.
+    // follow domain/store.md, 6.1's fixed M1 name/path limits.
     let record = u64::from(4_194_304_u32)
         .checked_mul(u64::try_from(size_of::<hearth_lib::encode::Item>()).ok()?)?
         .checked_add(List::<crate::resolution::Package>::worst_case(limits.closure.max(8_192))?)?

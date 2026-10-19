@@ -9,7 +9,7 @@ use skein_sim::Config;
 fn rendering_the_fleet_lists_once_and_reads_each_blob_once() {
     let run = budgets::fleet_run(false);
     let reads = budgets::reads(&run);
-    assert_eq!(reads.lists, budgets::RENDER_LISTS, "render.md, 3.10: one listing");
+    assert_eq!(reads.lists, budgets::RENDER_LISTS, "domain/render.md, 3.10: one listing");
     assert_eq!(budgets::distinct(&reads.blobs), reads.blobs.len(), "each oid read once");
     assert_eq!(reads.blobs.len(), budgets::FLEET_BLOBS);
     assert!(reads.blobs.len() < budgets::FLEET_ENTRIES, "the duplicate content is shared");
@@ -21,7 +21,7 @@ fn a_diff_reads_a_blob_the_two_revisions_share_once() {
     let reads = budgets::reads(&run);
     assert_eq!(reads.lists, budgets::DIFF_LISTS);
     assert_eq!(reads.blobs.len(), budgets::DIFF_BLOBS);
-    assert_eq!(budgets::distinct(&reads.blobs), reads.blobs.len(), "render.md, 8.4: shared oids reused");
+    assert_eq!(budgets::distinct(&reads.blobs), reads.blobs.len(), "domain/render.md, 8.4: shared oids reused");
 }
 
 #[test]

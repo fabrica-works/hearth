@@ -1,4 +1,4 @@
-//! Specs and part digests (render.md, 4.4, 4.5).
+//! Specs and part digests (domain/render.md, 4.4, 4.5).
 use crate::revision::Oid;
 use alloc::boxed::Box;
 use hearth_lib::{encode::Digest, hash::H};

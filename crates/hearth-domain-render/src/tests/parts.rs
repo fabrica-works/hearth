@@ -11,14 +11,14 @@ fn the_meta_record_encodes_as_store_md_3_1_writes_it() {
     meta::encode(&meta, &mut measure);
     let mut encoder = Encoder::writing(measure.measured());
     meta::encode(&meta, &mut encoder);
-    assert_eq!(encoder.written(), expected, "store.md, 3.1: meta record");
+    assert_eq!(encoder.written(), expected, "domain/store.md, 3.1: meta record");
 }
 #[test]
 fn the_meta_digest_is_h_of_part_meta_over_its_record() {
     assert_eq!(
         meta::digest(&fixtures::meta()),
         fixtures::digest("706777e0f8563a881bb75631bb73470298bc6d9f2f638d1dc526310adeb9b73d"),
-        "render.md, 4.4"
+        "domain/render.md, 4.4"
     );
 }
 
@@ -37,7 +37,7 @@ fn the_config_digest_is_h_of_part_config_over_its_tree() {
     assert_eq!(
         crate::parts::config::digest(&fixtures::config()),
         fixtures::digest("369415fd653cb11934a29e440c06fcd2c270c6bcb60f2301ddfbdd0c7d37168a"),
-        "store.md 3.1's tree encoding"
+        "domain/store.md 3.1's tree encoding"
     );
 }
 

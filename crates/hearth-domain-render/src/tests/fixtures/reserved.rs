@@ -4,7 +4,7 @@ use crate::{
     reserved::{self, Refused},
     revision::declaration::{Map, Name},
 };
-pub const COMMAND_LINE_LIMIT: usize = 2048; // machine.md, 6.2: COMMAND_LINE_SIZE.
+pub const COMMAND_LINE_LIMIT: usize = 2048; // domain/machine.md, 6.2: COMMAND_LINE_SIZE.
 pub const X1_EFI_BYTES: usize = 139; // 118 + 3 * x1-prod's seven bytes, session 21 Choices 6.
 pub const FITTING_PARAMETER: usize = COMMAND_LINE_LIMIT - X1_EFI_BYTES - 1; // One separating space.
 pub const PARAM_BYTES: &[u8; FITTING_PARAMETER + 1] = &[b'x'; FITTING_PARAMETER + 1];

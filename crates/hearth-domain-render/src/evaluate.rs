@@ -1,4 +1,4 @@
-//! A bounded postfix value stack (render.md, 8.3; format.md, 7.4 to 7.7).
+//! A bounded postfix value stack (domain/render.md, 8.3; protocol/format.md, 7.4 to 7.7).
 pub mod context;
 mod escape;
 pub mod filter;
@@ -48,7 +48,7 @@ impl Evaluator<'_> {
             nesting: limits.nesting,
             walk_depth: limits.depth.saturating_add(limits.nesting),
             branches: Stack::with_capacity(limits.nesting),
-            // Five roots, each within the 64 MiB validated-input bound (render.md, 2.3).
+            // Five roots, each within the 64 MiB validated-input bound (domain/render.md, 2.3).
             walk_steps: limits
                 .made
                 .saturating_add(limits.validated.saturating_mul(5))

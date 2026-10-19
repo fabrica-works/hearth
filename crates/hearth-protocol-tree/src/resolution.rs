@@ -1,4 +1,4 @@
-//! Resolution records, kind 4 at version 1 (store.md, 6.4; render.md, 5.4).
+//! Resolution records, kind 4 at version 1 (domain/store.md, 6.4; domain/render.md, 5.4).
 
 use crate::{
     fields::Fields,
@@ -19,7 +19,7 @@ pub struct Resolution {
     pub made: Made,
     pub sources: Box<[Line]>,
 }
-/// The key's four values, as the packages part holds them (render.md, 5.1).
+/// The key's four values, as the packages part holds them (domain/render.md, 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Inputs {
     pub apt: Box<[Item]>,

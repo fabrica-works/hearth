@@ -1,4 +1,4 @@
-//! One client call, routed through render (render.md, 8.1).
+//! One client call, routed through render (domain/render.md, 8.1).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;

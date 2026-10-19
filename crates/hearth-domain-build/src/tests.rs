@@ -38,12 +38,12 @@ fn the_keys_are_store_md_3_3_s() {
     assert_eq!(
         keys.empty,
         digest(b"8f43cea6a4bf9d3aec62c882bdafeab30cc6d71acc9b0b984b7f2fd8f70975d3"),
-        "store.md, 3.2: H(\"empty\")"
+        "domain/store.md, 3.2: H(\"empty\")"
     );
     assert_eq!(
         keys.packages,
         digest(b"22d5156ffefadb1f0df4eb2c4d405b2c8937215e044486b06b1725e3506b238d"),
-        "store.md, 3.2: H(\"packages\", digest 00…00, digest 01…01)"
+        "domain/store.md, 3.2: H(\"packages\", digest 00…00, digest 01…01)"
     );
     assert_eq!(
         keys.software,

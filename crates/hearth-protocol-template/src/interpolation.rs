@@ -1,4 +1,4 @@
-//! Decoded declaration strings compiled without template whitespace rules (format.md, 5.2).
+//! Decoded declaration strings compiled without template whitespace rules (protocol/format.md, 5.2).
 use crate::{
     Does, Error, ErrorKind, Instruction,
     limits::Limits,

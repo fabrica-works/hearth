@@ -1,4 +1,4 @@
-//! Recursive references from format.md, 4.1 and 7.4 to 7.7.
+//! Recursive references from protocol/format.md, 4.1 and 7.4 to 7.7.
 use super::expressions::{Binary, Plain, Roots, Tree};
 use hearth_domain_render::{
     evaluate::{Filter, Missing, Value},
@@ -37,7 +37,7 @@ impl Made {
     }
 }
 /// # Errors
-/// Returns the first fault specified by format.md, 7.4 to 7.7.
+/// Returns the first fault specified by protocol/format.md, 7.4 to 7.7.
 pub fn evaluate(tree: &Tree, roots: &Roots, limits: &Limits) -> Result<Option<Plain>, &'static str> {
     let mut left = limits.made;
     expression(tree, roots, limits, &mut left).map(|v| v.value)

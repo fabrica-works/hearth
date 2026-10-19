@@ -1,4 +1,4 @@
-//! Shapes known by name and kind alone (store.md, 2.1 and 4.4).
+//! Shapes known by name and kind alone (domain/store.md, 2.1 and 4.4).
 use crate::builder::store::vocabulary::{Directory, Removal, Shape};
 use crate::render::vocabulary::Digest;
 use alloc::boxed::Box;

@@ -30,7 +30,7 @@ pub struct Failed {
     pub step: Step,
     pub why: Why,
 }
-/// A layer's steps, by their names in a layer's costs (build.md, 5 to 7).
+/// A layer's steps, by their names in a layer's costs (domain/build.md, 5 to 7).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Step {
     Fetch,

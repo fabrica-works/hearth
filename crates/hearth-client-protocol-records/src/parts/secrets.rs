@@ -1,4 +1,4 @@
-//! Secret names and places (format.md, 9.4).
+//! Secret names and places (protocol/format.md, 9.4).
 use crate::form::text::Lines;
 use alloc::boxed::Box;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

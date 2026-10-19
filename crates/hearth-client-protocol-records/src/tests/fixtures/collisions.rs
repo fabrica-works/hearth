@@ -16,7 +16,7 @@ pub fn path_collision() -> Error {
         task: None,
     }
 }
-// A declared account id inside format.md 5.6's bounds.
+// A declared account id inside protocol/format.md 5.6's bounds.
 pub const COLLISION_UID: u32 = 1_000;
 pub fn shared_uid_collision() -> Error {
     let mut error = path_collision();

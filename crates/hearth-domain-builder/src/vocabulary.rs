@@ -51,7 +51,7 @@ pub enum Call {
         revision: Box<[u8]>,
         targets: Box<[Box<[u8]>]>,
     },
-    /// One target's output, rendered with its resolution (build.md, 4.1).
+    /// One target's output, rendered with its resolution (domain/build.md, 4.1).
     Build {
         repository: Box<[u8]>,
         revision: Box<[u8]>,
@@ -63,7 +63,7 @@ pub enum Request {
     Progress(Progress),
     Render(render::vocabulary::Request),
     Store(store::vocabulary::Request),
-    /// A build step, for the protocol layer to run (build.md, 4.3).
+    /// A build step, for the protocol layer to run (domain/build.md, 4.3).
     Run {
         step: build::Step,
     },
@@ -95,7 +95,7 @@ pub enum Answer {
         step: build::Step,
         why: build::vocabulary::Why,
     },
-    /// The store at a limit render's errors do not name: its layers (store.md, 8.1).
+    /// The store at a limit render's errors do not name: its layers (domain/store.md, 8.1).
     Full {
         limit: store::vocabulary::Limit,
         most: u32,

@@ -1,4 +1,4 @@
-//! Reviewed repository goldens and independently written file witnesses (render.md, 9.2).
+//! Reviewed repository goldens and independently written file witnesses (domain/render.md, 9.2).
 use std::{
     ffi::OsStr,
     fmt::Write,

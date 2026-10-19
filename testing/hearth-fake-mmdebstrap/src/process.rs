@@ -1,4 +1,4 @@
-//! Simulate as a process, with the child's files, permissions and pipes (testing.md, 4.1).
+//! Simulate as a process, with the child's files, permissions and pipes (domain/testing.md, 4.1).
 use crate::{
     face::{self, Inst, Outcome, Printed, Simulate, Source},
     resolve::{self, Request, Selected, Variant},

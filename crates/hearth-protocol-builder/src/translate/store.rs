@@ -1,4 +1,4 @@
-//! Records crossing the store boundary (store.md, 6.6).
+//! Records crossing the store boundary (domain/store.md, 6.6).
 use crate::{
     builder::store::vocabulary::{Range, StoreRecord},
     tree,
@@ -158,7 +158,7 @@ pub fn tree_resolution(record: crate::builder::store::vocabulary::Resolution) ->
     }
 }
 
-/// A layer's record, as far as the store's index reads it (store.md, 6.2 and 8.1).
+/// A layer's record, as far as the store's index reads it (domain/store.md, 6.2 and 8.1).
 #[must_use]
 pub fn layer(record: tree::layer::Layer) -> crate::builder::store::vocabulary::Layer {
     use crate::builder::store::vocabulary::{Layer, LayerInputs};

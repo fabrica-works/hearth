@@ -16,7 +16,7 @@ fn a_store_record_encodes_its_fields_in_key_order_byte_for_byte() {
         "04 0000000000000004 6d616465 03 186cc6acd4b00000 ",
         "04 0000000000000003 756964 03 00000000000003e8",
     ));
-    assert_eq!(store::write(&record, &SHIPPED), Ok(expected), "store.md, 6.6's fields in byte order");
+    assert_eq!(store::write(&record, &SHIPPED), Ok(expected), "domain/store.md, 6.6's fields in byte order");
 }
 
 #[test]
@@ -32,7 +32,11 @@ fn a_cache_file_record_encodes_its_fields_in_key_order_byte_for_byte() {
         "04 0000000000000004 73697a65 03 0000000000000000 ",
         "04 0000000000000004 746f6f6b 03 000000000016e360",
     ));
-    assert_eq!(cache_file::write(&a_cache_file(), &SHIPPED), Ok(expected), "store.md, 6.5's body, worked out from 3.1");
+    assert_eq!(
+        cache_file::write(&a_cache_file(), &SHIPPED),
+        Ok(expected),
+        "domain/store.md, 6.5's body, worked out from 3.1"
+    );
 }
 
 #[test]
@@ -351,7 +355,7 @@ fn an_empty_layer_record_encodes_its_fields_in_key_order_byte_for_byte() {
     assert_eq!(
         layer::write(&a_layer(LayerKind::Empty), &SHIPPED),
         Ok(expected),
-        "store.md, 6.2's empty layer: parent none, no scan, no placed"
+        "domain/store.md, 6.2's empty layer: parent none, no scan, no placed"
     );
 }
 
@@ -415,7 +419,7 @@ fn a_packages_layer_record_encodes_its_fields_in_key_order_byte_for_byte() {
     assert_eq!(
         layer::write(&a_layer(LayerKind::Packages), &SHIPPED),
         Ok(expected),
-        "store.md, 6.2's packages layer: base none, steps and tools by name"
+        "domain/store.md, 6.2's packages layer: base none, steps and tools by name"
     );
 }
 

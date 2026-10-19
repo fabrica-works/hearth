@@ -1,4 +1,4 @@
-//! One cat-file response at a time, then the bounded JSON machine (render.md, 2.2).
+//! One cat-file response at a time, then the bounded JSON machine (domain/render.md, 2.2).
 use crate::{
     Asked, Limits, builder, config,
     git::Child,

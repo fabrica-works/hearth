@@ -1,4 +1,4 @@
-//! Opening the store before a builder call (store.md, 8.2).
+//! Opening the store before a builder call (domain/store.md, 8.2).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;

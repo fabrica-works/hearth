@@ -1,4 +1,4 @@
-//! Secret names and places, never values (format.md, 9).
+//! Secret names and places, never values (protocol/format.md, 9).
 use crate::{
     entries::{Concrete, Located},
     errors::{Error, Format, Kind, Place, Schema},

@@ -4,14 +4,14 @@ Provisional, 2026-10-09, revised 2026-10-19. How an output is made from a spec: 
 the three layers, the plan, each layer's steps, the sandboxes they run
 in, what an output must not hold, the tools as protocols, caches and
 costs. M2 builds it. Where layers live, how they are named and how a
-layer is walked and published is store.md. What is open is in section
+layer is walked and published is domain/store.md. What is open is in section
 15.
 
 ## 1. In one page
 
 - **An output is three layers:** packages, software and config, each a
   writable snapshot of the one beneath, changed by steps in sandboxes,
-  then walked, frozen and published (store.md, 4.2).
+  then walked, frozen and published (domain/store.md, 4.2).
 - **The plan starts from the highest layer whose key is published.** A
   config change is a snapshot of the software layer and the config
   steps: seconds. The packages layer is reconciled from the target's
@@ -46,7 +46,7 @@ layer is walked and published is store.md. What is open is in section
   each step cost is a fact.
 - **On a developer's machine the client builds in-process** (M2), as a
   regular user with a subordinate range and a btrfs store of its own
-  (client/README.md, 3.5; store.md, section 9).
+  (client/README.md, 3.5; domain/store.md, section 9).
 
 ## 2. Recipes
 
@@ -55,43 +55,43 @@ output.
 
 ```
 recipe rootfs                                                this document
-  inputs   the spec's output parts: packages, software, config (render.md, section 4)
-           the resolution the packages part names (store.md, 6.4)
+  inputs   the spec's output parts: packages, software, config (domain/render.md, section 4)
+           the resolution the packages part names (domain/store.md, 6.4)
   layers   packages on the empty layer; software on packages; config on software
-  output   the config layer, named by its key (store.md, 3.3)
+  output   the config layer, named by its key (domain/store.md, 3.3)
 
-recipe artifact [M6]                                         artifacts.md
+recipe artifact [M6]                                         domain/artifacts.md
   inputs   an environment's output, sources, declared inputs, a command
   layers   one, collected from the command's outputs
 ```
 
-- **One machinery for both:** keys (store.md, section 3), the fetch
+- **One machinery for both:** keys (domain/store.md, section 3), the fetch
   (5.1), sandboxes (section 8), the tree helper, records, pins.
 - **Recipes are a closed set in `hearth-domain-build`,** each layer's
   steps fixed by its recipe; the parts give the data.
 - **Slot parts never reach a recipe:** `data`, `secrets` and `boot` are
-  the activator's at prepare (render.md, section 4; slots.md, section 5).
+  the activator's at prepare (domain/render.md, section 4; domain/slots.md, section 5).
 - **A host builds its containers' outputs [M5]** with the rootfs recipe,
-  in its own store: no hearth runs in a container (slots.md, 12.5). A
+  in its own store: no hearth runs in a container (domain/slots.md, 12.5). A
   container's output differs only by its parts: the containers' variant
   (5.4), no initramfs configuration and no kernel, so its tree file's
-  `boot` is empty (store.md, 6.3); nothing unique or secret enters it
+  `boot` is empty (domain/store.md, 6.3); nothing unique or secret enters it
   either (section 9), since its identity and secrets are written at
   prepare as a host's are.
 - **The artifact recipe's sandbox is not a container target [M6]:** a
   build environment's output is only a sandbox's root, never run by
-  nspawn nor placed in a slot (artifacts.md, 2.3).
+  nspawn nor placed in a slot (domain/artifacts.md, 2.3).
 
 ## 3. The layers
 
-| Layer | Parent | Key (store.md, 3.3) | Holds | Steps |
+| Layer | Parent | Key (domain/store.md, 3.3) | Holds | Steps |
 |---|---|---|---|---|
 | packages | empty | `H("packages", resolution digest, packages part)` | the bootstrapped system: every package's files and what its maintainer scripts made, dpkg's database, the kernel and initramfs in `/boot`, `/var` as installed | fetch; mmdebstrap; verify (section 5) |
 | software | packages | `H("software", packages key, software part)` | downloads placed; what each `software.sh` made (`/usr/local`, `/opt`) | fetch; place; `software.sh` (section 6) |
 | config | software | `H("config", software key, config part)` | users; the file tree (`/etc`, `/usr/local`, `/opt` and more, but never the rest of `/usr`); tmpfiles' paths in the image; unit links from presets; what each `customize.sh` made | users; file tree; tmpfiles; presets; `customize.sh` (section 7) |
 
 - **A layer is one staging subvolume;** its steps run on it in order,
-  and it is walked once, after the last (store.md, 4.2).
+  and it is walked once, after the last (domain/store.md, 4.2).
 - **An empty part still makes its layer:** a snapshot and a walk, about
   a second, so every output has three layers and keys stay uniform.
 - **"config", not "etc":** the layer writes users, `/usr/local`, unit
@@ -104,8 +104,8 @@ recipe artifact [M6]                                         artifacts.md
 ```
 plan(spec)
   resolution  ← the record named by the packages part's resolution key,
-                or a resolution (render.md, section 5)
-  keys        ← packages, software, config (store.md, 3.3)
+                or a resolution (domain/render.md, section 5)
+  keys        ← packages, software, config (domain/store.md, 3.3)
   start       ← the highest of config, software, packages that is published
   build       ← each layer above start, bottom-up; from the empty layer if none is
 ```
@@ -117,7 +117,7 @@ plan(spec)
 - **The plan is data** in `hearth-domain-build`: layers, each with its
   steps. The builder's root routes its requests to the store (snapshots,
   walks, records) and to the protocol layer (tools).
-- **A plan pins its chain** while it runs (store.md, 7.1).
+- **A plan pins its chain** while it runs (domain/store.md, 7.1).
 
 ### 4.2 The packages layer: reconcile, and scratch now and then
 
@@ -127,7 +127,7 @@ plan(spec)
   packages with the new one. The store answers the candidates from its
   layers' records: a packages layer's `inputs` name its resolution,
   whose record holds the suite, the architecture, the variant and the
-  closure (store.md, 6.2 and 6.4); a layer whose resolution is gone is
+  closure (domain/store.md, 6.2 and 6.4); a layer whose resolution is gone is
   no candidate. With no candidate of the same suite, the build is from
   scratch. The step snapshots the base and, in the
   sandbox, offline from the local repository (5.3), with the seeds and
@@ -137,10 +137,10 @@ plan(spec)
   holds, never `autoremove`, then `dpkg --configure -a`. The installed
   set is then checked against the closure, and the cleanups and the
   scan run, exactly as after a scratch build (5.6, 5.7, 9.3).
-- **The same key either way.** The key names the inputs (store.md,
+- **The same key either way.** The key names the inputs (domain/store.md,
   3.3); the record says how the layer was made: `how` scratch or
   reconcile, its `base`, and its `depth`, the reconciles since the last
-  scratch build in its line (store.md, 6.2).
+  scratch build in its line (domain/store.md, 6.2).
 - **From scratch instead, never in addition,** when there is no base;
   when the suite, the architecture or the variant changes; when a
   reconcile fails, which a scratch build then retries at once; and when
@@ -150,7 +150,7 @@ plan(spec)
 - **Why reconcile is the default:** a snapshot bump changes tens of a
   thousand packages, and only those are unpacked and configured, with
   triggers (the initramfs, `ldconfig`, man-db) run once; the walk hashes
-  only the files that changed (store.md, 4.3); the layer shares its
+  only the files that changed (domain/store.md, 4.3); the layer shares its
   unchanged extents with its base; and a peer's change set [M6] is a
   few megabytes, not a system.
 - **What a reconciled layer may carry:** a purged package's leftovers,
@@ -168,7 +168,7 @@ plan(spec)
 - **A step** is a tool or a tree helper request, with its inputs, its
   sandbox (section 8) and its limits, and ends in exactly one terminal
   event.
-- **Failures are typed,** in wire.md's classes (wire.md, 4.4): a fetch
+- **Failures are typed,** in protocol/wire.md's classes (protocol/wire.md, 4.4): a fetch
   is transient (the network, a 404, a digest mismatch); a step's exit,
   a limit, a failed verification or a scan finding fails the key.
 - **A failed layer publishes nothing.** Its staging subvolume is
@@ -176,28 +176,28 @@ plan(spec)
 
 ### 4.4 Concurrency
 
-- **One build per key** (store.md, 4.6), different keys at once within
+- **One build per key** (domain/store.md, 4.6), different keys at once within
   the builder's limits: one packages step at a time, other steps 4 at
   a time and builds in flight 8 by default (both configured), one
   fetcher per source host.
 - **On a machine, its own builds one at a time:** the steward gives its
   builder the pass's jobs one by one; from M6, artifacts and peers'
   change sets run beside them within the limits above
-  (steward.md, 3.4).
+  (domain/steward.md, 3.4).
 
 ## 5. The packages layer
 
 ### 5.1 The fetch
 
-- **What:** each `.deb` of the closure (store.md, 6.4) whose SHA-256 the
+- **What:** each `.deb` of the closure (domain/store.md, 6.4) whose SHA-256 the
   cache lacks. Never an index: Debian publishes no uncompressed
   `Packages` file, so the digest an `InRelease` gives for one names
   nothing a mirror serves. Resolution kept the indices apt verified in
-  the cache instead (store.md, 6.4); a resolution whose kept indices the
-  cache lacks is made again (render.md, section 5).
+  the cache instead (domain/store.md, 6.4); a resolution whose kept indices the
+  cache lacks is made again (domain/render.md, section 5).
 - **How:** `apt-helper download-file` with `<uri> <target> SHA256:<hex>`
   triples, at most 256 a run, into `staging/<key>/`; each file is then
-  renamed into `cache/<sha256>` with its record (store.md, 6.5).
+  renamed into `cache/<sha256>` with its record (domain/store.md, 6.5).
 - **URIs** join a source's URI with a package's `Filename`. Only `http` and `https` are allowed: with a `file:` URI
   `apt-helper` links the local file instead of fetching.
 - **Checked before kept:** `apt-helper` verifies the SHA-256 and leaves
@@ -237,7 +237,7 @@ plan(spec)
   fetch the indices on every build, and speak more of apt's text.
 - **skein's HTTP client** resolves names only at startup, and SHA-256
   in step code is unmeasured. It arrives with peers [M6]
-  (`hearth-protocol-http`, wire.md, section 8), for bytes within a
+  (`hearth-protocol-http`, protocol/wire.md, section 8), for bytes within a
   plane; the archive stays `apt-helper`'s.
 
 ### 5.3 The local repository
@@ -250,7 +250,7 @@ staging/<key>/repo/<a source URI's path>/                 one tree per source li
 ```
 
 - **A sparse copy of the snapshot:** the genuine `InRelease`, the
-  `Packages` files resolution kept (store.md, 6.4), and only the
+  `Packages` files resolution kept (domain/store.md, 6.4), and only the
   closure's packages. apt checks each index against `InRelease` and each
   `.deb` against its index, as it would online.
 - **Indices at their plain paths:** `InRelease` lists the uncompressed
@@ -265,13 +265,13 @@ staging/<key>/repo/<a source URI's path>/                 one tree per source li
   ```
 
   `trusted=yes`: the signature was checked when resolution fetched the
-  `InRelease` (render.md, section 5), and every byte since is checked
+  `InRelease` (domain/render.md, section 5), and every byte since is checked
   by SHA-256; checking it again would add nothing, and could fail an
   old snapshot whose signing key has expired (to verify).
 - **Bound read-only at `/run/hearth/repo`** in the sandbox (8.2), and
   into the chroot at the same path by mmdebstrap's
   `file-mirror-automount` hook, for apt inside. Directories are 0755,
-  files 0644: their owner is unmapped there (store.md, 2.2).
+  files 0644: their owner is unmapped there (domain/store.md, 2.2).
 
 ### 5.4 mmdebstrap
 
@@ -284,7 +284,7 @@ mmdebstrap
   --architectures=<arch>            the packages part
   --include=<name>=<version>,…      the closure, in arguments of at most 64 KiB
   --aptopt='APT::Install-Recommends "<install_recommends>"'     the packages part's one apt option
-  --aptopt='Acquire::Check-Valid-Until "false"'                 hearth's, as at resolution (render.md, 5.2)
+  --aptopt='Acquire::Check-Valid-Until "false"'                 hearth's, as at resolution (domain/render.md, 5.2)
   --dpkgopt=force-confold                                       hearth's: keep what the setup hook placed
   --hook-dir=/usr/share/mmdebstrap/hooks/file-mirror-automount
   --setup-hook=<5.5>   --essential-hook=<5.5>   --customize-hook=<5.6>
@@ -299,9 +299,9 @@ mmdebstrap
   host's.
 - **apt's and dpkg's options stay in the output**
   (`/etc/apt/apt.conf.d/99mmdebstrap`, `/etc/dpkg/dpkg.cfg.d/99mmdebstrap`).
-  `install_recommends` is the packages part's (render.md, 4.2). The
+  `install_recommends` is the packages part's (domain/render.md, 4.2). The
   others are hearth's constants, part of the encoding's version
-  `hearth/1` (store.md, 3.2), so changing one changes every key:
+  `hearth/1` (domain/store.md, 3.2), so changing one changes every key:
   `Check-Valid-Until`, which resolution passes too, and `force-confold`,
   which keeps the configuration file the setup hook places before its
   package (5.5). No proxy is passed: the source is local.
@@ -310,7 +310,7 @@ mmdebstrap
 - **The environment is given whole:** `PATH=/usr/sbin:/usr/bin`,
   `HOME=/root`, `LC_ALL=C.UTF-8`, `DEBIAN_FRONTEND=noninteractive`,
   `DEBCONF_NONINTERACTIVE_SEEN=true`. No `SOURCE_DATE_EPOCH`
-  (reproducible.md).
+  (domain/reproducible.md).
 - **Inputs** sit read-only in `/run/hearth/input`: the local sources,
   the part's sources for the output, the seeded `passwd` and `group`
   lines, the preseeds, the initramfs configuration.
@@ -337,13 +337,13 @@ mmdebstrap
   - `/var/lib/machines` and `/var/lib/portables` are made directories
     first: systemd-container's postinst runs `systemd-tmpfiles --create`,
     whose `Q` lines make both subvolumes on btrfs where they are absent,
-    and the walk refuses a nested subvolume (store.md, 3.4). Seen with
+    and the walk refuses a nested subvolume (domain/store.md, 3.4). Seen with
     sid's systemd 261; trixie's 257 is to confirm.
 - **The extract hook seeds fixed ids,** after the essential packages are
-  unpacked and before any is configured, in every variant. format.md
+  unpacked and before any is configured, in every variant. protocol/format.md
   requires a fixed uid and gid for each user and group that owns a data
   path, a secret or an identity file, package users included; the
-  packages part carries the package users' lines (render.md, 4.2),
+  packages part carries the package users' lines (domain/render.md, 4.2),
   since they change what this layer builds. A snapshot bump then cannot
   renumber them under their data entries: `adduser --system`
   finds the user and keeps it, and the config layer's sysusers lines
@@ -359,12 +359,12 @@ mmdebstrap
   `debconf-set-selections` loads the preseeds before tzdata, locales or
   postfix ask. mmdebstrap runs no essential hook for the `custom`
   variant, os's for containers and one candidate for hearth's
-  (format.md, section 13): where a container's preseeds would load is
+  (protocol/format.md, section 13): where a container's preseeds would load is
   open (section 15).
 - **The initramfs configuration is the packages part's,** which render
   writes from its two fields, the modules and the microcode choice
-  (render.md, 4.2; machine.md, 7.1). Nothing a task writes reaches it
-  (format.md, 5.11), so `AUTO_MODULES=yes` and `MICROCODE=yes`, which
+  (domain/render.md, 4.2; domain/machine.md, 7.1). Nothing a task writes reaches it
+  (protocol/format.md, 5.11), so `AUTO_MODULES=yes` and `MICROCODE=yes`, which
   read the build host, cannot occur.
 - **apt's configuration** enters as `--aptopt` (5.4), written by
   mmdebstrap during its setup, permanent by design.
@@ -396,20 +396,20 @@ mmdebstrap
 - **`resolv.conf` and `hostname`:** mmdebstrap copies the host's, here
   the tool root's: `hostname` alone, `localhost` (8.2). Both are removed
   rather than given fixed bytes: an absent file is as reproducible
-  (reproducible.md, 2.3), and holds nothing a target did not choose. A
+  (domain/reproducible.md, 2.3), and holds nothing a target did not choose. A
   task that wants either writes it in the config layer.
 - **Host keys:** openssh-server's postinst makes them, and dropbear's;
-  the activator writes the machine's at prepare (slots.md, 5.4).
+  the activator writes the machine's at prepare (domain/slots.md, 5.4).
 - **The snakeoil pair:** ssl-cert's postinst makes a private key, and
   dovecot-core and postgresql-common depend on ssl-cert. A task that
-  serves TLS declares its key as a secret (format.md, section 9).
+  serves TLS declares its key as a secret (protocol/format.md, section 9).
 - **Logs** that mmdebstrap's list misses (fontconfig's trigger writes
   `/var/log/fontconfig.log`) are emptied, keeping modes and owners.
 - **The empty `/etc/machine-id`.** A maintainer script makes an id
   (systemd's, to verify); mmdebstrap empties it. An empty file means "not a first boot"
   (machine-id(5)); on a read-only root systemd would then use a new
   transient id at every boot. The activator writes the machine's id
-  into the slot at prepare (slots.md, 5.4), so the output keeps the
+  into the slot at prepare (domain/slots.md, 5.4), so the output keeps the
   empty file and the scan refuses any other.
 
 ### 5.7 Verifying the installed set
@@ -430,17 +430,17 @@ dpkg-query --show --showformat='${Package}\t${Architecture}\t${Version}\t${db:St
 ### 5.8 Boot digests
 
 After the packages layer's walk, the builder records, per kernel the
-layer holds, what slots.md (6.1) needs to decide whether a slot's kernel
-is the running one. They go in the tree file's end item (store.md, 6.3):
+layer holds, what domain/slots.md (6.1) needs to decide whether a slot's kernel
+is the running one. They go in the tree file's end item (domain/store.md, 6.3):
 
 ```
 version     the <version> of usr/lib/modules/<version> and boot/vmlinuz-<version>
 kernel      the content digest of boot/vmlinuz-<version>, from the walk
-modules     the subtree digest of usr/lib/modules/<version> (store.md, 3.4)
+modules     the subtree digest of usr/lib/modules/<version> (domain/store.md, 3.4)
 initramfs   the initramfs's input digest, below
 ```
 
-**The initramfs's input digest,** defined here alone (slots.md, 6.1
+**The initramfs's input digest,** defined here alone (domain/slots.md, 6.1
 cites it):
 
 ```
@@ -455,11 +455,11 @@ H("initramfs",
 
 - **The initramfs's inputs, not its bytes:** mktirfs packs its staging
   tree with `cpio -H newc`, whose headers carry inode numbers and the
-  build's mtimes (reproducible.md, 2.2), so the image differs on every
+  build's mtimes (domain/reproducible.md, 2.2), so the image differs on every
   build, and comparing bytes would force a full reboot on every snapshot
   bump.
 - **From the resolution and the walk:** versions come from the closure
-  (store.md, 6.4), digests from the tree file; nothing is read again.
+  (domain/store.md, 6.4), digests from the tree file; nothing is read again.
 - **Carried up unchanged:** the software and config layers copy them.
   A change above packages to `boot/`, `usr/lib/modules/` or
   `etc/tiny-initramfs/` fails the scan (9.3), since nothing above
@@ -470,22 +470,22 @@ H("initramfs",
 ### 6.1 Downloads
 
 - **What a download is, and who owns what it gives, is defined once:**
-  format.md, 10.1 and render.md, 4.2. The part maps each path to a
+  protocol/format.md, 10.1 and domain/render.md, 4.2. The part maps each path to a
   SHA-256 and either a `file` (mode and owners) or a `tar` (leading
   segments to strip); software is root's, or a package user's with a
   fixed id, and render refuses any other owner. Its URL is a fetch hint
   beside the part, outside the digest.
 - **Fetched as in 5.1,** into the same cache, unless the cache has it.
   An artifact by key [M6] comes from the store instead
-  (artifacts.md, 7.3).
+  (domain/artifacts.md, 7.3).
 - **Recorded:** the software layer's record lists the SHA-256 of each
   download it placed, and the tree digest of each artifact [M6], so
-  collection keeps them while the layer is kept (store.md, 6.2 and 7.5).
+  collection keeps them while the layer is kept (domain/store.md, 6.2 and 7.5).
 
 ### 6.2 Placing them
 
 - **A `file`** is a put of its path, mode, owners and content digest,
-  applied by the tree helper (store.md, 5.5), owners resolved by name in
+  applied by the tree helper (domain/store.md, 5.5), owners resolved by name in
   the layer; a package user is there with its fixed id (5.5). No tool
   runs.
 - **A `tar`** is unpacked by the target's own `tar`, in a sandbox
@@ -497,16 +497,16 @@ H("initramfs",
   ```
 
   `--no-same-owner` makes every file the namespace root's, whatever the
-  archive says, and modes are kept, as format.md (10.1) says. `tar`
+  archive says, and modes are kept, as protocol/format.md (10.1) says. `tar`
   detects the compression, with the target's own decompressors.
 
 ### 6.3 `software.sh`
 
 - **Each task's script, after every download is placed,** in the order
-  the software part lists them (render.md, 4.2), each in a sandbox of
+  the software part lists them (domain/render.md, 4.2), each in a sandbox of
   its own: pivoted into the layer, offline, as the namespace's root,
   `/bin/sh -eu /run/hearth/script`, with the target's shell and tools.
-- **It names a download by the path it was placed at** (format.md, 5.8);
+- **It names a download by the path it was placed at** (protocol/format.md, 5.8);
   nothing of the builder's is visible (8.6).
 - **os ran it outside the chroot,** with the host's tools against
   `$ROOTDIR` and a writable host cache.
@@ -530,7 +530,7 @@ H("initramfs",
 
 ### 7.2 Users
 
-- **The part's groups, users and memberships** (render.md, 4.2) become
+- **The part's groups, users and memberships** (domain/render.md, 4.2) become
   sysusers lines (`g`, `u`, `m`), written to
   `/etc/sysusers.d/hearth.conf` (a put), then:
 
@@ -540,25 +540,25 @@ H("initramfs",
 
   Given a path, it runs that file alone (systemd-sysusers(8)). A
   field with a space, a `gecos` most often, is written in double quotes,
-  which format.md, 5.6, keeps out of the fields.
-- **Ids are fixed where format.md requires them:** a user or group that
+  which protocol/format.md, 5.6, keeps out of the fields.
+- **Ids are fixed where protocol/format.md requires them:** a user or group that
   owns a data path, a secret or an identity file has its uid and gid in
   its line, the same a package user was seeded with (5.5), so a snapshot
   bump renumbers nothing a data entry holds. A package user
-  gets no line: the package made it (render.md, 4.2).
+  gets no line: the package made it (domain/render.md, 4.2).
 - **Passwords are locked** (`!*`). A password hash is a secret: the
   activator applies it to the slot's shadow file at prepare
-  (slots.md, 5.4).
+  (domain/slots.md, 5.4).
 - **At boot** `systemd-sysusers.service` finds the users made, and with
   `/etc` read-only it writes nothing.
 
 ### 7.3 The file tree
 
-- **Path to content digest, mode and owner** (render.md, 4.2). Each
+- **Path to content digest, mode and owner** (domain/render.md, 4.2). Each
   content is in the cache by digest: a static blob streamed there by
-  render's protocol layer (render.md, 2.3), a rendered file written by
+  render's protocol layer (domain/render.md, 2.3), a rendered file written by
   the builder. The tree helper then applies the tree as a change set of
-  puts (store.md, 5.5), with owner and group names resolved against the
+  puts (domain/store.md, 5.5), with owner and group names resolved against the
   layer's own `/etc/passwd` and `/etc/group`, after 7.2.
 - **Modes and owners are exactly the part's,** a packaged conffile's
   included. os's `rsync -rltD` kept a packaged file's mode and its
@@ -568,7 +568,7 @@ H("initramfs",
 - **A path through a link is refused:** `/lib` is `usr/lib` since the
   merged `/usr`, so tasks name canonical paths.
 - **What hearth reserves is refused at render,** paths and kinds as
-  format.md (5.11) lists them.
+  protocol/format.md (5.11) lists them.
 
 ### 7.4 tmpfiles
 
@@ -585,10 +585,10 @@ H("initramfs",
   `/var`, which every slot copies; one for a data entry's path is
   applied again at boot, through the entry's bind, on its directory in
   its class; lines for `/run` and `/tmp` wait for boot.
-- **The types are format.md's (5.6),** less what it reserves (5.11):
-  lines that would make a nested subvolume in a layer (store.md, 4.1),
+- **The types are protocol/format.md's (5.6),** less what it reserves (5.11):
+  lines that would make a nested subvolume in a layer (domain/store.md, 4.1),
   or write into the read-only root at every boot and fail its bless
-  (slots.md, section 7).
+  (domain/slots.md, section 7).
 - **Only hearth's file runs at build;** the packages' own `tmpfiles.d`
   run at boot, as Debian intends.
 
@@ -609,7 +609,7 @@ H("initramfs",
 
 ### 7.6 `customize.sh`
 
-- **Each task's, last, in the part's order** (render.md, section 4),
+- **Each task's, last, in the part's order** (domain/render.md, section 4),
   each in a sandbox of its own: `/bin/sh -eu /run/hearth/script`, with
   the target's shell, offline, as the namespace's root.
 - **It sees the layer and nothing of the builder:** no secret (they are
@@ -624,7 +624,7 @@ H("initramfs",
   version, with its configuration. os ran the host's with `--root`.
 - **A target without the tool** (no systemd, yet users declared) fails
   the step with "not found"; render may refuse it earlier
-  (render.md, section 7).
+  (domain/render.md, section 7).
 - **The packages step is the one exception:** the builder's mmdebstrap,
   apt and `dpkg-deb` unpack the essential set, and every maintainer
   script then runs chrooted with the target's binaries. The
@@ -721,7 +721,7 @@ the packages step: a tool root                    every other step: the layer as
 - **`--mode=root` is the alternative.** mmdebstrap's code allows for
   root mode in a user namespace ("we don't know whether we run in root
   mode inside an unshared user namespace or as real root"); the
-  conformance tier runs both (testing.md, section 5).
+  conformance tier runs both (domain/testing.md, section 5).
 
 ### 8.4 `/proc`, `/sys` and `/dev`
 
@@ -759,7 +759,7 @@ the packages step: a tool root                    every other step: the layer as
 - **Never:** the target's name, the revision, the builder's hostname,
   its variables, its proxy. Inputs are files at fixed paths. A step
   can still read the clock and count processors; that is
-  reproducible.md's.
+  domain/reproducible.md's.
 
 ### 8.7 Limits and stopping
 
@@ -769,12 +769,12 @@ the packages step: a tool root                    every other step: the layer as
 | processes | 4096 | `pids.max` |
 | wall time | 60 min for packages, 15 min otherwise | the domain's deadline |
 | progress | 10 min with no output | the domain's deadline on the pipes |
-| disk | the store's free-space floor (store.md, 7.2) | `statfs` while the step runs |
+| disk | the store's free-space floor (domain/store.md, 7.2) | `statfs` while the step runs |
 
 - **Deadlines are the domain's;** the protocol layer runs the timers.
   The steward bounds the whole job besides, and stops a builder that
-  outlives it (steward.md, 5.2).
-- **The builder's cgroups** (steward.md, section 7). On a machine the
+  outlives it (domain/steward.md, 5.2).
+- **The builder's cgroups** (domain/steward.md, section 7). On a machine the
   activator's unit has `Delegate=yes`; the activator moves itself into a
   leaf, `activator/`, and makes `steward/`, owned by `hearth`. The
   steward moves itself into `steward/self/` and spawns each builder into
@@ -808,7 +808,7 @@ README.md (8.1) asks for contained process trees with id maps through
 - **`no_new_privs` and rlimits.**
 
 The domain and its worlds need none of this; real builds wait for it
-(testing.md, section 6).
+(domain/testing.md, section 6).
 
 ## 9. Nothing unique, nothing secret
 
@@ -837,7 +837,7 @@ be shared between machines and peers.
 | `/var/lib/systemd/credential.secret` | secret | `systemd-creds` run at build | refused |
 | `/etc/shadow`, `/etc/gshadow` and their `-` backups: a password field but `*`, `!`, `!!`, `!*` | secret | `chpasswd`, `useradd -p` in a script | refused; hashes applied at prepare |
 | `/etc/passwd`: a password field but `x` or `*` | secret | the same | refused |
-| `/var/cache/debconf/passwords.dat`, not empty | secret | a password preseed | refused; render refuses `password` preseeds (format.md, 5.11) |
+| `/var/cache/debconf/passwords.dat`, not empty | secret | a password preseed | refused; render refuses `password` preseeds (protocol/format.md, 5.11) |
 | `/etc/resolv.conf`, `/etc/hostname` | the builder | mmdebstrap copies the host's | removed (5.6); a task may write its own |
 | `/etc/apt/sources.list` | the builder | mmdebstrap: the local repository | replaced by the part's sources (5.6) |
 | an apt proxy setting | the builder | os's `--aptopt` | never passed: the build is offline |
@@ -850,12 +850,12 @@ be shared between machines and peers.
 | anything in `/proc`, `/sys`, `/run`, `/tmp`, `/var/tmp` | noise | a step | emptied by mmdebstrap; tmpfs later (8.2); refused |
 | a socket | noise | a daemon a script started | refused |
 | an initramfs with the builder's microcode or modules | the builder | `MICROCODE=yes`, `AUTO_MODULES=yes` | never written: render writes the configuration (5.5) |
-| an owner outside the range | the builder | a file the builder wrote | refused by the walk (store.md, 3.4) |
+| an owner outside the range | the builder | a file the builder wrote | refused by the walk (domain/store.md, 3.4) |
 
 ### 9.3 The scan
 
 - **After every layer, in the tree helper's walk,** over what the layer
-  changed (store.md, 5.4). A layer is its parent and its change set,
+  changed (domain/store.md, 5.4). A layer is its parent and its change set,
   and the parent passed, so checking the changes covers the output.
 - **Rules are data** in `hearth-domain-build`: a path (exact, a prefix,
   or a pattern in its last component, such as `ssh_host_*_key`), a
@@ -865,21 +865,21 @@ be shared between machines and peers.
 - **The helper judges contents** (password fields, emptiness), since
   only it can read every file. A password field is read by a protocol
   machine, `hearth-protocol-accounts`, never by the helper's domain
-  (store.md, 5.3). A finding names the path and the rule, never
+  (domain/store.md, 5.3). A finding names the path and the rule, never
   contents.
 - **A finding fails the layer,** naming the step's layer, the path and
   the rule. Nothing is removed silently above the packages step: a
   `customize.sh` that makes a host key fails its build.
-- **Above packages, `/usr` is fixed but `/usr/local`** (format.md,
+- **Above packages, `/usr` is fixed but `/usr/local`** (protocol/format.md,
   5.5): a change in the software or config layer under `usr/` outside
   `usr/local/` is a finding, a `software.sh` or a `customize.sh` that
   writes there included. The rest of `/usr` is the packages', and a
-  live change overlays `/usr/local` alone of it (slots.md, 6.6).
+  live change overlays `/usr/local` alone of it (domain/slots.md, 6.6).
 - **Above packages, the boot files are fixed.** A change in the
   software or config layer to `boot/`, `usr/lib/modules/` or
   `etc/tiny-initramfs/` is a finding: nothing above packages makes the
   initramfs again, and the boot digests are carried up unchanged (5.8).
-- **The rules' digest is in the layer's record** (store.md, 6.2).
+- **The rules' digest is in the layer's record** (domain/store.md, 6.2).
 
 ## 10. The tools as protocols
 
@@ -959,26 +959,26 @@ with its tail.
 
 ### 10.5 Recordings
 
-- **Every machine is tested against real runs** (testing.md, section 4):
+- **Every machine is tested against real runs** (domain/testing.md, section 4):
   the argument vector, the environment, the bytes of stdout and stderr
   as they came, the exit status, recorded by the conformance tier on the
-  local mirror (testing.md, section 5).
+  local mirror (domain/testing.md, section 5).
 - **They replace os's hand-written fixtures** (a 17-line `Inst` sample,
   a 22-line failure log), and are recorded again when a tool moves.
 - **What a recording settles, the design does not restate:** a
   maintainer script's failure line, the fetch's environment,
   `dpkg-query`'s margin and the `--version` formats behind `tools`
-  (store.md, 6.2) are taken from the recordings, with the rules above:
+  (domain/store.md, 6.2) are taken from the recordings, with the rules above:
   `Ign:` and `Fetched` ignored, a pin with no architecture the
   target's.
 
 ## 11. Caches
 
-- **Layers by key** (store.md, section 4): a config change reuses the
+- **Layers by key** (domain/store.md, section 4): a config change reuses the
   software and packages layers.
-- **Resolutions by key** (render.md, section 5): unchanged sources and
+- **Resolutions by key** (domain/render.md, section 5): unchanged sources and
   requests resolve with no network.
-- **Downloads by SHA-256** (store.md, 2.1): `.deb`s, indices and
+- **Downloads by SHA-256** (domain/store.md, 2.1): `.deb`s, indices and
   software, shared by every layer and target; a `.deb` is fetched once
   per store.
 - **An apt proxy is optional,** the fetcher's from the builder's
@@ -986,17 +986,17 @@ with its tail.
   6.5), never in a key. snapshot.debian.org already redirects to
   content-addressed URLs.
 - **Peers [M6]:** change sets and blobs by digest, within a plane
-  (store.md, section 10).
+  (domain/store.md, section 10).
 - **Not cached in M2:** work inside a packages build (an essential base
-  shared by closures); compile caches (artifacts.md, section 6).
+  shared by closures); compile caches (domain/artifacts.md, section 6).
 
 ## 12. Costs
 
-- **Facts, per step and per build** (wire.md, section 6): wall and CPU
+- **Facts, per step and per build** (protocol/wire.md, section 6): wall and CPU
   time (cgroup `cpu.stat`), peak memory (`memory.peak`), bytes fetched,
   bytes written (from the walk), entries walked, files and bytes
   hashed, hits and misses per cache. The layer's record keeps them
-  (store.md, 6.2).
+  (domain/store.md, 6.2).
 - **What to expect:**
 
   | Work | Cost | Source |
@@ -1005,26 +1005,26 @@ with its tail.
   | essential trixie from deb.debian.org | 28.6 s, 3,940 paths | measured, unprivileged |
   | a host's packages layer, about 1,000 packages | minutes | an estimate, to measure |
   | snapshot, freeze, publish | constant | btrfs |
-  | walking an unchanged root of 100,000 entries | under a second | an estimate (store.md, 5.7) |
-  | hashing a packages layer | its bytes at the SHA-256 rate | to measure (store.md, 5.7) |
+  | walking an unchanged root of 100,000 entries | under a second | an estimate (domain/store.md, 5.7) |
+  | hashing a packages layer | its bytes at the SHA-256 rate | to measure (domain/store.md, 5.7) |
   | a config change, end to end | seconds | an estimate |
   | deleting a layer without the mount option | about 15 µs a path | measured |
 
 - **hearth's own memory is a cost fact too:** the steward's, idle,
   since it always runs, and a steward that grows is a finding; the
-  builder's at its peak, and its start, the store's scan (store.md,
+  builder's at its peak, and its start, the store's scan (domain/store.md,
   8.2), which every pass pays. The heavy work runs in child processes
   that exit, and an idle machine runs no builder at all
-  (steward.md, 4.1).
+  (domain/steward.md, 4.1).
 - **A regression is a finding:** the lab benchmarks hearth as it does
   any product, and the real tier's second run builds nothing, which its
-  costs show (testing.md, section 9).
+  costs show (domain/testing.md, section 9).
 
 ## 13. Its world
 
 - **`hearth-domain-build`'s world** runs the build's domain with the
   store's (or a scripted store) on the fake machine
-  (testing.md, section 3). Its fakes: mmdebstrap, installing a seeded
+  (domain/testing.md, section 3). Its fakes: mmdebstrap, installing a seeded
   universe from a local repository, with users made by maintainer
   scripts, conffiles, a kernel, and output from recordings; the fetcher;
   `dpkg-query`; the target's systemd tools and `tar`; scripts in
@@ -1032,17 +1032,17 @@ with its tail.
 - **Faults from the seed:** a 404, a mismatch or a stall in a fetch; a
   maintainer script that fails; a full disk; a step past its deadline;
   a step that leaves an offender; a power cut mid-step.
-- **Invariants** (testing.md, section 8):
+- **Invariants** (domain/testing.md, section 8):
   - no published output holds an offender of 9.2, as the world checks
     on the fake tree on its own;
   - every step's processes saw only their view, and no network;
   - a failed step publishes nothing, and the layers beneath stay;
   - a packages layer's installed set is its closure;
-  - keys follow store.md, 3.3: a second build of a spec builds nothing,
+  - keys follow domain/store.md, 3.3: a second build of a spec builds nothing,
     a config change builds only config;
   - every step reports its costs.
 - **Real builds** run as a regular user against the local mirror
-  (testing.md, section 6).
+  (domain/testing.md, section 6).
 
 ## 14. What changes from os
 
@@ -1072,7 +1072,7 @@ with its tail.
   part data; the variant comes from placement; the initramfs
   configuration enters the packages part with `MICROCODE` explicit.
 - **Verification adds architecture and status;** no `/.manifest/` in the
-  output, whose records live beside the layer (slots.md, 5.5 for the
+  output, whose records live beside the layer (domain/slots.md, 5.5 for the
   slot's).
 - **Recordings replace hand-written fixtures;** pipes and deadlines
   replace `os-proc`'s one-second polling of files.
@@ -1084,7 +1084,7 @@ with its tail.
   reconcile and scratch finds (temper's `factory.md`, 6.4), and on how
   often snapshots are bumped.
 - **Preseeds where no essential hook runs:** the `custom` variant, if
-  containers take it (format.md, section 13), and preseeds for
+  containers take it (protocol/format.md, section 13), and preseeds for
   `Essential: yes` packages; depends on whether the extract hook can
   load them with an unconfigured debconf.
 - **`--mode=unshare` or `--mode=root`** inside the sandbox; depends on
@@ -1097,10 +1097,10 @@ with its tail.
   recorded but not in the packages key; depends on whether two versions
   ever build different trees from one closure.
 - **The snakeoil pair:** removed, or made per machine by the activator
-  as identity; depends on slots.md's identity (5.4).
+  as identity; depends on domain/slots.md's identity (5.4).
 - **setuid, setgid and capabilities added above packages,** by an
   archive's modes or a script: allowed, or refused unless declared;
-  depends on format.md (5.8, 10.1).
+  depends on protocol/format.md (5.8, 10.1).
 - **Nested subvolumes made at build** beyond `/var/lib/machines` and
   `/var/lib/portables` (5.5), which trixie's systemd 257 is to confirm;
   depends on recordings of a bootstrap of the fleet's closures.
@@ -1109,4 +1109,4 @@ with its tail.
   packages that write it.
 - **seccomp in sandboxes;** depends on skein's contained trees.
 - **The limits' defaults;** depends on the real tier's costs.
-- **`SOURCE_DATE_EPOCH` per layer;** depends on reproducible.md.
+- **`SOURCE_DATE_EPOCH` per layer;** depends on domain/reproducible.md.

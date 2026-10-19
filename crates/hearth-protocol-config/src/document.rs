@@ -1,4 +1,4 @@
-//! Configuration layers (format.md, 3.1 to 3.6).
+//! Configuration layers (protocol/format.md, 3.1 to 3.6).
 use crate::{
     Error, Fault, Field, Position, Shape,
     json::{Entry, Kind, Value},
@@ -135,7 +135,7 @@ fn read_field(entry: Entry, layer: &mut Layer, tasks: &mut List<Task>) -> Result
     }
     Ok(())
 }
-/// Members in name order, at the map's opening brace (format.md, 3.6).
+/// Members in name order, at the map's opening brace (protocol/format.md, 3.6).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Members {
     pub at: Position,
@@ -169,7 +169,7 @@ fn read_members(value: Value) -> Result<Members, Error> {
     Ok(Members { at: value.at, each: each.into_boxed() })
 }
 
-/// A whole placement, replaced by a later layer (format.md, 3.4).
+/// A whole placement, replaced by a later layer (protocol/format.md, 3.4).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Placement {
     pub at: Position,

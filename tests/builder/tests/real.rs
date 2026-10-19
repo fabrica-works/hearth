@@ -6,7 +6,7 @@ use skein_io::kernel::Exit;
 fn hearth_render_prints_the_thin_repositorys_spec_through_real_git() {
     let repository = Repository::make("thin", fixtures::THIN);
     let rendered = fixtures::render(&repository, &[], Form::Text);
-    assert_eq!(String::from_utf8_lossy(&rendered.stdout), fixtures::THIN_TEXT, "render.md 9.2's lines");
+    assert_eq!(String::from_utf8_lossy(&rendered.stdout), fixtures::THIN_TEXT, "domain/render.md 9.2's lines");
     assert_eq!(rendered.exit, Exit::Code(0), "client/README.md 3.3: done");
 }
 #[test]
@@ -248,7 +248,7 @@ fn a_stray_file_in_a_task_prints_a_repository_error() {
     let rendered = fixtures::render(&repository, &[], Form::Text);
     assert_eq!(
         String::from_utf8_lossy(&rendered.stdout),
-        "tasks/motd/tre/etc/motd: motd: a path format.md 2.1 does not allow\n"
+        "tasks/motd/tre/etc/motd: motd: a path protocol/format.md 2.1 does not allow\n"
     );
     assert_eq!(rendered.exit, Exit::Code(2));
 }
@@ -568,7 +568,7 @@ fn a_hosts_template_lists_the_containers_placed_on_it() {
             "  /etc/containers          file 0644 root:root 9e40aaeae922\n",
             "  /etc/containers          file 0644 root:root 755c9769e418\n",
         ),
-        "format.md, 3.5: chat none, lab mail, prod chat and mail"
+        "protocol/format.md, 3.5: chat none, lab mail, prod chat and mail"
     );
 }
 #[test]

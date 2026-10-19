@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fs, path::Path};
 
-/// `testing/mirror/pin`, read (testing.md, 6.2); a bump is a commit of it.
+/// `testing/mirror/pin`, read (domain/testing.md, 6.2); a bump is a commit of it.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Pin {
     pub archive: Box<str>,

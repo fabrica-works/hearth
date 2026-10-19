@@ -1,4 +1,4 @@
-//! Closed word rules and the EFI command-line bound (machine.md, 6.2).
+//! Closed word rules and the EFI command-line bound (domain/machine.md, 6.2).
 use super::{Refused, refused};
 use crate::{
     entries::{Expansion, Located},

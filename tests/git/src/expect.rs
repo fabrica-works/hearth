@@ -1,4 +1,4 @@
-//! The recording's independent typed expectations (testing.md, 4.5).
+//! The recording's independent typed expectations (domain/testing.md, 4.5).
 use crate::world::Blob;
 use hearth_protocol_git::{
     listing::{Entry, Mode},

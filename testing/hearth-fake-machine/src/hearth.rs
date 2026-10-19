@@ -1,4 +1,4 @@
-//! The program table above the generic machine (testing.md, 3.5).
+//! The program table above the generic machine (domain/testing.md, 3.5).
 pub mod draw;
 pub mod mirror;
 pub mod universe;

@@ -1,4 +1,4 @@
-//! One source per destination and directory governance (format.md, 5.5).
+//! One source per destination and directory governance (protocol/format.md, 5.5).
 use crate::{
     entries::{Concrete, Fault, Located},
     errors::{Format, Kind, Repository, Schema, TypeName},

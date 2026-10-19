@@ -1,4 +1,4 @@
-//! A resolution run's decoded install lines and classified cause (render.md, 5.5).
+//! A resolution run's decoded install lines and classified cause (domain/render.md, 5.5).
 use crate::{errors::Resolution, limits::Limits, vocabulary::Class};
 use alloc::boxed::Box;
 use skein_lib::Map;
@@ -145,7 +145,7 @@ impl Closure {
     }
 }
 
-/// The closure recorded whole by key (store.md, 6.4).
+/// The closure recorded whole by key (domain/store.md, 6.4).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Record {
     pub key: hearth_lib::encode::Digest,

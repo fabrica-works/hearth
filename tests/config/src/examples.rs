@@ -1,4 +1,4 @@
-//! format.md's nine complete configuration examples.
+//! protocol/format.md's nine complete configuration examples.
 #[derive(Clone, Copy, Debug)]
 pub struct Example {
     pub name: &'static str,
@@ -19,7 +19,7 @@ pub fn all() -> &'static [Example] {
     ]
 }
 
-/// A task example from format.md.
+/// A task example from protocol/format.md.
 #[must_use]
 pub fn task(name: &str) -> Example {
     for example in TASKS {

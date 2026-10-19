@@ -1,4 +1,4 @@
-//! Unit presets (format.md, 5.6).
+//! Unit presets (protocol/format.md, 5.6).
 use super::secrets::{fault, required};
 use crate::{
     entries::Located,

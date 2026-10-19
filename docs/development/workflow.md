@@ -42,16 +42,16 @@ Two things the gate does until the workspace grows:
   with the two lines `.config/nextest.toml` gives in its comments; the
   gate fails a fuzzy test file while the fuzzy profile still selects
   `none()`. From then on a fuzzy run that selects nothing fails, as a
-  default run always does: every crate lands with its tests (testing.md,
+  default run always does: every crate lands with its tests (domain/testing.md,
   section 1).
 
 The gate needs Linux and git, nothing else: no root, no KVM, no Incus,
-no network (testing.md, section 1).
+no network (domain/testing.md, section 1).
 
 ## 2. The two test suites
 
 The suites are those of skein's `docs/foundation/testing-strategy.md`
-(section 8); `docs/design/testing.md` (sections 2 and 9) says what they
+(section 8); `docs/design/domain/testing.md` (sections 2 and 9) says what they
 hold in hearth.
 
 - **The default suite** is every crate's unit tests and each world's
@@ -100,8 +100,8 @@ which nextest uses all of), with nothing else building. Run the checks on
 an idle machine.
 
 **Outside the gate** are hearth's own tiers: conformance, real builds and
-the VM tier (testing.md, 2.8), each a profile of its own with a ceiling
-(testing.md, 9.2). Each profile comes with its tier's first test, and
+the VM tier (domain/testing.md, 2.8), each a profile of its own with a ceiling
+(domain/testing.md, 9.2). Each profile comes with its tier's first test, and
 its binaries join the default and fuzzy profiles' exclusions in the same
 landing.
 

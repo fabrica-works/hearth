@@ -8,7 +8,7 @@ use hearth_lib::encode::Digest;
 use skein_lib::{List, bytes::copy_of};
 pub const FILE_AT: Position = Position { line: 3, column: 5 };
 pub const FIELD_AT: Position = Position { line: 3, column: 20 };
-// format.md, 5.5: PATH_MAX less its terminating NUL.
+// protocol/format.md, 5.5: PATH_MAX less its terminating NUL.
 pub const LINK_MAX: usize = 4095;
 pub fn tree(paths: &[&[u8]]) -> Box<[TreeFile]> {
     let mut tree = List::with_capacity(u32::try_from(paths.len()).expect("fixture count"));

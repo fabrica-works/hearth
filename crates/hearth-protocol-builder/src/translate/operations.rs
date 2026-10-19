@@ -1,4 +1,4 @@
-//! Total expression translations from the template compiler (format.md, 7.4 to 7.7).
+//! Total expression translations from the template compiler (protocol/format.md, 7.4 to 7.7).
 use crate::render::evaluate as render;
 use hearth_protocol_template as template;
 use skein_lib::List;

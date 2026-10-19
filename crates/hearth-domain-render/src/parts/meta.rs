@@ -1,4 +1,4 @@
-//! Meta's canonical record (render.md, 4.4; store.md, 3.1).
+//! Meta's canonical record (domain/render.md, 4.4; domain/store.md, 3.1).
 use crate::revision::{Firmware, Runs};
 use alloc::boxed::Box;
 use hearth_lib::{
@@ -20,7 +20,7 @@ pub struct Placement {
     pub hardware: Option<Box<[u8]>>,
     pub on: Option<Box<[u8]>>,
 }
-/// Each changed meta field, before and after (render.md, 6.1).
+/// Each changed meta field, before and after (domain/render.md, 6.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Change {
     pub base: Option<NamePair>,

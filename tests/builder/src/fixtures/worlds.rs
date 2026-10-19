@@ -132,7 +132,7 @@ impl Shared {
             if let Some(file) = close {
                 fake.locks.remove(&file);
             }
-            assert!(fake.locks.len() <= 1, "testing.md, 8.4: at most one store lock holder");
+            assert!(fake.locks.len() <= 1, "domain/testing.md, 8.4: at most one store lock holder");
         }
         result
     }

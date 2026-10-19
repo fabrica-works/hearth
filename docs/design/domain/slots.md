@@ -7,8 +7,8 @@ bless, fall back, roll back, drift, what crashes and power cuts do at
 every step, and containers. M3 builds it on EFI, with a minimal bless
 and live changes; M3b adds trials through GRUB; containers and pool
 hosts are M5, live changes in a container included. The layout slots
-live on is machine.md's; the process that carries out every transition
-is activator.md's. What is open is in section 15.
+live on is domain/machine.md's; the process that carries out every transition
+is domain/activator.md's. What is open is in section 15.
 
 ## 1. In one page
 
@@ -16,7 +16,7 @@ is activator.md's. What is open is in section 15.
   labelled `a` or `b`, holding one output prepared for this machine:
   shifted to real ids, with this machine's identity and secrets, fstab
   and units written in, then sealed; a mutable target's slot is left
-  unsealed and read-write, for changes by hand (development.md).
+  unsealed and read-write, for changes by hand (domain/development.md).
 - **Four facts, kept apart:** the slot running (the root subvolume's
   identity, never `/proc/cmdline`), the default (what the firmware or
   GRUB boots), the slot on trial (the activator's marker), and the live
@@ -51,7 +51,7 @@ is activator.md's. What is open is in section 15.
   so no failed mount and no emergency mode can disarm it.
 - **The new slot blesses itself:** its own steward asks its own
   activator, once the boot has reached its target with no failed unit
-  and a builder has rendered the slot's own revision (steward.md,
+  and a builder has rendered the slot's own revision (domain/steward.md,
   section 6). A broken hearth release cannot bless itself, so it cannot
   strand a machine.
 - **Fall back is recorded, not decided:** the default slot's activator
@@ -73,7 +73,7 @@ is activator.md's. What is open is in section 15.
 
 - **Two subvolumes at the top level,** `@<target>.<label>` (the root)
   and `@<target>.<label>.var` (its `/var`), with the label `a` or `b`
-  (machine.md, section 3).
+  (domain/machine.md, section 3).
 - **One output at a time,** prepared for one machine: the output's tree
   is the same on every machine that builds its key; the slot adds this
   machine's identity, secrets, fstab and units, and splits off `/var`.
@@ -84,7 +84,7 @@ is activator.md's. What is open is in section 15.
   place: a fix, a new secret or a new command line is a new prepare.
 - **But a mutable slot,** whose `boot` part says `mutable`, on a machine
   that accepts it: its root is not sealed and is mounted `rw`
-  (development.md, 4.2). What is changed in it by hand is never
+  (domain/development.md, 4.2). What is changed in it by hand is never
   carried into another slot: the next prepare starts from the output.
 - **One machine runs one target,** so its slots are `@<target>.a` and
   `@<target>.b`. A host's containers have slots of their own on the
@@ -93,7 +93,7 @@ is activator.md's. What is open is in section 15.
 ### 2.2 The slot record
 
 The activator keeps one record per slot in `@hearth.state`
-(activator.md, section 7), written atomically:
+(domain/activator.md, section 7), written atomically:
 
 ```
 slot record    slots/<target>.<label>
@@ -105,14 +105,14 @@ slot record    slots/<target>.<label>
   window, allowed    the trial's window and the units whose failure does not block a bless (7.1)
   data policies      from the data part, per class: the snapshot policy [M5], and the backup's
                      period, peer and age recipient [M6], the only recipient a send may use
-                     (activator.md, 5.11; operating.md, section 7)
+                     (domain/activator.md, 5.11; domain/operating.md, section 7)
   output tree        the output's tree digest, as its store record gives it and the shift found it
   slot tree          the slot's own tree digest: the sealed root after prepare; root-only
   reported tree      the same, each secret and identity file's content digest replaced by
                      H(name, generation): the one the facts carry (5.7)
   var tree           the slot's /var as copied, secrets beneath it included
   kernel             version; the four digests of 6.1; the initramfs file's digest, to check its ESP copy
-  command line       as written for this slot (machine.md, section 6)
+  command line       as written for this slot (domain/machine.md, section 6)
   subvolumes         root and var: id and uuid
   boot               EFI: its two entry numbers, normal and trial, and its ESP files' digests;
                      BIOS: its fragment's digest
@@ -125,7 +125,7 @@ slot record    slots/<target>.<label>
 ```
 
 - **The manifest** beside it, `slots/<target>.<label>.manifest`, is a
-  tree file (store.md, 6.3) of the sealed root: one entry per path in
+  tree file (domain/store.md, 6.3) of the sealed root: one entry per path in
   tree order, with its local inode and change time as the seal left
   them. Drift compares against it (section 10).
 - **The record inside the root,** `/.hearth/slot`, holds the target, the
@@ -150,7 +150,7 @@ slot record    slots/<target>.<label>
 - **The steward chooses nothing:** it asks to place an output, and the
   activator answers with the slot it used. converge decides whether a
   new prepare is needed by comparing the desired output and parts with
-  the slots' records in the facts (wire.md, section 4).
+  the slots' records in the facts (protocol/wire.md, section 4).
 
 ### 2.4 The live record
 
@@ -186,7 +186,7 @@ live record    live/<target>
 | Fact | Read from | When it can be wrong |
 |---|---|---|
 | **running** | `BTRFS_IOC_GET_SUBVOL_INFO` on `/`: the root subvolume's uuid, matched with the slot records; cross-checked with `/.hearth/slot` | never; `none` on a live system or a root hearth did not prepare |
-| **default** | EFI: the first of the target's entries in `BootOrder`; BIOS: `default` in the valid environment file (machine.md, 4.4 and 5.6) | a firmware that reorders or forgets entries: reported, and put right at start |
+| **default** | EFI: the first of the target's entries in `BootOrder`; BIOS: `default` in the valid environment file (domain/machine.md, 4.4 and 5.6) | a firmware that reorders or forgets entries: reported, and put right at start |
 | **trial** | the trial marker in `@hearth.state` (6.4) | never: it is the activator's own record |
 | **live** | `/proc/self/mountinfo`: an overlay on `/etc`, `/usr/local` or `/opt` with source `hearth-live`, whose layers are a delta `@<target>.live.<n>` over the running slot's directory; checked against the live record (2.4) and the marker | after a person's soft reboot, which keeps the overlay on `/etc` and drops `/usr/local`'s and `/opt`'s (to verify): the disagreement is found at start, and ends in a full reboot (section 11) |
 
@@ -196,7 +196,7 @@ live record    live/<target>
 - **What runs, derived:** the prepare key the machine's files come from,
   the live record's while a verified live state is in place, else the
   running slot's; and the effective slot, the slot that holds it, if
-  any. converge compares the desired prepare key with it (wire.md, 4.2).
+  any. converge compares the desired prepare key with it (protocol/wire.md, 4.2).
   After a later live change falls back, no slot may hold it (6.9).
 - **Running is never read from `/proc/cmdline`.** After a soft reboot the
   kernel's command line still names the slot the kernel was booted for.
@@ -211,7 +211,7 @@ live record    live/<target>
   boots.
 - **Facts are read afresh** at every start of the activator and after
   every operation, and reported to the steward when they change
-  (activator.md, section 4) and to an engine [M4] (wire.md, section 6).
+  (domain/activator.md, section 4) and to an engine [M4] (protocol/wire.md, section 6).
   An event such as `fell back` is a hint; the facts are the truth.
 
 ## 4. The state machine
@@ -269,7 +269,7 @@ activator's own order of steps excludes the cell.
 
 Guards across both slots, checked before a cell is taken:
 
-- **One mutating operation at a time** (activator.md, section 4), so at
+- **One mutating operation at a time** (domain/activator.md, section 4), so at
   most one slot is `preparing`, `trying`, `on trial` or `on live trial`.
 - **`prepare`** names a slot that is neither running nor the default.
 - **`try`** names a slot whose other slot runs and is the default.
@@ -283,7 +283,7 @@ Guards across both slots, checked before a cell is taken:
   steward on the link, the base's, spawned anew after the swap (6.8,
   L6).
 - **`first bless`** only while running is `none` and neither slot is
-  blessed: bootstrap (machine.md, 8.2).
+  blessed: bootstrap (domain/machine.md, 8.2).
 
 The invariant, checked by every world (section 13):
 
@@ -304,7 +304,7 @@ The invariant, checked by every world (section 13):
 
 ## 5. Prepare
 
-Inputs, from the place request (activator.md, 5.1): the slot, the
+Inputs, from the place request (domain/activator.md, 5.1): the slot, the
 output's key and tree digest, its kernel version and digests, the
 `data`, `secrets` and `boot` parts, the package users, the trial's
 window, the units allowed to fail, and the target's kind and firmware
@@ -313,7 +313,7 @@ part [M5] (12.1).
 
 - **Identity first:** before anything else the activator makes every
   identity item the request declares and the store lacks
-  (activator.md, 5.7), then computes the prepare key (2.2), whose
+  (domain/activator.md, 5.7), then computes the prepare key (2.2), whose
   identity generation is then final. A request whose key the slot
   already holds is answered at once, as done.
 - **Every path in the slot is resolved from the snapshot's root
@@ -327,7 +327,7 @@ part [M5] (12.1).
   or `/etc/shadow` are not regular files, is refused; no error carries
   a file's content.
 - **Each step starts by writing the activator's journal**
-  (activator.md, 7.3), so a crash finds the slot `preparing` and deletes
+  (domain/activator.md, 7.3), so a crash finds the slot `preparing` and deletes
   it (section 11).
 
 ### 5.1 The snapshot
@@ -345,10 +345,10 @@ part [M5] (12.1).
    the `.var`; then the root, read-only or not (the activator is root).
 3. **Open the output by its key,** beneath
    `/run/hearth-activator/top/@hearth.store/` without following links
-   (store.md, section 2), and check it (activator.md, 6.1).
+   (domain/store.md, section 2), and check it (domain/activator.md, 6.1).
 4. **Snapshot it, writable,** with `BTRFS_IOC_SNAP_CREATE_V2` from the
    descriptor opened in step 3, into the top level as `@x1-prod.b`.
-5. **Check the snapshot** (activator.md, 6.2): its parent uuid is the
+5. **Check the snapshot** (domain/activator.md, 6.2): its parent uuid is the
    output's; the output is still read-only, with the same change
    generation. Record the new subvolume's id and uuid.
 
@@ -357,7 +357,7 @@ A snapshot is a metadata operation: milliseconds, and no data copied.
 ### 5.2 The shift
 
 The output is owned on disk by the builder's subordinate range, base
-`B` (store.md, section 9), and its extended attributes are in that
+`B` (domain/store.md, section 9), and its extended attributes are in that
 range's terms. The shift makes it owned by real ids, metadata only, in
 one depth-first walk of the snapshot with a bounded stack
 (`hearth-domain-tree`, a child of `hearth-domain-slots`). For each
@@ -378,7 +378,7 @@ inode, once (hard links are found by inode number):
    one is written back as it was; a v3 with any other root id is refused;
 6. **rewrite each ACL's `ACL_USER` and `ACL_GROUP` qualifiers** from
    `q` to `q - B`, refusing any outside the range;
-7. **hash its contents** if it is a regular file (activator.md, 6.3),
+7. **hash its contents** if it is a regular file (domain/activator.md, 6.3),
    and **write its manifest entry,** the same entry the builder's tree
    helper wrote inside its namespace.
 
@@ -387,7 +387,7 @@ inode, once (hard links are found by inode number):
   capability or ACL read by root now reads as the namespace read it. So
   the digest of the shifted tree, computed as the walk goes, must equal
   the output's tree digest: that is the shift's own verification
-  (activator.md, 6.3).
+  (domain/activator.md, 6.3).
 - **What it costs:** about 10 µs an inode for the metadata, so half a
   second to two seconds for a root of 50k to 100k inodes, plus hashing
   contents when the activator hashes again. Data extents stay shared
@@ -402,7 +402,7 @@ inode, once (hard links are found by inode number):
 
 ### 5.3 /var
 
-A layer is one subvolume, `/var` included (store.md, section 4); a slot
+A layer is one subvolume, `/var` included (domain/store.md, section 4); a slot
 splits it off, so that dpkg's database travels with its slot and the
 root can stay read-only.
 
@@ -417,7 +417,7 @@ root can stay read-only.
    activator's own namespace.
 3. **Empty the root's `/var`,** depth first, by `unlinkat` on directory
    descriptors; `/var` itself stays, as the mount point.
-4. **Make the classes and the entries' directories** (machine.md, 3.4).
+4. **Make the classes and the entries' directories** (domain/machine.md, 3.4).
    For each class an entry of the `data` part uses, make
    `@x1-prod.<class>` with `BTRFS_IOC_SUBVOL_CREATE` if the top level
    lacks it, its root `0:0 0755`. For each entry whose directory its
@@ -446,32 +446,32 @@ A copy, rather than a second snapshot of the output trimmed down to its
 
 ### 5.4 Identity and secrets
 
-Written from the secret store in `@hearth.state` (activator.md, 7.1)
+Written from the secret store in `@hearth.state` (domain/activator.md, 7.1)
 into the slot, through descriptors (section 5): every parent must
 already be a directory in the slot; the file is created anew, replacing
 a file at its path and refusing a link there. A path beneath `/var` is
 written into the slot's `.var` subvolume, which 5.3 has made, and its
 entry joins the `/var` manifest.
 
-- **The identity** (format.md, 9.3), made before the prepare key
+- **The identity** (protocol/format.md, 9.3), made before the prepare key
   (section 5):
   - the machine-id, every target's and never declared, at
     `/etc/machine-id`, `0:0 0444`: 32 hexadecimal digits and a newline.
     The journal's directory is named by it, so it must be the same for
     every slot of the target, and it must be written: on a read-only
     root an empty file means a new id at every boot;
-  - each item of the `secrets` part's `identity` map (render.md, 4.3),
+  - each item of the `secrets` part's `identity` map (domain/render.md, 4.3),
     at its `path`, with its `public_path`, mode and owners: an SSH host
     key in M3, such as `/etc/ssh/ssh_host_ed25519_key`. An output holds
-    none (build.md, section 9).
+    none (domain/build.md, section 9).
 - **Secret files** from the `secrets` part: name, path, mode, owner,
   group. Owner and group are names, resolved against the slot's own
   `/etc/passwd` and `/etc/group` after the shift, through bounded parsers
-  (activator.md, 2.3); an unknown name, or a missing secret, fails the
+  (domain/activator.md, 2.3); an unknown name, or a missing secret, fails the
   prepare and names them all.
 - **Never readable by the steward or its builder:** a secret or
   identity file owned by `hearth`, or by a group `hearth` belongs to,
-  and a secret whose mode lets others read it, are refused (format.md,
+  and a secret whose mode lets others read it, are refused (protocol/format.md,
   5.11 refuses them first).
 - **Password hashes,** secrets too, for the users the `secrets` part
   names: the activator replaces the second field of those users' lines
@@ -483,19 +483,19 @@ entry joins the `/var` manifest.
   Never a value, nor a digest of one (5.7).
 - **Rotation:** an import bumps the secret store's generation, which
   changes the prepare key, so converge prepares the same output again
-  into the other slot (wire.md, 4.6), and the new secret arrives by trial
+  into the other slot (protocol/wire.md, 4.6), and the new secret arrives by trial
   and bless like any change.
 
 ### 5.5 The slot's files
 
 Written from typed data into the root before it is sealed, each into the
-manifest, by the format crates of activator.md, 8.1:
+manifest, by the format crates of domain/activator.md, 8.1:
 
 | Path | Owner, mode | Content |
 |---|---|---|
-| `/etc/fstab` | `0:0 0644` | machine.md, 3.3 |
+| `/etc/fstab` | `0:0 0644` | domain/machine.md, 3.3 |
 | `/.hearth/slot` | `0:0 0444` | the record inside the root (2.2) |
-| `/.hearth/grub.cfg` [M3b] | `0:0 0444` | the slot's `linux` and `initrd` lines (machine.md, 5.4) |
+| `/.hearth/grub.cfg` [M3b] | `0:0 0444` | the slot's `linux` and `initrd` lines (domain/machine.md, 5.4) |
 | `/etc/systemd/system/hearth-trial.timer` | `0:0 0644` | the dead-man's timer |
 | `/etc/systemd/system/hearth-trial.service` | `0:0 0644` | the dead-man's reboot |
 | `/etc/systemd/system/hearth-trial-arm.service` | `0:0 0644` | starts the trial's target when the slot is on trial |
@@ -505,7 +505,7 @@ manifest, by the format crates of activator.md, 8.1:
 
 An output that holds `/.hearth`, any of these unit names, or a drop-in
 sorting after `zz-hearth-watchdog.conf` is refused: they are hearth's
-(format.md, 5.11). The units, for slot `x1-prod.b` with a 10-minute
+(protocol/format.md, 5.11). The units, for slot `x1-prod.b` with a 10-minute
 window (their exact behaviour is to verify on the VM tier):
 
 ```
@@ -593,7 +593,7 @@ RebootWatchdogSec=10min
   through descriptors (section 5), each through a temporary file, synced
   and renamed; unmount. Then read the slot's two entries, normal and
   trial, from efivarfs and make again each one that is missing or
-  differs, at its number (machine.md, 4.2 and 4.3). Both stay out of
+  differs, at its number (domain/machine.md, 4.2 and 4.3). Both stay out of
   `BootOrder`.
 - **BIOS [M3b]:** nothing on the boot partition changes at prepare. The
   slot's fragment is one of its files (5.5), and `grub.cfg` is fixed.
@@ -604,17 +604,17 @@ RebootWatchdogSec=10min
 
 1. **Seal the root:** `BTRFS_IOC_SUBVOL_SETFLAGS` with
    `BTRFS_SUBVOL_RDONLY`; left out for a mutable slot, whose fstab
-   mounts `/` `rw` (development.md, 4.2). Its manifest is written all
-   the same: capture compares against it (development.md, section 5).
+   mounts `/` `rw` (domain/development.md, 4.2). Its manifest is written all
+   the same: capture compares against it (domain/development.md, section 5).
 2. **Check the package users and groups:** every user and group a task
-   declares as made by a package (format.md, 5.6), such as `postfix`,
+   declares as made by a package (protocol/format.md, 5.6), such as `postfix`,
    must be in the slot's `/etc/passwd` or `/etc/group`, read through the
    same bounded parsers as 5.4's; a missing one refuses the slot, naming
    every one missing.
 3. **Walk the sealed root's metadata** against the manifest, without
    contents, and record each entry's inode and change time as the seal
    left them. Anything else that differs (nothing should) fails the
-   prepare. `H("tree", …)` over the manifest's entries (store.md, 3.4)
+   prepare. `H("tree", …)` over the manifest's entries (domain/store.md, 3.4)
    is the slot's own tree digest; it stays in the state.
 4. **Compute the reported tree digest,** the same formula with each
    secret and identity file's content digest replaced by
@@ -646,14 +646,14 @@ and the booted kernel (section 3) agree on all four of:
 
 | Digest | Of | From |
 |---|---|---|
-| image | the content of `boot/vmlinuz-<version>` | the output's tree file (store.md, 6.3); the shift's walk finds it again |
-| modules | the subtree `usr/lib/modules/<version>` (store.md, 3.4) | the tree file; the walk finds it again |
-| initramfs inputs | `H("initramfs", …)` over the versions of `tiny-initramfs-core` and of the kernel's package, its configuration (which lists the modules), the kernel version, and with `MICROCODE=generic` the microcode packages' versions | the resolution's closure (render.md, 5.4), which build.md, 5.7 checks is what was installed, and the `packages` part's initramfs configuration (render.md, 4.2); the builder computes it with the output (build.md, 5.8; store.md, 6.3) and the place request carries it (activator.md, 5.1) |
-| command line | the line without the slot's own tokens, `initrd=` and `rootflags=` | the slot record (machine.md, section 6) |
+| image | the content of `boot/vmlinuz-<version>` | the output's tree file (domain/store.md, 6.3); the shift's walk finds it again |
+| modules | the subtree `usr/lib/modules/<version>` (domain/store.md, 3.4) | the tree file; the walk finds it again |
+| initramfs inputs | `H("initramfs", …)` over the versions of `tiny-initramfs-core` and of the kernel's package, its configuration (which lists the modules), the kernel version, and with `MICROCODE=generic` the microcode packages' versions | the resolution's closure (domain/render.md, 5.4), which domain/build.md, 5.7 checks is what was installed, and the `packages` part's initramfs configuration (domain/render.md, 4.2); the builder computes it with the output (domain/build.md, 5.8; domain/store.md, 6.3) and the place request carries it (domain/activator.md, 5.1) |
+| command line | the line without the slot's own tokens, `initrd=` and `rootflags=` | the slot record (domain/machine.md, section 6) |
 
 - **The initramfs is compared by its inputs, never its bytes.** mktirfs's
   cpio carries inode numbers and mtimes, so two builds of the same inputs
-  differ (reproducible.md, 2.2, row 4); comparing bytes would force a full
+  differ (domain/reproducible.md, 2.2, row 4); comparing bytes would force a full
   reboot at every snapshot bump.
 - **It counts at all because a soft reboot never runs it.** A changed
   initramfs would first run at the next full boot, after the bless, with
@@ -661,7 +661,7 @@ and the booted kernel (section 3) agree on all four of:
   which runs it.
 - **The modules must match** because the running kernel loads its
   modules from the new root. Whether depmod's indexes beneath them
-  reproduce across builds is to verify (reproducible.md, section 4);
+  reproduce across builds is to verify (domain/reproducible.md, section 4);
   until then a snapshot bump that keeps the kernel may still cost a full
   reboot.
 - **The command line must match** because the running kernel keeps its
@@ -674,10 +674,10 @@ and the booted kernel (section 3) agree on all four of:
 - **`how: auto`** takes the first kind that applies; **`how: live`**
   asks for live only, and is refused, with the rules that fail, when the
   change is not eligible; **`how: full`** a one-shot reboot
-  (wire.md, 5.4).
+  (protocol/wire.md, 5.4).
 - **The steward asks for live,** with `try live`, since half of 6.7's
   rules read the specs and the store, which a builder checks for it in
-  its `plan live` job (steward.md, 3.3); the activator checks the rest
+  its `plan live` job (domain/steward.md, 3.3); the activator checks the rest
   and refuses otherwise, and the steward then asks an ordinary `try`.
 - **The activator chooses between soft and one-shot,** since that rule
   reads only the records and facts it owns, and it answers with the
@@ -694,7 +694,7 @@ and the booted kernel (section 3) agree on all four of:
    ```
 
    It is the mount tiny-initramfs would have made, since the initramfs
-   does not run again (machine.md, 7.4).
+   does not run again (domain/machine.md, 7.4).
 3. **Write `/run/hearth-trial/x1-prod.b`,** which `/run` carries across
    the soft reboot and which arms the new root's dead-man (5.5).
 4. **Set the marker's phase to `armed`.**
@@ -718,12 +718,12 @@ What the new root finds:
 ### 6.3 By one-shot reboot
 
 1. **Check the slot's trial entry** (EFI): present and as written, or
-   made again (machine.md, 4.2). Its command line is the normal entry's
+   made again (domain/machine.md, 4.2). Its command line is the normal entry's
    with `hearth.trial=x1-prod.b`, which arms the dead-man (5.5).
 2. **Write the marker,** phase `arming`.
 3. **Set the one-shot:** `efibootmgr --bootnext 4811`, the trial entry;
    or, on BIOS, `next_entry=x1-prod.b` in `env.0`, then `env.1`, from
-   which GRUB adds the same token (machine.md, 5.3).
+   which GRUB adds the same token (domain/machine.md, 5.3).
 4. **Set the marker's phase to `armed`.**
 5. **Make sure `/run/nextroot` is not a mount point,** unmounting a
    leftover, and answer the request.
@@ -733,7 +733,7 @@ What the new root finds:
 On the trial's boot, the new slot's activator checks that the one-shot
 was consumed: `BootCurrent` is the slot's trial entry and `BootNext` is
 gone (EFI), or `next_entry` is empty in both files (BIOS); a
-`next_entry` still set is cleared at once (machine.md, 5.6).
+`next_entry` still set is cleared at once (domain/machine.md, 5.6).
 
 ### 6.4 The trial marker
 
@@ -776,7 +776,7 @@ gone (EFI), or `next_entry` is empty in both files (BIOS); a
 | userspace never finishes booting | `JobTimeoutAction=reboot-force` on `hearth-trial.target` | the default |
 | a mount fails and systemd isolates `emergency.target` | the dead-man's timer, kept by `IgnoreOnIsolate=yes`, armed without any mount | the default |
 | it boots, but no bless comes: a failed unit, a broken hearth | the dead-man: `systemctl reboot -ff` after the window | the default |
-| the slot's steward finds a definite failure: a failed unit that counts (`degraded`), or its builder cannot render the slot's revision (steward.md, section 6) | it asks `fall back` (section 8) | the default |
+| the slot's steward finds a definite failure: a failed unit that counts (`degraded`), or its builder cannot render the slot's revision (domain/steward.md, section 6) | it asks `fall back` (section 8) | the default |
 | the power is cut | the next power-on | the default |
 | live: a unit action fails, a touched unit dies in the settle, the criterion fails | the live fall back (8.5) | the base's files, with no reboot |
 | live: the live fall back itself fails or hangs | `reboot -ff`, or the base's dead-man | the default |
@@ -788,7 +788,7 @@ gone (EFI), or `next_entry` is empty in both files (BIOS); a
 Two gaps remain: a kernel that hangs with no hardware watchdog, which
 needs a person or, with an engine, a power cycle from outside [M4]; and
 a firmware that ignores `BootNext`, where the trial never runs and is
-reported (machine.md, section 9). A hardware watchdog's behaviour across
+reported (domain/machine.md, section 9). A hardware watchdog's behaviour across
 a soft reboot is to verify.
 
 ### 6.6 Live
@@ -815,7 +815,7 @@ stays the root: no reboot and no soft reboot. With `x1-prod` running
   path afterwards gets `b`'s file; one already open stays `a`'s, and
   nothing on disk changes, so there is no `ETXTBSY` and no torn file.
 - **The units** that read the changed files are stopped, reloaded,
-  restarted or started, as the tasks declare (format.md, 5.14).
+  restarted or started, as the tasks declare (protocol/format.md, 5.14).
 - **The live bless arms `b`'s trial, and does not move the default**
   (7.6). `a + delta` is not `b`: `b`'s early boot, generators, udev,
   sysctl and every unit run `b`'s configuration only at `b`'s first
@@ -844,43 +844,43 @@ mount, `fsopen("overlay")` then `move_mount` with `MOVE_MOUNT_BENEATH`,
 is the kernel mechanism upstream's fix and NixOS's `/etc` use: it swaps
 with no window, fails without touching the old overlay, and costs about
 as much code as driving the tools and checking their output. The
-`hearth` task disables both services (format.md, 5.12), so nothing
+`hearth` task disables both services (protocol/format.md, 5.12), so nothing
 merges extensions behind hearth's back.
 
 ### 6.7 What may be live
 
 An allowlist. A builder decides it when the steward has it plan the
-trial (`plan live`, steward.md, 3.3), from the two outputs' tree files
-(a sorted diff, store.md, 6.3) and the specs' `live` parts
-(render.md, 4.4); the activator checks again what its own records and
+trial (`plan live`, domain/steward.md, 3.3), from the two outputs' tree files
+(a sorted diff, domain/store.md, 6.3) and the specs' `live` parts
+(domain/render.md, 4.4); the activator checks again what its own records and
 the machine show. A change that fails any rule takes an
 ordinary trial (6.1). Not being live is never an error: the facts say
-why (wire.md, section 6).
+why (protocol/wire.md, section 6).
 
 | # | Rule | Why | Checked by |
 |---|---|---|---|
-| 1 | **The same packages layer:** both outputs have one packages key | packages, the kernel, its modules, the initramfs's inputs, systemd, dbus and libc stay; a packages change is never live | builder; activator, from the layer records' parents (activator.md, 6.1) |
+| 1 | **The same packages layer:** both outputs have one packages key | packages, the kernel, its modules, the initramfs's inputs, systemd, dbus and libc stay; a packages change is never live | builder; activator, from the layer records' parents (domain/activator.md, 6.1) |
 | 2 | **The prepare key equal but for the output,** the window and the units allowed to fail: the same `data`, `secrets` and `boot` digests, the same identity and secret store generations | a new data entry, a class changed or a policy changed alters the `data` part: a new bind changes fstab and the class's directory must be made and seeded at prepare; a new command line changes the boot; a rotated secret is not in the output's diff | both, from the slot records |
-| 3 | **Changes only under `etc/`, `usr/local/` and `opt/`** | `/var` content reaches a slot only at prepare; `/boot` and the rest of `/usr` are the packages', which rule 1 keeps and the build refuses above them (build.md, 9.3) | both |
-| 4 | **No boot-time or PID 1 configuration** (format.md, 5.14) | read only at boot or at PID 1's re-exec; applied live it is not what a boot does (a removed sysctl is not reverted), so the trial would test the wrong thing | both |
-| 5 | **Users and groups only added:** no line of `passwd`, `group`, `shadow`, `gshadow`, `subuid` or `subgid` removed, no id changed | a renumbering touches files in `/var` and data; a removal strands running processes | builder; activator, with its account parsers (activator.md, 2.3) |
+| 3 | **Changes only under `etc/`, `usr/local/` and `opt/`** | `/var` content reaches a slot only at prepare; `/boot` and the rest of `/usr` are the packages', which rule 1 keeps and the build refuses above them (domain/build.md, 9.3) | both |
+| 4 | **No boot-time or PID 1 configuration** (protocol/format.md, 5.14) | read only at boot or at PID 1's re-exec; applied live it is not what a boot does (a removed sysctl is not reverted), so the trial would test the wrong thing | both |
+| 5 | **Users and groups only added:** no line of `passwd`, `group`, `shadow`, `gshadow`, `subuid` or `subgid` removed, no id changed | a renumbering touches files in `/var` and data; a removal strands running processes | builder; activator, with its account parsers (domain/activator.md, 2.3) |
 | 6 | **tmpfiles only creatable:** the changed lines of `etc/tmpfiles.d/hearth.conf` are of types `systemd-tmpfiles --create` applies whole; none is `r`, `R` or `D` | the output's `/var` got them at build; the running `/var` needs them now, and nothing removes live | builder |
-| 7 | **Every changed path has a consumer:** a task's `live` entry, or one hearth knows (format.md, 5.14); a deleted path's from the running slot's spec, every other path's from the new one | hearth must know what to reload or restart; guessing from paths is how this fails | builder |
-| 8 | **Nothing never-live** (format.md, 5.14): systemd's own units and configuration, dbus (its policy files are allowed, with a reload of dbus), logind, journald, udevd, networkd, NetworkManager, the gettys, AppArmor, and hearth itself for now | restarting them live is risky or wrong | builder; activator, for the plan's units |
+| 7 | **Every changed path has a consumer:** a task's `live` entry, or one hearth knows (protocol/format.md, 5.14); a deleted path's from the running slot's spec, every other path's from the new one | hearth must know what to reload or restart; guessing from paths is how this fails | builder |
+| 8 | **Nothing never-live** (protocol/format.md, 5.14): systemd's own units and configuration, dbus (its policy files are allowed, with a reload of dbus), logind, journald, udevd, networkd, NetworkManager, the gettys, AppArmor, and hearth itself for now | restarting them live is risky or wrong | builder; activator, for the plan's units |
 | 9 | **No file dpkg owns** under `usr/local/` or `opt/` changed by the software layer, by the packages layer's dpkg database; conffiles in `etc/` are fine | a download over a packaged file is a packages change in disguise | builder |
 | 10 | **The machine fits:** Linux 6.8 or later (`MOVE_MOUNT_BENEATH` since 6.5, overlayfs's `lowerdir+` since 6.8; trixie runs 6.12); `etc`, `usr` and `opt` are directories in the base; no mount on or beneath them but hearth's; running = default = blessed; no trial; at most one live state, whose base is the running slot; [M5] the new slot's window no longer than the base's | the swap's mechanisms; a base proven by a native boot; the base's dead-man ends the trial | activator |
 | 11 | **Sandboxes beneath the hierarchies:** units whose mount namespace has a mount beneath `/etc`, `/usr/local` or `/opt` join the restarts, and if one is never-live the change is not eligible | the overlay, propagated into the unit's namespace, shadows that mount until the unit restarts | activator, as root, from `/proc/<pid>/mountinfo` of every process and its cgroup |
-| 12 | **An unexplored base, on a mutable machine:** a metadata walk of the base's `etc/`, `usr/local/` and `opt/` matches its manifest (development.md, 4.4) | what was changed by hand beneath the overlay would stay visible and fail L2; a soft reboot discards it instead | activator |
+| 12 | **An unexplored base, on a mutable machine:** a metadata walk of the base's `etc/`, `usr/local/` and `opt/` matches its manifest (domain/development.md, 4.4) | what was changed by hand beneath the overlay would stay visible and fail L2; a soft reboot discards it instead | activator |
 
 - **What the steward sends:** `try live`, with the digest of the change
   from the base's output to the new one, which the delta will hold, and
-  the unit plan (activator.md, 5.17): the units to stop before the swap,
+  the unit plan (domain/activator.md, 5.17): the units to stop before the swap,
   to reload, restart or start after it, and whether `daemon-reload`,
   tmpfiles, D-Bus or the accounts need acting on: all as its builder's
   plan answered them.
 - **What the activator recomputes:** the change between the two slots'
   manifests, leaving out each slot's own files (5.4, 5.5), whose digest
-  (in store.md, 3.5's form) must equal the plan's; then rules 1 to 5,
+  (in domain/store.md, 3.5's form) must equal the plan's; then rules 1 to 5,
   8 for the plan's units, 10, 11 and 12. The delta is built from its own
   diff, never from paths the steward sent. A difference refuses the
   trial, naming the rule.
@@ -890,7 +890,7 @@ why (wire.md, section 6).
 ### 6.8 The steps
 
 Every step that leaves the state starts by writing the journal
-(activator.md, 7.3); the marker carries the phase from L3.
+(domain/activator.md, 7.3); the marker carries the phase from L3.
 
 | Step | What the activator does | Phase after |
 |---|---|---|
@@ -900,8 +900,8 @@ Every step that leaves the state starts by writing the journal
 | **L3. Arm** | write the marker: kind `live`, phase `arming`, base `a`, the delta, the previous one, the boot id and soft reboot count. Write `/run/hearth-trial/x1-prod.a`, then `systemctl start hearth-trial.timer`: `a`'s own dead-man (5.5), whose condition the file meets and whose `OnActiveSec=` counts from now; check it is active | `armed`; `b` is `on live trial` |
 | **L4. Stop** | `systemctl stop`, one call: the units being removed or disabled, and each `restart` unit with a changed path under `usr/local/` or `opt/`; every job's result checked | `armed` |
 | **L5. Swap** | for `/etc`, then `/usr/local`, then `/opt`: the overlay built and moved beneath the current top (below); the mount table read back; the live record written | `swapped` |
-| **L6. Act** | `systemctl daemon-reload` if a unit file, drop-in or `.wants` link changed; `systemd-tmpfiles --create /etc/tmpfiles.d/hearth.conf` if it changed; `systemctl reload dbus` if D-Bus policy changed; `nscd --invalidate` for `passwd` and `group` if nscd runs and the accounts changed. Then the declared reloads, restarts and starts as one batch (below), every job checked. Then answer the request and spawn the steward anew (activator.md, 3.3), so the live bless comes from a steward started in the new files, whose builder renders the slot's revision (steward.md, section 6) | `running` |
-| **L7. Settle** | 60 seconds to start, within the base's window: every unit L4 to L6 touched stays `active` with the `InvocationID` and `NRestarts` L6 read; the minimal criterion holds (7.1); from M5, the blessing checks pass (operating.md, section 3) | `running` |
+| **L6. Act** | `systemctl daemon-reload` if a unit file, drop-in or `.wants` link changed; `systemd-tmpfiles --create /etc/tmpfiles.d/hearth.conf` if it changed; `systemctl reload dbus` if D-Bus policy changed; `nscd --invalidate` for `passwd` and `group` if nscd runs and the accounts changed. Then the declared reloads, restarts and starts as one batch (below), every job checked. Then answer the request and spawn the steward anew (domain/activator.md, 3.3), so the live bless comes from a steward started in the new files, whose builder renders the slot's revision (domain/steward.md, section 6) | `running` |
+| **L7. Settle** | 60 seconds to start, within the base's window: every unit L4 to L6 touched stays `active` with the `InvocationID` and `NRestarts` L6 read; the minimal criterion holds (7.1); from M5, the blessing checks pass (domain/operating.md, section 3) | `running` |
 | **L8. Live bless** | asked by the steward: 7.6. The default does not move | `live-blessed`; `b` is `live-blessed` |
 | **L9. The native boot** | the next boot consumes the one-shot and boots `b`'s trial entry: `b` runs on trial (6.3), its dead-man armed by `hearth.trial=`; its activator sets the marker `running`; its steward blesses it (7.3), the default moves to `b`, and the delta is deleted | the marker removed by the bless |
 
@@ -930,7 +930,7 @@ prepare resolves them (section 5), the delta's beneath the delta's:
 **L2, the merged view.** The three overlays are built exactly as L5 will
 build them, with `fsopen` and `fsmount`, and never attached: a detached
 mount is in an anonymous mount namespace no process sees, and the
-activator walks it through its descriptor (activator.md, 6.5). The walk
+activator walks it through its descriptor (domain/activator.md, 6.5). The walk
 must give the expected manifest: `a`'s manifest under `etc/`,
 `usr/local/` and `opt/`, with each path of the change replaced by `b`'s
 entry or removed. It compares type, mode, owners, size, extended
@@ -938,13 +938,13 @@ attributes and link targets for every entry, and contents for the
 delta's files; not inode numbers or change times, which an overlay
 reports from its layers or itself. Any difference fails the trial, and
 the delta is deleted. The expected manifest becomes the live record's
-(2.4). It is store.md, 3.5's rule for a change set, kept for a delta:
+(2.4). It is domain/store.md, 3.5's rule for a change set, kept for a delta:
 applied and walked, it must give the child's tree. Then the delta is
 sealed: nothing writes a layer once it is merged, which overlayfs calls
 undefined.
 
 **L4 and L6, the units.** Each changed path's consumers
-(format.md, 5.14) decide:
+(protocol/format.md, 5.14) decide:
 
 - **Before the swap** stop what must not straddle it: a `restart` unit
   whose binary, library or tree under `usr/local/` or `opt/` changes, so it
@@ -987,7 +987,7 @@ otherwise:                 move_mount(mnt, "", AT_FDCWD, "/etc", MOVE_MOUNT_F_EM
   opening a file in a tight loop. A `move_mount` that fails leaves the
   old top in place, so a failed hierarchy changes nothing.
 - **Exec is allowed** on all three; `nosuid` is set on `/etc` only,
-  until setuid files above the packages are settled (build.md,
+  until setuid files above the packages are settled (domain/build.md,
   section 15): if they are refused, `/usr/local` and `/opt` take it
   too.
 - **A hierarchy the new delta does not change** loses a previous overlay
@@ -1004,7 +1004,7 @@ otherwise:                 move_mount(mnt, "", AT_FDCWD, "/etc", MOVE_MOUNT_F_EM
   measured), and whether overlayfs carries a lower mount's `noexec` to
   the merged files is to verify.
 - **The activator stays in the host's mount namespace,** with no
-  sandboxing in its unit (activator.md, 3.1), or its overlays would land
+  sandboxing in its unit (domain/activator.md, 3.1), or its overlays would land
   in a namespace of its own.
 
 **A person's soft reboot while live** (`systemctl soft-reboot` with no
@@ -1050,26 +1050,26 @@ While `b` is `live-blessed` (or a live state outlives its slot, below):
   counts:** `systemctl is-system-running` answers `running`, or
   `degraded` with every failed unit (`systemctl list-units --state=failed`,
   parsed by `hearth-protocol-systemd`) on the target's
-  `bless.ignore_failed` list (format.md, 5.13), which the place request
+  `bless.ignore_failed` list (protocol/format.md, 5.13), which the place request
   carries. `starting` means not yet; a failed unit that counts means the
   steward asks to fall back rather than wait out the window. A desktop
   such as `x1-prod` often carries a routinely failed unit; comparing
   against a baseline of the previous slot is later, once measured there.
 - **The slot's own steward is up and has answered its activator, and
   a builder it spawned has answered the bless's render** of the slot's
-  own revision (steward.md, section 6): the bless request arrives over
+  own revision (domain/steward.md, section 6): the bless request arrives over
   the link from the steward the slot's activator spawned, after its
   hello and after that render. The activator checks the rest of the
   criterion itself (7.3); the render it cannot see, and takes the
   request as its proof. A render that fails makes the steward ask to
-  fall back instead (steward.md, 5.1).
+  fall back instead (domain/steward.md, 5.1).
 - **A host's containers never count [M5]:** the failed units counted
   leave out the nspawn unit, `systemd-nspawn@<container>.service`, of
   every container the host's activator keeps records for
-  (activator.md, 7.1), with no list to write. Each container's slot has
+  (domain/activator.md, 7.1), with no list to write. Each container's slot has
   its own trial and its own facts (12.3); one bad container must not
   roll its host back.
-- **Task checks join in M5** (operating.md, section 3).
+- **Task checks join in M5** (domain/operating.md, section 3).
 
 ### 7.2 Who asks
 
@@ -1080,13 +1080,13 @@ While `b` is `live-blessed` (or a live state outlives its slot, below):
   never starts, never connects or never asks, the dead-man ends the
   trial, and the default never moved. If its builder cannot render the
   slot's own revision, an error or a second loss, the steward asks to
-  fall back at once (steward.md, 5.1's table). No outside probe judges
+  fall back at once (domain/steward.md, 5.1's table). No outside probe judges
   the slot: the bash fleet once lost a good boot to an SSH probe that
   never reconnected.
 - **A container is the exception [M5]:** no hearth runs in it, so its
   host's steward asks its host's activator, which reads the container
   from outside (12.3), with no bless's render: the host's hearth did not
-  change (steward.md, section 6).
+  change (domain/steward.md, section 6).
 - **A live trial is blessed by the base's steward,** spawned anew after
   the swap so that it starts in the new files, and whose builder runs
   the bless's render (7.6); the new slot blesses itself only at its
@@ -1096,7 +1096,7 @@ While `b` is `live-blessed` (or a live state outlives its slot, below):
 
 1. **Check:** the marker names this slot and attempt; the slot runs; the
    criterion holds (the activator checks it itself).
-2. **Journal** the bless (activator.md, 7.3).
+2. **Journal** the bless (domain/activator.md, 7.3).
 3. **Write the slot record** as `blessed`.
 4. **Remove the marker,** and `/run/hearth-trial/x1-prod.b` if a soft
    reboot left one; after a live trial, delete the delta it names
@@ -1119,11 +1119,11 @@ While `b` is `live-blessed` (or a live state outlives its slot, below):
 
 ### 7.4 Holding a bless [M4]
 
-An engine may hold a bless while a canary bakes (wire.md, 5.4: an
+An engine may hold a bless while a canary bakes (protocol/wire.md, 5.4: an
 `activate` with `bless: held for at most d`):
 
 - **The slot's steward asks to hold** once the minimal criterion holds
-  (operating.md's checks too, from M5). The activator moves the marker to
+  (domain/operating.md's checks too, from M5). The activator moves the marker to
   phase `held`, with the hold's end, and replaces the dead-man's timer by
   a transient one ending at the hold's end, `systemd-run
   --on-active=<d> /usr/bin/systemctl reboot -ff`, so the end does not
@@ -1153,8 +1153,8 @@ An engine may hold a bless while a canary bakes (wire.md, 5.4: an
   before it moved the default, after a firmware fell through to it, or
   after GRUB's counter booted it (8.4). The facts say so.
 - **Its steward asks to bless it again,** a stage of converge's pass
-  (wire.md, section 4), with no bless's render: the slot's hearth was
-  proven when it was first blessed (steward.md, section 6). The
+  (protocol/wire.md, section 4), with no bless's render: the slot's hearth was
+  proven when it was first blessed (domain/steward.md, section 6). The
   activator checks the criterion as for a trial, but needs no marker:
   the slot is already blessed, and it runs.
   Then it moves the default to it (7.3, step 5), and writes nothing else.
@@ -1169,19 +1169,19 @@ An engine may hold a bless while a canary bakes (wire.md, 5.4: an
 
 The bless of a live trial (6.8, L8), asked by the steward on the link,
 the base's, spawned after the swap, once its builder has answered the
-bless's render (steward.md, section 6):
+bless's render (domain/steward.md, section 6):
 
 1. **Check:** the marker names this slot and attempt, in phase
    `running`; the live fact agrees with the live record; every unit L4
    to L6 touched is active with the `InvocationID` and `NRestarts` L6
    read; the settle has passed; the criterion holds (7.1); from M5, the
-   blessing checks pass (operating.md, section 3).
-2. **Journal** the live bless (activator.md, 7.3).
+   blessing checks pass (domain/operating.md, section 3).
+2. **Journal** the live bless (domain/activator.md, 7.3).
 3. **Write the slot record** as `live-blessed`.
 4. **Set the one-shot to the slot's trial entry:** `efibootmgr
    --bootnext 4811`, read back (EFI); or `next_entry=x1-prod.b` in
    `env.0`, then `env.1`, from which GRUB adds the trial's token (BIOS,
-   machine.md, 5.3) [M3b].
+   domain/machine.md, 5.3) [M3b].
 5. **Set the marker's phase to `live-blessed`,** and delete the previous
    delta, if any (6.9).
 6. **Stop the base's dead-man:** `systemctl stop hearth-trial.timer`,
@@ -1258,7 +1258,7 @@ default, for ever: EFI falls through `BootOrder` only when an image
 fails to load, and GRUB's `fallback` is the default itself.
 
 - **BIOS [M3b]: a boot counter in the environment pair,** RAUC's pattern
-  (machine.md, 5.3). At bless the activator writes `previous`, the old
+  (domain/machine.md, 5.3). At bless the activator writes `previous`, the old
   default, and `tries=3`. GRUB counts `tries` down at each boot of the
   default; at 0 it boots `previous` instead. The activator resets
   `tries` at every start that meets the minimal criterion. The previous
@@ -1301,15 +1301,15 @@ throughout:
 - **Any failure in steps 1 to 6 is `reboot -ff`:** the default boots
   natively, and a fall back that hangs meets the dead-man.
 - **When it succeeds nothing reboots:** the files that ran before run
-  again, and the facts report `fell back (live)` (wire.md, section 6).
+  again, and the facts report `fell back (live)` (protocol/wire.md, section 6).
 - **It restores files, not state.** An open file or a working directory
   keeps the new files until closed, a process keeps what it loaded,
   users added keep their files in `/var`, tmpfiles' paths stay, and what
   was written to `/var` or a data entry stays: a data migration is not
   undone, as with any fall back (8.3). Only a reboot restores process
   state; only a restore from a snapshot brings data back
-  (operating.md, 7.4).
-- **A fell-back slot is refused by its prepare key** (wire.md, 4.4), as
+  (domain/operating.md, 7.4).
+- **A fell-back slot is refused by its prepare key** (protocol/wire.md, 4.4), as
   after any trial, though its `/var` never ran.
 
 ## 9. Roll back
@@ -1330,7 +1330,7 @@ throughout:
   `live-blessed` slot is not blessed, so no other slot is a roll back's
   target until it has booted natively.
 - **Who asks:** an engine's order, an operational effect granted by
-  policy [M5] (operating.md, section 6); standalone, a person through
+  policy [M5] (domain/operating.md, section 6); standalone, a person through
   the client (client/README.md, section 3).
 
 ## 10. Drift
@@ -1351,15 +1351,15 @@ ids are facts; drift is never repaired in place.
 | `slot.boot.files` | EFI: the slot's ESP files match their digests |
 | `slot.boot.entry` | EFI: the slot's two entries match; BIOS: covered by `slot.root.tree` |
 | `machine.default` | the default is the slot the records say, and blessed |
-| `machine.subvolumes` | every subvolume the layout names exists, and no other `@<target>.*` but a restore's or the deltas the live record and the marker name (machine.md, 3.1) |
+| `machine.subvolumes` | every subvolume the layout names exists, and no other `@<target>.*` but a restore's or the deltas the live record and the marker name (domain/machine.md, 3.1) |
 | `machine.class.<class>` | the class subvolume exists and is mounted at `/srv/<class>`, for each class an entry uses |
 | `machine.data.<name>` | the entry's directory exists in its class's subvolume, and its path shows it: bound from `/srv/<class>/<name>`, or that path itself |
-| `machine.data.orphaned` | no directory in a class subvolume but the entries' and a restore's (machine.md, 3.4); each orphan is listed, and reported, never removed |
+| `machine.data.orphaned` | no directory in a class subvolume but the entries' and a restore's (domain/machine.md, 3.4); each orphan is listed, and reported, never removed |
 
-- **On a mutable slot** (development.md, 5.3) the same checks are the
+- **On a mutable slot** (domain/development.md, 5.3) the same checks are the
   experiment's diff: what `slot.root.tree` finds was changed by hand, is
   reported as `explored` rather than as a fault, and is what `hearth
-  diff --running` presents with contents (development.md, section 5);
+  diff --running` presents with contents (domain/development.md, section 5);
   `slot.root.subvolume` expects the read-only flag clear.
 - **Left out:** the contents of `/var` and of the class subvolumes,
   which are meant to change, and anything mounted beneath `/`. The root's
@@ -1370,7 +1370,7 @@ ids are facts; drift is never repaired in place.
   them unless someone cleared its read-only flag. Contents are hashed
   again only on demand.
 - **When:** on demand from the client, and at every start; on a period
-  with operating's signals [M5] (operating.md, section 4).
+  with operating's signals [M5] (domain/operating.md, section 4).
 - **Drift is the activator's:** it wrote the record, and only root can
   read every file of a slot (README, section 4.2).
 - **A host's containers [M5]** are checked by the host's activator under
@@ -1385,7 +1385,7 @@ ids are facts; drift is never repaired in place.
 
 The activator writes its journal before each step with effects outside
 the state, and the trial marker before each one-shot
-(activator.md, section 7). Every start reads them, reads the facts, and
+(domain/activator.md, section 7). Every start reads them, reads the facts, and
 applies the start events of section 4. What each cut leaves, with `a`
 running and default and `b` the slot in question:
 
@@ -1400,7 +1400,7 @@ running and default and `b` the slot in question:
 | bless, record written, default not moved | restart in `b`: `blessed`, not the default: the re-bless moves it (7.5) | `a` boots, the default: `b` is a blessed slot not the default, the roll back's target; converge tries it again |
 | bless, default moved, dead-man not stopped | restart in `b`: stopped at start | `b` boots as the default, blessed, unarmed: nothing to do |
 | fall back recorded, marker not removed | finished at start | finished at start |
-| BIOS environment, a file torn | the other holds the old state; made whole at start | GRUB reads the other: the old state (machine.md, 5.5) |
+| BIOS environment, a file torn | the other holds the old state; made whole at start | GRUB reads the other: the old state (domain/machine.md, 5.5) |
 | live, L1 or L2 | the journal: the delta deleted; `b` stays `prepared` | the same after the boot into `a` |
 | live, marker `arming` | `prepared`: the dead-man stopped, `/run/hearth-trial/` emptied, the delta deleted | `a` boots: `prepared`, the delta deleted |
 | live, `armed`, `swapped` or `running` | `reboot -ff` at start, before anything else; then `a` boots: `fell back` | `a` boots, the overlays gone: `fell back`, the delta deleted |
@@ -1445,34 +1445,34 @@ running and default and `b` the slot in question:
   persistent `.var` into each container; what a container keeps across
   slots is a `data` entry of its tasks, a directory in one of its
   classes, as on a host. A container has no `journal` entry: its
-  journal is its host's (operating.md, section 5).
+  journal is its host's (domain/operating.md, section 5).
 - **Its classes follow its host's policies** [M5]: a container has no
-  `hearth` task (format.md, 5.12), so the host's activator snapshots its
+  `hearth` task (protocol/format.md, 5.12), so the host's activator snapshots its
   classes by the host's running slot's data policies, into the host's
   `@hearth.snapshots` under the container's target, and sends them to
   the backup peer of the container's environment [M6]
-  (operating.md, section 7).
+  (domain/operating.md, section 7).
 - **Prepared by the host's activator,** section 5's steps, with these
   differences:
   - the shift writes ids from the container's own range, its
     `PrivateUsers=` base, 64 Ki aligned and clear of the builder's
-    range (store.md, 9.2), instead of from 0 (or from 0, with idmapped
+    range (domain/store.md, 9.2), instead of from 0 (or from 0, with idmapped
     mounts: 12.4); its class subvolumes are owned in the same ids,
     their root the container's root, and so are its entries'
     directories, seeded from the shifted slot;
   - 5.1 takes nothing out of a firmware's fallbacks, and 5.3 makes no
     mount point for hearth's state and store, which are never bound into
-    a container (store.md, 9.4);
+    a container (domain/store.md, 9.4);
   - 5.5 writes its `/etc/fstab` with no line, and writes no dead-man
     unit and no watchdog drop-in: nspawn makes its root and binds the
-    rest (machine.md, 3.3), and the host judges the trial (12.3);
+    rest (domain/machine.md, 3.3), and the host judges the trial (12.3);
   - 5.6 writes the host's nspawn settings instead of boot files (below),
     and 5.7 reads no boot file back;
   - the identity and secrets are the container's target's, made and
     kept by the host's activator, so a container no longer shares its
     host's machine-id.
-- **Its parameters arrive in its `boot` part** (format.md, 3.5;
-  render.md, 4.3): the id base, the binds, the capabilities and the
+- **Its parameters arrive in its `boot` part** (protocol/format.md, 3.5;
+  domain/render.md, 4.3): the id base, the binds, the capabilities and the
   network. Its slot record (2.2) holds them where a host's holds a
   kernel and a command line, and its nspawn settings are written from
   them. They enter the prepare key as any slot part does, so a change to
@@ -1483,14 +1483,14 @@ running and default and `b` the slot in question:
   old one, which the old slot needs to fall back to. So the activator
   refuses a place whose base is not the owner of the roots of the
   container's existing class subvolumes, each made owned by the
-  container's root (machine.md, 3.4), and names them. A person
+  container's root (domain/machine.md, 3.4), and names them. A person
   deletes them, and the container starts again from scratch, as every
   machine does (README, section 7).
 - **The host's nspawn settings,** written by the host's activator from
   the slot's parameters into `/run/systemd/nspawn/<container>.nspawn`:
 
   ```
-  # /run/systemd/nspawn/chat-prod.nspawn, written by rhi-prod's activator for slot b (slots.md, 12.1)
+  # /run/systemd/nspawn/chat-prod.nspawn, written by rhi-prod's activator for slot b (domain/slots.md, 12.1)
   [Exec]
   PrivateUsers=327680
   LinkJournal=try-host
@@ -1508,13 +1508,13 @@ running and default and `b` the slot in question:
   `systemd-nspawn@.service` runs nspawn with `--settings=override`, so
   these lines win over the unit's own `--link-journal=try-guest` and
   `--network-veth`. `LinkJournal=try-host` keeps the container's journal
-  in its host's (operating.md, section 5). Each entry's directory is
+  in its host's (domain/operating.md, section 5). Each entry's directory is
   bound at its path straight from its class, with no `/srv/<class>`
   mount inside the container; the ids are the container's own, so no
   `:idmap` is needed, but for a pool's idmapped roots (12.4). The root
   is found at `/run/machines/<container>`, a link to the slot's root
   (that nspawn's image search includes `/run/machines` is to verify). That
-  top-level mount is `nodev,nosuid,noexec` (machine.md, 3.2); whether
+  top-level mount is `nodev,nosuid,noexec` (domain/machine.md, 3.2); whether
   nspawn's bind of a root and of `/var` from it keeps those flags is to
   verify (section 15).
 
@@ -1535,7 +1535,7 @@ and no one-shot. A change to the container's parameters is never live
   leaves them as they are.
 - **No output enables them:** a host's output enables no
   `systemd-nspawn@` unit of its containers, and render refuses one that
-  does (format.md, 5.11). Started at boot before its link exists, it
+  does (protocol/format.md, 5.11). Started at boot before its link exists, it
   would fail.
 
 ### 12.3 Trial
@@ -1546,13 +1546,13 @@ and no one-shot. A change to the container's parameters is never live
   switch-container`, its only working trial and fall back.
 - **Then the minimal criterion, read from the host:** the container's
   boot reached its default target with no failed unit but those its
-  target's `bless.ignore_failed` lists (7.1; format.md, 5.13), through
+  target's `bless.ignore_failed` lists (7.1; protocol/format.md, 5.13), through
   `systemctl --machine=<container> is-system-running` and
-  `list-units --state=failed`, as operating.md (2.9) reads a container's
+  `list-units --state=failed`, as domain/operating.md (2.9) reads a container's
   units. 7.1's second condition, a steward of the slot's own and its
-  bless's render, has no counterpart (12.5; steward.md, section 6).
+  bless's render, has no counterpart (12.5; domain/steward.md, section 6).
 - **The host's steward asks to bless** once the criterion holds, and the
-  container's blessing checks too (operating.md, section 3), or to fall
+  container's blessing checks too (domain/operating.md, section 3), or to fall
   back on a failed unit that counts. The bless records the link's target
   as the container's default in the host's state (12.6).
 - **The window is the host's activator's:** no dead-man runs in a
@@ -1587,17 +1587,17 @@ and no one-shot. A change to the container's parameters is never live
   container's snapshot into its own range, one walk each.
 - **VMs with a virtiofs root [later]** have the same shape: their slots
   live on the pool host, and a trial stops the VM, repoints its virtiofs
-  devices and starts it, judged from the host (machine.md, 2.6).
+  devices and starts it, judged from the host (domain/machine.md, 2.6).
 
 ### 12.5 A hearth in the container
 
 - **The lean, open:** none in M5. The host's hearth prepares, tries and
   judges its containers from outside, runs their checks through the host
-  (operating.md, section 2), and reports their facts as its own.
+  (domain/operating.md, section 2), and reports their facts as its own.
 - **What one would bring:** the container's own bless, as hosts have, and
   checks run inside it. What it would lack: an activator with anything
   to own, since the container has no boot and its root is the host's to
-  place. This depends on how operating.md's checks reach a container,
+  place. This depends on how domain/operating.md's checks reach a container,
   and on whether a pool's containers need to report to the lab's engine
   directly.
 
@@ -1608,7 +1608,7 @@ A container's facts are its host's activator's, read from outside:
 | Fact | Read from |
 |---|---|
 | **running** | the subvolume of the container's root, by uuid, while its unit is active (through its leader's root, to verify how); `none` otherwise |
-| **default** | the slot the host's state records as the container's default (activator.md, 7.1), which its link names at every host start |
+| **default** | the slot the host's state records as the container's default (domain/activator.md, 7.1), which its link names at every host start |
 | **trial** | the trial marker, `trial/<container>.<label>` (6.4) |
 | **live** | the container's leader's mount table, `/proc/<leader>/mountinfo`, against the container's live record, `live/<container>` (12.8) |
 
@@ -1623,9 +1623,9 @@ A container's facts are its host's activator's, read from outside:
 - **The invariant reads:** the slot the host links at start, and the one
   nspawn runs outside a trial, is blessed; a link to a slot on trial
   lasts until its bless, its fall back or the host's next start.
-- **One mutating operation at a time** (activator.md, 4.2) holds across
+- **One mutating operation at a time** (domain/activator.md, 4.2) holds across
   the host and its containers, so a host prepares and tries one target
-  at a time (wire.md, 4.3).
+  at a time (protocol/wire.md, 4.3).
 - **What does not apply:** boot files and entries (5.6), the dead-man
   and the watchdog (5.5; the window is the activator's, 12.3), the
   kernel's rule (6.1), and the BIOS boot counter (8.4).
@@ -1635,8 +1635,8 @@ A container's facts are its host's activator's, read from outside:
 A container leaves its host's spec when its target is deleted from the
 repository or placed on another host. The host's steward then finds,
 in the activator's facts, a container whose target its spec no longer
-names (`target.containers`, format.md, 3.5), and asks its activator to
-remove it (activator.md, 5.16):
+names (`target.containers`, protocol/format.md, 3.5), and asks its activator to
+remove it (domain/activator.md, 5.16):
 
 1. **Stop it:** `systemctl stop systemd-nspawn@<container>.service`;
    remove its link in `/run/machines` and its settings in
@@ -1646,11 +1646,11 @@ remove it (activator.md, 5.16):
    container's own record, so no host start links it again.
 3. **Keep its data:** its class subvolumes and their snapshots stay,
    unmounted and reported as orphaned as any target's data is
-   (machine.md, 3.4), until a person deletes them; its identity and
+   (domain/machine.md, 3.4), until a person deletes them; its identity and
    secrets stay with them.
 
 - **Its outputs are then unpinned:** no slot holds them, so the store
-  may collect them (store.md, section 7).
+  may collect them (domain/store.md, section 7).
 - **Each step is idempotent,** and a removal cut anywhere is finished
   by asking again; a container already gone is done.
 - **A container placed on another host starts there from scratch:**
@@ -1663,7 +1663,7 @@ A container gets live changes with the same mechanics (6.6 to 6.9), run
 by its host's activator from outside, since no hearth runs inside:
 
 - **Eligibility** is 6.7's, read inside the container: the never-live
-  list (format.md, 5.14) applies to its units, the same as a host's;
+  list (protocol/format.md, 5.14) applies to its units, the same as a host's;
   rule 10 reads the host's kernel and the container's own facts (12.6);
   rule 11 reads the mount namespaces of the container's processes.
 - **The delta** is built from the container's new slot, in the
@@ -1680,7 +1680,7 @@ by its host's activator from outside, since no hearth runs inside:
   `start`, `show`), and tmpfiles through `systemd-run
   --machine=<container> --wait`; there is no steward inside to spawn
   anew. The host's steward has a builder plan the change
-  (steward.md, 3.3), waits out the settle and asks the live bless
+  (domain/steward.md, 3.3), waits out the settle and asks the live bless
   (12.3).
 - **The dead-man is the host's:** the window is the activator's deadline
   in the marker, as for any container trial (12.3). At its end, or when
@@ -1689,7 +1689,7 @@ by its host's activator from outside, since no hearth runs inside:
   drops the overlays, which live only in the container's mount
   namespace.
 - **The live bless records "the next start of this container is `b`'s
-  trial"** in the host's state (activator.md, 7.1): the container's
+  trial"** in the host's state (domain/activator.md, 7.1): the container's
   one-shot. The next start the host's activator makes, at a host boot or
   a restart it asks for, links `b` and tries it as 12.3 does; that
   bless records `b` as the default and deletes the delta.
@@ -1706,11 +1706,11 @@ by its host's activator from outside, since no hearth runs inside:
 ## 13. Its world
 
 `hearth-domain-slots` runs in domain worlds on the fake machine
-(testing.md, sections 3 and 8), under the activator's root or alone,
+(domain/testing.md, sections 3 and 8), under the activator's root or alone,
 with:
 
 - **the fake machine's top level, firmware and GRUB**
-  (machine.md, section 10), and its models of tiny-initramfs and
+  (domain/machine.md, section 10), and its models of tiny-initramfs and
   systemd: a boot reaches its target or not, units fail,
   `is-system-running` answers, a soft reboot switches roots and keeps
   the boot id;
@@ -1719,16 +1719,16 @@ with:
 - **data by class:** entries added, removed and moved between classes
   across prepares, so classes are made once, each entry seeded once and
   never touched again, a moved entry refused, an orphan reported, and
-  every bind mounted after its class (testing.md, 3.7);
+  every bind mounted after its class (domain/testing.md, 3.7);
 - **faults from the seed** at every step: a crash of the activator, a
   power cut, a kernel that panics or hangs, a unit that fails, a hearth
   that never blesses, a firmware quirk, a torn FAT or NVRAM write;
 - **a host's containers [M5]** on the fake machine's nspawn
-  (testing.md, 3.12): units that start or fail, failed units inside, a
+  (domain/testing.md, 3.12): units that start or fail, failed units inside, a
   host reboot or an activator crash mid-trial, a container removed from
   the spec (12.7), checked against 12.6's invariant;
 - **live changes** on the fake machine's mounts, overlays and PID 1's
-  jobs (testing.md, 3.13): eligible and ineligible changes drawn from
+  jobs (domain/testing.md, 3.13): eligible and ineligible changes drawn from
   the seed, a reload that fails, a unit that dies during the settle, a
   crash or a power cut at every phase from L1 to L9, a person's soft
   reboot, a later change while live and its fall back to the previous
@@ -1741,7 +1741,7 @@ exactly one answer. It computes 6.7's rules on its own from the fake
 trees and specs, and each trial's kind must follow them. The VM tier
 runs the trial's ending paths for real: a panic, a dead-man reboot, a
 soft reboot and its fall back, and every live scenario
-(testing.md, section 7).
+(domain/testing.md, section 7).
 
 ## 14. What changes from os
 
@@ -1782,7 +1782,7 @@ soft reboot and its fall back, and every live scenario
 
 - **The trial window:** 10 minutes in M3, a place input sealed into the
   units; from M5 the steward computes it from the blessing checks its
-  builder's render answered (operating.md, section 3). Its right length
+  builder's render answered (domain/operating.md, section 3). Its right length
   depends on measuring the slowest target.
 - **A blessed EFI default that stops booting:** keeping the previous
   slot first in `BootOrder` and arming `BootNext` to the default at each
@@ -1809,23 +1809,23 @@ soft reboot and its fall back, and every live scenario
   verify).
 - **Holding a bless [M4]:** the `held` state's exact cells, and whether a
   hold survives the activator's restart by its marker alone; depends on
-  wire.md, 5.4.
+  protocol/wire.md, 5.4.
 - **What a fell-back slot leaves for triage:** its journal is in the
   `core` class only if a task declares the `journal` entry; depends on
-  operating.md's telemetry.
+  domain/operating.md's telemetry.
 - **Data policies in the prepare key:** a change to a class's snapshot
   or backup policy is a change to the `data` part, so it prepares a new
   slot of the same output, never live (6.7); whether policies should
   reach the activator by a request of their own depends on how often
   they change.
 - **Hashing contents again at prepare,** or trusting the builder's
-  records (README, section 9; activator.md, 6.3).
-- **Drift's period and its full depth;** depends on operating.md's
+  records (README, section 9; domain/activator.md, 6.3).
+- **Drift's period and its full depth;** depends on domain/operating.md's
   signals and on the cost of hashing a root, once measured.
 - **Containers:** whether a container runs a hearth of its own; shifting
   to each container's range, or once with idmapped mounts; how a pool
   names several containers of one target; whether nspawn finds images in
-  `/run/machines`. Depends on M5's pool design and operating.md's checks.
+  `/run/machines`. Depends on M5's pool design and domain/operating.md's checks.
 - **nspawn's binds from the activator's top-level mount [M5]:** whether
   a root and a `/var` bound from `/run/hearth-activator/top`, mounted
   `nodev,nosuid,noexec`, keep those flags (to verify); if they do,
@@ -1833,9 +1833,9 @@ soft reboot and its fall back, and every live scenario
 - **Reading a container from its host [M5]:** whether
   `systemctl --machine=` needs a system bus inside the container, and
   how the running slot's subvolume is read through the container's
-  leader (to verify on the VM tier, testing.md, 7.3).
+  leader (to verify on the VM tier, domain/testing.md, 7.3).
 - **Live changes on a real machine,** to verify on the VM tier
-  (testing.md, 7.3) on trixie's systemd 257 and forky's 262, Incus with
+  (domain/testing.md, 7.3) on trixie's systemd 257 and forky's 262, Incus with
   OVMF:
   - real root and real ids: `trusted.overlay.*` whiteouts and opaque
     directories honoured as the `user.*` forms were; owners, v2

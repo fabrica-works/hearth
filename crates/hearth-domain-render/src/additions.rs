@@ -1,4 +1,4 @@
-//! Files and tmpfiles lines render contributes (render.md, 3.6, 4.2).
+//! Files and tmpfiles lines render contributes (domain/render.md, 3.6, 4.2).
 use crate::{
     kinds::{
         data,

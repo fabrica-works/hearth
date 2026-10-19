@@ -1,4 +1,4 @@
-//! Each child machine retains its own configured bounds (render.md, 2.3).
+//! Each child machine retains its own configured bounds (domain/render.md, 2.3).
 use crate::{config, git_machine, records};
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
@@ -10,7 +10,7 @@ pub struct Limits {
     pub tree: crate::tree::limits::Limits,
     pub printer: records::limits::Limits,
 }
-/// The bounded staging walk (store.md, 4.4).
+/// The bounded staging walk (domain/store.md, 4.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Walk {
     pub depth: u32,

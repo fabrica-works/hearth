@@ -1,4 +1,4 @@
-//! ls-tree's NUL records, with carry held below (render.md, 2.2–2.3).
+//! ls-tree's NUL records, with carry held below (domain/render.md, 2.2–2.3).
 use crate::{MaxOut, limits::Limits, oid::Oid};
 use alloc::boxed::Box;
 use core::mem;

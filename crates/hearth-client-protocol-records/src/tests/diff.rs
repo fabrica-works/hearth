@@ -12,7 +12,7 @@ use skein_lib::bytes::copy_of;
 #[test]
 fn a_changed_file_prints_its_hunks_as_render_md_shows() {
     let printed = form::print(Form::Text, &Record::Change(fixtures::wg0_changed()), None, &limits::SHIPPED);
-    assert_eq!(printed.as_deref(), Ok(fixtures::WG0_TEXT.as_bytes()), "render.md, 6.3, three lines of context");
+    assert_eq!(printed.as_deref(), Ok(fixtures::WG0_TEXT.as_bytes()), "domain/render.md, 6.3, three lines of context");
 }
 const NOTHING: &str = "ion-prod                                            nothing to build\n";
 #[test]

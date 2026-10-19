@@ -1,4 +1,4 @@
-//! Seed changes by name; text prints the new row (render.md, 6.1).
+//! Seed changes by name; text prints the new row (domain/render.md, 6.1).
 use super::{Lines, SeedGroupKeyed, SeedIds, SeedUserKeyed, SeedsChange};
 use skein_json::writer::Encoder;
 impl SeedUserKeyed {

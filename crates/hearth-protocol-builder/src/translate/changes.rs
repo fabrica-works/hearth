@@ -1,4 +1,4 @@
-//! Typed changes translated to client records (render.md, 6.1).
+//! Typed changes translated to client records (domain/render.md, 6.1).
 use crate::{
     records::diff as target,
     render::{diff as source, parts::config},

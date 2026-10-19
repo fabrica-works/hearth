@@ -24,7 +24,7 @@ pub fn service() -> Service {
 }
 
 pub const LARGER_QUEUE: u32 = limits::SHIPPED.queue + 1;
-/// Render's shipped builder budget (render.md, 8.4).
+/// Render's shipped builder budget (domain/render.md, 8.4).
 pub const BUILDER_BYTES: u64 = 1 << 30;
 
 pub fn with_source_root() -> (Service, Token) {

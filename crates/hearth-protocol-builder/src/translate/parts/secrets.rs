@@ -1,4 +1,4 @@
-//! Secret records translated exhaustively (render.md, 4.3).
+//! Secret records translated exhaustively (domain/render.md, 4.3).
 use crate::{records::parts::secrets as target, render::parts::secrets as source};
 use alloc::boxed::Box;
 #[must_use]

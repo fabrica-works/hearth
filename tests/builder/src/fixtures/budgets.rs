@@ -8,11 +8,11 @@ use std::collections::BTreeSet;
 
 /// Session 47 compares three generated repositories through eight pipe schedules.
 pub const CASES: core::ops::Range<u64> = 0..3;
-/// A revision is listed once (render.md, 3.10).
+/// A revision is listed once (domain/render.md, 3.10).
 pub const RENDER_LISTS: usize = 1;
 /// A diff lists its before and after revisions.
 pub const DIFF_LISTS: usize = RENDER_LISTS + RENDER_LISTS;
-/// Both git discovery processes precede the batched blob reads (render.md, 2.2).
+/// Both git discovery processes precede the batched blob reads (domain/render.md, 2.2).
 pub const DISCOVERY_SPAWNS: usize = 2;
 pub const FLEET_EDIT: File = File {
     path: "hosts/x1/x1-prod.json",

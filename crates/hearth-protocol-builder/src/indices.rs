@@ -1,4 +1,4 @@
-//! Read apt's verified indices once, sharing each pass with the stanza decoder (render.md, 5.3).
+//! Read apt's verified indices once, sharing each pass with the stanza decoder (domain/render.md, 5.3).
 use crate::{Asked, builder::vocabulary::Event, limits::Limits, render, resolve::OWNER, translate};
 use alloc::boxed::Box;
 use hearth_protocol_mmdebstrap::{lists, packages, vector};

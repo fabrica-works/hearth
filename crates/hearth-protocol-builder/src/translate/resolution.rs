@@ -1,4 +1,4 @@
-//! Resolution inputs and apt's install triples (render.md, 5.2 and 5.5).
+//! Resolution inputs and apt's install triples (domain/render.md, 5.2 and 5.5).
 use crate::render::{parts::packages as target, resolution};
 use alloc::boxed::Box;
 use hearth_protocol_mmdebstrap::{limits::Limits, output, tail, vector};

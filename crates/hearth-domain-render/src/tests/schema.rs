@@ -22,7 +22,7 @@ fn a_read_of_a_setting_its_task_lacks_is_refused_at_it() {
                 at: at(1, 34)
             }
         )],
-        "format.md, 6.5: the reader's, at its setting"
+        "protocol/format.md, 6.5: the reader's, at its setting"
     );
 }
 #[test]

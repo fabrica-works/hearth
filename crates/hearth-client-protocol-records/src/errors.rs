@@ -1,4 +1,4 @@
-//! Errors in the answer (render.md, 7.1 to 7.3).
+//! Errors in the answer (domain/render.md, 7.1 to 7.3).
 mod ids;
 mod validation;
 use crate::form::{json::field, text::Lines};
@@ -464,7 +464,7 @@ impl Field {
     }
 }
 
-/// Why a decoded task.json is no declaration (format.md, 5.1).
+/// Why a decoded task.json is no declaration (protocol/format.md, 5.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Declared {
     Unknown { of: Object },
@@ -705,7 +705,7 @@ pub use composition::{Composition, Host};
 mod collisions;
 pub use collisions::{Collision, Id, Subject};
 
-/// Reference roots restricted to literal names (format.md, 6.4).
+/// Reference roots restricted to literal names (protocol/format.md, 6.4).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Root {
     Debian,
@@ -719,7 +719,7 @@ pub enum ExportFault {
     Root { root: Root },
 }
 
-/// Another target's exports failed (render.md, 3.4).
+/// Another target's exports failed (domain/render.md, 3.4).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Exported {
     pub exporter: Box<[u8]>,

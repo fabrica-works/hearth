@@ -1,8 +1,8 @@
-//! Both claimants and their namespace (render.md, 3.7 and 7.3).
+//! Both claimants and their namespace (domain/render.md, 3.7 and 7.3).
 use crate::form::{json::field, text::Lines};
 use alloc::boxed::Box;
 use skein_json::writer::Encoder;
-/// A key produced twice by one task's expanded maps (format.md, 5.2).
+/// A key produced twice by one task's expanded maps (protocol/format.md, 5.2).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Collision {
     Key { key: Box<[u8]> },
@@ -13,7 +13,7 @@ pub enum Collision {
     Overlap { subject: Subject, first: Box<[u8]>, second: Box<[u8]> },
 }
 
-/// The namespace of a collision (render.md, 3.7).
+/// The namespace of a collision (domain/render.md, 3.7).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Subject {
     Tree,
@@ -30,7 +30,7 @@ pub enum Subject {
     Parameter,
     Range,
 }
-/// The account id namespace (format.md, 5.6).
+/// The account id namespace (protocol/format.md, 5.6).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Id {
     Uid,

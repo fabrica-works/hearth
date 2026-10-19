@@ -1,4 +1,4 @@
-//! The canonical encoding of hearth's values (store.md, 3.1).
+//! The canonical encoding of hearth's values (domain/store.md, 3.1).
 
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]

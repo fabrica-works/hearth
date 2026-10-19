@@ -1,4 +1,4 @@
-//! The store's bounds and lock pace (store.md, 8.1, 8.2).
+//! The store's bounds and lock pace (domain/store.md, 8.1, 8.2).
 use skein_lib::Duration;
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {

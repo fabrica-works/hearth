@@ -1,4 +1,4 @@
-//! Store io, with no waiting in the protocol layer (store.md, 8.2).
+//! Store io, with no waiting in the protocol layer (domain/store.md, 8.2).
 pub(super) mod names;
 use crate::{
     Asked, Roots,
@@ -59,7 +59,7 @@ impl Store {
             if let Request::Remove { directory, .. } = &request { removal_root(roots, *directory) } else { None };
         if let (Request::Remove { .. }, None) = (&request, removal) {
             // The protocol holds no root for layers/: nothing is removed there
-            // before the task that deletes layers with btrfs (store.md, 7.3).
+            // before the task that deletes layers with btrfs (domain/store.md, 7.3).
             self.pending = None;
             self.deferred = Some(Event::Failed);
             return;
@@ -328,7 +328,7 @@ impl Store {
             file::Event::Locked { .. } => Event::Locked,
             file::Event::Busy { .. } => Event::Busy,
             file::Event::Loaded { bytes, .. } => loaded(&bytes, pending, limits),
-            // A store made by a builder that built no layer has no `layers/` (store.md, 2.4).
+            // A store made by a builder that built no layer has no `layers/` (domain/store.md, 2.4).
             file::Event::Failed { error: Error::NotFound, .. }
                 if *pending == Request::List { directory: Directory::Layers, max: self.max } =>
             {

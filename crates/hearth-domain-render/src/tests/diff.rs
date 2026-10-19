@@ -17,7 +17,7 @@ const REBUILDS: &[(&[Layer], Rebuild)] = &[
 #[test]
 fn the_lowest_changed_layer_is_the_rebuild() {
     for (changed, expected) in REBUILDS {
-        assert_eq!(diff::rebuild(changed, Needs::Needed), *expected, "render.md 6.2: {changed:?}");
+        assert_eq!(diff::rebuild(changed, Needs::Needed), *expected, "domain/render.md 6.2: {changed:?}");
     }
 }
 #[test]

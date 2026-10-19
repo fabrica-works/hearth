@@ -1,4 +1,4 @@
-//! Named templates and repository copies (format.md, 2.1, 5.5, 6.2).
+//! Named templates and repository copies (protocol/format.md, 2.1, 5.5, 6.2).
 use super::{Box, Class, Error, Kind, List, Map, Meta, Mode, Place, Plan, Repository, Side, Writer, copy_of, revision};
 use crate::{
     entries::Fault,

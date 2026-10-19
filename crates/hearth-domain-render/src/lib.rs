@@ -1,4 +1,4 @@
-//! Configuration to specs, without parsing or effects (render.md, 8.1).
+//! Configuration to specs, without parsing or effects (domain/render.md, 8.1).
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;

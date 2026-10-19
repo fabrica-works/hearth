@@ -1,4 +1,4 @@
-//! Bare repositories, resolution and recursive tree listings (testing.md, 4.2).
+//! Bare repositories, resolution and recursive tree listings (domain/testing.md, 4.2).
 use crate::objects::{Commit, Entry, Mode, Oid, Tag, Type, hash};
 use alloc::{boxed::Box, collections::BTreeMap};
 use hearth_fake_machine::linux::{Ids, Item, Machine};
