@@ -1,6 +1,7 @@
 use hearth_lib::encode;
 use hearth_protocol_tree::{
     frame::Kind,
+    layer,
     limits::{self, Limits},
     resolution,
 };
@@ -14,9 +15,10 @@ use skein_lib::Rng;
 #[global_allocator]
 static HEAP: Counting = Counting;
 
-const OVERFLOW: &[(Kind, bool)] = &[(Kind::Store, false), (Kind::CacheFile, false), (Kind::Resolution, true)];
+const OVERFLOW: &[(Kind, bool)] =
+    &[(Kind::Store, false), (Kind::Layer, false), (Kind::CacheFile, false), (Kind::Resolution, true)];
 const DEPTH_EXPECTATIONS: &[(Kind, Option<u64>)] =
-    &[(Kind::Store, None), (Kind::CacheFile, None), (Kind::Resolution, None)];
+    &[(Kind::Store, None), (Kind::Layer, None), (Kind::CacheFile, None), (Kind::Resolution, None)];
 const SEEDS: &[u64] = &[0, 1, 2, 3];
 
 fn measure(kind: Kind, frame: &[u8], limits: &Limits, seed: u64) {
@@ -45,6 +47,22 @@ fn reading_a_resolution_at_its_limits_holds_no_more_than_its_worst_case() {
     assert!(step.held() <= held, "the record it hands out: {} of {held}", step.held());
     drop(read);
     meter.check(step, own, &"a resolution at its limits, besides its record");
+}
+
+#[test]
+fn reading_a_layer_at_its_limits_holds_no_more_than_its_worst_case() {
+    let limits = fixtures::limits();
+    let record = Record::Layer(Box::new(generate::layer_at_its_limits(&limits)));
+    let frame = check::write(&record, &limits);
+    let own = limits::worst_case(Kind::Layer, &limits).expect("fits a u64");
+    let held = limits::held(Kind::Layer, &limits).expect("fits a u64");
+    let meter = Meter::new();
+    meter.start();
+    let read = layer::read(&frame, &limits).expect("a record at its limits reads");
+    let step = meter.end();
+    assert!(step.held() <= held, "the record it hands out: {} of {held}", step.held());
+    drop(read);
+    meter.check(step, own, &"a layer at its limits, besides its record");
 }
 
 #[test]

@@ -75,6 +75,34 @@ impl<'a> Fields<'a> {
             }
         }
     }
+    pub(crate) fn digest_or_none(&mut self, field: &'static [u8]) -> Result<Option<Digest>, Unreadable> {
+        match self.next(field, u32::MAX)? {
+            Item::None => Ok(None),
+            Item::Digest(value) => Ok(Some(value)),
+            Item::False | Item::True | Item::Uint(_) | Item::Bytes(_) | Item::Map(_) | Item::List(_) => {
+                Err(Unreadable::Shape(field))
+            }
+        }
+    }
+    /// A uuid is exactly 16 bytes; `none` where the field may hold nothing.
+    pub(crate) fn uuid_or_none(&mut self, field: &'static [u8]) -> Result<Option<[u8; 16]>, Unreadable> {
+        match self.next(field, u32::MAX)? {
+            Item::None => Ok(None),
+            Item::Bytes(value) => match <[u8; 16]>::try_from(value.as_ref()) {
+                Ok(uuid) => Ok(Some(uuid)),
+                Err(_) => Err(Unreadable::Shape(field)),
+            },
+            Item::False | Item::True | Item::Uint(_) | Item::Digest(_) | Item::Map(_) | Item::List(_) => {
+                Err(Unreadable::Shape(field))
+            }
+        }
+    }
+    pub(crate) fn uuid(&mut self, field: &'static [u8]) -> Result<[u8; 16], Unreadable> {
+        match self.uuid_or_none(field)? {
+            Some(uuid) => Ok(uuid),
+            None => Err(Unreadable::Shape(field)),
+        }
+    }
     pub(crate) fn list(&mut self, field: &'static [u8], limit: u32) -> Result<u32, Unreadable> {
         match self.next(field, u32::MAX)? {
             Item::List(count) => {

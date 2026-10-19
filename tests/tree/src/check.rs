@@ -4,6 +4,7 @@ use hearth_protocol_tree::{
     cache_file::{self, CacheFile},
     decode::Decoder,
     frame::{self, Kind, Unreadable},
+    layer::{self, Layer},
     limits::Limits,
     resolution::{self, Resolution},
     store::{self, Store},
@@ -13,6 +14,7 @@ use skein_lib::Rng;
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Record {
     Store(Store),
+    Layer(Box<Layer>),
     CacheFile(CacheFile),
     Resolution(Resolution),
 }
@@ -21,6 +23,7 @@ impl Record {
     pub const fn kind(&self) -> Kind {
         match self {
             Self::Store(_) => Kind::Store,
+            Self::Layer(_) => Kind::Layer,
             Self::CacheFile(_) => Kind::CacheFile,
             Self::Resolution(_) => Kind::Resolution,
         }
@@ -34,6 +37,7 @@ impl Record {
 pub fn read(kind: Kind, bytes: &[u8], limits: &Limits) -> Result<Record, Unreadable> {
     match kind {
         Kind::Store => store::read(bytes, limits).map(Record::Store),
+        Kind::Layer => layer::read(bytes, limits).map(|record| Record::Layer(Box::new(record))),
         Kind::CacheFile => cache_file::read(bytes, limits).map(Record::CacheFile),
         Kind::Resolution => resolution::read(bytes, limits).map(Record::Resolution),
     }
@@ -42,6 +46,7 @@ pub fn read(kind: Kind, bytes: &[u8], limits: &Limits) -> Result<Record, Unreada
 pub fn write(record: &Record, limits: &Limits) -> Box<[u8]> {
     match record {
         Record::Store(value) => store::write(value, limits),
+        Record::Layer(value) => layer::write(value, limits),
         Record::CacheFile(value) => cache_file::write(value, limits),
         Record::Resolution(value) => resolution::write(value, limits),
     }

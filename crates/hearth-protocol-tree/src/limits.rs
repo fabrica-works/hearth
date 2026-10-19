@@ -3,10 +3,11 @@
 use crate::{
     decode,
     frame::Kind,
+    layer::{Step, Tool},
     resolution::{Index, Line, Package},
 };
 use alloc::boxed::Box;
-use hearth_lib::encode::{self, Item};
+use hearth_lib::encode::{self, Digest, Item};
 use skein_lib::List;
 
 /// The records' configured limits, including the decoder's own bounds.
@@ -15,6 +16,7 @@ pub struct Limits {
     pub depth: u32,
     pub key: u32,
     pub store: StoreLimits,
+    pub layer: LayerLimits,
     pub resolution: ResolutionLimits,
     pub cache_file: CacheFileLimits,
 }
@@ -22,6 +24,16 @@ pub struct Limits {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct StoreLimits {
     pub body: u32,
+}
+/// Kind 2's body and lists: `steps` counts the steps in `costs`, `name` bounds
+/// a tool's name or version.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct LayerLimits {
+    pub body: u32,
+    pub placed: u32,
+    pub tools: u32,
+    pub steps: u32,
+    pub name: u32,
 }
 /// Kind 4's body and fields; `inputs` counts the four input values' items.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -46,6 +58,7 @@ pub const SHIPPED: Limits = Limits {
     depth: 8,
     key: 64,
     store: StoreLimits { body: 4_096 },
+    layer: LayerLimits { body: 1_048_576, placed: 4_096, tools: 256, steps: 64, name: 256 },
     resolution: ResolutionLimits {
         body: 4_194_304,
         packages: 8_192,
@@ -66,7 +79,7 @@ pub fn worst_case(kind: Kind, limits: &Limits) -> Option<u64> {
     let own = decode::worst_case(limits)?;
     let inputs = match kind {
         Kind::Resolution => List::<Item>::worst_case(limits.resolution.inputs)?,
-        Kind::Store | Kind::CacheFile => 0,
+        Kind::Store | Kind::Layer | Kind::CacheFile => 0,
     };
     own.checked_add(inputs)?.checked_add(held(kind, limits)?)?.checked_add(u64::from(kind.bound(limits)))
 }
@@ -83,6 +96,9 @@ pub fn held(kind: Kind, limits: &Limits) -> Option<u64> {
     let lists = match kind {
         Kind::Store => return Some(0),
         Kind::CacheFile => 0,
+        Kind::Layer => List::<Digest>::worst_case(limits.layer.placed)?
+            .checked_add(List::<Tool>::worst_case(limits.layer.tools)?)?
+            .checked_add(List::<Step>::worst_case(limits.layer.steps)?)?,
         Kind::Resolution => {
             let line = List::<Box<[u8]>>::worst_case(l.inputs)?.checked_add(List::<Index>::worst_case(l.indices)?)?;
             List::<Package>::worst_case(l.packages)?

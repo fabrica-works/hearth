@@ -195,3 +195,108 @@ pub fn past_limit(record: &mut crate::resolution::Resolution, field: &[u8]) {
         _ => unreachable!("a known field"),
     }
 }
+
+pub const AT: u64 = 1_760_000_000_000_000_000;
+pub const LINE_AT: u64 = 1_750_000_000_000_000_000;
+fn digest_of(byte: u8) -> hearth_lib::encode::Digest {
+    hearth_lib::encode::Digest([byte; 32])
+}
+/// One layer record of each kind; the packages layer is a scratch build with `base: none`.
+pub fn a_layer(kind: crate::layer::LayerKind) -> crate::layer::Layer {
+    use crate::layer::{Cost, Counts, How, Inputs, Layer, LayerKind, Line, Made, Step, Subvolume, Tool, TreeFile};
+    use skein_lib::{Duration, Wall};
+    let empty = kind == LayerKind::Empty;
+    let (inputs, packages) = match kind {
+        LayerKind::Empty => (Inputs::Empty, None),
+        LayerKind::Packages => (
+            Inputs::Packages { part: digest_of(5), resolution: digest_of(6) },
+            Some(Line { base: None, depth: 0, how: How::Scratch, line: Wall::from_nanos(LINE_AT) }),
+        ),
+        LayerKind::Software => (Inputs::Software { part: digest_of(5) }, None),
+        LayerKind::Config => (Inputs::Config { part: digest_of(5) }, None),
+    };
+    let (costs, tools): (Box<[Step]>, Box<[Tool]>) = if empty {
+        (Box::from([]), Box::from([]))
+    } else {
+        (
+            Box::from([
+                Step {
+                    name: bytes::copy_of(b"fetch"),
+                    cost: Cost {
+                        cpu: Duration::from_nanos(1_000),
+                        fetched: 5_000,
+                        hashed: 0,
+                        memory: 1_048_576,
+                        wall: Duration::from_nanos(2_000),
+                        written: 0,
+                    },
+                },
+                Step {
+                    name: bytes::copy_of(b"walk"),
+                    cost: Cost {
+                        cpu: Duration::from_nanos(3_000),
+                        fetched: 0,
+                        hashed: 900,
+                        memory: 2_097_152,
+                        wall: Duration::from_nanos(4_000),
+                        written: 0,
+                    },
+                },
+            ]),
+            Box::from([
+                Tool { name: bytes::copy_of(b"apt"), version: bytes::copy_of(b"3.0.3") },
+                Tool { name: bytes::copy_of(b"mmdebstrap"), version: bytes::copy_of(b"1.5.7") },
+            ]),
+        )
+    };
+    Layer {
+        changes: digest_of(3),
+        costs,
+        counts: Counts { bytes: 1_000, deletes: 2, entries: 30, files: 20, hashed: 900, puts: 5 },
+        inputs,
+        key: digest_of(1),
+        kind,
+        made: Made { at: Wall::from_nanos(AT), packages },
+        parent: if empty { None } else { Some(digest_of(8)) },
+        placed: (kind == LayerKind::Software).then_some(Box::from([digest_of(9), digest_of(10)])),
+        scan: (!empty).then_some(digest_of(7)),
+        subvolume: Subvolume { parent_uuid: (!empty).then_some([0x22; 16]), uuid: [0x11; 16] },
+        tools,
+        tree: digest_of(2),
+        tree_file: TreeFile { sha256: digest_of(4), size: 4_096 },
+    }
+}
+pub fn layer_items(record: &crate::layer::Layer) -> Box<[Item]> {
+    let mut measure = hearth_lib::encode::Encoder::measuring();
+    crate::layer::encode(record, &mut measure);
+    let mut writer = hearth_lib::encode::Encoder::writing(measure.measured());
+    crate::layer::encode(record, &mut writer);
+    items(&writer.written(), &SHIPPED).expect("a fixture is a canonical value")
+}
+/// The items with the first run of `from` replaced by `to`.
+pub fn edit(items: &[Item], from: &[Item], to: &[Item]) -> Box<[Item]> {
+    let room = items.len().checked_add(to.len()).expect("a fixture fits");
+    let mut result = List::with_capacity(u32::try_from(room).expect("a fixture fits"));
+    let mut start = None;
+    for (at, window) in items.windows(from.len()).enumerate() {
+        if window == from {
+            start = Some(at);
+            break;
+        }
+    }
+    let start = start.expect("the fixture holds the items to replace");
+    let end = start.checked_add(from.len()).expect("a fixture fits");
+    for item in items.get(..start).expect("the run starts inside") {
+        result.push(item.clone()).expect("fixture room");
+    }
+    for item in to {
+        result.push(item.clone()).expect("fixture room");
+    }
+    for item in items.get(end..).expect("the run ends inside") {
+        result.push(item.clone()).expect("fixture room");
+    }
+    result.into_boxed()
+}
+pub fn digest_item(byte: u8) -> Item {
+    Item::Digest(digest_of(byte))
+}

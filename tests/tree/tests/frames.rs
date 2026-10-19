@@ -22,11 +22,17 @@ const CUT_CASES: &[(u64, bool)] = &[
     (15, true),
 ];
 const WRONG_KINDS: &[(Kind, Kind, Unreadable)] = &[
+    (Kind::Store, Kind::Layer, Unreadable::Kind { found: 1 }),
     (Kind::Store, Kind::Resolution, Unreadable::Kind { found: 1 }),
     (Kind::Store, Kind::CacheFile, Unreadable::Kind { found: 1 }),
+    (Kind::Layer, Kind::Store, Unreadable::Kind { found: 2 }),
+    (Kind::Layer, Kind::Resolution, Unreadable::Kind { found: 2 }),
+    (Kind::Layer, Kind::CacheFile, Unreadable::Kind { found: 2 }),
     (Kind::Resolution, Kind::Store, Unreadable::Kind { found: 4 }),
+    (Kind::Resolution, Kind::Layer, Unreadable::Kind { found: 4 }),
     (Kind::Resolution, Kind::CacheFile, Unreadable::Kind { found: 4 }),
     (Kind::CacheFile, Kind::Store, Unreadable::Kind { found: 5 }),
+    (Kind::CacheFile, Kind::Layer, Unreadable::Kind { found: 5 }),
     (Kind::CacheFile, Kind::Resolution, Unreadable::Kind { found: 5 }),
 ];
 
@@ -91,7 +97,7 @@ fn every_body_the_decoder_takes_the_encoder_writes_again_byte_for_byte() {
 }
 
 #[test]
-fn a_frame_of_each_kind_is_unreadable_as_the_other_two() {
+fn a_frame_of_each_kind_is_unreadable_as_the_other_three() {
     let limits = fixtures::limits();
     let records = generate::one_of_each(&mut Rng::new(0x7EE0_3000), &limits);
     for &(own, other, expected) in WRONG_KINDS {

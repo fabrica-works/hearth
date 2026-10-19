@@ -6,10 +6,11 @@ use skein_lib::{Reader, Writer};
 
 /// The frame's first eight bytes (store.md, 6.1).
 pub const MAGIC: [u8; 8] = *b"hearth\0r";
-/// The kinds of record M1 reads and writes.
+/// The kinds of record this release reads and writes.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Kind {
     Store,
+    Layer,
     Resolution,
     CacheFile,
 }
@@ -18,6 +19,7 @@ impl Kind {
     pub const fn number(self) -> u16 {
         match self {
             Self::Store => 1,
+            Self::Layer => 2,
             Self::Resolution => 4,
             Self::CacheFile => 5,
         }
@@ -31,6 +33,7 @@ impl Kind {
     pub const fn bound(self, limits: &Limits) -> u32 {
         match self {
             Self::Store => limits.store.body,
+            Self::Layer => limits.layer.body,
             Self::Resolution => limits.resolution.body,
             Self::CacheFile => limits.cache_file.body,
         }

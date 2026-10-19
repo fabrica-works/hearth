@@ -7,6 +7,7 @@ pub mod cache_file;
 pub mod decode;
 mod fields;
 pub mod frame;
+pub mod layer;
 pub mod limits;
 pub mod resolution;
 pub mod store;
