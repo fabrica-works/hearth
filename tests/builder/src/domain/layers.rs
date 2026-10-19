@@ -22,10 +22,18 @@ pub(super) struct Layers {
     seed: u64,
     /// The layer the last snapshot made, whose steps the world runs.
     staging: Option<Digest>,
+    /// The helper requests answered so far.
+    helped: usize,
+    /// The helper request, counted from zero, that fails after doing its work.
+    failing: Option<usize>,
 }
 impl Layers {
     pub fn new(seed: u64) -> Self {
-        Self { seed, staging: None }
+        Self { seed, staging: None, helped: 0, failing: None }
+    }
+    /// The `nth` helper request, counted from zero, fails: it does its work, then answers `Failed`.
+    pub fn fail_helper(&mut self, nth: usize) {
+        self.failing = Some(nth);
     }
     /// The empty layer's subvolume, with the uuid the builder reads after making it (4.1).
     pub fn create(&self, files: &Files, key: Digest) -> Event {
@@ -54,7 +62,22 @@ impl Layers {
         });
         if matches!(stored, file::Event::Stored { .. }) { Event::Done } else { Event::Failed }
     }
+    /// A staging layer's directory, once emptied (7.3, step 5).
+    pub fn remove_staging(files: &Files, key: Digest) -> Event {
+        let removed = within(files, &layer(key, ".staging"), |directory, name| remove(files, directory, name, true));
+        done(removed)
+    }
+    /// `<key>.tree.tmp`, if the walk wrote one.
+    pub fn remove_tree_tmp(files: &Files, key: Digest) -> Event {
+        let removed = within(files, &layer(key, ".tree.tmp"), |directory, name| remove(files, directory, name, false));
+        done(match removed {
+            Err(Error::NotFound) => Ok(()),
+            Ok(()) | Err(_) => removed,
+        })
+    }
     pub fn helper(&mut self, files: &Files, helper: Helper) -> Event {
+        let nth = self.helped;
+        self.helped = nth.saturating_add(1);
         let answer = match helper {
             Helper::Snapshot { parent, staging } => {
                 self.staging = Some(staging);
@@ -64,11 +87,17 @@ impl Layers {
             Helper::Hash { layer: key } => walk(files, key, None).map(Helped::Hashed),
             // A freeze is the sync, and the fake keeps no read-only flag (btrfs comes with h08).
             Helper::Freeze { .. } => files.call(Ask::Sync { file: files.store_root() }).map(|_| Helped::Frozen),
-            Helper::Thaw { .. } | Helper::Apply { .. } | Helper::Empty { .. } | Helper::Delete { .. } => {
-                unreachable!("h04b sends no {helper:?}")
+            Helper::Empty { layer: key } => {
+                empty(files, &layer(key, ".staging")).map(|removed| Helped::Emptied { removed })
+            }
+            Helper::Thaw { .. } | Helper::Apply { .. } | Helper::Delete { .. } => {
+                unreachable!("no task sends {helper:?} yet")
             }
         };
-        Event::Helped { answer: answer.unwrap_or(Helped::Failed { cause: Cause::NotFound }) }
+        let answer = answer.unwrap_or(Helped::Failed { cause: Cause::NotFound });
+        Event::Helped {
+            answer: if self.failing == Some(nth) { Helped::Failed { cause: Cause::NoSpace } } else { answer },
+        }
     }
     fn snapshot(&self, files: &Files, parent: Digest, staging: Digest) -> Result<Helped, Error> {
         let record = read(files, &layer(parent, ".record"))?;
@@ -95,6 +124,23 @@ impl Layers {
         let drawn = skein_lib::sha256::digest(&[&self.seed.to_le_bytes()[..], &key.0].concat());
         drawn[..16].try_into().expect("sixteen of thirty-two bytes")
     }
+}
+fn remove(files: &Files, directory: Handle, name: &str, is_directory: bool) -> Result<(), Error> {
+    files.call(Ask::Remove { dir: directory, name: name.as_bytes().into(), directory: is_directory }).map(|_| ())
+}
+/// Removes everything beneath the directory at `path`, deepest first; how many entries went.
+fn empty(files: &Files, path: &str) -> Result<u64, Error> {
+    let mut removed = 0_u64;
+    for (name, kind) in entries(files, path)? {
+        let child = format!("{path}/{name}");
+        let is_directory = kind == Kind::Directory;
+        if is_directory {
+            removed = removed.saturating_add(empty(files, &child)?);
+        }
+        within(files, &child, |directory, entry| remove(files, directory, entry, is_directory))?;
+        removed = removed.saturating_add(1);
+    }
+    Ok(removed)
 }
 fn done(result: Result<(), Error>) -> Event {
     if result.is_ok() { Event::Done } else { Event::Failed }

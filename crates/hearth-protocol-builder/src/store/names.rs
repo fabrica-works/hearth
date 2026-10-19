@@ -106,6 +106,8 @@ pub(super) fn removal(name: Removal) -> Box<[u8]> {
         Removal::Named(name) => return name,
         Removal::File(digest) => (digest, b""),
         Removal::Record(digest) => (digest, b".record"),
+        Removal::Staging(digest) => (digest, b".staging"),
+        Removal::TreeTmp(digest) => (digest, b".tree.tmp"),
     };
     let mut writer = Writer::new(64_usize.checked_add(suffix.len()).expect("digest and suffix"));
     for byte in digest.0 {

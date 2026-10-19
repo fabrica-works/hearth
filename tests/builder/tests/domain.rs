@@ -1,5 +1,11 @@
-use hearth_builder_world::{domain::Cut, fixtures};
-use hearth_domain_builder::vocabulary::{Answer, Request};
+use hearth_builder_world::{
+    domain::{Cut, Failing},
+    fixtures,
+};
+use hearth_domain_builder::{
+    build::vocabulary::Why,
+    vocabulary::{Answer, Request},
+};
 use hearth_domain_render::{
     keys::Resolution,
     vocabulary::{Outcome, Request as RenderRequest},
@@ -279,4 +285,108 @@ fn a_build_whose_config_layer_is_published_finds_all_three() {
         );
         assert_eq!(found.outcome, Some(Outcome::Done), "seed {seed}");
     });
+}
+
+/// Every step and helper request of a clean build, as a build can fail it: with the layer it is
+/// in and what its failure is reported as (domain/build.md, 4.3).
+fn failures(clean: &hearth_builder_world::domain::Run) -> Vec<(Failing, hearth_lib::encode::Digest, Why)> {
+    let empty = hearth_domain_store::layers::empty();
+    let (mut steps, mut helpers, mut layer) = (0, 0, empty);
+    let mut points = Vec::new();
+    for request in clean.requests() {
+        match request {
+            Request::Run { .. } => {
+                points.push((Failing::Step(steps), layer, Why::Failed));
+                steps += 1;
+            }
+            Request::Store(StoreRequest::Helper(helper)) => {
+                let (key, why) = match helper {
+                    Helper::Snapshot { staging, .. } => {
+                        layer = *staging;
+                        (*staging, Why::Stage)
+                    }
+                    Helper::Hash { layer: key } => (*key, Why::Stage),
+                    Helper::Walk { layer: key, .. } | Helper::Freeze { layer: key } => {
+                        (*key, if *key == empty { Why::Stage } else { Why::Seal })
+                    }
+                    Helper::Thaw { .. } | Helper::Apply { .. } | Helper::Empty { .. } | Helper::Delete { .. } => {
+                        unreachable!("a clean build sends no {helper:?}")
+                    }
+                };
+                points.push((Failing::Helper(helpers), key, why));
+                helpers += 1;
+            }
+            Request::Progress(_)
+            | Request::Render(_)
+            | Request::Store(_)
+            | Request::Unopened { .. }
+            | Request::Answer(_)
+            | Request::Reply { .. } => {}
+        }
+    }
+    points
+}
+/// A build that fails at `failing` publishes nothing of the layer it is making, keeps the layers
+/// beneath, leaves no staging layer and no temporary, and is built again by the next call.
+fn fails_cleanly(failing: Failing, layer: hearth_lib::encode::Digest, why: Why, seed: u64) {
+    use hearth_builder_world::domain::Run;
+    let (keys, _) = rendered_keys(seed);
+    let empty = hearth_domain_store::layers::empty();
+    let chain = [empty, keys.packages, keys.software, keys.config];
+    let at = chain.iter().position(|key| *key == layer).expect("a layer of the chain");
+    let mut run = Run::new(&fixtures::build::building(), seed);
+    run.fail(failing);
+    let run = run.finish();
+    let note = format!("seed {seed}: {failing:?} in layer {at}");
+    assert!(
+        matches!(run.answers.last(), Some(Answer::Failed { why: found, .. }) if *found == why),
+        "{note}: {:?}",
+        run.answers
+    );
+    assert_eq!(run.strays(), 0, "{note}: no staging layer and no temporary remain");
+    for (index, key) in chain.iter().enumerate() {
+        let hex = fixtures::hex_digest(key.0);
+        if index < at {
+            assert!(fixtures::build::record(&run.shared, *key).is_some(), "{note}: the layer beneath {index} stays");
+            assert!(fixtures::build::laid(&run.shared, &hex), "{note}: and its subvolume");
+            assert!(fixtures::build::laid(&run.shared, &format!("{hex}.tree")), "{note}: and its tree");
+        } else {
+            for name in [
+                hex.clone(),
+                format!("{hex}.record"),
+                format!("{hex}.tree"),
+                format!("{hex}.staging"),
+                format!("{hex}.tree.tmp"),
+            ] {
+                assert!(!fixtures::build::laid(&run.shared, &name), "{note}: {name} is not left");
+            }
+        }
+    }
+    assert_eq!(run.referee.asked, run.referee.ended, "{note}: every request has its terminal");
+    let again = run.restart().finish();
+    assert_eq!(again.outcome, Some(Outcome::Done), "{note}: built again");
+    assert!(!again.answers.iter().any(|answer| matches!(answer, Answer::Failed { .. })), "{note}: {:?}", again.answers);
+    for key in chain {
+        assert!(fixtures::build::record(&again.shared, key).is_some(), "{note}: the rebuild publishes layer {key:?}");
+    }
+    assert_eq!(again.strays(), 0, "{note}");
+}
+/// Fails each request of the wanted kind once, in the world of a seed drawn per request.
+fn each_failure(wanted: impl Fn(Failing) -> bool) {
+    use hearth_builder_world::domain::Run;
+    let clean = Run::new(&fixtures::build::building(), 0).finish();
+    let points: Vec<_> = failures(&clean).into_iter().filter(|(failing, _, _)| wanted(*failing)).collect();
+    assert!(!points.is_empty(), "a build has requests to fail");
+    for (index, (failing, layer, why)) in points.into_iter().enumerate() {
+        let seed = u64::try_from(index).expect("few requests") % fixtures::WORLD_SEEDS.end;
+        fails_cleanly(failing, layer, why, seed);
+    }
+}
+#[test]
+fn a_step_that_fails_in_any_layer_leaves_no_staging_and_no_temporary_and_keeps_the_layers_beneath() {
+    each_failure(|failing| matches!(failing, Failing::Step(_)));
+}
+#[test]
+fn a_helper_request_that_fails_leaves_no_staging_and_no_temporary_and_keeps_the_layers_beneath() {
+    each_failure(|failing| matches!(failing, Failing::Helper(_)));
 }

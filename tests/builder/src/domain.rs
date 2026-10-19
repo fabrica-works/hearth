@@ -24,6 +24,15 @@ use std::collections::VecDeque;
 pub enum Cut {
     BeforeKeep,
 }
+/// A request of the run that fails, counted from zero among those of its kind. It does its work
+/// first, and its answer is the failure: what it made is left for the store to clear.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Failing {
+    /// The nth step run.
+    Step(usize),
+    /// The nth request to the tree helper.
+    Helper(usize),
+}
 #[derive(Debug)]
 struct Delivery {
     event: Event,
@@ -48,6 +57,8 @@ pub struct Run {
     seed: u64,
     rng: Rng,
     cut: Option<Cut>,
+    failing: Option<usize>,
+    ran: usize,
     held: Option<(skein_sim::Handle, Time)>,
 }
 impl Run {
@@ -82,11 +93,19 @@ impl Run {
             seed,
             rng: Rng::new(seed),
             cut: None,
+            failing: None,
+            ran: 0,
             held: None,
         }
     }
     pub fn cut_at(&mut self, cut: Cut) {
         self.cut = Some(cut);
+    }
+    pub fn fail(&mut self, failing: Failing) {
+        match failing {
+            Failing::Step(nth) => self.failing = Some(nth),
+            Failing::Helper(nth) => self.store.fail_helper(nth),
+        }
     }
     /// Holds a second independently opened lock until this simulated time.
     pub fn hold_lock_until(&mut self, until: Time) {
@@ -183,7 +202,14 @@ impl Run {
             Request::Run { step } => {
                 self.referee.ask(key);
                 self.store.run(self.files(), *step);
-                let event = Event::Build(builder::build::vocabulary::Event::Ran { step: *step });
+                let step = *step;
+                let nth = self.ran;
+                self.ran = nth.saturating_add(1);
+                let event = Event::Build(if self.failing == Some(nth) {
+                    builder::build::vocabulary::Event::StepFailed { step }
+                } else {
+                    builder::build::vocabulary::Event::Ran { step }
+                });
                 self.send(Delivery { event, terminal: Some(key) });
             }
             Request::Answer(answer) => self.answers.push(answer.clone()),

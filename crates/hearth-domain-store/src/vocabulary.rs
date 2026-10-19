@@ -306,6 +306,10 @@ pub enum Removal {
     File(Digest),
     Record(Digest),
     Named(Box<[u8]>),
+    /// `layers/<key>.staging`, once emptied: an `rmdir` (7.3, step 5).
+    Staging(Digest),
+    /// `layers/<key>.tree.tmp`, done also when there is none: a walk may fail before it writes it.
+    TreeTmp(Digest),
 }
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Stray {

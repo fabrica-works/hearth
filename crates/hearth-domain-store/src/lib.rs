@@ -71,8 +71,8 @@ pub fn step(store: &mut Store, env: &Env<Limits>, ev: Event, out: &mut Queue<Out
         staging::stage(store, env, key, parent, out);
     } else if let Event::Seal { key, parent, inputs } = ev {
         staging::seal(store, env, key, parent, inputs, out);
-    } else if let Event::Discard { .. } = ev {
-        staging::discard(out);
+    } else if let Event::Discard { key } = ev {
+        staging::discard(store, env, key, out);
     } else if store.working.is_some() {
         staging::step(store, ev, out);
     } else if store.writing.is_some() {

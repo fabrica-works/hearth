@@ -2,8 +2,8 @@ use super::fixtures::{self, D1, D2, D3};
 use crate::{
     limits::SHIPPED,
     vocabulary::{
-        Answer, Cause, Counts, Event, Helped, Helper, Layer, LayerInputs, Output, Record, Renaming, Request, Step,
-        TreeFile, Walk,
+        Answer, Cause, Counts, Directory, Event, Helped, Helper, Layer, LayerInputs, Output, Record, Removal, Renaming,
+        Request, Step, TreeFile, Walk,
     },
 };
 use hearth_lib::encode::Digest;
@@ -142,7 +142,8 @@ fn a_helper_failure_refuses_the_stage_and_the_seal() {
         let mut store = published();
         let parent = fixtures::packages_layer().key;
         drop(store.step(Time::ZERO, Event::Stage { key: KEY, parent }));
-        assert_eq!(helped(&mut store, Helped::Failed { cause }), refused(Step::Stage), "{cause:?}");
+        assert_eq!(helped(&mut store, Helped::Failed { cause }), helper(Helper::Empty { layer: KEY }), "{cause:?}");
+        assert_eq!(dropped_through(&mut store, KEY, false), refused(Step::Stage), "{cause:?}");
         staged(&mut store);
         drop(store.step(Time::ZERO, sealing()));
         assert_eq!(helped(&mut store, Helped::Failed { cause }), refused(Step::Seal), "{cause:?}");
@@ -164,7 +165,12 @@ fn an_answer_the_chain_did_not_ask_for_refuses_it() {
         let mut store = published();
         let parent = fixtures::packages_layer().key;
         drop(store.step(Time::ZERO, Event::Stage { key: KEY, parent }));
-        assert_eq!(helped(&mut store, answer), refused(Step::Stage), "{answer:?}");
+        assert_eq!(
+            helped(&mut store, answer),
+            helper(Helper::Empty { layer: KEY }),
+            "{answer:?}: dropped, then refused"
+        );
+        assert_eq!(dropped_through(&mut store, KEY, false), refused(Step::Stage), "{answer:?}");
     }
 }
 #[test]
@@ -188,4 +194,111 @@ fn a_second_stage_is_refused_not_queued_and_so_is_a_seal_of_what_is_not_staged()
 fn a_stage_over_a_parent_that_is_not_published_is_refused() {
     let mut store = fixtures::ready(SHIPPED, &[]);
     assert_eq!(one(store.step(Time::ZERO, Event::Stage { key: KEY, parent: D1 })), refused(Step::Stage));
+}
+fn removal(removal: Removal) -> Output {
+    Output::Request(Request::Remove { directory: Directory::Layers, name: removal })
+}
+/// Answers the requests of a drop after its first, with what they ask for; the last output.
+fn dropped_through(store: &mut fixtures::Harness, key: Digest, tmp: bool) -> Output {
+    assert_eq!(helped(store, Helped::Emptied { removed: 3 }), removal(Removal::Staging(key)), "7.3: emptied first");
+    if tmp {
+        assert_eq!(one(store.step(Time::ZERO, Event::Done)), removal(Removal::TreeTmp(key)), "then the walk's file");
+    }
+    one(store.step(Time::ZERO, Event::Done))
+}
+#[test]
+fn a_discard_empties_the_staging_layer_removes_it_and_lets_the_key_stage_again() {
+    let parent = fixtures::packages_layer().key;
+    let mut store = published();
+    staged(&mut store);
+    assert_eq!(one(store.step(Time::ZERO, Event::Discard { key: KEY })), helper(Helper::Empty { layer: KEY }));
+    assert_eq!(dropped_through(&mut store, KEY, false), Output::Answer(Answer::Discarded { key: KEY }));
+    assert!(!store.published(&KEY), "nothing is published");
+    assert!(store.published(&parent), "the layers beneath stay");
+    assert_eq!(one(store.step(Time::ZERO, sealing())), refused(Step::Seal), "a discarded layer is no longer staged");
+    staged(&mut store);
+}
+#[test]
+fn a_discard_after_a_seal_that_failed_in_its_walk_removes_the_temporary_too() {
+    for walked in [false, true] {
+        let mut store = published();
+        staged(&mut store);
+        drop(store.step(Time::ZERO, sealing()));
+        if walked {
+            drop(store.step(Time::ZERO, Event::Helped { answer: Helped::Walked(walk()) }));
+            assert_eq!(one(store.step(Time::ZERO, Event::Failed)), refused(Step::Seal), "the freeze failed");
+        } else {
+            assert_eq!(helped(&mut store, Helped::Failed { cause: Cause::Bound }), refused(Step::Seal));
+        }
+        assert_eq!(one(store.step(Time::ZERO, Event::Discard { key: KEY })), helper(Helper::Empty { layer: KEY }));
+        assert_eq!(dropped_through(&mut store, KEY, true), Output::Answer(Answer::Discarded { key: KEY }), "{walked}");
+        staged(&mut store);
+    }
+}
+#[test]
+fn a_discard_refuses_what_the_helper_or_the_store_did_not_answer_as_asked() {
+    for answer in [
+        Helped::Failed { cause: Cause::Permission },
+        Helped::Thawed,
+        Helped::Applied,
+        Helped::Deleted,
+        Helped::Frozen,
+        Helped::Walked(walk()),
+        Helped::Hashed(walk()),
+        Helped::Snapshotted { uuid: UUID, parent_uuid: PARENT_UUID },
+    ] {
+        let mut store = published();
+        staged(&mut store);
+        drop(store.step(Time::ZERO, Event::Discard { key: KEY }));
+        assert_eq!(helped(&mut store, answer), refused(Step::Discard), "{answer:?}");
+        staged(&mut store);
+    }
+    for failing in [1_u8, 2] {
+        let mut store = published();
+        staged(&mut store);
+        drop(store.step(Time::ZERO, sealing()));
+        drop(store.step(Time::ZERO, Event::Helped { answer: Helped::Failed { cause: Cause::Bound } }));
+        drop(store.step(Time::ZERO, Event::Discard { key: KEY }));
+        drop(helped(&mut store, Helped::Emptied { removed: 0 }));
+        if failing == 2 {
+            drop(store.step(Time::ZERO, Event::Done));
+        }
+        assert_eq!(one(store.step(Time::ZERO, Event::Failed)), refused(Step::Discard), "request {failing} failed");
+        staged(&mut store);
+    }
+}
+#[test]
+fn a_discard_of_a_layer_not_staged_or_while_a_chain_runs_is_refused() {
+    let mut store = published();
+    assert_eq!(one(store.step(Time::ZERO, Event::Discard { key: KEY })), refused(Step::Discard), "nothing staged");
+    staged(&mut store);
+    assert_eq!(one(store.step(Time::ZERO, Event::Discard { key: D1 })), refused(Step::Discard), "another key");
+    drop(store.step(Time::ZERO, sealing()));
+    assert_eq!(one(store.step(Time::ZERO, Event::Discard { key: KEY })), refused(Step::Discard), "a seal runs");
+}
+#[test]
+fn a_stage_that_fails_part_way_drops_what_it_made_and_is_refused() {
+    let parent = fixtures::packages_layer().key;
+    let mut store = published();
+    drop(store.step(Time::ZERO, Event::Stage { key: KEY, parent }));
+    assert_eq!(helped(&mut store, Helped::Failed { cause: Cause::NoSpace }), helper(Helper::Empty { layer: KEY }));
+    assert_eq!(dropped_through(&mut store, KEY, false), refused(Step::Stage), "the snapshot failed");
+    staged(&mut store);
+
+    let empty = fixtures::empty_layer().key;
+    let mut store = fixtures::ready(SHIPPED, &[]);
+    drop(store.step(Time::ZERO, Event::Stage { key: KEY, parent: empty }));
+    drop(store.step(Time::ZERO, Event::Created { uuid: UUID }));
+    assert_eq!(
+        helped(&mut store, Helped::Failed { cause: Cause::NotFound }),
+        helper(Helper::Empty { layer: empty }),
+        "4.1: the empty layer's staging, with the stage's own cleanup"
+    );
+    assert_eq!(dropped_through(&mut store, empty, true), refused(Step::Stage), "the hash failed");
+    assert!(!store.published(&empty), "the empty layer is not published");
+    assert_eq!(
+        one(store.step(Time::ZERO, Event::Stage { key: KEY, parent: empty })),
+        Output::Request(Request::Create { key: empty }),
+        "a stage after it starts over"
+    );
 }

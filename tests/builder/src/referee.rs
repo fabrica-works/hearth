@@ -1,6 +1,6 @@
 //! Boundary obligations and the store's settled invariants (domain/testing.md, 8.4).
 use crate::files::Files;
-use skein_io::kernel::Kind;
+use skein_io::kernel::{Kind, OpenHow};
 use skein_world::domain::Ledger;
 
 #[derive(Debug)]
@@ -48,5 +48,14 @@ pub fn strays(files: &Files) -> usize {
             .filter(|entry| entry.name.ends_with(b".tmp") || entry.name.windows(7).any(|part| part == b".skein-"))
             .count();
     }
-    count
+    count.saturating_add(layer_strays(files))
+}
+/// The temporaries and staging layers in `layers/`, which the store clears when a layer fails (4.4).
+fn layer_strays(files: &Files) -> usize {
+    let Ok(directory) = files.open(files.store_root(), b"layers", OpenHow::Directory) else {
+        return 0;
+    };
+    let entries = files.list(directory, 4096).expect("layer entries");
+    files.close(directory);
+    entries.iter().filter(|entry| entry.name.ends_with(b".tmp") || entry.name.ends_with(b".staging")).count()
 }

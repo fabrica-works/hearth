@@ -26,6 +26,10 @@ impl Store {
     pub fn new(seed: u64) -> Self {
         Self { layers: super::layers::Layers::new(seed), ..Self::default() }
     }
+    /// The `nth` helper request of the run fails (see `Layers::fail_helper`).
+    pub fn fail_helper(&mut self, nth: usize) {
+        self.layers.fail_helper(nth);
+    }
     /// The seeded files a step leaves in the layer being made.
     pub fn run(&self, files: &Files, step: hearth_domain_builder::build::Step) {
         self.layers.run(files, step);
@@ -96,11 +100,18 @@ impl Store {
                 let bytes = tree::store::write(&translate::store::tree_store(record), &SHIPPED).expect("store record");
                 terminal(&write(files, files.roots.store, b"store.record", bytes))
             }
+            Request::Remove { directory: Directory::Layers, name: Removal::Staging(key) } => {
+                super::layers::Layers::remove_staging(files, key)
+            }
+            Request::Remove { directory: Directory::Layers, name: Removal::TreeTmp(key) } => {
+                super::layers::Layers::remove_tree_tmp(files, key)
+            }
             Request::Remove { directory, name } => {
                 let name = match name {
                     Removal::Named(name) => name,
                     Removal::File(digest) => hex_digest(digest.0).into_bytes().into(),
                     Removal::Record(digest) => format!("{}.record", hex_digest(digest.0)).into_bytes().into(),
+                    Removal::Staging(_) | Removal::TreeTmp(_) => unreachable!("only layers/ holds a staging layer"),
                 };
                 let Some(root) = root(files, directory) else {
                     return Event::Failed;
