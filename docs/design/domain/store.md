@@ -649,11 +649,12 @@ with a token that its one answer echoes.
   owners and attributes; and a directory's entry, its attributes read,
   is written before any entry beneath it, so a child never waits on its
   parent. A mismatch is a refusal of the layer, never a repair.
-- **The digests come from the finished tree file.** 3.5's change set
-  names its count first, so the helper writes the tree file as it walks,
-  then reads it once more to compute the tree digest and the change
-  set's, and writes the end item (6.3). It costs a second read of a file
-  the page cache holds.
+- **The digests come from the finished tree file.** The tree's entries
+  and 3.5's change set each name their count first, so the helper writes
+  the tree file as it walks, then reads it twice more: once for the tree
+  digest, and once for the change set's, which hashes the child's tree
+  digest before its changes. Then it writes the end item (6.3). Each
+  read is of a file the page cache holds.
 - **The scan's rules come with the request** as data (domain/build.md, 9.3).
   The helper checks them on what changed, since only it can read every
   file, and answers findings, never contents. A rule on a file's lines
