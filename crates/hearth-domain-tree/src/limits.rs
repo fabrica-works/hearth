@@ -2,7 +2,7 @@
 use crate::{
     Level,
     links::Link,
-    vocabulary::{Item, Xattr},
+    vocabulary::{Item, Kernel, Xattr},
 };
 use alloc::boxed::Box;
 use skein_lib::{List, Map, Stack};
@@ -58,6 +58,11 @@ pub const SHIPPED: Limits = Limits {
     batch: 262_144,
 };
 
+/// The most kernels in a layer's `boot`, and the bytes of a version (5.6, 6.3): what the parent's
+/// end item holds, which the walk copies unchanged.
+const KERNELS: u32 = 8;
+const VERSION: u32 = 255;
+
 /// The most items a batch of `limits.batch` bytes holds: each weighs at least an `Item`, and an
 /// entry with its put, whatever they weigh, goes alone.
 pub(crate) fn batch_items(limits: &Limits) -> u32 {
@@ -81,9 +86,18 @@ fn pair(limits: &Limits) -> Option<u64> {
     item.checked_mul(2)?.checked_add(path(limits)?.checked_mul(2)?)?.checked_add(attributes)?.checked_add(payload)
 }
 
+/// The parent's stream: the entry in hand, which the entry read at the same path is compared
+/// with, so two; the last path received; and the parent's `boot`.
+fn parent(limits: &Limits) -> Option<u64> {
+    let kernel = u64::try_from(size_of::<Kernel>()).ok()?.checked_add(u64::from(VERSION))?;
+    let boot = kernel.checked_mul(u64::from(KERNELS))?;
+    pair(limits)?.checked_add(path(limits)?)?.checked_add(boot)
+}
+
 /// The walk's state and the events in flight: the names of each directory on the stack, bounded
 /// in all; the entry in hand and its attributes; the linked inodes; the batch, twice, as a
-/// flushed one is in the step that starts the next; and a page.
+/// flushed one is in the step that starts the next; the parent's stream, one entry at a time; and
+/// a page.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     let levels = limits.depth.checked_add(1)?;
@@ -116,5 +130,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(linked)?
         .checked_add(batch)?
         .checked_add(entry)?
+        .checked_add(parent(limits)?)?
         .checked_add(u64::try_from(size_of::<crate::Tree>()).ok()?)
 }

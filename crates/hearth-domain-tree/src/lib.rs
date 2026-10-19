@@ -11,6 +11,7 @@ extern crate alloc;
 mod batch;
 pub mod limits;
 mod links;
+mod parent;
 mod read;
 pub mod vocabulary;
 mod walk;
@@ -36,6 +37,8 @@ enum After {
     Advance,
     /// Into the directory in hand.
     List,
+    /// To the parent: the paths before the next one are deletes, and then it is read.
+    Merge,
     /// To the tree file's digests.
     Digests,
 }
@@ -49,6 +52,8 @@ enum Wait {
     Attribute,
     ReadLink,
     Hash,
+    /// The parent's next entry.
+    Parent,
     Listing,
     Written(After),
     Digests,
@@ -72,6 +77,8 @@ pub struct Tree {
     batch: batch::Batch,
     /// The tree digest and the change set's, once the file is read back.
     digests: Option<(Digest, Digest)>,
+    /// The parent's tree file as a stream, until the walk ends; none for a walk with no parent.
+    parent: Option<parent::Merge>,
 }
 impl Tree {
     #[must_use]
@@ -88,6 +95,7 @@ impl Tree {
             linked: links::Linked::new(limits),
             batch: batch::Batch::new(limits),
             digests: None,
+            parent: None,
         }
     }
 }
@@ -95,7 +103,7 @@ impl Tree {
 pub fn step(tree: &mut Tree, env: &Env<Limits>, ev: Event, out: &mut Queue<Output>) {
     let limits = &env.limits;
     match ev {
-        Event::Hash { key } => walk::begin(tree, key, out),
+        Event::Walk { key, parent } => walk::begin(tree, key, parent, out),
         Event::Stat(stat) => {
             if tree.wait == Wait::Stat {
                 read::stat(tree, limits, stat, out);
@@ -112,6 +120,7 @@ pub fn step(tree: &mut Tree, env: &Env<Limits>, ev: Event, out: &mut Queue<Outpu
             | Wait::Attribute
             | Wait::ReadLink
             | Wait::Hash
+            | Wait::Parent
             | Wait::Written(_)
             | Wait::Digests
             | Wait::Finish => walk::unexpected(tree, out),
@@ -146,6 +155,7 @@ pub fn step(tree: &mut Tree, env: &Env<Limits>, ev: Event, out: &mut Queue<Outpu
             | Wait::Attribute
             | Wait::ReadLink
             | Wait::Hash
+            | Wait::Parent
             | Wait::Listing
             | Wait::Digests
             | Wait::Finish => walk::unexpected(tree, out),
@@ -160,6 +170,20 @@ pub fn step(tree: &mut Tree, env: &Env<Limits>, ev: Event, out: &mut Queue<Outpu
         Event::Finished { sha256, size } => {
             if tree.wait == Wait::Finish {
                 walk::finished(tree, sha256, size, out);
+            } else {
+                walk::unexpected(tree, out);
+            }
+        }
+        Event::ParentEntry { entry, local } => {
+            if tree.wait == Wait::Parent {
+                parent::received(tree, limits, entry, local, out);
+            } else {
+                walk::unexpected(tree, out);
+            }
+        }
+        Event::ParentEnd { tree: digest, boot, sha256, size } => {
+            if tree.wait == Wait::Parent {
+                parent::ended(tree, limits, digest, boot, sha256, size, out);
             } else {
                 walk::unexpected(tree, out);
             }

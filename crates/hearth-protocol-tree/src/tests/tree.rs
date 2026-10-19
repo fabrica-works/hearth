@@ -4,11 +4,8 @@ use crate::{
     frame::{Refused, Unreadable},
     layer::Counts,
     limits::{Limits, TreeLimits},
-    tree::{
-        self, ChangesDigest, End, Entry, Item, Kernel, Local, Next, Op, Payload, Reader, TreeDigest, Xattr,
-    },
+    tree::{self, ChangesDigest, End, Entry, Item, Kernel, Local, Next, Op, Payload, Reader, TreeDigest, Xattr},
 };
-use core::cmp::Ordering;
 use hearth_lib::encode::{Digest, Encoder, Item as Value};
 use skein_lib::{Decimal, List, Writer, bytes};
 

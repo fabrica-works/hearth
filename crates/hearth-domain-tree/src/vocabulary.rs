@@ -6,11 +6,13 @@
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
 
-/// What the walk hears: the helper's `hash` request, and the one answer to each request it made.
+/// What the walk hears: the helper's `walk` or `hash` request, and the one answer to each request
+/// it made.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
-    /// Walks the layer of this key with no parent; the end item names it (6.3).
-    Hash { key: Digest },
+    /// Walks the layer of this key against its parent's tree file; the end item names the key
+    /// (6.3). With no parent it is `hash`: every file is read, every entry a put.
+    Walk { key: Digest, parent: Option<Parent> },
     /// The answer to `Stat`.
     Stat(Stat),
     /// The answer to `List`, `Next` or `Attributes`: at most the page asked for, in any order,
@@ -28,8 +30,21 @@ pub enum Event {
     Digested { tree: Digest, changes: Digest },
     /// The answer to `Finish`: the tree file's SHA-256 and size.
     Finished { sha256: Digest, size: u64 },
+    /// The answer to `ParentNext`: the parent's next entry, with its local index.
+    ParentEntry { entry: Entry, local: Local },
+    /// The other answer to `ParentNext`: the parent's tree file has no entry left. `tree` and
+    /// `boot` are its end item's; `sha256` and `size` are those of the bytes streamed.
+    ParentEnd { tree: Digest, boot: Box<[Kernel]>, sha256: Digest, size: u64 },
     /// The answer to any request that failed.
     Failed { fault: Fault },
+}
+
+/// The parent's record (6.2): its tree digest and its tree file's SHA-256 and size, which the
+/// stream read must come to.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Parent {
+    pub tree: Digest,
+    pub tree_file: TreeFile,
 }
 
 /// Why a request failed below.
@@ -87,17 +102,19 @@ pub enum Request {
         entries: u64,
         changes: u64,
     },
+    /// The parent's next item of the tree file, change items skipped.
+    ParentNext,
     /// Writes the end item and the real header, then syncs.
     Finish {
         end: End,
     },
 }
 
-/// What the walk answers, once for a `Hash`.
+/// What the walk answers, once for a `Walk`.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
     /// The shape of the store's `Walk` (6.2): a layer's digests, its tree file and its counts.
-    Hashed { tree: Digest, changes: Digest, tree_file: TreeFile, counts: Counts },
+    Walked { tree: Digest, changes: Digest, tree_file: TreeFile, counts: Counts },
     /// Names the path the walk was at.
     Failed { path: Box<[u8]>, cause: Cause },
 }
@@ -129,7 +146,7 @@ pub struct Counts {
 /// Why the walk failed.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Cause {
-    /// A `Hash` while a walk runs.
+    /// A `Walk` while a walk runs.
     Busy,
     /// An event the request in flight cannot have, or none is in flight.
     Unexpected,
@@ -140,6 +157,9 @@ pub enum Cause {
     Io,
     Bound(Bound),
     Refused(Refusal),
+    /// The parent's stream is not the parent: its entries are out of order, or its end is not
+    /// the record's.
+    Parent,
 }
 
 /// The bound a walk passed (5.6).
@@ -222,12 +242,17 @@ pub enum Kind {
     Socket,
 }
 
-/// An item of the tree file to append (6.3), in tree order: an entry, then its put.
+/// An item of the tree file to append (6.3), in tree order: an entry, then its put if it is one;
+/// a delete stands alone.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Item {
     Entry(Entry, Local),
     /// The put of the entry just before it.
     Put {
+        path: Box<[u8]>,
+    },
+    /// The parent had `path`; the child has nothing there.
+    Delete {
         path: Box<[u8]>,
     },
 }
@@ -278,7 +303,16 @@ pub struct Local {
     pub ctime: (u64, u32),
     pub mtime: (u64, u32),
 }
-/// The end item (6.3) of a layer with no parent and no kernel inputs: its `boot` is empty.
+/// A kernel a layer holds (6.3).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Kernel {
+    pub version: Box<[u8]>,
+    pub kernel: Digest,
+    pub modules: Digest,
+    pub initramfs: Digest,
+}
+/// The end item (6.3). Its `boot` is the parent's, copied unchanged; the packages layer computes
+/// its own later, and with no parent it is empty.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct End {
     pub key: Digest,
@@ -286,4 +320,5 @@ pub struct End {
     pub tree: Digest,
     pub changes: Digest,
     pub counts: Counts,
+    pub boot: Box<[Kernel]>,
 }

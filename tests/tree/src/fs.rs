@@ -89,12 +89,14 @@ impl Node {
 #[derive(Clone, Debug)]
 pub struct Fs {
     nodes: Vec<Node>,
+    /// The kernel's clock for change times, which only moves forward.
+    clock: u64,
 }
 impl Fs {
     /// A root alone: a directory, 0755, owned by 0, as the empty layer is.
     #[must_use]
     pub fn new() -> Fs {
-        Fs { nodes: vec![Node::new(Kind::Directory, 1)] }
+        Fs { nodes: vec![Node::new(Kind::Directory, 1)], clock: 0 }
     }
     #[must_use]
     pub fn root(&self) -> &Node {
@@ -196,6 +198,75 @@ impl Fs {
     #[must_use]
     pub fn count(&self) -> usize {
         self.nodes.len()
+    }
+
+    /// A time later than any given before: what a change reads at.
+    pub fn tick(&mut self) -> (u64, u32) {
+        self.clock += 1;
+        (1_900_000_000 + self.clock, 13)
+    }
+    /// `chmod`, `chown`, `setxattr`, a link made or lost, a rename: the change time moves.
+    pub fn changed(&mut self, at: usize) {
+        let time = self.tick();
+        self.nodes[at].ctime = time;
+    }
+    /// A write, or `touch`: the change time and the modification time move.
+    pub fn touched(&mut self, at: usize) {
+        let time = self.tick();
+        self.nodes[at].ctime = time;
+        self.nodes[at].mtime = time;
+    }
+    /// Every name that leads from the root to a node, with the node: a hard link's names each.
+    #[must_use]
+    pub fn paths(&self) -> Vec<(Vec<u8>, usize)> {
+        let mut found = Vec::new();
+        self.walk(0, &mut Vec::new(), &mut found);
+        found
+    }
+    fn walk(&self, at: usize, path: &mut Vec<u8>, found: &mut Vec<(Vec<u8>, usize)>) {
+        found.push((path.clone(), at));
+        for (name, child) in &self.nodes[at].names {
+            let before = path.len();
+            if !path.is_empty() {
+                path.push(b'/');
+            }
+            path.extend_from_slice(name);
+            self.walk(*child, path, found);
+            path.truncate(before);
+        }
+    }
+    /// The names that lead to the node.
+    #[must_use]
+    pub fn names_of(&self, at: usize) -> usize {
+        self.nodes.iter().map(|node| node.names.iter().filter(|(_, child)| *child == at).count()).sum()
+    }
+    /// The largest inode number the nodes have.
+    #[must_use]
+    pub fn last_inode(&self) -> u64 {
+        self.nodes.iter().map(|node| node.inode).max().unwrap_or(0)
+    }
+    /// Removes the name at `path`, and what is beneath it if it is a directory. The directory it
+    /// was in changes; every node that loses a name but keeps another changes, as a link lost does.
+    pub fn remove(&mut self, path: &[u8]) {
+        let (parent, name) = split(path);
+        let directory = self.lookup(parent).unwrap_or_else(|| panic!("{parent:?} exists"));
+        let place = self.nodes[directory].names.iter().position(|(found, _)| found == name).expect("the name exists");
+        let (_, at) = self.nodes[directory].names.remove(place);
+        self.touched(directory);
+        let mut gone = Vec::new();
+        self.detach(at, &mut gone);
+        for node in gone {
+            if self.nodes[node].kind != Kind::Directory && self.names_of(node) > 0 {
+                self.changed(node);
+            }
+        }
+    }
+    fn detach(&mut self, at: usize, gone: &mut Vec<usize>) {
+        gone.push(at);
+        let names = std::mem::take(&mut self.nodes[at].names);
+        for (_, child) in names {
+            self.detach(child, gone);
+        }
     }
 }
 impl Default for Fs {

@@ -4,7 +4,7 @@ use hearth_protocol_tree::{
     layer,
     limits::{self, Limits},
     resolution,
-    tree::{self, Next, Reader},
+    tree::{Next, Reader},
 };
 use hearth_tree_world::{
     check::{self, Record},
@@ -165,6 +165,7 @@ mod walk {
     };
     use hearth_lib::encode::Digest;
     use hearth_tree_world::{
+        edits,
         fs::{Fs, Node},
         helper::{self, Helper},
         layers,
@@ -178,14 +179,24 @@ mod walk {
     /// Walks `fs` with the machine metered step by step, and returns the most it held at once of
     /// its own: its state, and the event it was given.
     fn peak(fs: &Fs, limits: &Limits, what: &dyn core::fmt::Debug) -> u64 {
+        peak_against(fs, None, limits, what)
+    }
+    /// The same, against the parent's tree file if there is one.
+    fn peak_against(fs: &Fs, parent: Option<&[u8]>, limits: &Limits, what: &dyn core::fmt::Debug) -> u64 {
         let bound = worst_case(limits).expect("the limits fit a u64");
         // The file has its room before the meter, so that the helper's growth is not the walk's.
-        let reserve = helper::walk(fs, limits, KEY).file.len() + 64;
+        let reserve = match parent {
+            Some(file) => helper::walk_with(Helper::new(fs).against(file), limits, KEY).file.len() + 64,
+            None => helper::walk(fs, limits, KEY).file.len() + 64,
+        };
         let mut helper = Helper::reserving(fs, reserve);
+        if let Some(file) = parent {
+            helper = helper.against(file);
+        }
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
         let meter = Meter::new();
         let mut machine = Tree::new(limits);
-        let mut event = Event::Hash { key: KEY };
+        let mut event = Event::Walk { key: KEY, parent: None };
         let mut most = 0;
         loop {
             let mut out = Queue::with_capacity(MAX_OUT);
@@ -248,6 +259,23 @@ mod walk {
     }
 
     #[test]
+    fn walking_generated_layers_against_a_parent_holds_no_more_than_the_worst_case() {
+        for seed in 0..6_u64 {
+            let mut rng = Rng::new(0x7EE0_7200 + seed);
+            let parent = layers::layer(&mut rng, 60 + seed * 30);
+            let mut child = parent.clone();
+            edits::edit(&mut rng, &mut child, 4, 12);
+            for (name, limits) in [("shipped", SHIPPED), ("small", small())] {
+                let file = helper::walk(&parent, &limits, KEY).file;
+                let held = peak_against(&child, Some(&file), &limits, &(name, seed));
+                assert!(held > 0, "the walk holds something, seed {seed}");
+                // Nothing changed: every entry is kept from the parent's stream.
+                peak_against(&parent, Some(&file), &limits, &(name, "unchanged", seed));
+            }
+        }
+    }
+
+    #[test]
     fn walking_wide_and_deep_layers_holds_no_more_than_the_worst_case() {
         let mut rng = Rng::new(0x7EE0_7100);
         let fs = layers::wide_and_deep(&mut rng, 2_000, 12);
@@ -290,5 +318,20 @@ mod walk {
         fs.add(&path, Node::file(9, b""));
         let held = peak(&fs, &SHIPPED, &"at the limits");
         assert!(held > 4_000_000, "the full entry alone is more: {held}");
+        // Against itself, with the full entry read again beside the parent's, and with the
+        // parent's entries deleted: the deepest path, the full entry, and a long name.
+        let file = helper::walk(&fs, &SHIPPED, KEY).file;
+        let mut child = fs.clone();
+        let full = child.lookup(b"full").expect("full");
+        child.touched(full);
+        let touched = peak_against(&child, Some(&file), &SHIPPED, &"the full entry read again");
+        assert!(touched > 4_000_000, "the full entry alone is more: {touched}");
+        let mut empty = Fs::new();
+        empty.add(b"names", Node::new(Kind::Directory, 4));
+        let deleted = peak_against(&empty, Some(&file), &SHIPPED, &"everything deleted but a directory");
+        assert!(deleted > 0, "the parent's entries are held one at a time: {deleted}");
+        // The other way: the full entry is only in the child, and the parent holds a small one.
+        let small_file = helper::walk(&empty, &SHIPPED, KEY).file;
+        peak_against(&fs, Some(&small_file), &SHIPPED, &"everything put");
     }
 }

@@ -52,30 +52,43 @@ fn weigh(item: &Item) -> u64 {
             let attributes = u64::try_from(entry.xattrs.len()).expect("a length fits in a u64").saturating_mul(xattr);
             u64::try_from(sum.saturating_add(payload)).expect("a length fits in a u64").saturating_add(attributes)
         }
-        Item::Put { path } => u64::try_from(path.len()).expect("a length fits in a u64"),
+        Item::Put { path } | Item::Delete { path } => u64::try_from(path.len()).expect("a length fits in a u64"),
     };
     own.saturating_add(owned)
 }
 
-/// An entry and its put are kept for the next write, or written with the batch before them when
-/// they would pass its bound, and the walk goes on `after` the write.
-pub(crate) fn queue(tree: &mut Tree, limits: &Limits, entry: Item, put: Item, after: After, out: &mut Queue<Output>) {
-    let weight = weigh(&entry).saturating_add(weigh(&put));
+/// An item and the one that goes with it, if any (an entry and its put), are kept for the next
+/// write, or written with the batch before them when they would pass its bound, and the walk goes
+/// on `after` the write.
+pub(crate) fn queue(
+    tree: &mut Tree,
+    limits: &Limits,
+    first: Item,
+    second: Option<Item>,
+    after: After,
+    out: &mut Queue<Output>,
+) {
+    let weight = match &second {
+        Some(second) => weigh(&first).saturating_add(weigh(second)),
+        None => weigh(&first),
+    };
     let full = tree.batch.bytes.saturating_add(weight) > u64::from(limits.batch);
     let flushing = full && !tree.batch.items.is_empty();
     if flushing {
         send(tree, limits, out);
     }
     if tree.batch.items.is_empty() {
-        let first = match &entry {
-            Item::Entry(entry, _) => Some(skein_lib::bytes::copy_of(&entry.path)),
-            Item::Put { path } => Some(skein_lib::bytes::copy_of(path)),
+        let path = match &first {
+            Item::Entry(entry, _) => skein_lib::bytes::copy_of(&entry.path),
+            Item::Put { path } | Item::Delete { path } => skein_lib::bytes::copy_of(path),
         };
-        tree.batch.first = first;
+        tree.batch.first = Some(path);
     }
     tree.batch.bytes = tree.batch.bytes.saturating_add(weight);
-    assert!(tree.batch.items.push(entry).is_ok(), "an entry and its put fit the batch");
-    assert!(tree.batch.items.push(put).is_ok(), "an entry and its put fit the batch");
+    assert!(tree.batch.items.push(first).is_ok(), "an item and its put fit the batch");
+    if let Some(second) = second {
+        assert!(tree.batch.items.push(second).is_ok(), "an item and its put fit the batch");
+    }
     if flushing {
         tree.wait = Wait::Written(after);
     } else {

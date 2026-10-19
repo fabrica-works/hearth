@@ -6,10 +6,10 @@ use hearth_domain_tree::vocabulary::Kind;
 use hearth_lib::encode::Digest;
 use hearth_protocol_tree::{
     layer::Counts,
-    tree::{End, Entry, Item, Local, Op, Payload, Xattr},
+    tree::{End, Entry, Item, Kernel, Local, Op, Payload, Xattr},
 };
 use skein_lib::sha256;
-use std::collections::BTreeMap;
+use std::{cmp::Ordering, collections::BTreeMap};
 
 /// Whether the walk keeps an attribute (3.4).
 #[must_use]
@@ -100,4 +100,94 @@ pub fn items(fs: &Fs, key: Digest) -> Vec<Item> {
     }
     items.push(Item::End(End { key, parent_tree: None, tree, changes, counts, boot: Box::new([]) }));
     items
+}
+
+/// What a walk of `child` against the tree file of a walk of `parent` must produce, listed
+/// without the machine: the entries of the child in tree order, each with its put unless the
+/// parent has the same entry; a delete for each path only the parent has, in its place in tree
+/// order; the digests (3.4, 3.5); and the counts, `hashed` being the sizes of the files that were
+/// read, which are those not unchanged (4.3). `boot` is the parent's, copied.
+///
+/// An entry the rule calls unchanged must be equal to the parent's: an edit of the layer that
+/// leaves it unequal moved no change time, and the oracle fails there rather than agree with a
+/// walk that kept the parent's entry.
+#[must_use]
+pub fn items_against(child: &Fs, parent: &Fs, key: Digest) -> Vec<Item> {
+    items_over(child, &entries(parent).0, key, Box::new([]))
+}
+/// The same, against a parent's entries and the kernels in its end item.
+#[must_use]
+pub fn items_over(child: &Fs, parent: &[(Entry, Local)], key: Digest, boot: Box<[Kernel]>) -> Vec<Item> {
+    let (found, mut counts) = entries(child);
+    counts.puts = 0;
+    counts.hashed = 0;
+    let parent_entries: Vec<&Entry> = parent.iter().map(|(entry, _)| entry).collect();
+    let parent_tree = oracle::tree_digest(&parent_entries);
+    let mut items = Vec::new();
+    let mut changes: Vec<(Op, Vec<u8>, Option<Entry>)> = Vec::new();
+    let (mut at, mut behind) = (0, 0);
+    loop {
+        let old = parent.get(behind);
+        let new = found.get(at);
+        let order = match (old, new) {
+            (None, None) => break,
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (Some((old, _)), Some((new, _))) => oracle::order(&old.path, &new.path),
+        };
+        match order {
+            Ordering::Less => {
+                let (old, _) = old.expect("a parent entry");
+                items.push(Item::Change { op: Op::Delete, path: old.path.clone() });
+                changes.push((Op::Delete, old.path.to_vec(), None));
+                counts.deletes += 1;
+                behind += 1;
+            }
+            Ordering::Greater | Ordering::Equal => {
+                let (entry, local) = new.expect("a child entry");
+                let same = match old {
+                    Some((old, before)) if order == Ordering::Equal => {
+                        let unchanged = before.inode == local.inode
+                            && before.ctime == local.ctime
+                            && kind_of(old) == kind_of(entry);
+                        if unchanged {
+                            assert_eq!(
+                                old, entry,
+                                "an entry unchanged by 4.3's rule is the parent's: {:?}",
+                                entry.path
+                            );
+                        } else if let Payload::File { size, .. } = entry.payload {
+                            counts.hashed += size;
+                        }
+                        behind += 1;
+                        old == entry
+                    }
+                    Some(_) | None => {
+                        if let Payload::File { size, .. } = entry.payload {
+                            counts.hashed += size;
+                        }
+                        false
+                    }
+                };
+                items.push(Item::Entry(entry.clone(), *local));
+                if !same {
+                    items.push(Item::Change { op: Op::Put, path: entry.path.clone() });
+                    changes.push((Op::Put, entry.path.to_vec(), Some(entry.clone())));
+                    counts.puts += 1;
+                }
+                at += 1;
+            }
+        }
+    }
+    let list: Vec<&Entry> = found.iter().map(|(entry, _)| entry).collect();
+    let tree = oracle::tree_digest(&list);
+    let view: Vec<(Op, &[u8], Option<&Entry>)> =
+        changes.iter().map(|(op, path, entry)| (*op, path.as_slice(), entry.as_ref())).collect();
+    let digest = oracle::changes_digest(Some(parent_tree), tree, &view);
+    items.push(Item::End(End { key, parent_tree: Some(parent_tree), tree, changes: digest, counts, boot }));
+    items
+}
+/// An entry's kind, by its number.
+fn kind_of(entry: &Entry) -> u8 {
+    entry.payload.kind()
 }

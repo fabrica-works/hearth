@@ -40,12 +40,14 @@ fn a_root_alone_is_one_entry_and_its_put() {
         Request::List { path: path(b""), max: SHIPPED.page },
         Request::Write { items: Box::new([first, second]) },
         Request::Digests { parent_tree: None, entries: 1, changes: 1 },
-        Request::Finish { end: End { key: KEY, parent_tree: None, tree: TREE, changes: CHANGES, counts } },
+        Request::Finish {
+            end: End { key: KEY, parent_tree: None, tree: TREE, changes: CHANGES, counts, boot: Box::default() },
+        },
     ];
     assert_eq!(run.requests.as_slice(), expected);
     assert_eq!(
         run.answer,
-        Answer::Hashed { tree: TREE, changes: CHANGES, tree_file: TreeFile { sha256: FILE, size: FILE_SIZE }, counts }
+        Answer::Walked { tree: TREE, changes: CHANGES, tree_file: TreeFile { sha256: FILE, size: FILE_SIZE }, counts }
     );
 }
 
@@ -70,7 +72,7 @@ fn entries_come_in_tree_order_each_followed_by_its_put() {
     let expected: &[&[u8]] = &[b"", b"a", b"a/b", b"a-b", b"b", b"b/B", b"b/a", b"c", b"d", b"e", b"f", b"g"];
     assert_paths(&run.paths(), expected);
     assert_paths(&run.puts, expected);
-    let Answer::Hashed { counts, .. } = run.answer else { panic!("hashed: {:?}", run.answer) };
+    let Answer::Walked { counts, .. } = run.answer else { panic!("hashed: {:?}", run.answer) };
     assert_eq!(counts, Counts { bytes: 7, deletes: 0, entries: 12, files: 4, hashed: 7, puts: 12 });
 }
 
@@ -127,6 +129,7 @@ fn a_directory_is_written_before_anything_beneath_it_is_read() {
             | Request::ReadLink { .. }
             | Request::HashFile { .. }
             | Request::Create
+            | Request::ParentNext
             | Request::Digests { .. }
             | Request::Finish { .. } => {}
         }
@@ -202,8 +205,8 @@ fn failed(path: &[u8], cause: Cause) -> Output {
 #[test]
 fn a_second_hash_is_busy_and_the_walk_goes_on() {
     let mut tree = Tree::new(&SHIPPED);
-    assert_eq!(feed(&mut tree, Event::Hash { key: KEY }), Output::Request(Request::Create));
-    assert_eq!(feed(&mut tree, Event::Hash { key: KEY }), failed(b"", Cause::Busy));
+    assert_eq!(feed(&mut tree, Event::Walk { key: KEY, parent: None }), Output::Request(Request::Create));
+    assert_eq!(feed(&mut tree, Event::Walk { key: KEY, parent: None }), failed(b"", Cause::Busy));
     assert_eq!(feed(&mut tree, Event::Done), Output::Request(Request::Stat { path: path(b"") }));
 }
 
@@ -211,7 +214,7 @@ fn a_second_hash_is_busy_and_the_walk_goes_on() {
 fn an_answer_nothing_waits_for_fails_the_walk_at_its_path() {
     let mut tree = Tree::new(&SHIPPED);
     assert_eq!(feed(&mut tree, Event::Done), failed(b"", Cause::Unexpected));
-    assert_eq!(feed(&mut tree, Event::Hash { key: KEY }), Output::Request(Request::Create));
+    assert_eq!(feed(&mut tree, Event::Walk { key: KEY, parent: None }), Output::Request(Request::Create));
     assert_eq!(feed(&mut tree, Event::Done), Output::Request(Request::Stat { path: path(b"") }));
     assert_eq!(feed(&mut tree, Event::Value { bytes: path(b"x") }), failed(b"", Cause::Unexpected));
     assert_eq!(feed(&mut tree, Event::Done), failed(b"", Cause::Unexpected), "and the walk is over");
@@ -221,7 +224,7 @@ fn an_answer_nothing_waits_for_fails_the_walk_at_its_path() {
 fn a_walk_after_a_failed_walk_starts_clean() {
     let mut tree = Tree::new(&SHIPPED);
     for fault in [Fault::Permission, Fault::NoSpace] {
-        assert_eq!(feed(&mut tree, Event::Hash { key: KEY }), Output::Request(Request::Create));
+        assert_eq!(feed(&mut tree, Event::Walk { key: KEY, parent: None }), Output::Request(Request::Create));
         assert_eq!(feed(&mut tree, Event::Done), Output::Request(Request::Stat { path: path(b"") }));
         let cause = if fault == Fault::Permission { Cause::Permission } else { Cause::NoSpace };
         assert_eq!(feed(&mut tree, Event::Failed { fault }), failed(b"", cause));
@@ -240,10 +243,10 @@ fn named(request: &Request, listed: &[u8]) -> Box<[u8]> {
         Request::Next { .. } => bytes::copy_of(listed),
         Request::Write { items } => match items.first() {
             Some(Item::Entry(entry, _)) => bytes::copy_of(&entry.path),
-            Some(Item::Put { path }) => bytes::copy_of(path),
+            Some(Item::Put { path } | Item::Delete { path }) => bytes::copy_of(path),
             None => panic!("a write holds items"),
         },
-        Request::Create | Request::Digests { .. } | Request::Finish { .. } => path(b""),
+        Request::Create | Request::ParentNext | Request::Digests { .. } | Request::Finish { .. } => path(b""),
     }
 }
 

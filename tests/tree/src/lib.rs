@@ -1,5 +1,7 @@
 //! Seeded worlds for the canonical store record decoders (domain/render.md, 9.4).
+pub mod against;
 pub mod check;
+pub mod edits;
 pub mod expected;
 pub mod fixtures;
 pub mod fs;

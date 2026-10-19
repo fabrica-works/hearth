@@ -18,7 +18,8 @@ const FAMILIES: &[&[u8]] = &[
 
 /// A name that sorts among its siblings in ways that trip a naive order: shared prefixes, `-`
 /// and `.` beside `/`, bytes past ASCII.
-fn name(rng: &mut Rng, taken: &[Vec<u8>]) -> Vec<u8> {
+#[must_use]
+pub fn name(rng: &mut Rng, taken: &[Vec<u8>]) -> Vec<u8> {
     const PARTS: &[&[u8]] = &[b"a", b"b", b"ab", b"-", b".", b"_", b"z", b"\xff", b"\x01", b" ", b"0", b"B"];
     loop {
         let mut name = Vec::new();
@@ -30,7 +31,8 @@ fn name(rng: &mut Rng, taken: &[Vec<u8>]) -> Vec<u8> {
         }
     }
 }
-fn bytes(rng: &mut Rng, most: u64) -> Vec<u8> {
+#[must_use]
+pub fn bytes(rng: &mut Rng, most: u64) -> Vec<u8> {
     (0..rng.between(0, most)).map(|_| u8::try_from(rng.below(256)).expect("a byte")).collect()
 }
 fn attributes(rng: &mut Rng, node: Node) -> Node {
@@ -57,6 +59,33 @@ fn owner(rng: &mut Rng) -> u32 {
     [0, 1, 1000, 65_535, 33][usize::try_from(rng.below(5)).expect("an index")]
 }
 
+/// A node of a random kind, with a random mode, owners and attributes.
+#[must_use]
+pub fn node(rng: &mut Rng, inode: u64) -> Node {
+    let node = match rng.below(10) {
+        0 | 1 => Node::new(Kind::Directory, inode),
+        2..=4 => Node::file(inode, &bytes(rng, 200)),
+        5 => Node::symlink(inode, &bytes(rng, 30).into_iter().map(|byte| byte.max(1)).collect::<Vec<_>>()),
+        6 => Node::device(
+            Kind::Char,
+            inode,
+            u32::try_from(rng.below(300)).expect("small"),
+            u32::try_from(rng.below(300)).expect("small"),
+        ),
+        7 => Node::device(
+            Kind::Block,
+            inode,
+            u32::try_from(rng.below(300)).expect("small"),
+            u32::try_from(rng.below(300)).expect("small"),
+        ),
+        8 => Node::new(Kind::Fifo, inode),
+        _ => Node::new(Kind::Socket, inode),
+    };
+    let node = if node.kind == Kind::Symlink { node } else { Node { mode: mode(rng), ..node } };
+    let (uid, gid) = (owner(rng), owner(rng));
+    attributes(rng, node.owned(uid, gid))
+}
+
 /// A random layer of about `size` entries below the root.
 #[must_use]
 pub fn layer(rng: &mut Rng, size: u64) -> Fs {
@@ -74,28 +103,7 @@ pub fn layer(rng: &mut Rng, size: u64) -> Fs {
             path.push(b'/');
         }
         path.extend_from_slice(&leaf);
-        let node = match rng.below(10) {
-            0 | 1 => Node::new(Kind::Directory, inode),
-            2..=4 => Node::file(inode, &bytes(rng, 200)),
-            5 => Node::symlink(inode, &bytes(rng, 30).into_iter().map(|byte| byte.max(1)).collect::<Vec<_>>()),
-            6 => Node::device(
-                Kind::Char,
-                inode,
-                u32::try_from(rng.below(300)).expect("small"),
-                u32::try_from(rng.below(300)).expect("small"),
-            ),
-            7 => Node::device(
-                Kind::Block,
-                inode,
-                u32::try_from(rng.below(300)).expect("small"),
-                u32::try_from(rng.below(300)).expect("small"),
-            ),
-            8 => Node::new(Kind::Fifo, inode),
-            _ => Node::new(Kind::Socket, inode),
-        };
-        let node = if node.kind == Kind::Symlink { node } else { Node { mode: mode(rng), ..node } };
-        let (uid, gid) = (owner(rng), owner(rng));
-        let node = attributes(rng, node.owned(uid, gid));
+        let node = node(rng, inode);
         let directory = node.kind == Kind::Directory;
         let at = fs.add(&path, node);
         if directory {

@@ -29,7 +29,7 @@ fn hex(digest: &Digest) -> String {
 /// file and its digest.
 fn hashed(fs: &Fs, limits: &Limits, what: &str) -> Walked {
     let walked = helper::walk(fs, limits, KEY);
-    let Answer::Hashed { tree, changes, tree_file, counts } = &walked.answer else {
+    let Answer::Walked { tree, changes, tree_file, counts } = &walked.answer else {
         let (path, cause) = walked.failed();
         panic!("{what}: the walk failed at a path of {} bytes: {cause:?}", path.len())
     };
@@ -53,7 +53,7 @@ fn hashed(fs: &Fs, limits: &Limits, what: &str) -> Walked {
 #[test]
 fn the_empty_layers_root_alone_is_the_tree_digest_of_the_design() {
     let walked = hashed(&Fs::new(), &SHIPPED, "the empty layer");
-    let Answer::Hashed { tree, counts, .. } = &walked.answer else { unreachable!("checked") };
+    let Answer::Walked { tree, counts, .. } = &walked.answer else { unreachable!("checked") };
     assert_eq!(hex(tree), "6022d1fbc6ad38d08d2ae02cefc21e7e6af5a35e6be9d115f0ba267fdb0d005a");
     assert_eq!((counts.entries, counts.puts, counts.deletes, counts.files), (1, 1, 0, 0));
 }
@@ -334,14 +334,16 @@ fn named(requests: &[Request], at: usize) -> &[u8] {
                 | Request::HashFile { .. }
                 | Request::Create
                 | Request::Write { .. }
+                | Request::ParentNext
                 | Request::Digests { .. }
                 | Request::Finish { .. } => None,
             })
             .expect("a directory is open"),
         Request::Write { items } => match &items[0] {
             hearth_domain_tree::vocabulary::Item::Entry(entry, _) => &entry.path,
-            hearth_domain_tree::vocabulary::Item::Put { path } => path,
+            hearth_domain_tree::vocabulary::Item::Put { path }
+            | hearth_domain_tree::vocabulary::Item::Delete { path } => path,
         },
-        Request::Create | Request::Digests { .. } | Request::Finish { .. } => b"",
+        Request::Create | Request::ParentNext | Request::Digests { .. } | Request::Finish { .. } => b"",
     }
 }

@@ -1,11 +1,12 @@
 //! The walk's course: the stack, the listings, and the ends (domain/store.md, 5.4).
 use crate::{
     After, Level, Tree, Wait,
-    batch::{self, Batch},
+    batch::Batch,
     limits::Limits,
     links::Linked,
+    parent::{self, Merge},
     read::Reading,
-    vocabulary::{Answer, Bound, Cause, Counts, End, Fault, Output, Refusal, Request, TreeFile},
+    vocabulary::{Answer, Bound, Cause, Counts, End, Fault, Output, Parent, Refusal, Request, TreeFile},
 };
 use alloc::boxed::Box;
 use hearth_lib::encode::Digest;
@@ -19,22 +20,22 @@ pub(crate) fn root() -> Box<[u8]> {
     bytes::copy_of(&[])
 }
 
-/// A `Hash`: the tree file first. A walk running is not disturbed by a second.
-pub(crate) fn begin(tree: &mut Tree, key: Digest, out: &mut Queue<Output>) {
+/// A `Walk`: the tree file first. A walk running is not disturbed by a second.
+pub(crate) fn begin(tree: &mut Tree, key: Digest, record: Option<Parent>, out: &mut Queue<Output>) {
     if tree.wait != Wait::Idle {
         out.push(Output::Answer(Answer::Failed { path: root(), cause: Cause::Busy }));
         return;
     }
     tree.key = key;
+    tree.parent = Merge::start(record);
     tree.wait = Wait::Create;
     out.push(Output::Request(Request::Create));
 }
 
-/// The tree file is there: the root's entry is the first to read.
+/// The tree file is there: the root's entry is the first to read, once the parent is up to it.
 pub(crate) fn created(tree: &mut Tree, limits: &Limits, out: &mut Queue<Output>) {
-    tree.wait = Wait::Stat;
     tree.entry = Some(Reading::new(root(), limits));
-    out.push(Output::Request(Request::Stat { path: root() }));
+    parent::catch_up(tree, limits, out);
 }
 
 /// What a walk does once the items of the entry in hand are written.
@@ -42,19 +43,21 @@ pub(crate) fn proceed(tree: &mut Tree, limits: &Limits, after: After, out: &mut 
     match after {
         After::Advance => advance(tree, limits, out),
         After::List => list(tree, limits, out),
+        After::Merge => parent::catch_up(tree, limits, out),
         After::Digests => {
             tree.wait = Wait::Digests;
+            let parent_tree = Merge::tree_of(tree.parent.as_ref());
             out.push(Output::Request(Request::Digests {
-                parent_tree: None,
+                parent_tree,
                 entries: tree.counts.entries,
-                changes: tree.counts.puts,
+                changes: tree.counts.puts.saturating_add(tree.counts.deletes),
             }));
         }
     }
 }
 
 /// The next name of the innermost directory with any, as the entry in hand; or, with the stack
-/// empty, the end of the walk.
+/// empty, the end of the walk, once every parent path left is a delete.
 pub(crate) fn advance(tree: &mut Tree, limits: &Limits, out: &mut Queue<Output>) {
     // Each pass takes a name and returns, or pops a level: the stack is empty after its depth.
     for _ in 0..=tree.stack.capacity() {
@@ -69,9 +72,8 @@ pub(crate) fn advance(tree: &mut Tree, limits: &Limits, out: &mut Queue<Output>)
                     reset(tree);
                     out.push(Output::Answer(Answer::Failed { path, cause: Cause::Bound(Bound::Path) }));
                 } else {
-                    tree.wait = Wait::Stat;
-                    tree.entry = Some(Reading::new(bytes::copy_of(&path), limits));
-                    out.push(Output::Request(Request::Stat { path }));
+                    tree.entry = Some(Reading::new(path, limits));
+                    parent::catch_up(tree, limits, out);
                 }
                 return;
             }
@@ -79,7 +81,7 @@ pub(crate) fn advance(tree: &mut Tree, limits: &Limits, out: &mut Queue<Output>)
         }
     }
     assert!(tree.stack.is_empty(), "every level was popped");
-    batch::flush(tree, limits, After::Digests, out);
+    parent::catch_up(tree, limits, out);
 }
 /// `dir/name`, or `name` in the root.
 fn join(dir: &[u8], name: &[u8]) -> Box<[u8]> {
@@ -159,8 +161,13 @@ fn refuse(name: &[u8], limits: &Limits) -> Option<Cause> {
 pub(crate) fn digested(tree: &mut Tree, digest: Digest, changes: Digest, out: &mut Queue<Output>) {
     tree.digests = Some((digest, changes));
     tree.wait = Wait::Finish;
+    let parent_tree = Merge::tree_of(tree.parent.as_ref());
+    let boot = match tree.parent.as_mut() {
+        Some(merge) => merge.boot(),
+        None => Box::default(),
+    };
     out.push(Output::Request(Request::Finish {
-        end: End { key: tree.key, parent_tree: None, tree: digest, changes, counts: tree.counts },
+        end: End { key: tree.key, parent_tree, tree: digest, changes, counts: tree.counts, boot },
     }));
 }
 /// The file is whole: the walk is done.
@@ -168,7 +175,7 @@ pub(crate) fn finished(tree: &mut Tree, sha256: Digest, size: u64, out: &mut Que
     let (digest, changes) = tree.digests.expect("the digests precede the end");
     let counts = tree.counts;
     reset(tree);
-    out.push(Output::Answer(Answer::Hashed { tree: digest, changes, tree_file: TreeFile { sha256, size }, counts }));
+    out.push(Output::Answer(Answer::Walked { tree: digest, changes, tree_file: TreeFile { sha256, size }, counts }));
 }
 
 /// The request in flight failed below.
@@ -190,10 +197,12 @@ pub(crate) fn unexpected(tree: &mut Tree, out: &mut Queue<Output>) {
 pub(crate) fn fail(tree: &mut Tree, cause: Cause, out: &mut Queue<Output>) {
     let path = match tree.wait {
         Wait::Idle | Wait::Create | Wait::Digests | Wait::Finish => root(),
-        Wait::Stat | Wait::Attributes | Wait::Attribute | Wait::ReadLink | Wait::Hash => match &tree.entry {
-            Some(reading) => bytes::copy_of(&reading.path),
-            None => root(),
-        },
+        Wait::Stat | Wait::Attributes | Wait::Attribute | Wait::ReadLink | Wait::Hash | Wait::Parent => {
+            match &tree.entry {
+                Some(reading) => bytes::copy_of(&reading.path),
+                None => root(),
+            }
+        }
         Wait::Listing => match &tree.listing {
             Some(level) => bytes::copy_of(&level.path),
             None => root(),
@@ -220,4 +229,5 @@ fn reset(tree: &mut Tree) {
     tree.linked = Linked::emptied(&tree.linked);
     tree.batch = Batch::emptied(&tree.batch);
     tree.digests = None;
+    tree.parent = None;
 }

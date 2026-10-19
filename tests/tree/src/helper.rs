@@ -1,13 +1,17 @@
 //! The helper's side of a walk, played as h06's protocol layer will: it answers the domain's
 //! requests from a fake filesystem, turns the domain's items into h05a's, writes them with its
 //! writer into a byte file, reads the file back with its `Reader` for the digests, and ends the
-//! file with the end item and the real header.
+//! file with the end item and the real header. Against a parent, it streams the parent's tree
+//! file through the same `Reader`, change items skipped, as typed entries.
 use crate::fs::Fs;
 use hearth_domain_tree::{
     MAX_OUT, Tree,
     limits::Limits,
     step,
-    vocabulary::{Answer, Cause, Counts, End, Entry, Event, Fault, Item, Local, Output, Payload, Request, Xattr},
+    vocabulary::{
+        Answer, Cause, Counts, End, Entry, Event, Fault, Item, Kernel, Local, Output, Parent, Payload, Request,
+        TreeFile, Xattr,
+    },
 };
 use hearth_lib::encode::Digest;
 use hearth_protocol_tree::{
@@ -42,6 +46,31 @@ pub fn tree_entry(entry: &Entry) -> tree::Entry {
         },
     }
 }
+/// h05a's entry as the domain's: the other total function.
+#[must_use]
+pub fn domain_entry(entry: &tree::Entry) -> Entry {
+    Entry {
+        path: entry.path.clone(),
+        mode: entry.mode,
+        uid: entry.uid,
+        gid: entry.gid,
+        xattrs: entry
+            .xattrs
+            .iter()
+            .map(|tree::Xattr { name, value }| Xattr { name: name.clone(), value: value.clone() })
+            .collect(),
+        payload: match &entry.payload {
+            tree::Payload::Directory => Payload::Directory,
+            tree::Payload::File { size, content } => Payload::File { size: *size, content: *content },
+            tree::Payload::Symlink { target } => Payload::Symlink { target: target.clone() },
+            tree::Payload::Hardlink { path } => Payload::Hardlink { path: path.clone() },
+            tree::Payload::Char { major, minor } => Payload::Char { major: *major, minor: *minor },
+            tree::Payload::Block { major, minor } => Payload::Block { major: *major, minor: *minor },
+            tree::Payload::Fifo => Payload::Fifo,
+            tree::Payload::Socket => Payload::Socket,
+        },
+    }
+}
 /// A domain item as h05a's.
 #[must_use]
 pub fn tree_item(item: &Item) -> tree::Item {
@@ -50,6 +79,7 @@ pub fn tree_item(item: &Item) -> tree::Item {
             tree::Item::Entry(tree_entry(entry), tree::Local { inode: *inode, ctime: *ctime, mtime: *mtime })
         }
         Item::Put { path } => tree::Item::Change { op: Op::Put, path: path.clone() },
+        Item::Delete { path } => tree::Item::Change { op: Op::Delete, path: path.clone() },
     }
 }
 #[must_use]
@@ -63,7 +93,7 @@ pub fn tree_counts(counts: &Counts) -> layer::Counts {
         puts: counts.puts,
     }
 }
-/// The end item of a walk with no parent and no kernels.
+/// The end item the domain asks for.
 #[must_use]
 pub fn tree_end(end: &End) -> tree::Item {
     tree::Item::End(tree::End {
@@ -72,8 +102,50 @@ pub fn tree_end(end: &End) -> tree::Item {
         tree: end.tree,
         changes: end.changes,
         counts: tree_counts(&end.counts),
-        boot: Box::new([]),
+        boot: end
+            .boot
+            .iter()
+            .map(|Kernel { version, kernel, modules, initramfs }| tree::Kernel {
+                version: version.clone(),
+                kernel: *kernel,
+                modules: *modules,
+                initramfs: *initramfs,
+            })
+            .collect(),
     })
+}
+
+/// What a damaged parent stream does: the helper tells the domain something the parent's file
+/// does not say.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Tamper {
+    /// The end names another tree digest.
+    Tree,
+    /// The end names another SHA-256.
+    Sha256,
+    /// The end names another size.
+    Size,
+    /// The entry numbered so, counting from 0, comes after the one that follows it.
+    Swap(usize),
+    /// The entry numbered so comes twice.
+    Repeat(usize),
+}
+
+/// The parent's tree file as the helper streams it.
+#[derive(Debug)]
+struct Stream<'a> {
+    file: &'a [u8],
+    reader: Reader,
+    at: usize,
+    /// Entries given so far.
+    given: usize,
+    /// An entry read ahead, to give next.
+    stash: Option<(Entry, Local)>,
+    tamper: Option<Tamper>,
+}
+enum Streamed {
+    Entry(Entry, Local),
+    End { tree: Digest, boot: Box<[Kernel]> },
 }
 
 /// What the helper made of a walk.
@@ -90,7 +162,7 @@ impl Walked {
     pub fn failed(&self) -> (&[u8], Cause) {
         match &self.answer {
             Answer::Failed { path, cause } => (path, *cause),
-            Answer::Hashed { .. } => panic!("the walk failed: {:?}", self.answer),
+            Answer::Walked { .. } => panic!("the walk failed: {:?}", self.answer),
         }
     }
 }
@@ -110,6 +182,8 @@ pub struct Helper<'a> {
     pub fault: Option<(usize, Fault)>,
     /// Items written, for the digests.
     items: u64,
+    /// The parent's tree file, when the walk has one, and the record it comes with.
+    stream: Option<(Stream<'a>, Parent)>,
 }
 impl<'a> Helper<'a> {
     #[must_use]
@@ -127,7 +201,34 @@ impl<'a> Helper<'a> {
             asked: 0,
             fault: None,
             items: 0,
+            stream: None,
         }
+    }
+    /// Walks against `file`, a tree file that a walk of the parent layer wrote.
+    #[must_use]
+    pub fn against(mut self, file: &'a [u8]) -> Helper<'a> {
+        let mut reader = Reader::new(&self.limits);
+        reader.header(file[..24].try_into().expect("a header")).expect("the parent is a tree file");
+        let tree = end_of(file, &self.limits).tree;
+        let record = Parent {
+            tree,
+            tree_file: TreeFile {
+                sha256: Digest(sha256::digest(file)),
+                size: u64::try_from(file.len()).expect("a size"),
+            },
+        };
+        self.stream = Some((Stream { file, reader, at: 24, given: 0, stash: None, tamper: None }, record));
+        self
+    }
+    /// Damages the parent stream.
+    pub fn tamper(&mut self, tamper: Tamper) {
+        let (stream, _) = self.stream.as_mut().expect("a parent is streamed");
+        stream.tamper = Some(tamper);
+    }
+    /// The parent's record that a walk against the file starts with.
+    #[must_use]
+    pub fn parent(&self) -> Option<Parent> {
+        self.stream.as_ref().map(|(_, record)| *record)
     }
     pub fn limit(&mut self, limits: ProtocolLimits) {
         self.limits = limits;
@@ -192,8 +293,54 @@ impl<'a> Helper<'a> {
                 Event::Done
             }
             Request::Write { items } => self.write(items),
+            Request::ParentNext => self.parent_next(),
             Request::Digests { parent_tree, entries, changes } => self.digests(*parent_tree, *entries, *changes),
             Request::Finish { end } => self.finish(end),
+        }
+    }
+    fn parent_next(&mut self) -> Event {
+        let (stream, _) = self.stream.as_mut().expect("a parent is streamed when it is asked for");
+        let number = stream.given;
+        if let Some((entry, local)) = stream.stash.take() {
+            stream.given += 1;
+            return Event::ParentEntry { entry, local };
+        }
+        match stream.read() {
+            Streamed::Entry(entry, local) => {
+                stream.given += 1;
+                match stream.tamper {
+                    Some(Tamper::Swap(at)) if at == number => {
+                        if let Streamed::Entry(second, other) = stream.read() {
+                            stream.stash = Some((entry, local));
+                            return Event::ParentEntry { entry: second, local: other };
+                        }
+                        Event::ParentEntry { entry, local }
+                    }
+                    Some(Tamper::Repeat(at)) if at == number => {
+                        stream.stash = Some((entry.clone(), local));
+                        Event::ParentEntry { entry, local }
+                    }
+                    Some(Tamper::Swap(_) | Tamper::Repeat(_) | Tamper::Tree | Tamper::Sha256 | Tamper::Size) | None => {
+                        Event::ParentEntry { entry, local }
+                    }
+                }
+            }
+            Streamed::End { tree, boot } => {
+                let flip = |digest: Digest| {
+                    let mut bytes = digest.0;
+                    bytes[0] ^= 1;
+                    Digest(bytes)
+                };
+                let (mut tree, mut sha256, mut size) =
+                    (tree, Digest(sha256::digest(stream.file)), u64::try_from(stream.file.len()).expect("a size"));
+                match stream.tamper {
+                    Some(Tamper::Tree) => tree = flip(tree),
+                    Some(Tamper::Sha256) => sha256 = flip(sha256),
+                    Some(Tamper::Size) => size += 1,
+                    Some(Tamper::Swap(_) | Tamper::Repeat(_)) | None => {}
+                }
+                Event::ParentEnd { tree, boot, sha256, size }
+            }
         }
     }
     fn page(&mut self, max: u32) -> Event {
@@ -269,6 +416,50 @@ fn not_found() -> Event {
     Event::Failed { fault: Fault::NotFound }
 }
 
+impl Stream<'_> {
+    /// The next entry of the file, or its end; change items are skipped.
+    fn read(&mut self) -> Streamed {
+        for _ in 0..=self.file.len() {
+            match self.reader.next(&self.file[self.at..]).expect("the reader takes the parent file") {
+                Next::Item(item, used) => {
+                    self.at += usize::try_from(used).expect("small");
+                    match item {
+                        tree::Item::Entry(entry, local) => {
+                            let local = Local { inode: local.inode, ctime: local.ctime, mtime: local.mtime };
+                            return Streamed::Entry(domain_entry(&entry), local);
+                        }
+                        tree::Item::Change { .. } => {}
+                        tree::Item::End(end) => {
+                            let boot = end
+                                .boot
+                                .iter()
+                                .map(|kernel| Kernel {
+                                    version: kernel.version.clone(),
+                                    kernel: kernel.kernel,
+                                    modules: kernel.modules,
+                                    initramfs: kernel.initramfs,
+                                })
+                                .collect();
+                            return Streamed::End { tree: end.tree, boot };
+                        }
+                    }
+                }
+                Next::Need(_) => panic!("the whole file is fed"),
+            }
+        }
+        panic!("each item takes bytes")
+    }
+}
+/// The end item of a tree file.
+#[must_use]
+pub fn end_of(file: &[u8], limits: &ProtocolLimits) -> tree::End {
+    let items = crate::check::read_tree(file, limits).expect("a tree file");
+    match items.last() {
+        Some(tree::Item::End(end)) => end.clone(),
+        Some(tree::Item::Entry(..) | tree::Item::Change { .. }) | None => panic!("a tree file ends with its end item"),
+    }
+}
+
 /// Walks `fs` with a fresh machine until it answers.
 #[must_use]
 pub fn walk(fs: &Fs, limits: &Limits, key: Digest) -> Walked {
@@ -280,7 +471,7 @@ pub fn walk_with(mut helper: Helper<'_>, limits: &Limits, key: Digest) -> Walked
     let mut machine = Tree::new(limits);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits };
     let mut requests = Vec::new();
-    let mut event = Event::Hash { key };
+    let mut event = Event::Walk { key, parent: helper.parent() };
     loop {
         let mut out = Queue::with_capacity(MAX_OUT);
         step(&mut machine, &env, event, &mut out);

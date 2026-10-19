@@ -3,7 +3,7 @@
 use crate::{
     After, Tree, Wait, batch,
     limits::Limits,
-    links,
+    links, parent,
     vocabulary::{Bound, Cause, Entry, Item, Kind, Local, Output, Payload, Refusal, Request, Stat, Xattr},
     walk,
 };
@@ -14,7 +14,7 @@ use skein_lib::{List, Map, Queue, bytes};
 /// The largest owner id (3.4).
 const OWNER: u32 = 65_535;
 /// The permission bits with setuid, setgid and sticky.
-const MODE: u32 = 0o7777;
+pub(crate) const MODE: u32 = 0o7777;
 /// The root's mode (3.4).
 const ROOT_MODE: u32 = 0o755;
 
@@ -81,9 +81,54 @@ pub(crate) fn stat(tree: &mut Tree, limits: &Limits, stat: Stat, out: &mut Queue
         }
         tree.counts.entries = tree.counts.entries.checked_add(1).expect("entries are within their bound");
         reading.stat = Some(stat);
-        tree.wait = Wait::Attributes;
-        out.push(Output::Request(Request::Attributes { path: bytes::copy_of(&reading.path) }));
+        if parent::unchanged(tree.parent.as_ref(), &reading.path, &stat) {
+            keep(tree, limits, out);
+        } else {
+            tree.wait = Wait::Attributes;
+            out.push(Output::Request(Request::Attributes { path: bytes::copy_of(&reading.path) }));
+        }
     }
+}
+
+/// The entry is the parent's, unchanged (domain/store.md, 4.3): its covered fields are the
+/// parent's, unread, with the new stat's local index. Its file is not hashed, and it is no change.
+fn keep(tree: &mut Tree, limits: &Limits, out: &mut Queue<Output>) {
+    let reading = tree.entry.as_ref().expect("an entry is in hand while it is kept");
+    let stat = reading.stat.expect("the stat came first");
+    let entry = parent::take(tree.parent.as_mut()).expect("the parent's entry is in hand");
+    if stat.kind != Kind::Directory && stat.links > 1 {
+        let first = match &entry.payload {
+            Payload::Hardlink { path } => path,
+            Payload::Directory
+            | Payload::File { .. }
+            | Payload::Symlink { .. }
+            | Payload::Char { .. }
+            | Payload::Block { .. }
+            | Payload::Fifo
+            | Payload::Socket => &entry.path,
+        };
+        let agree = links::agreement(entry.mode, entry.uid, entry.gid, &entry.xattrs);
+        if let Err(cause) = links::met(&mut tree.linked, limits, stat.inode, first, agree) {
+            walk::fail(tree, cause, out);
+            return;
+        }
+    }
+    match &entry.payload {
+        Payload::File { size, .. } => {
+            tree.counts.files = tree.counts.files.saturating_add(1);
+            tree.counts.bytes = tree.counts.bytes.saturating_add(*size);
+        }
+        Payload::Directory
+        | Payload::Symlink { .. }
+        | Payload::Hardlink { .. }
+        | Payload::Char { .. }
+        | Payload::Block { .. }
+        | Payload::Fifo
+        | Payload::Socket => {}
+    }
+    let after = if stat.kind == Kind::Directory { After::List } else { After::Advance };
+    let local = Local { inode: stat.inode, ctime: stat.ctime, mtime: stat.mtime };
+    emit(tree, limits, entry, local, false, after, out);
 }
 
 /// Whether the walk keeps an attribute: the four families of 3.4.
@@ -159,7 +204,7 @@ fn payload(tree: &mut Tree, limits: &Limits, out: &mut Queue<Output>) {
     let stat = reading.stat.expect("the stat came first");
     let mut first: Option<Box<[u8]>> = None;
     if stat.kind != Kind::Directory && stat.links > 1 {
-        match links::seen(&mut tree.linked, limits, &stat, &reading.path, &reading.xattrs) {
+        match links::seen(&mut tree.linked, limits, &stat, &reading.path, reading.xattrs.as_slice()) {
             Ok(path) => first = path,
             Err(cause) => {
                 walk::fail(tree, cause, out);
@@ -217,7 +262,8 @@ pub(crate) fn hashed(tree: &mut Tree, limits: &Limits, sha256: Digest, size: u64
     finish(tree, limits, Payload::File { size, content: sha256 }, After::Advance, out);
 }
 
-/// The entry is read: it and its put go to the batch. A directory's stays in hand, to be listed.
+/// The entry is read: it goes to the batch, with its put unless the parent had it so. A
+/// directory's stays in hand, to be listed.
 fn finish(tree: &mut Tree, limits: &Limits, payload: Payload, after: After, out: &mut Queue<Output>) {
     let reading = tree.entry.as_mut().expect("an entry is in hand while its items are made");
     let stat = reading.stat.expect("the stat came first");
@@ -235,10 +281,28 @@ fn finish(tree: &mut Tree, limits: &Limits, payload: Payload, after: After, out:
         payload,
     };
     let local = Local { inode: stat.inode, ctime: stat.ctime, mtime: stat.mtime };
-    let put = Item::Put { path: bytes::copy_of(&reading.path) };
+    let put = parent::settle(tree.parent.as_mut(), &entry);
+    emit(tree, limits, entry, local, put, after, out);
+}
+
+/// An entry of the child's tree goes to the batch, followed by its put if it is one.
+fn emit(
+    tree: &mut Tree,
+    limits: &Limits,
+    entry: Entry,
+    local: Local,
+    put: bool,
+    after: After,
+    out: &mut Queue<Output>,
+) {
+    let second = if put {
+        tree.counts.puts = tree.counts.puts.saturating_add(1);
+        Some(Item::Put { path: bytes::copy_of(&entry.path) })
+    } else {
+        None
+    };
     if after != After::List {
         tree.entry = None;
     }
-    tree.counts.puts = tree.counts.puts.saturating_add(1);
-    batch::queue(tree, limits, Item::Entry(entry, local), put, after, out);
+    batch::queue(tree, limits, Item::Entry(entry, local), second, after, out);
 }

@@ -5,9 +5,10 @@ use hearth_domain_tree::{
 use hearth_lib::encode::Digest;
 use hearth_protocol_tree::{limits as protocol, tree::Item};
 use hearth_tree_world::{
+    against::{against, checked, parent_file},
     check::{self, Record},
-    expected, fixtures, generate,
-    helper::{self, Helper},
+    edits, expected, fixtures, generate,
+    helper::{self, Helper, Tamper},
     layers, mutate, oracle,
 };
 use skein_lib::Rng;
@@ -96,7 +97,7 @@ fn random_layers_hash_to_what_the_oracle_lists() {
         };
         let limits = limits(&mut rng);
         let walked = helper::walk(&fs, &limits, KEY);
-        let Answer::Hashed { tree, changes, counts, tree_file } = &walked.answer else {
+        let Answer::Walked { tree, changes, counts, tree_file } = &walked.answer else {
             panic!("seed {seed}: {:?}", walked.failed().1)
         };
         let items = expected::items(&fs, KEY);
@@ -118,7 +119,7 @@ fn an_io_failure_anywhere_ends_the_walk_at_that_requests_path_and_never_panics()
         let fs = layers::layer(&mut rng, size);
         let limits = limits(&mut rng);
         let clean = helper::walk(&fs, &limits, KEY);
-        assert!(matches!(clean.answer, Answer::Hashed { .. }), "seed {seed}");
+        assert!(matches!(clean.answer, Answer::Walked { .. }), "seed {seed}");
         let at = usize::try_from(rng.below(clean.requests.len() as u64)).expect("an index");
         let fault = [Fault::NotFound, Fault::Permission, Fault::NoSpace, Fault::Bound, Fault::Other]
             [usize::try_from(rng.below(5)).expect("an index")];
@@ -144,12 +145,97 @@ fn an_io_failure_anywhere_ends_the_walk_at_that_requests_path_and_never_panics()
             }
             Request::Write { items } => match &items[0] {
                 hearth_domain_tree::vocabulary::Item::Entry(entry, _) => &entry.path,
-                hearth_domain_tree::vocabulary::Item::Put { path } => path,
+                hearth_domain_tree::vocabulary::Item::Put { path }
+                | hearth_domain_tree::vocabulary::Item::Delete { path } => path,
             },
-            Request::Create | Request::Digests { .. } | Request::Finish { .. } => b"",
+            Request::Create | Request::ParentNext | Request::Digests { .. } | Request::Finish { .. } => b"",
         };
         assert_eq!(path, wanted, "seed {seed}, request {at}");
         assert_ne!(cause, Cause::Unexpected, "seed {seed}");
         assert_eq!(walked.requests.len(), at + 1, "seed {seed}");
+    }
+}
+
+const AGAINST_FIRST_SEED: u64 = 0x7EE0_F200;
+const AGAINST_SEEDS: u64 = 400;
+const EDIT_SEEDS: u64 = 60;
+const PARENT_FAULT_SEEDS: u64 = 300;
+
+#[test]
+fn random_layers_walk_against_their_edits_to_what_the_oracle_lists() {
+    for seed in AGAINST_FIRST_SEED..AGAINST_FIRST_SEED + AGAINST_SEEDS {
+        let mut rng = Rng::new(seed);
+        let parent = if rng.chance(60) {
+            let (width, depth) = (rng.between(1, 120), rng.between(1, 40));
+            layers::wide_and_deep(&mut rng, width, depth)
+        } else {
+            let size = rng.between(0, 200);
+            layers::layer(&mut rng, size)
+        };
+        let mut child = parent.clone();
+        edits::edit(&mut rng, &mut child, 0, 14);
+        let limits = limits(&mut rng);
+        checked(&parent, &child, &limits, &format!("seed {seed}"));
+    }
+}
+
+#[test]
+fn each_edit_alone_walks_to_what_the_oracle_lists() {
+    for edit in edits::ALL {
+        for seed in AGAINST_FIRST_SEED..AGAINST_FIRST_SEED + EDIT_SEEDS {
+            let mut rng = Rng::new(seed);
+            let size = rng.between(10, 120);
+            let parent = layers::layer(&mut rng, size);
+            let mut child = parent.clone();
+            if edits::apply(&mut rng, &mut child, edit) {
+                let limits = limits(&mut rng);
+                checked(&parent, &child, &limits, &format!("{edit:?}, seed {seed}"));
+            }
+        }
+    }
+}
+
+#[test]
+fn an_io_failure_in_a_walk_against_a_parent_ends_it_at_that_requests_path_and_never_panics() {
+    for seed in AGAINST_FIRST_SEED..AGAINST_FIRST_SEED + PARENT_FAULT_SEEDS {
+        let mut rng = Rng::new(seed);
+        let size = rng.between(0, 40);
+        let parent = layers::layer(&mut rng, size);
+        let mut child = parent.clone();
+        edits::edit(&mut rng, &mut child, 0, 8);
+        let limits = limits(&mut rng);
+        let first = parent_file(&parent, &limits);
+        let clean = against(&child, &first.file, &limits);
+        assert!(matches!(clean.answer, Answer::Walked { .. }), "seed {seed}");
+        let at = usize::try_from(rng.below(clean.requests.len() as u64)).expect("an index");
+        let fault = [Fault::NotFound, Fault::Permission, Fault::NoSpace, Fault::Bound, Fault::Other]
+            [usize::try_from(rng.below(5)).expect("an index")];
+        let mut helper = Helper::new(&child).against(&first.file);
+        helper.fault = Some((at, fault));
+        let walked = helper::walk_with(helper, &limits, KEY);
+        let (_, cause) = walked.failed();
+        assert_ne!(cause, Cause::Unexpected, "seed {seed}");
+        assert_eq!(walked.requests.len(), at + 1, "seed {seed}: nothing is asked after a failure");
+    }
+}
+
+#[test]
+fn a_damaged_parent_stream_never_gives_digests() {
+    for seed in AGAINST_FIRST_SEED..AGAINST_FIRST_SEED + PARENT_FAULT_SEEDS {
+        let mut rng = Rng::new(seed);
+        let size = rng.between(1, 40);
+        let parent = layers::layer(&mut rng, size);
+        let mut child = parent.clone();
+        edits::edit(&mut rng, &mut child, 0, 8);
+        let limits = limits(&mut rng);
+        let first = parent_file(&parent, &limits);
+        let entries = expected::entries(&parent).0.len();
+        let at = usize::try_from(rng.below((entries - 1).max(1) as u64)).expect("an index");
+        let tamper = [Tamper::Tree, Tamper::Sha256, Tamper::Size, Tamper::Swap(at), Tamper::Repeat(at)]
+            [usize::try_from(rng.below(5)).expect("an index")];
+        let mut helper = Helper::new(&child).against(&first.file);
+        helper.tamper(tamper);
+        let walked = helper::walk_with(helper, &limits, KEY);
+        assert_eq!(walked.failed().1, Cause::Parent, "seed {seed}, {tamper:?} of {entries} entries");
     }
 }
