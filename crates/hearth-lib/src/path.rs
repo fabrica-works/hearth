@@ -1,4 +1,5 @@
-//! A tree entry's path and tree order (domain/store.md, 3.4).
+//! A tree entry's path and tree order (domain/store.md, 3.4), shared by the tree file's
+//! codec and the walk, which merges by it.
 
 use core::cmp::Ordering;
 

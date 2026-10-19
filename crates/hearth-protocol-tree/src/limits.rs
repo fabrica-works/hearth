@@ -95,7 +95,7 @@ pub fn worst_case(kind: Kind, limits: &Limits) -> Option<u64> {
     };
     // A body is read whole, but a tree file's reader keeps the last path.
     let buffer = match kind {
-        Kind::Tree => u64::from(tree::path::PATH),
+        Kind::Tree => u64::from(hearth_lib::path::PATH),
         Kind::Store | Kind::Layer | Kind::Resolution | Kind::CacheFile => u64::from(kind.bound(limits)),
     };
     own.checked_add(inputs)?.checked_add(held(kind, limits)?)?.checked_add(buffer)

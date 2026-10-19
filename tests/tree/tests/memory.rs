@@ -32,7 +32,7 @@ const SEEDS: &[u64] = &[0, 1, 2, 3];
 fn measure_tree(frame: &[u8], limits: &Limits, seed: u64) {
     let own = limits::worst_case(Kind::Tree, limits).expect("fits a u64");
     let held = limits::held(Kind::Tree, limits).expect("fits a u64");
-    let last = u64::from(tree::path::PATH);
+    let last = u64::from(hearth_lib::path::PATH);
     let Some(header) = frame.get(..24) else { return };
     let mut reader = Reader::new(limits);
     if reader.header(header.try_into().expect("24 bytes")).is_err() {

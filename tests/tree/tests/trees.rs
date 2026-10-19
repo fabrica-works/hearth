@@ -1,8 +1,11 @@
-use hearth_lib::encode::Digest;
+use hearth_lib::{
+    encode::Digest,
+    path::{path_valid, tree_order},
+};
 use hearth_protocol_tree::{
     frame::Unreadable,
     limits::{Limits, TreeLimits},
-    tree::{self, ChangesDigest, Entry, Item, Op, TreeDigest, path_valid, tree_order},
+    tree::{self, ChangesDigest, Entry, Item, Op, TreeDigest},
 };
 use hearth_tree_world::{check, fixtures, generate, mutate, oracle};
 use skein_lib::Rng;

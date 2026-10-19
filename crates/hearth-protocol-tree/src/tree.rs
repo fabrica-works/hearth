@@ -3,12 +3,10 @@
 //! body's length, at offset 0 of the placeholder it began with.
 
 pub mod digest;
-pub mod path;
 pub mod read;
 
 pub use self::{
     digest::{ChangesDigest, TreeDigest},
-    path::{path_valid, tree_order},
     read::{Next, Reader},
 };
 
@@ -18,7 +16,10 @@ use crate::{
     limits::Limits,
 };
 use alloc::boxed::Box;
-use hearth_lib::encode::{Digest, Encoder};
+use hearth_lib::{
+    encode::{Digest, Encoder},
+    path::path_valid,
+};
 use skein_lib::Writer;
 
 /// An item's tag (domain/store.md, 6.3).

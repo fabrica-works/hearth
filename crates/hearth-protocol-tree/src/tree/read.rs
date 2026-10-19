@@ -4,7 +4,6 @@
 use super::{
     CHANGE, END, ENTRY, End, Entry, Item, Kernel, Local, MODE, OWNER, Op, Payload, TARGET, VALUE, VERSION, XATTRS,
     Xattr,
-    path::{PATH, path_valid, tree_order},
 };
 use crate::{
     fields::Fields,
@@ -14,6 +13,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use core::cmp::Ordering;
+use hearth_lib::path::{PATH, path_valid, tree_order};
 use skein_lib::{List, Reader as Bytes, bytes};
 
 /// What the next bytes hold.
