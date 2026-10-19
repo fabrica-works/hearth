@@ -390,6 +390,10 @@ change set digest = H("changes", parent tree digest, child tree digest, list [ c
 - **In tree order, a path at most once.** A deleted directory lists
   every path beneath it; a put that changes a path's kind replaces what
   was there.
+- **Of the two trees alone:** a path whose entry, read again (4.3),
+  equals the parent's is no change, so the change set and its digest
+  depend on the parent's tree and the child's, never on which entries a
+  walk read.
 - **With no parent** (`hash`, 5.4), the parent tree digest is `none`
   and every entry is a put, as the end item's `parent_tree` (6.3).
 - **Never trusted alone:** applied to the parent and walked, it must
