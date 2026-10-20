@@ -589,7 +589,7 @@ the tree helper: hearth's own code, `hearth-domain-tree` on
 trees, and snapshot, freeze or thaw, and delete subvolumes. The last
 three are the helper's, not the builder's, because btrfs allows them
 only to the owner of a subvolume's root, which is the namespace's root
-(5.1). Its records are `hearth-protocol-tree`'s: sized, each request
+(5.1). Its messages are `hearth-protocol-helper`'s: sized, each request
 with a token that its one answer echoes.
 
 | Request | Answer |
@@ -601,7 +601,7 @@ with a token that its one answer echoes.
 | `apply` a change set from `<key>.changes`, contents by digest | `applied`: counts |
 | `empty` a layer | `emptied`: entries removed |
 | `delete` a layer whole, where `user_subvol_rm_allowed` is set | `deleted` |
-| any | `failed`: the path and a typed cause: not found, permission, a bound, a refused entry, no space, a bad input |
+| any | `failed`: the path and a typed cause: not found, permission, a bound, a refused entry, no space, an io failure of no other kind, a bad input |
 
 - **One request at a time;** a builder may run more than one helper
   (one by default).
@@ -622,9 +622,8 @@ with a token that its one answer echoes.
 - **Formats are machines, each its own lib-only crate**
   (`programming-model.md`, section 4), so the helper's domain parses
   nothing:
-  - `hearth-protocol-tree`: the decoder of 3.1's encoding, these
-    records, and the store's record and tree files, which share the
-    frame (6.1); it depends on skein-lib and `hearth-lib` only;
+  - `hearth-protocol-tree`: the decoder of 3.1's encoding and the
+    store's record and tree files, which share the frame (6.1); it depends on skein-lib and `hearth-lib` only;
   - `hearth-protocol-accounts`: the lines of `/etc/passwd`, `/etc/group`,
     `/etc/shadow` and `/etc/gshadow`, read from a layer, as typed
     entries: names to ids for apply's owners (5.5), and whether each
