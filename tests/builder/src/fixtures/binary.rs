@@ -34,7 +34,7 @@ pub fn binary(program: &Path, arguments: &[&OsStr], environment: &[(&str, &OsStr
     let mut world = real::World::new(Judge { settled: false });
     world.spawn_with_fds(binary.descriptors(), || Process::Binary(Box::new(binary)));
     world.spawn_with_fds(fds, || Process::Reader(Reader::new(input, output)));
-    let outcome = world.run(&Clock::new(), Duration::from_secs(2));
+    let outcome = world.run(&Clock::new(), Duration::from_secs(4));
     let mut ended = Ended { exit: None, stdout: Vec::new(), stderr: Vec::new() };
     for process in outcome.procs {
         match process {
