@@ -166,8 +166,10 @@ code from the first step.
   leaves: the installed set, dpkg's status, files and their modes. skein
   holds its simulator and its io_uring backend to one kernel contract
   the same way.
-- **Tiers, each with a budget** (temper's are 15 seconds for the default
-  suite and a minute for the randomized one):
+- **Tiers, each with a budget** (temper's are 30 seconds (15 seconds before
+  the user's doubling of 10-22, provisional) for the default suite and two
+  minutes (a minute before the user's doubling of 10-22, provisional) for
+  the randomized one):
   - domain worlds on the fake machine, seeded: milliseconds a scenario,
     and the bulk of the tests;
   - protocol parsers against recorded output of the real tools:

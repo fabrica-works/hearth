@@ -13,11 +13,13 @@ M1 and grows with every milestone. What is open is in section 11.
 
 ## 1. In one page
 
-- **Efficiency is a rule of the tests too.** Every test runs as a
-  regular user, and the gate needs Linux and git, nothing else. A world
-  settles in milliseconds; the focused suite takes 15 seconds and the
-  fuzzy one 60. Each crate lands with its world, and each tool's
-  protocol machine with its fake and its recordings.
+- **Efficiency is a rule of the tests too.** Every test runs as a regular
+  user, and the gate needs Linux and git, nothing else. A world settles in
+  milliseconds; the focused suite takes 30 seconds (15 seconds before the
+  user's doubling of 10-22, provisional) and the fuzzy one 120 seconds (60
+  seconds before the user's doubling of 10-22, provisional). Each crate
+  lands with its world, and each tool's protocol machine with its fake and
+  its recordings.
 - **The domain runs whole on a fake machine** (section 3): files with
   owners, modes, extended attributes, inode numbers and change times;
   btrfs under the kernel's unprivileged rules; user namespaces and id
@@ -1515,13 +1517,14 @@ same repository (7.3).
 
 ### 9.1 The two suites
 
-The focused suite takes at most **15 seconds** and the fuzzy suite **60
-seconds**, wall time on the development machine, idle, as skein's,
-smith's and temper's are measured; nextest's global timeouts enforce
-them, and raising one is an explicit decision
-(testing-strategy.md, section 8). temper's gate recorded 1,092 focused
-tests in 5.2 seconds; the budgets hold when the design is cheap from the
-first step:
+The focused suite takes at most **30 seconds** (15 seconds before the user's
+doubling of 10-22, provisional) and the fuzzy suite **120 seconds** (60
+seconds before the user's doubling of 10-22, provisional), wall time on the
+development machine, idle, as skein's, smith's and temper's are measured;
+nextest's global timeouts enforce them, and raising one is an explicit
+decision (testing-strategy.md, section 8). temper's gate recorded 1,092
+focused tests in 5.2 seconds; the budgets hold when the design is cheap from
+the first step:
 
 - **The fakes are small:** a universe of tens of packages, trees of
   hundreds of files, snapshots that copy no bytes, a fake bootstrap in
@@ -1539,10 +1542,10 @@ first step:
 
 | Profile | Runs | Needs | Ceiling |
 |---|---|---|---|
-| `conformance` | section 5 | its scenarios' (5.5): in M1 git, mmdebstrap and the mirror's indexes; from M2, 6.4's too | 2 minutes |
-| `real` | section 6, but 6.6 | 6.4 and the mirror | 5 minutes |
-| `boot` | 6.6 | 6.4, the mirror, QEMU and OVMF; KVM where it exists | 10 minutes |
-| `vm` | section 7 | KVM and Incus | 30 minutes |
+| `conformance` | section 5 | its scenarios' (5.5): in M1 git, mmdebstrap and the mirror's indexes; from M2, 6.4's too | 4 minutes (2 minutes before the user's doubling of 10-22, provisional) |
+| `real` | section 6, but 6.6 | 6.4 and the mirror | 10 minutes (5 minutes before the user's doubling of 10-22, provisional) |
+| `boot` | 6.6 | 6.4, the mirror, QEMU and OVMF; KVM where it exists | 20 minutes (10 minutes before the user's doubling of 10-22, provisional) |
+| `vm` | section 7 | KVM and Incus | 60 minutes (30 minutes before the user's doubling of 10-22, provisional) |
 | `measure` | both suites with `-j 1`, timing each test | — | none |
 
 Each is selected by its test binaries' names and kept out of the

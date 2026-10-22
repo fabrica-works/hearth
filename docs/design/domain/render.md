@@ -1425,9 +1425,10 @@ Over generated repositories, valid by construction and then mutated:
 
 - **Rendering every target of the miniature fleet, and a diff of two
   revisions,** are domain-world scenarios. Their budgets are counts, the
-  requests a run makes, asserted against 3.10's costs; their time is an
-  aim, 0.5 s a scenario, reported and never failed on (domain/testing.md, 9.3).
-  The suites' budgets are domain/testing.md's (section 9).
+  requests a run makes, asserted against 3.10's costs; their time is an aim,
+  1 s (0.5 s before the user's doubling of 10-22, provisional) a scenario,
+  reported and never failed on (domain/testing.md, 9.3). The suites' budgets
+  are domain/testing.md's (section 9).
 
 ## 10. What is open
 

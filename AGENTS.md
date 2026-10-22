@@ -7,11 +7,12 @@
   `land --docs`. Run what compiles and the tests of the crates you touch
   through `heavy`.
 - The default test suite (unit tests and the worlds' focused tests under
-  `tests/`) takes at most 15 seconds; the fuzzy suite (the worlds'
-  `tests/fuzzy_*.rs`, randomized tests) at most 1 minute. Keep new tests
-  within these budgets: see the same document. Every test runs as a
-  regular user; conformance, real builds and the VM tier are outside the
-  gate (`domain/testing.md`, 2.8).
+  `tests/`) takes at most 30 seconds (15 seconds before the user's doubling
+  of 10-22, provisional); the fuzzy suite (the worlds' `tests/fuzzy_*.rs`,
+  randomized tests) at most 2 minutes (1 minute before the user's doubling
+  of 10-22, provisional). Keep new tests within these budgets: see the same
+  document. Every test runs as a regular user; conformance, real builds and
+  the VM tier are outside the gate (`domain/testing.md`, 2.8).
 - **hearth is the factory's build daemon** (temper's `factory.md`,
   section 7): it renders, builds and runs a machine's outputs. Read
   [docs/design/README.md](docs/design/README.md) first: its section 2 is
