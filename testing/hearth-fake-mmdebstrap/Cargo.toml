@@ -3,6 +3,7 @@ name = "hearth-fake-mmdebstrap"
 description = "Package closure resolution for the deterministic mmdebstrap child"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 

@@ -5,6 +5,7 @@ resolver = "3"
 members = ["crates/*", "tests/*", "testing/hearth-*"]
 
 [workspace.package]
+license = "MIT"
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.95"
